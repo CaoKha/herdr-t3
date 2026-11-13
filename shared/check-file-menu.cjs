@@ -12,13 +12,13 @@ vm.runInContext(src, context);
 const ids = (o) => [...context.menu.fileMenuItems(o).map((it) => it.id)];
 const agent = { terminal: "t1" };
 
-assert.deepEqual(ids({ page: "files", platform: "macos", agent }), ["reveal", "copy-path", "mention"]);
-assert.deepEqual(ids({ page: "files", platform: "macos", dir: true }), ["reveal", "copy-path", "mention"]);
+assert.deepEqual(ids({ page: "files", platform: "macos", agent, editors: ["Zed"] }), ["open", "reveal", "open-with", "copy-path", "mention"]);
+assert.deepEqual(ids({ page: "files", platform: "macos", dir: true }), ["open", "reveal", "copy-path", "mention"]);
 assert.deepEqual(ids({ page: "files", platform: "macos", remote: true }), ["copy-path", "mention"]);
 assert.deepEqual(ids({ page: "files", platform: "linux" }), ["copy-path", "mention"]);
 assert.deepEqual(ids({ page: "review", platform: "macos" }), []);
 assert.equal(context.menu.fileMenuItems({ page: "files" }).at(-1).disabled, true);
-for (const page of ["files", "review"]) assert.ok(!ids({ page, platform: "macos", files: true, changed: true }).some(id => id.startsWith("open-")), "neither page offers a cross-page action");
+for (const page of ["files", "review"]) assert.ok(!ids({ page, platform: "macos" }).some(id => id === "open-review" || id === "open-files"), "neither page offers a cross-page action");
 
 const cx = { read_from_clipboard: () => clipboard, write_to_clipboard: v => { clipboard = v; }, sleep: async () => {}, spawn: f => jobs.push(f) };
 (async () => {

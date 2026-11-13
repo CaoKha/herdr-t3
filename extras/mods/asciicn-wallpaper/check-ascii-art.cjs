@@ -12,8 +12,8 @@ vm.runInContext(src, context);
 const { convert, tintOf, legacyTintOf, imageGrid, decodeBmp, brailleAns, imageAns, imagePlan, sampleImage } = context.art;
 
 // All of a conversion: the tiles and what it returns.
-function run(text, aspect) {
-  const it = convert(text, aspect), tiles = [];
+function run(text, aspect, paper) {
+  const it = convert(text, aspect, paper), tiles = [];
   for (;;) {
     const step = it.next();
     if (step.done) return { tiles, ...step.value };
@@ -138,13 +138,15 @@ function bmp(rows, { bits = 24, topDown = true } = {}) {
 }
 console.log("ok: BMP chunks preserve pixels; incomplete/forged headers fail before RGBA allocation.");
 // The image generator emits website image-cell geometry, persisted in a non-drawing OSC header.
-const MARK = "\x1b]777;asciicn-wallpaper;image-v3\x07";
-const plain = (text) => text.replace(MARK, "").replace(/\x1b\[[0-9;]*m/g, "");
+const MARK = "\x1b]777;asciicn-wallpaper;image-v3\x07", HEADER = /^\x1b\]777;asciicn-wallpaper;image-v\d[^\x07]*\x07/;
+const markOf = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
+const plain = (text) => text.replace(HEADER, "").replace(/\x1b\[[0-9;]*m/g, "");
 const pixelsOf = (rows) => finish(decodeBmp(bmp(rows)));
 {
   const pixels = pixelsOf([[0, 32, 96, 160, 224, 255].map(v => [v, v, v])]);
   const text = finish(imageAns(pixels, "dots"));
-  assert.ok(text.startsWith(MARK), "new image metadata stays in the saved .ans");
+  assert.ok(text.startsWith(markOf("dots")), "new image metadata, with its mode, stays in the saved .ans");
+  assert.ok(text.includes(`${E("38;2;0;0;0")} `), "a blank opaque cell keeps its colour, so it can be inked on paper");
   assert.equal(run(text).aspect, 0.5, "new halftone images are half-width cells, including after reload");
   assert.equal(plain(text), " ·∙•⦁●\n", "website six-glyph dots ramp includes a blank level");
 }
@@ -182,7 +184,7 @@ const hash = value => crypto.createHash("sha256").update(JSON.stringify(value)).
 function cellsOf(text) {
   const cells = [];
   let color = null;
-  for (const token of text.replace(MARK, "").matchAll(/\x1b\[([0-9;]*)m|([^\x1b\n])/gu)) {
+  for (const token of text.replace(HEADER, "").matchAll(/\x1b\[([0-9;]*)m|([^\x1b\n])/gu)) {
     if (token[1] !== undefined) {
       const code = token[1].split(";").map(Number);
       color = code[0] === 38 ? code.slice(2) : null;
@@ -260,3 +262,33 @@ assert.equal(imageGrid(4000, 100).columns, 480);
 assert.equal(imageGrid(100, 4000).columns, 16);
 assert.equal(run("●\n", 0.75).width, 0.75, "builtins can still pass their known aspect");
 console.log("ok: six legacy conversion hashes and all 263 builtin scene files are unchanged.");
+
+// Light themes draw on paper: a new image's tones turn over (blank cells become full ones) and opacity follows darkness.
+{
+  const tilesOf = (text, paper) => run(text, undefined, paper).tiles;
+  const solid = (rgb, style) => finish(imageAns(pixelsOf([[rgb]]), style));
+  for (const style of ["dots", "blocks", "quadrants", "braille"]) {
+    const [gx, gy] = { dots: [1, 1], blocks: [1, 1], quadrants: [2, 2], braille: [2, 4] }[style];
+    const fill = (rgb) => finish(imageAns(pixelsOf(Array.from({ length: gy }, () => Array.from({ length: gx }, () => rgb))), style));
+    assert.equal(tilesOf(fill([0, 0, 0]), false).length, 0, `${style}: black is blank in the dark`);
+    const ink = tilesOf(fill([0, 0, 0]), true);
+    assert.ok(ink.length && ink.every(t => t.tint === "ansi0" && t.opacity === 1), `${style}: black is full ink on paper`);
+    assert.equal(tilesOf(fill([255, 255, 255]), true).length, 0, `${style}: white is blank on paper`);
+    assert.equal(run(fill([0, 0, 0])).paper, true, `${style}: a new image says it can be drawn on paper`);
+  }
+  const one = (style, glyph) => `${markOf(style)}${E("38;2;128;128;128")}${glyph}\n`;
+  const svgOf = (text, paper) => tilesOf(text, paper)[0].svg;
+  assert.equal(count(svgOf(one("braille", "⠁"), true), "h0"), 7, "a Braille cell's dots complement on paper");
+  assert.equal(count(svgOf(one("quadrants", "▘"), true), "z"), 3, "a quadrant cell complements on paper");
+  assert.equal(svgOf(one("blocks", "░"), true), svgOf(one("blocks", "▓"), false), "a shade turns over on paper");
+  assert.equal(svgOf(one("dots", "·"), true), svgOf(one("dots", "⦁"), false), "a dot size turns over on paper");
+  assert.equal(tilesOf(one("dots", "·"), false)[0].opacity, 0.55, "grey 128 in the dark: eight value steps");
+  assert.equal(tilesOf(one("dots", "·"), true)[0].opacity, 0.4, "grey 128 on paper: eight darkness steps");
+  const clear = finish(imageAns({ width: 1, height: 1, rgba: new Uint8ClampedArray([0, 0, 0, 0]) }, "dots"));
+  assert.equal(tilesOf(clear, true).length, 0, "transparent cells stay empty on paper");
+  for (const text of ["\x1b[38;2;255;0;0m⠿⣿\x1b[0m\n", "·•●\n●•·\n", `${MARK}${E("38;2;9;9;9")}●\n`]) {
+    assert.equal(hash(run(text, undefined, true)), hash(run(text)), "Studio, legacy and v3 frames draw the same on paper");
+    assert.equal(run(text).paper, undefined, "and their result is unchanged");
+  }
+}
+console.log("ok: new images turn over on paper; older frames draw unchanged.");

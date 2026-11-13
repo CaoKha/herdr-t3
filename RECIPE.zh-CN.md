@@ -56,6 +56,8 @@ Agents 行高 36、圆角 6、行间隔 1、内边距 10、间隔 10，16px 程�
 
 侧栏右缘保持两列：12px 折叠箭头中线距边 22；机器 `+` 是 24px、14px 图标，中线距边 50。
 
+Connect 保留含机器名的无障碍标签，不用 tooltip 重复同行机器名。
+
 ### 标签栏
 
 标签高 24、圆角 6、字号 12，当前为 `selected`。Lists 显示当前 space 全部标签：12px 程序／终端图标、名字，末尾 16px 状态槽，悬停换成 16px 关闭按钮、12px `×`。短标签至少 96px。放得下就显示全名；放不下时最长的先让步，当前降到 240、其余 144，再放不下就滚动。两种模式被裁的一端都在 16px 内渐隐。只在当前标签或可用空间改变时，以最小移动保持当前可见；滚轮滚开的不拉回。
@@ -66,35 +68,37 @@ Inbox 左边改成面包屑：space／适用时的父级／当前查看的 agent
 
 多 pane 标签进入 Herdr 原生 zoom 后，标签变为高 24、圆角 6、虚线框的分段组：每 pane 一段图标名字，被 zoom 的为 `selected`、最宽 240，其余最宽 144。Lists 在组末尾保留状态，组没有关闭、标签菜单或拖动。Inbox 的 agent 仍在面包屑，工具段只含非 agent pane。用 pane 缩放按钮或 `cmd-shift-enter` 恢复分屏，标签栏不重复放按钮。
 
-标签后是Details（square-menu）和末尾，Lists另有24px新终端+。详情／panel-right入口28px、图标16、圆角8、间距4、开启态淡灰，下方提示读当前绑定。详情属于工作列，面板开关／平台按钮转到展开的面板头。点击／cmd-shift-b打开下挂右对齐原生popup，宽280／圆角16／内缩8，内容自然高／上限420，严格三个32px整行，13px medium／图标16／gap10／横距10／圆角8：laptop＋单行截断电脑名＋folder路径提示／复制菜单＋space菜单箭头；应用图标＋Open in目标，仅多目标有箭头；动作图标／名字＋32px split箭头，中线只悬停显示，空动作为+ Add action。本机取macOS ComputerName，远程取space机器名。并行检测VS Code／Cursor／Zed／Sublime Text，加Finder，全局记目标，卸载回退Finder；远程置灰说明。打开前捕获space／tab／终端／cwd，优先终端、同标签终端、space目录，动作显式cwd优先。切space／tab关闭提示重开；Esc先子菜单后详情，外点保留面板，运行／编辑先收层。开面板关详情，隐藏不弹详情；放大时详情快捷键先恢复工作列。详情不改终端尺寸／分屏／zoom，Home仍无Actions。
+标签后是Details（square-menu）和末尾，Lists另有24px新终端+。详情／panel-right用既有sm/card（28／图标16／圆角8／gap4）、下方快捷键提示；详情属工作列，面板／平台按钮转到展开面板头。点击／cmd-shift-b打开下挂右对齐原生popup：宽280／圆角16，自然高、最高420；分区p8，行32／字13 medium／图标16／gap10／横距10／圆角8（t3-tokens）。Workspace：locked电脑名（本机ComputerName／远程机器），folder只提示路径，整行右键Copy full path；无hover／chevron／假终端迁移。Open in列Finder和已装T3编辑器（Cursor／Trae／Kiro、VSCode／Insiders／VSCodium、Zed／Antigravity、JetBrains）；菜单始终有入口，只选择全局偏好，主按钮才执行，卸载回退Finder；远程禁用并说明。全局Actions仍全局：空时Add action，有时主动作图标／名字＋菜单，hover／键盘选中才显示Edit。split菜单跟整行同宽、下偏移4，开启时维持中性底与中线，箭头仅aria-label。Add action仅图标态提示；动作／电脑／surface名仅实测截断时提示。编辑器打开保留详情，运行只收菜单，来源失效收详情；Tab／Enter／Space走按钮，方向键只走菜单，不默认高亮首行。卡片右键可切四个可用项显隐／Reset，全隐藏保留Choose what to show。打开前捕获space／tab／终端／cwd，动作显式cwd优先。开面板收详情，外点保留面板，放大时快捷键先恢复工作列；不改终端几何，Home无Actions。
+
+Quick Review取代Git控件：整行同宽／下偏移4的行锚定子菜单，无第二个范围按钮；base入口留在菜单内。复用Review页scope／Commits／base及键盘，选中范围就打开／切换Review标签。计数和提交异步读取、有界缓存，迟到结果作废；无Git写操作／PR行。未安装Review、远程或非Git来源说明不可用原因。
 
 ### 窗格与子 agent
 
 标题依次是程序图标、有意义的名字（14px medium）、隔 12 的目录、子 agent 按钮、状态、右／下分屏、zoom／还原、关闭。控件 24、图标 14，悬停或键盘聚焦时显示。名字只是程序名时省略。Inbox 里单独显示或 zoom 的 agent 名已在面包屑，标题不重复；分屏保留。Inbox 标题用 14px `dim` 勾标已 Settle，用 12px `accent` 闹钟加剩余时间标 Snooze；working/blocked 优先。Lists 不画这两种收起标记。首图标文字对齐首标签，最后控件／状态距窗口边 12。
 
-子 agent 按钮统计所有层级活着的 agent：`3 agents ⌄`，或 `blocked` 色 `1 needs you ⌄`；高 24、12px medium、内边距 8、14px 箭头、圆角 8。弹层宽 280，在下方 4、右对齐，内缩 4、28px 行、无标题，超过十行滚动；随启动／结束改变高度，全结束就关闭。每层缩进 16。行含程序图标、名字、工作时长（`4m`、每秒更新）／`Needs you`／`Idle`，以及自己的 12px 转圈／徽章或 6px idle 环；首次状态上报前无状态文字／标记。行表示自身状态，按钮和 pane 状态汇总子树。点击／Enter 用 `terminal.peek` 并关闭，详情卡向左打开。纯跑命令的 shell 不算子 agent。
+子 agent 入口只数活后代：`3 ⌄`，需要你时用 `blocked` 色，tooltip／aria 写总数与需要你的数量；标题不重复聚合 working／需要你的标记。按钮24／字12 medium／p8／箭头14／r8。菜单280宽，下方4／右对齐，p4／行28／无标题，十行后滚动，全结束关闭。只留列表：无底部详情或动作按钮，不恢复外部悬停卡，打开不默认高亮行。严格深度优先树序，每级缩进16，不按紧急程度重排。程序图标16不动，右侧固定多留16：gap4后放12折叠箭头、在名字前；Left／Right 收展。固定96右列：转圈加时长、`! Needs you`、`! Failed`、完成点、空闲时长（`12m`，无 Idle／环），首次报告前留空；表示自身状态，done不读成idle。悬停／方向键高亮，点击／Enter peek并关闭；右键关闭此弹层，打开侧栏共用的 `t3-menu` agent 菜单，含 Send back／Copy address。树每秒在render外更新，render不读文件、跑命令或遍历全量终端。命令shell不算agent。
 
 ### space 面板与 Files
 
 右侧唯一面板跨终端标签跟随space；每space记开关／放大、标签列表／当前项，未用过关闭且空，宽度全窗口共用。删除固定Files／Review两页；每文件一标签，通用Files／Review各最多一个。40px头含横滚标签（高24／圆角6／字12／槽内图标12／最宽144／相对路径提示）、+、28px放大／恢复／panel-right；溢出有箭头／滚轮，当前自动可见。隐藏保留并退出放大，切space恢复放大。 标签左6/右8/间距2，左16px槽显示12px surface图标，悬停/聚焦换×（tab面/圆角4），右边无×；+用24px xs ghost/图标14，间距4紧跟末标签并同条横滚，菜单左对齐下偏移6，布局控件固定最右。
 
-空面板居中Open a surface，列表最宽320，Files F／装了才有Review R，行32／图标16／键提示。远程／非Git Review 50%置灰说明，+相同。面板cmd-t打开+，F/R选择、方向键循环可用、Enter执行，修饰键／输入焦点不抢字母；终端cmd-t仍新建终端。+ Files总添加／激活整宽树通用标签；文件原位替换通用，文件已有则移除通用并激活已有项，其他文件追加不重复。共用一树；选文件标签清搜索、展开祖先、选中滚到文件，目录面包屑仅定位树。
+空面板居中Open a surface，列表最宽320，Files F／装了才有Review R，行32／图标16／键提示。远程／非Git Review 50%置灰说明，+相同。面板cmd-t打开+，F/R选择、方向键循环可用、Enter执行，修饰键／输入焦点不抢字母；终端cmd-t仍新建终端。+ Files添加／激活整宽树；文件原位替换通用，或激活已有文件，不重复。共用一树；外部选标签清搜索、展开祖先并定位文件。
 
 ×／中键／面板cmd-w关标签不关终端。关当前选右邻无则左邻，关其他不换，最后收起重开空。标签菜单：仅文件Copy path，另有Close／Close others／Close to the right／Close all，不可用置灰、批量原子更新。隐藏／切换保留，关闭释放文件／Review状态；Review重加默认范围，切换保留范围／组／文件／位置。每space只留最近显示三个文件标签的预览／Editor／阅读位置，更早回顶重读；页面仍仅缓存三个space。删除／改名保留标签并显示路径／根、定位树和Retry。终端路径点击首版未完成：宿主无链接／点击回调。
 
-两页是同一张圆角 8、`background` 卡片；每页一条 40px 透明全宽工具栏，下面内容左、唯一导航列右；只靠细线分开，不换底色，代码行号栏也同色。加载是居中 14px 转圈加状态文字；空态是居中 24px 图标、13px medium 标题、12px 淡色提示、间隔 8；读取失败在工具栏下用 11px `ansi1` 错误条叠 `18` 透明底，带 Retry。空态也保留工具栏。
+两页共用圆角8、`background`卡片，内容左、导航右。Review保留40px透明工具栏和共用的加载／空／Retry状态。Files使用T3 inline结构；通用Files直接显示树头。Files错误留在对应区域，读不了的文件保留路径／根上下文。
 
-每页独立记导航开关／宽度、Wrap／Scroll。导航默认开、宽 256、最小 160、最大 560，内容至少留 256；左 6px 拖动区、40px 列头，不按断点重排。工具栏末尾 `folder-tree` 开关为 24px ghost，开时高亮。宽度稳定 300ms 才重排。切页只恢复自己的文件和阅读位置，没有跨页打开／定位。
+每页独立记导航开关／宽度、Wrap／Scroll。导航初始256、最小160／最大560，内容至少256、左6px拖动区；Files另支持←／→每次16及Home／End。无宽度断点，停稳300ms重排。切页恢复各自状态，不跨页定位。
 
-Files 只读，根是 space 所在机器的 `folder`，不跟终端 cwd。未选文件时工具栏只显示根名，选中后是路径面包屑，点目录在树里定位。Markdown 可 Preview／Code，其他文本是只读语法高亮 Editor，图片是预览。长行默认换行，`text-wrap` 切 Scroll，与 Review 独立。工具栏 24px ghost 按钮间隔 4，首字内缩 16。导航列头有 Search files、Collapse all／Expand all；全部展开最多列 200 个目录，Git 忽略的保持折叠。
+Files读space的`folder`／机器，不跟终端cwd。文件头28加下距12，树头36加下距4。面包屑横滚／截断，无独立底条；目录hover仅文字提亮、不填底色。目录从原文件旁打开，继续导航原位替换目录标签、保留trail；chevron菜单浏览同层。Open in与详情共用目标，菜单只记偏好、主按钮执行。split固定57×28，用同排ghost/sm/card按钮与居中16px图标；菜单行显式pointer。Preview／Code、Wrap、Tree固定28px槽／间隔4，不适用置灰不消失。Markdown预览、语法Editor、图片仍只读；保留原生选择／复制，内容按下不夺焦点。宿主无gutter底色／高度API，已知不能完全匹配T3，用户选择保留原生Editor。
 
-共用树：行高 24、12px 界面字、圆角 6、内缩 2、每层 27.2、12px 箭头、16px Catppuccin 图标；悬停文字色 7%、选中 12%。单目录链压成 `a / b`。先目录后文件，不分大小写自然排序（`file2` 在 `file10` 前）；省略 `.git`、忽略项变暗。改动用 Review 色标 A／M／D／R，删除划线，含改动的折叠目录带点。虚拟列表只画可见行，不截前 N 个。方向键（←／→ 收起／到父级、展开／进入）、Home／End、Enter 移动 1px 环并打开所在行。
+Files树：行24／字12／圆角6；目录chevron或原Pierre文件图形16，只占一个槽、颜色取主题。内距／缩进见[token](docs/internals/t3-tokens.md)，不沿用Review勾选框槽。已读单目录链折叠后仍紧凑；目录优先自然序，点文件仅省略`.git`，忽略项变暗。无改动徽章／删除幽灵；树行／面包屑无tooltip。hover7%／选中12%／焦点accent1px分开；方向键、Home／End、Enter／Space、Shift范围、Cmd／Ctrl切换／全选、Shift+F10可用。只画可见行；焦点索引和目录统计每次树重建只做一次。
 
-搜索要求空格分开的每个词都在路径中，不分大小写。最多显示 200 行并提示超出数量。在 Git 内搜索引和未跟踪非忽略文件，外部最多 20 万路径；远程过滤最多回传 1,000。不超过 1,000 候选时用 uFuzzy 排序高亮；↑／↓、Enter、Esc 同其他搜索列表。
+Search是28px ghost输入，按token保留光标内距／focus ring，无清除图标；Esc清空并退出输入。防抖200ms、查询≤256字符、每个词都在路径中、不分大小写。结果与祖先保留为树，打开结果不清搜索。最多200文件加收窄提示；Git非忽略路径或文件系统≤20万，远程≤1000。加载／无匹配／错误分开。
 
-仅本页、space、窗口都可见才刷新：回来立即读，通常本机每 5s、远程每 10s，慢读取延长。文本只在变化时重读，图片重新点选才刷新。太大、二进制、缺失、非 UTF-8 是带文件名说明的空态；真正的读取／列目录失败用 Retry。远程图片上限 512KB，文本先检查大小／NUL。完整内容和 Editor 只保留最近显示的三个 space，更早只留轻量阅读选择，回来重读。
+可见才刷新：回来立即读，通常本机5s／远程10s，慢读取延长。文本变化更新，图片重选刷新。文本≤1MB、远程图片≤512KB；二进制／缺失／非UTF8说明原因。最近三个space／文件保留完整预览。全部展开跳过ignored、最多200目录／四路读取；折叠、手动toggle和搜索作废旧展开，await之后也检查。刷新不抢读、无同步磁盘IO；数千节点测展开／折叠／搜索／滚动／文件切换并比较耗时。
 
-Files树右键在指针处，Shift+F10可开：本机Reveal in Finder、Copy path（相对space）、Insert into agent terminal；远程不列Finder。Insert用当前标签最后非null活动终端，无则置灰说明；补分隔空格粘贴路径，不回车，之后恢复原文本剪贴板，图片／后来新复制内容不覆盖。Review树无右键。
+树菜单：本机Open／Reveal／Open with、相对Copy path、Insert到当前标签最后活动终端（无则置灰）；远程不列本机应用。方向键／Escape／typeahead、指针／键盘锚点。Insert借用并恢复文本剪贴板，不回车，不覆盖图片／后来新复制内容。Review树无菜单。
 
 ### 可选 Review 页
 
@@ -124,7 +128,7 @@ Home 是一张带框无标题的 pane，不是 agent 看板。默认正中三个
 
 卡片、Agents、标签、标题统一命名：Pi 在跑先用 `pi.session`；再用人为命名的标签，但只给顶层 agent，且不能与另一个顶层 agent 共用此标签；然后是有意义的终端标题，只去掉该程序自己的装饰（Pi `π - … - <目录>`，OpenCode `OC | `）；最后程序名。拒绝纯路径／user@host／程序／目录标题，以及不再跑 agent 时残留的 agent 装饰标题。子 agent 不继承标签名。未命名标签按里面的 agent，否则聚焦 pane 命名。
 
-父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent done 是父级的消息，不单独亮 done。会报告状态或程序标成 agent 的活终端才算，命令 shell 不算，但经过 shell 启动的 agent 算。Working 用自带转圈／`working`；blocked 是圆角 `!`、15% `blocked` 底（通常 14px，Inbox 16、Agents／子 agent 行 12）；done 是 6px `done` 点（Inbox 绿色 `Done`）；idle 在 Agents／子 agent 菜单里是环，其他不画。
+父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent 自身行区分 done 与 idle，但不再变成另一份父级未读结果。会报告状态或程序标成 agent 的活终端才算，命令 shell 不算，但经过 shell 启动的 agent 算。Working 用自带转圈／`working`；blocked 是圆角 `!`、15% `blocked` 底（通常 14px，Inbox 16、Agents／子 agent 行 12）；done 是 6px `done` 点（Inbox 绿色 `Done`）；idle 在 Agents 里是环、子 agent 菜单里是时长，其他不画。
 
 Space 标记优先当前所在位置（第一个终端目录，否则创建目录）的仓库根 favicon：先常见文件再页面／路由 icon 声明，不含 `.icns`，16px、圆角 25%。没有则取名字第一个字母／数字、大写，粗体等宽、字号为标记的 8.25/16，从 T3 的 18 色按名字哈希取（暗色 Tailwind 400、亮色 600），同色 14% 底；没有可用字符就文件夹。找到十分钟重查，没找到一分钟。程序标志按组件槽直接画 Herdr/mod 素材，不改原画布配色。
 
@@ -234,19 +238,19 @@ Home 是按需创建、本机一个隐形 space，跨项目／机器共用。只
 
 ### 可选 asciicn 壁纸 Home
 
-装 `extras/mods/asciicn-wallpaper`，在 Home shows 选择。静态主题色画，不做动画；内置 Lighthouse、Mountain dusk、Nebula、Ember，来自 [asciicn](https://asciicn.dev)，MIT。SVG 图形画字，映射最近主题 `ansi0..15`／foreground、四档透明度，不是字面文字或原图精确颜色。Braille、方块、象限、阴影、半调圆点、斜线保留形状，其他字符按暗度画圆头竖条、不保留字母轮廓。
+装 `extras/mods/asciicn-wallpaper`，在 Home shows 选择。静态主题色画，不做动画；内置 Lighthouse、Mountain dusk、Nebula、Ember，来自 [asciicn](https://asciicn.dev)，MIT。新图片以VGA/OKLab最近槽映射主题ANSI16，明度分8档不透明度；浅色主题画在纸上（字形取反色调、有色空格上墨、按暗度分档）；内置与旧`.ans`保留原4档和几何。SVG保留Braille/方块/象限/阴影/半调点/斜线；其他字符近似圆头竖条，不保留字母轮廓或原图精确颜色。
 
-无构图记录时填满 Home 高、主体横向锚定；较窄的填宽、上下均裁。贴底，高度缩小稳定250ms才采纳。仅右下340×104区域显示距角12的切换器，chrome/圆角8、24px按钮：`‹`、名字（160截断，只随Home宽度缩小）、`›`、`+`、`×`。预览、进度、长名、主题、Studio展开和错误均保留槽位；内置画删除、单张翻页、预览浏览置灰。卡片在切换器上方，删除是独立确认弹层。选中新Home也沿用。
+无构图记录时填满 Home 高、主体横向锚定；较窄的填宽、上下均裁。贴底，高度缩小稳定250ms才采纳。仅右下368×104区域显示距角12的切换器，chrome/圆角8、24px按钮：`‹`、名字（160截断，只随Home宽度缩小）、`›`、`+`、裁切、`×`。预览、进度、长名、主题、Studio展开和错误均保留槽位；内置画删除／裁切、单张翻页、预览浏览置灰。卡片在切换器上方，删除是独立确认弹层。选中新Home也沿用。
 
 `+` 立即开卡（再点＋／×关）：主 Choose image…、次 Import Studio file (.ans)…，可展开 Create in asciicn Studio…（开 Studio、用 .ans 存 Downloads、回来导入），辅助 Open folder。Studio：`https://asciicn.dev/studio?source=image&charset=braille&color=truecolor`。
 
-图片固定生成Dots；Studio `.ans` 保留原字形，两者都先在Home构图。预览卡popover300×312（窄Home用宽减24）、right12/bottom60、内边16/间距12/圆角8、标题13/字12；标题/名字/模式/缩放名/滑条/状态/操作分别固定20/20/28/20/24/60/28高。Fill/Fit两个等宽24px槽（分段p2/间距2/圆角6），Reset/Cancel/Apply三个等宽compact槽。滑轨4/圆点16居中，禁用0.64。长错误区内滚动，Applying…不改变几何。导入及点画布即聚焦，Tab逐控件走。构图复用固定分辨率原生预览纹理；拖动/缩放/方向键不转换或读写文件。
+图片默认Dots，卡片首行常驻Dots/Braille/Blocks(`░▒▓█`)/Quadrants，方向键切换；Studio `.ans` 保留原字形，首行占位禁用并提示。切换仅从内存原像素重建草稿，分块让出，连续切换取消旧任务。图片按网站cover/超采样块平均/autoLevels，96行、4.5×9格；内置与旧方格Dots不变，重新导入原图才用新处理。预览卡popover300×352（窄Home宽减24）、right12/bottom60/p16/gap12/r8、标题13/字12；处理/标题/名字/铺放/缩放名/滑条/状态/操作固定28/20/20/28/20/24/60/28高。分段等宽24px槽（p2/gap2/r6，处理项px3），Reset/Cancel/Apply三个等宽compact槽。窄卡Quadrants缩写Quads；默认宽度显示全名。滑轨4/圆点16居中，禁用0.64，长错误区内滚动。模式/转换中/错误/Applying均不挪按钮。导入及点画布即聚焦，Tab逐控件走；构图复用原生纹理，输入不转换或读写文件。
 
-Fill默认cover铺满裁切；Fit用contain，1倍看全图。拖动或方向键移10px，Shift50px；缩放为当前铺放基准1–4倍，缩放控件方向键±0.1。Reset保留mode、恢复居中1倍。调整只改内存。Apply先发布`.ans`，最终场景就绪才写构图/选择；失败保留草稿与卡片内可重试错误，重试只复用自己内容一致的已发布源，否则另存空闲名。Cancel回原选择/构图，保留失败Apply已发布的源。保存后无编辑入口，相对构图经重启/主题/窗口/侧栏变化及缓存重建保留。迟到请求/Apply不能覆盖新选择。
+Fill默认cover铺满裁切；Fit用contain，1倍看全图。拖动或方向键移10px，Shift50px；缩放为当前铺放基准1–4倍，缩放控件方向键±0.1。Reset保留mode、恢复居中1倍。调整只改内存。Apply先发布`.ans`，最终场景就绪才写构图/选择；失败保留草稿与卡片内可重试错误，重试只复用自己内容一致的已发布源，否则另存空闲名。Cancel回原选择/构图，保留失败Apply已发布的源。裁切按钮以已存构图按`.ans`重开导入画，Apply只改构图。相对构图经重启/主题/窗口/侧栏变化及缓存重建保留。迟到请求/Apply不能覆盖新选择。
 
 手放`<appHome>/asciicn-wallpaper/`的文件按默认构图出现，改动重转。Unicode/短横/普通隐藏名支持，拒绝不安全`.ans/..ans/...ans`。导入画×确认写明名字，取消不动；确认删除源/图块/构图，即使重转时条目暂时移出列表也不跳过，同时取消转换/待提交Apply、选前一张。迟到结果不复活。原图不改。
 
-macOS 用 `osascript`、Linux `zenity` 选择，等待显示 Opening…；图片转 BMP 用 macOS `sips`、Linux ImageMagick `identify/convert`，没 ImageMagick 导入 Studio 文件。Windows／没选择框用 Open folder、复制 `.ans`。不处理 EXIF 方向，先外部旋转。失败／空导入弹提示、不自动重试。更新保留 mod 目录外的用户文件，见存储契约。主题导出、可选配色是另装 extras，不是布局前提。
+macOS 用 `osascript`、Linux `zenity` 选择，等待显示 Opening…；图片转 BMP 用 macOS `sips`、Linux ImageMagick `convert`，没 ImageMagick 导入 Studio 文件。Windows／没选择框用 Open folder、复制 `.ans`。按 EXIF 方向转正。失败／空导入弹提示、不自动重试。更新保留 mod 目录外的用户文件，见存储契约。主题导出、可选配色是另装 extras，不是布局前提。
 
 ### 键盘与焦点
 
@@ -310,7 +314,7 @@ floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 
 sidebar/work/panel 列 `resizable:false` 固定内部边界，外分隔线仍可拖。Spaces 传 `{newMenu:"t3-new-menu"}`；Inbox 传 `{newMenu:"t3-new-menu",picker:"t3-picker",home:"t3-tabs.home",menu:"t3-menu"}`。main/home-main 共用前述 background/border/focus/radius/gap/lone。浮动 keys 副本负责命令、Home、space 面板同步；其他 tab 副本共用导航，不各开一份确认。
 
-必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应的从官方 mod 改，Inbox/Home/Files 新建。保留官方 workspace-status/转圈/程序素材；UI 自带目录 Lucide 24网格/1.75px，文件用 vendored Catppuccin。mod 不能越目录 import，改 `shared/` 源后由 `scripts/sync.sh` 分发，复用命名/状态/pin/labels、焦点/菜单/动画/按钮、侧栏/面板/存储、文件树/菜单/状态模块。
+必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应的从官方 mod 改，Inbox/Home/Files 新建。保留官方 workspace-status/转圈/程序素材；UI 自带目录 Lucide 24网格/1.75px，Files用T3/Pierre原图形，Review用Catppuccin。mod 不能越目录 import，改 `shared/` 源后由 `scripts/sync.sh` 分发，复用命名/状态/pin/labels、焦点/菜单/动画/按钮、侧栏/面板/存储、文件树/菜单/状态模块。
 
 必需 mod 要真实文件（SVG 软链不加载），布局/SVG、按 context 合并 keys 放 `HERDR_APP_HOME` 或 `~/.config/herdr-app`，`layout.switch {"name":"herdr-t3"}` 选中。`scripts/update.sh` 要 `jq/rsync`，先验证旧 layout/keys，再 `rsync --delete` 自己 mod；保留主题/focus/stack 选择、支持的 extra 块、Review `config.json`，只更新已装 extras/主题，repo 键优先、报告替换。设置/pins/用户画不在替换目录。`scripts/sync.sh` 还写安装目录和同级独立仓库，不是只读检查。
 
@@ -327,7 +331,7 @@ Herdr API：`spaces/panes/agents/terminals/focused/layout/settings/window/keys`�
 | 关闭／导航 | `hc get <terminal> --json`；原生 space/tab/pane 新建/选择/移动/改名/关闭，`agent.focus`、`pane.focus`、`terminal.peek`、split/zoom/`terminal.park` |
 | 布局 chrome | `layout.select/show/hide/resize`；安装布局仅 `traffic_lights` 字段，不整份 `layout.set` |
 | Space 图标 | space 机器上 `git rev-parse --show-toplevel`、`sh -c` 检查、`base64`；app `cache/t3-icons/`，共享图标/颜色信息 |
-| Files | `sh` 列目录、`git check-ignore --stdin`、`git status --porcelain=v2 -z --untracked-files=all`、`git ls-files -co --exclude-standard -z`、后备 `find`、远程 `awk`；文本和 app `cache/t3-files/` 图片（远程 base64），close/下次启动清理 |
+| Files | `sh`列目录、`git check-ignore --stdin`、`git ls-files -co --exclude-standard -z`、后备`find`、远程`awk`；文本和`cache/t3-files/`图片（远程base64），close／下次启动清理；vendored Pierre／T3图形 |
 | 文件菜单 | 剪贴板保存/粘贴/恢复、`pane.focus`、`terminal.paste`，支持的平台本机 `open -R`／默认程序打开 |
 | Actions | `terminal.open` 执行 `sh -c`、可选目录，全局列表/上次选择 |
 | Review | `jin.review`、共用只读 Git scope/base/ref helpers，本地 daemon/Review 配置，无远程 |
@@ -359,8 +363,8 @@ Git 读取带 `--no-optional-locks -c core.fsmonitor=false`。Spaces 不扫未�
 5. current/held/away/fresh 面包屑、同级/子 agent、zoom/滚动/拖动与卡片焦点一致。关前后台 tab/最后 pane/分屏 pane：Home/前标签/留原处正确，未读邻居保留、有程序先问。Overlay 上四个关闭键不关底层。
 6. Home 改 mod/Terminal、shell 起 agent：普通 space 原地保留 agent，下次 Home 干净，项目编号稳定。New/Go to：之前 pane/名字命中在前、远程信息、shell 重用、机器/footer 键盘可达、终端 Tab 保留。Worktree 折/拖/checkout 缺席时分组编号正确。
 7. Actions 加/改/删/运行 tab/右/下/目录：必填、确认、上次选择、shell 保留、窄栏宽度。
-8. 回放空态→Files→两文件→重复→通用替换、唯一Review，关当前/非当前/最右/最后/批量，隐藏重开/放大/space/Home，三文件/三space驱逐、Review关闭重加；本地/远程、菜单/剪贴板、禁用Review、缺失/长名/大量标签、面板cmd-t/w与终端上下文。详情核对空/多动作、本地/远程、电脑名单行、编辑器回退、来源cwd/位置、嵌套Esc/外点/来源失效。默认侧栏/窄窗/明暗整窗；真实中/右键/拖动和键盘路由未实测须注明。
+8. 回放surface创建/替换/去重/Review，关闭/批量/隐藏/放大/space/Home、有界驱逐和关闭重加；本机/远程、菜单/剪贴板、禁用/缺失/长名/多标签、面板与终端快捷键。详情核对空/多动作、locked机器行、选择与执行、分层Escape、来源失效、Git各态/写确认/显隐，测冷暖打开和切标签耗时。默认侧栏/窄窗/明暗整窗；未实测真实指针/键盘须注明。
 9. Review scope/base/remotes/commits/groups/reviewed/j/k/Analyze/Unicode/二进制/空/失败：树/diff 同序，无误分析，安全换行，吸顶头不透明、勾选 alpha 正确。
-10. 壁纸固定Dots、Studio字形、横/竖/方图Fill/Fit、真实拖动/方向键/缩放/当前mode重置、固定按钮槽，Apply/Cancel/失败重试、同名/两Home/迟到选图/转换中删除；构图经重启/重建缓存/主题/尺寸变化有效。原图不改、不重复自己的保存、不复活。手动/Unicode/短横/隐藏名/密集阴影导入有效。
+10. 壁纸四种模式逐格对齐网站/8档，浅色纸面、EXIF转正、重新构图，内置与旧画不变，切换/转换中按钮零漂移；Studio字形、横/竖/方Fill/Fit、拖动/方向键/缩放/Reset不做I/O，Apply/Cancel/重试/同名/两Home/迟到/转换中删除；构图经重启/缓存/主题/尺寸变化有效。原图不改、不重复保存、不复活。手动/Unicode/短横/隐藏名/密集阴影有效。
 
 通过代码检查不能替代可见/真实输入验证。未试真实点击须说明，只清理本次 demo 创建的资源。

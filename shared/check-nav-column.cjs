@@ -19,6 +19,7 @@ const element = () => {
     if (key === "w") target.w = args[0];
     if (["text_color", "opacity", "bg"].includes(key)) target.style[key] = args[0];
     if (key === "on_mouse_move" || key === "on_hover" || key === "on_click") target.on[key] = args[0];
+    if (key === "on_key_down") target.on[key] = args[0];
     if (key === "on_mouse_down" || key === "on_mouse_up") target.on[key] = args[1];
     if (key === "when") return args[0] ? args[1](proxy(target)) : proxy(target);
     return proxy(target);
@@ -122,4 +123,17 @@ assert.equal(navWidth(681), 310, "the pages retain different widths");
   assert.equal(cx.notified, 2, "settling at the same width does not request another frame");
 }
 
-console.log("ok: independent nav widths and open state; a changing width settles after 300ms without stale timers crossing pages.");
+{
+  const handle = { is_focused: () => true }, cx = { stop_propagation() {}, notify() {} };
+  const key = value => {
+    made.length = 0;
+    withNav({}, "files", 900, { content: null, head: null, list: null, open: true, inline: true, handle });
+    made.find(el => el.ids.includes("files-nav-edge")).on.on_key_down({ key: value }, cx);
+  };
+  store.set("local:nav.width", "300");
+  key("left"); assert.equal(navWidth(900), 316);
+  key("right"); assert.equal(navWidth(900), 300);
+  key("home"); assert.equal(navWidth(900), 160);
+  key("end"); assert.equal(navWidth(900), 560);
+}
+console.log("ok: independent nav widths/open state, keyboard resize and width settling without stale cross-page timers.");

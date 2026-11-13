@@ -24,13 +24,15 @@
 
 构图期间的合成预览纹理和分块文件也只写在该草稿的 `.preview/<unique-id>/` 中，随草稿清理；图形正文、主题签名和纹理路径只在内存里。它不是源文件或最终 `.tiles/` 缓存，不持久化新的偏好。
 
-图片和 Studio `.ans` 导入都先建立本次运行的内存草稿：原图引用、转换结果、请求身份、相对构图和 `draft.savedName` 不提前持久化。新图片只生成 Dots，`.ans` 保留原字符画法；迟到的读取或转换必须核对请求／草稿身份。`draft.savedName` 只记这个草稿已经发布的 `.ans` 文件名：Apply 的最终缓存失败时保留草稿、预览 SVG 和已发布的源文件；重试只可复用同一草稿记下的文件，并先逐内容核对它与当前草稿一致。文件缺失或内容不同就按不覆盖规则另存，不能复用其他草稿或仅仅同名的文件。预览用的 SVG 写入 `<appHome>/asciicn-wallpaper/.preview/<unique-id>/`，每个草稿独占一个目录，和已导入壁纸的 `.tiles/` 分开。每次 app 运行，各副本共用 `previewsReady` promise，在创建草稿前只清理一次上次运行的遗留预览；之后各副本仅在取消、成功应用、关闭时清理自己的草稿目录，不扫描其他运行中副本的目录。
+图片和 Studio `.ans` 导入都先建立本次运行的内存草稿：原图引用、解码像素 `draft.pixels`、采样计划、模式、代次、转换结果、请求身份、相对构图和 `draft.savedName` 不提前持久化。图片默认Dots，可切Braille/Blocks/Quadrants；从同一解码像素重建，不重读原图。`.ans` 保留原字符画法，不能切模式。迟到结果必须核对请求／草稿及转换代次；新代次取消旧生成器，不排队完成旧任务。`draft.savedName` 只记这个草稿已发布的 `.ans`：Apply 最终缓存失败时保留草稿、预览和已发布源；重试仅可复用自己记下且内容与当前草稿完全一致的文件。切模式后内容不同就按不覆盖规则另存，不复用其他草稿或仅同名文件。预览写入 `<appHome>/asciicn-wallpaper/.preview/<unique-id>/`，各代次用独立 `frame-<generation>/`，成功替换或失效后清自己的旧目录，与 `.tiles/` 分开。每次app运行，各副本共用 `previewsReady` promise，在创建草稿前仅一次清上次遗留预览；之后只清自己的目录，不扫描其他运行中副本。
 
-预览不写 `.ans`，也不改变共享的 `asciicn-wallpaper.scene`。**Apply** 保存 `.ans`，最终场景就绪后才写构图、更新选择并清草稿；**Cancel** 保留原来的选择、构图和文件，包括失败的 Apply 已发布的 `.ans`。只保存生成的画，不复制或修改原图；原图引用不持久化，保存后没有回到原图编辑的入口。删除已导入的壁纸必须先显示文件名并再次确认；取消确认不删除文件、缓存或构图。确认删除不依赖转换期间暂时移出的显示列表；它使对应的在途转换及等待中的 Apply 失效。取消标记与任务一起只留在内存中，等任务结束才释放，防止新任务与未结束的旧任务并行写同一缓存。迟到的结果既不能发布场景、选择或构图，也不能留下重建的缓存。
+新图片生成的 `.ans` 以非绘制OSC `ESC ] 777;asciicn-wallpaper;image-v4;<dots|blocks|quadrants|braille> BEL` 开头，记录这张画使用0.5格宽比、新版8档/VGA主题映射和模式；v4 的空格若不透明也带颜色，浅色主题据此在 `.tiles/<名>/` 里另写一套 `paper-*.svg`（字形取反），不需原图。先前 `image-v3`（无模式）照常识别，但没有纸面套；它是`.ans`内容的一部分，不新增sidecar、模式偏好或原图副本。读取时仅识别完整的开头标记并剥离；其余`.ans`和内置画保持原4档与既有半调aspect推断。已有两张导入画不改写、不迁移，重建缓存也不变形／变色；重新导入原图才有新处理。
+
+预览不写 `.ans`，也不改变共享的 `asciicn-wallpaper.scene`。**Apply** 保存 `.ans`，最终场景就绪后才写构图、更新选择并清草稿；**Cancel** 保留原来的选择、构图和文件，包括失败的 Apply 已发布的 `.ans`。只保存生成的画，不复制或修改原图；原图引用不持久化，保存后没有回到原图编辑的入口。裁切按钮以已导入的 `.ans` 及其已存构图开草稿（`draft.savedName` 预置为该名），Apply 因内容一致复用该文件，只改构图表，不另存。删除已导入的壁纸必须先显示文件名并再次确认；取消确认不删除文件、缓存或构图。确认删除不依赖转换期间暂时移出的显示列表；它使对应的在途转换及等待中的 Apply 失效。取消标记与任务一起只留在内存中，等任务结束才释放，防止新任务与未结束的旧任务并行写同一缓存。迟到的结果既不能发布场景、选择或构图，也不能留下重建的缓存。
 
 `shared("asciicn-wallpaper.placements")` 是本 mod 唯一写入的持久构图表，键为 `file:<文件名主干>`，值为 `{ mode: "cover" | "contain", zoom: 1..4, x: 0..1, y: 0..1 }`。x/y 表示画布与缩放后图片之间剩余空间的对齐比例；0/0是左上，0.5/0.5居中，1/1是右下。画布／侧栏尺寸变化和主题切换只重算相同参数下的几何，不重转字符画。读取有限数值并钳制范围；无记录保留旧壁纸的主体focus和铺满规则。构图独立于 `.tiles/` 可重建缓存；确认删除后清对应条目，外部源文件消失时也清理；扫描开始后若有更新构图提交，旧扫描不得删掉新记录。拖动、缩放、重置只改草稿，不写共享表或文件。Reset 保留当前 mode，只恢复居中与1倍。
 
-用户文件名保留合法 Unicode、前导短横和普通隐藏名；文件枚举及校验元数据用 NUL 分隔，文件路径按参数而非选项处理。外部 `.ans` 的文件名主干为空、`.` 或 `..`（`.ans`、`..ans`、`...ans`）时安全拒绝，不能把它们用作 `.tiles/` 缓存目录；`.hidden.ans` 等普通隐藏文件照常支持。转换器版本 2 使用 40 大小的图块，使展开后的阴影图形也低于每次写入的 1 MiB 上限；旧版缓存通过现有版本键重建。
+用户文件名保留合法 Unicode、前导短横和普通隐藏名；文件枚举及校验元数据用 NUL 分隔，文件路径按参数而非选项处理。外部 `.ans` 的文件名主干为空、`.` 或 `..`（`.ans`、`..ans`、`...ans`）时安全拒绝，不能把它们用作 `.tiles/` 缓存目录；`.hidden.ans` 等普通隐藏文件照常支持。转换器版本4仍用40大小图块，展开后的阴影图形低于每次写入1MiB；版本键失配只重建缓存，不改源文件或构图。
 
 Apply 和 Studio 导入保存时，在独占的 `.preview/save-<unique-id>/` 写入文本分块（每块最多 64K 个 Unicode 字符，低于 `writeTextFile` 的 1 MiB 上限），拼成完整文件后通过 POSIX `link` 原子发布目标 `.ans`；已有文件、符号链接或目录都不覆盖。成功或失败都清理自己的保存目录，源图和其他草稿保持不动。
 
@@ -53,14 +55,25 @@ Apply 和 Studio 导入保存时，在独占的 `.preview/save-<unique-id>/` 写
 
 `t3.panels[space]` 保存 `{ open, wide, tabs, active }`，标签为 `{ id, path?, born }`：`files`、`file:<相对路径>` 或 `review`。`born` 是同名标签关闭再开后的新实例号，使隐藏 mod 也能识别状态已释放。旧 `{ page }` 在首次读取时转成一个对应标签；无记录从空列表开始。布局 stack 子块只是渲染位，空列表选择 `panel-empty`（独立 Review 安装无此块时回退 Files 渲染位）。
 
-`selected` 是最后一次选择标签的事件号，用于 Files 在重复选择当前标签时也清空搜索并定位；旧 `page` 字段只作 stack 布局回传的同步记号，不是可见的页签模式。`t3-actions.openTarget` 全局只保存一个目标名；本机每次运行并行检测应用列表，目标卸载时回退 Finder。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
+`selected` 是最后一次选择标签的事件号，用于 Files 在重复选择当前标签时也清空搜索并定位；旧 `page` 字段只作 stack 布局回传的同步记号，不是可见的页签模式。`t3.openTarget` 在Files／详情之间全局只保存一个目标名，不保留本轮旧键迁移；本机每次运行共用 `globalThis.t3OpenInTargets` 的 `{version:3,promise,names}` 并行应用检测，名单版本变化即替换旧缓存，目标卸载时失效并回退Finder。已完成名单可经knownTargets只读访问，避免热加载时旧init任务丢失使Files永久只留Finder；绘制不等待promise或扫描应用。候选仅取T3完整编辑器表，以macOS LaunchServices查安装（GUI进程PATH可能没有CLI）；绘制和打开菜单不扫描。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
 
 Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。Review 标签关闭同步删除 `review.shown[space]`，其内存副本按实例号驱逐，迟到读取失效。详情来源和弹层 id 只通过 popup props 传递，不写持久状态；本机机器名在弹层启动时读取。
 
 `globalThis.t3Titlebar` 只记本次运行测到的标题栏末端和面板宽度，供键盘打开详情时锚定到同一入口；不写共享状态或磁盘。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
 
+详情子菜单关系只记本次运行的 `globalThis.t3DetailsLayers`（子overlay id → 父详情id／kind），用于菜单开启时的split状态和父关闭时清理。子关闭即删对应记录；不写共享偏好。Open in菜单选择只更新既有全局目标名，真正执行只在主按钮点击发生。全局Actions的数据归属不改成项目脚本，已有动作不迁移或删除。
+
+`t3-actions.detailsItems` 保存详情中可用项目的显隐偏好：`environment`、`openIn`、`scripts`、`review`。默认全开，只存与默认不同的 `false`；Reset 清空。卡片右键与所有详情副本共用这一份，不存未知项目或缺少后端的T3功能。全隐藏仍显示 Choose what to show 入口，不改变Actions数据、面板标签或Git仓库。
+
+Quick Review与Review页共用`shared/review-scope.js`及本次运行的`globalThis.t3ReviewScopeRun`：按root＋所选base仅留最近三份完成快照、TTL5秒，同源合并在途读取；活跃owner／follower不能因容量驱逐而丢结果，完成或关闭才释放。关闭／驱逐／来源、page、space或base变化使结果失效；关闭原生owner同步释放pending并唤醒仍存活的follower，避免永远停在Reading。范围选择继续写既有`review`请求和`review.bases`；不新增持久范围。base的remote开关保留原菜单stays语义：切换Review标签而不关闭选择器，普通选范围收起详情。
+
+
 - 几个 mod 都要读写的数据，经 `shared/` 里的一个模块读写，默认值也写在那里：置顶经 `shared/pins.js`（`pinList`、`pin`、`unpin`、`putBack`），布局设置经 `shared/layout-settings.js`。所以 Pin 不管从哪里点，都会结束 Snooze；Undo 不管从哪里点，都会把置顶放回原位。
 - 只有一个 mod 读写的键，在那个 mod 里写 `shared(KEY.x) ?? 默认值`。
+
+Files 的树选择集合、范围锚点、搜索中的折叠集合、目录 loading/error、面包屑目录菜单及 hover 几何仅存本次运行，不写 shared 或磁盘。内部树选择打开文件时保留搜索；外部选标签／open 命令清搜索并 reveal。所有内部选择都记录同次 surface selected 事件号，避免下一帧把它误判为外部选择。树仍按 space 共用，不复制每标签树。`t3.panels` 的目录标签复用 `file:<path>`，加 `folder:true` 与可选的 `trail`；根目录仍是 `files`，`trail` 保留原文件面包屑。此为新增标签元数据，已有文件标签不迁移、不写文件内容。
+
+`shared/measured-text.js`的`nameW`／`textW`仅记本次运行各文字的自然宽／容器宽，供同一份nameText／named／measuredTooltip判断截断。原生布局回调按zoom归一化，宽度未变不notify；不以字符数估算，不在每次重绘重新测量。
 
 ## `localStorage` 的键名
 

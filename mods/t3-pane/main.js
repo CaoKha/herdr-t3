@@ -6,12 +6,10 @@
 // Its sub-agents: a count in the header that opens their list, this mod again as a popup with { kids: terminal }.
 
 import { View, div, svg } from "gpui-kit";
-import { h_flex, v_flex, Popup } from "gpui-base";
+import { h_flex, v_flex } from "gpui-base";
 import { panes, terminals, agents, spaces, props, run, theme, home, openOverlay, closeOverlay, settings, shared, setShared, layout } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
-import { agentKids, kidStatus, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
-import { projectMark } from "./project.js";
-import { detailsFor, detailsAt, detailsLine, detailsCard } from "./details.js";
+import { isAgent, kidStatus, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { programIcon } from "./program.js";
 import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within, pressed, justClosed } from "./focus.js";
@@ -23,18 +21,26 @@ import { button as drawButton, radiusOf } from "./button.js";
 
 // The list as the layout's other menus (the sort menu, the right-click menu): 4 around 28px rows.
 const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_ROW = 28, KIDS_CLOSED = "t3-pane.kidsClosed";
-const WORD = { working: "Working", blocked: "Needs you", idle: "Idle" };
+const WORD = { working: "Working", blocked: "Needs you", idle: "Idle", done: "Done", error: "Failed" };
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // Everything an agent started, a step in for each level, as the agents list nests them, each with its own status:
 // as T3's rows, one waiting on a stuck one under it is still at work, and that one says it's stuck.
 function kidRows(addr) {
   const all = terminals(), listed = new Map(agents().map((a) => [a.address, a.status]));
+  const children = new Map();
+  for (const k of all) {
+    if (k.state !== "live") continue;
+    if (!children.has(k.parent)) children.set(k.parent, []);
+    children.get(k.parent).push(k);
+  }
   const walk = (at, depth, seen) => {
     if (seen.has(at)) return [];
     seen.add(at);
     // A shell between them isn't listed (tree.js): what it started stands where it would have.
-    return agentKids(all, at, seen).flatMap((k) => [{ k, depth, st: kidStatus(k, listed) }, ...walk(k.address, depth + 1, seen)]);
+    return (children.get(at) ?? []).filter((k) => !seen.has(k.address)).flatMap((k) => isAgent(k)
+      ? [{ k, depth, st: k.status === "error" ? "error" : kidStatus(k, listed) }, ...walk(k.address, depth + 1, seen)]
+      : walk(k.address, depth, seen));
   };
   return walk(addr, 0, new Set());
 }
@@ -44,14 +50,6 @@ const kidName = (k) => k.name || k.template || k.program?.name || k.address;
 function took(ms, now) {
   const s = Math.max(0, Math.floor((now - ms) / 1000)), m = Math.floor(s / 60);
   return s < 60 ? `${s}s` : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
-}
-
-// The Agents list's one-line marks, in the same 12px column.
-function kidMark(t, st) {
-  return div().w(12).flex_none().flex().items_center().justify_center().role("status").accessibility_label(WORD[st] ?? "Unknown")
-    .when(st === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
-    .when(st === "blocked", el => el.child(div().size(12).flex_none().rounded(3).bg(t.blocked + "26").text_size(10).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!")))
-    .when(st === "idle", el => el.child(div().size(6).flex_none().rounded_full().border(1.5).border_color(t.idle ?? t.dim)));
 }
 
 // Time left on a snooze, as the Inbox's row says it: 10m, 3h, 2d.
@@ -70,18 +68,19 @@ function folder(cwd) {
 export default class Pane extends View {
   init(_props, cx) {
     if (props()?.kids) {
-      // The list takes the keyboard, as the shipped menu does; as T3's, nothing's lit until a key or the pointer arrives.
+      // Take the keyboard; a row lights only after a key or the pointer arrives.
       this.at = -1;
       this.keys = cx.focus_handle();
       this.keys.focus();
+      // Only this run: folds and the tree snapshot belong to this popup, not a saved preference.
+      this.folded = new Set();
+      this.refreshKids();
       // A working one's time runs on, as the Inbox's pill. With all of them ended, the list goes.
       this.clock = cx.timer.every(1000, (cx) => {
-        if (kidRows(props().kids).length === 0) closeOverlay(props().overlay);
+        this.refreshKids();
+        if (this.rows.length === 0) closeOverlay(props().overlay);
         else cx.notify();
       });
-      // A row's details card (details.js): which is up or fading, and its timers.
-      this.details = this.detailsOut = this.hovered = null;
-      this.detailsWait = this.detailsFade = this.detailsWatch = null;
       return;
     }
     this.hovered = false;
@@ -92,49 +91,56 @@ export default class Pane extends View {
 
   async close() {
     if (props()?.kids) {
-      for (const w of [this.clock, this.detailsWait, this.detailsFade, this.detailsWatch]) w?.cancel();
+      this.clock?.cancel();
       setShared(KIDS_CLOSED, Date.now());
     }
     else { stopsEnd(this); this.napWatch?.cancel(); }
   }
 
-  // The sub-agents' list, as the layout's other menus: 28px rows, stepped in by level. A pick peeks that one and closes it.
+  refreshKids() {
+    const selected = this.rows?.[this.at]?.k.address;
+    this.allRows = kidRows(props().kids);
+    const live = new Set(this.allRows.map(({ k }) => k.address));
+    for (const key of this.folded) if (!live.has(key)) this.folded.delete(key);
+    this.allRows.forEach((r, i) => {
+      r.children = this.allRows[i + 1]?.depth > r.depth;
+    });
+    this.visibleKids(selected);
+  }
+
+  visibleKids(selected = this.rows?.[this.at]?.k.address) {
+    let hidden = Infinity;
+    this.rows = this.allRows.filter((r) => {
+      if (r.depth > hidden) return false;
+      hidden = this.folded.has(r.k.address) ? r.depth : Infinity;
+      return true;
+    });
+    this.labels = this.rows.map(({ k }) => kidName(k));
+    this.at = this.rows.findIndex(({ k }) => k.address === selected);
+  }
+
+  foldKid(row, folded) {
+    if (!row?.children) return;
+    if (folded) this.folded.add(row.k.address); else this.folded.delete(row.k.address);
+    this.visibleKids(row.k.address);
+  }
+
+  // Rendering and moving selection use the timer's tree snapshot, never terminal enumeration.
   kidsMenu(t) {
-    const rows = kidRows(props().kids), done = () => closeOverlay(props().overlay), now = Date.now();
-    if (this.at >= rows.length) this.at = rows.length - 1;
+    const rows = this.rows, done = () => closeOverlay(props().overlay), now = Date.now();
     const peek = (k) => { done(); run("terminal.peek", { terminal: k.address }); };
     // T3's text-2xs with tabular figures: the time in monospace children, one per part, as the Inbox's pill.
     const mono = settings()?.font_family ?? "JetBrains Mono";
-    // No status_ms is a status unchanged since it began: working since it was made.
+    // No status_ms means unchanged since creation, for working and idle alike.
     const since = (k) => k.status_ms || k.created_ms || 0;
-    const trail = (k, st) => st === "blocked" ? div().text_color(t.blocked).child(WORD.blocked)
-      : st === "working" ? (since(k) > 0 ? h_flex().gap(4).children(took(since(k), now).split(" ").map((part) => div().font_family(mono).child(part))) : div().child(WORD.working))
-      : div().child(WORD[st] ?? "");
-    // Each row's details, the agents list's card for a sub-agent: its space, machine, branch and program. Hung on the row's left,
-    // as the list stands at the window's right. One with no pane of its own is in its parent's space, and has no branch to name.
-    const ps = panes(), sp = spaces(), parent = ps.find((p) => p.terminal === props().kids);
-    const spaceOf = (p) => p && sp.find((s) => (s.tabs ?? []).some((b) => b.id === p.tab));
-    const details = (k) => {
-      const key = k.address;
-      if (this.details !== key && this.detailsOut !== key) return null;
-      const own = ps.find((p) => p.terminal === k.address), space = spaceOf(own) ?? spaceOf(parent);
-      const machine = k.address.includes("/") ? k.address.split("/")[0] : null, pic = programIcon(k.program, 12, t.muted);
-      // Its right edge 4 off the list's: the list's 4 in, then 4, as the agents list's card stands off its row.
-      return Popup.new(`details-${key}`, div()).absolute().top(-1).left(-9).size(1).anchor("top_right")
-        .content(detailsCard(this, t, key, kidName(k), [
-          space && detailsLine(t, projectMark(space, 12, t, ps, true), space.name),
-          machine && detailsLine(t, svg("mods/t3-pane/icons/server.svg").size(12).flex_none().text_color(t.muted), machine),
-          own?.branch && detailsLine(t, svg("mods/t3-pane/icons/git-branch.svg").size(12).flex_none().text_color(t.muted), own.branch),
-          pic && detailsLine(t, div().flex_none().opacity(0.6).child(pic), k.program.name),
-        ], { from: 4 }));
-    };
     // As tall as it is: the popup opens with no height, so it grows and shrinks as sub-agents come and go.
     return v_flex().id("pane-kids").w_full().min_h(0).p(4).bg(t.popover).text_size(14)
       .track_focus(this.keys).on_key_down((e, cx) => {
         if (e.key === "enter") { if (rows[this.at]) peek(rows[this.at].k); }
         else if (e.key === "escape") done();
+        else if (e.key === "left" || e.key === "right") this.foldKid(rows[this.at], e.key === "left");
         else {
-          const to = menuJump(this, e, rows.map(({ k }) => kidName(k)), this.at);
+          const to = menuJump(this, e, this.labels, this.at);
           if (to < 0) return;
           this.at = to;
         }
@@ -144,39 +150,40 @@ export default class Pane extends View {
       .child(scrollList(this, "pane-kids-list", { count: rows.length, row: KIDS_ROW, height: Math.min(rows.length, KIDS_SHOWN) * KIDS_ROW, at: this.at,
         wheeled: (keep) => { if (keep >= 0) this.at = keep; },
         draw: (i) => {
-          const { k, depth, st } = rows[i];
+          const r = rows[i], { k, depth, st } = r;
           // The menus' row: 8 in, 8 between, radius 4, lit with the selection; a level steps in by the icon's 16.
-          const card = details(k);
           return h_flex().id(`kid-${k.address}`).relative().h(KIDS_ROW).pl(8 + depth * 16).pr(8).gap(8).rounded(4).items_center().flex_none()
             .text_color(t.foreground).when(i === this.at, (el) => el.bg(t.selected))
-            .role("button").accessibility_label(WORD[st] ? `${kidName(k)}, ${WORD[st]}` : kidName(k))
+            .role("button").cursor_pointer().accessibility_label(WORD[st] ? `${kidName(k)}, ${WORD[st]}` : kidName(k))
             .on_hover((on, cx) => {
-              // As the agents list's rows: the next row's enter can come before this one's leave.
-              if (on) { this.hovered = k.address; detailsFor(this, k.address, cx); }
-              else if (this.hovered === k.address) { this.hovered = null; detailsFor(this, null, cx); }
-              const to = on ? i : this.at === i ? -1 : this.at;
-              if (to !== this.at) this.at = to;
-              cx.notify();
+              if (on && this.at !== i) { this.at = i; cx.notify(); }
             })
-            .on_mouse_move((e) => detailsAt(this, k.address, e))
+            .on_mouse_down("right", (_e, cx) => { done(); openMenu(this, "agent", { address: k.address }, cx); })
             .on_click(() => peek(k))
-            // As the menus' icons, it hangs 2 into the padding and the gap.
-            .child(div().size(16).mx(-2).flex_none().flex().items_center().justify_center()
-              .child(programIcon(k.program, 16, t.muted) ?? svg("mods/workspace-chrome/terminal.svg").size(16).flex_none().text_color(t.muted)))
+            // Grow the icon group to the right only: icon16 + gap4 + fold12, the program stays at its original x.
+            .child(div().w(32).h(16).mx(-2).flex_none().relative().flex().items_center()
+              .child(programIcon(k.program, 16, t.muted) ?? svg("mods/workspace-chrome/terminal.svg").size(16).flex_none().text_color(t.muted))
+              .when(r.children, (el) => el.child(div().id(`kid-fold-${k.address}`).absolute().left(20).top(2).size(12).role("button")
+                .accessibility_label(this.folded.has(k.address) ? "Expand sub-agents" : "Collapse sub-agents")
+                .on_click((_e, cx) => { cx.stop_propagation(); this.foldKid(r, !this.folded.has(k.address)); cx.notify(); })
+                .child(svg(`mods/t3-pane/icons/${this.folded.has(k.address) ? "chevron-right" : "chevron-down"}.svg`).size(12).text_color(t.dim)))))
             .child(div().flex_1().min_w(0).truncate().child(kidName(k)))
-            // The right-click menu's shortcut column: 12px medium, dim.
-            .child(div().flex_none().text_size(12).font_medium().text_color(t.dim).child(trail(k, st)))
-            .child(kidMark(t, st).id(`kid-status-${k.address}`))
-            .when(Boolean(card), (el) => el.child(card));
+            // T3's shortcut column, one fixed status group. Its width fits Needs you at 12px without squeezing the icon.
+            .child(h_flex().id(`kid-status-${k.address}`).w(96).flex_none().gap(4).items_center().justify_end().text_size(12).font_medium().text_color(t.dim)
+              .role("status").accessibility_label(WORD[st] ?? "Unknown")
+              .when(st === "working", (el) => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
+              .when(st === "blocked" || st === "error", (el) => el.text_color(st === "error" ? t.ansi1 : t.blocked).child(div().size(12).flex_none().rounded(4).when(st === "blocked", (badge) => badge.bg(t.blocked + "26")).text_size(10).font_bold().flex().items_center().justify_center().child("!")).child(WORD[st]))
+              .when(st === "done", (el) => el.child(div().size(6).flex_none().rounded_full().bg(t.done)))
+              .when((st === "working" || st === "idle") && since(k) > 0, (el) => el.children(took(since(k), now).split(" ").map((part) => div().font_family(mono).child(part)))));
         } }));
   }
 
   // How many sub-agents, all the way down, or how many need the person, as T3's details meta button; a click opens their list under it.
   kidsButton(t, pane, terminal) {
     const rows = kidRows(terminal);
-    const id = `ph-kids-${pane}`, n = rows.length, stuck = rows.filter((r) => r.st === "blocked").length;
-    const total = plural(n, "sub-agent", "sub-agents"), text = stuck ? `${stuck} need${stuck === 1 ? "s" : ""} you` : plural(n, "agent", "agents");
-    const label = stuck ? `${total}, ${text}` : total;
+    const id = `ph-kids-${pane}`, n = rows.length, stuck = rows.filter((r) => r.st === "blocked" || r.st === "error").length;
+    const total = plural(n, "sub-agent", "sub-agents"), text = String(n);
+    const label = stuck ? `${total}, ${stuck} need${stuck === 1 ? "s" : ""} you` : total;
     return tip(this, t, id, label, stop(this, t, id, drawButton(t, id, {
       text, label, surface: "card", color: stuck ? t.blocked : undefined, hot: this.hot === id })
       .on_hover(glow(this, id))
@@ -286,9 +293,9 @@ export default class Pane extends View {
           .child(this.button(t, `ph-z-${pane}`, `mods/t3-pane/icons/${p.zoomed ? "minimize-2" : "maximize-2"}.svg`, p.zoomed ? "Unzoom pane" : "Zoom pane", () => run("pane.zoom", { pane }), "pane.zoom"))
           .child(this.button(t, `ph-x-${pane}`, "mods/t3-pane/icons/x.svg", "Close pane", () => { this.hot = null; run(`t3-tabs.close-pane:${pane}`); }, "pane.close")))))
       .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal)))
-      .when(st === "working", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Working", svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))))
+      .when(st === "working" && !kids.length, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Working", svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))))
       // The same marks as the agents list and tabs.
-      .when(st === "blocked", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Needs you", div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().accessibility_label("Needs you").child("!")))))
+      .when(st === "blocked" && !kids.length, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Needs you", div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().accessibility_label("Needs you").child("!")))))
       .when(inbox && away, el => el.child(slot(nap
         ? tipMark(this, t, `ph-mark-${pane}`, "Snoozed", h_flex().gap(4).items_center().text_size(12).text_color(t.accent)
           .child(svg("mods/t3-pane/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(nap, now)))

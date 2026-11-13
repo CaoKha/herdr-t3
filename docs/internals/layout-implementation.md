@@ -34,6 +34,8 @@ Herdr 自 0.1.14 起自动处理绑定 `tab.close`/`pane.close` 的关闭键，�
 
 ## 尺寸、滚动与重排
 
+文字截断提示统一经`shared/measured-text.js`：显示文字量容器，零高、不带truncate的副本量自然宽，二者字体／字重相同；只有布局宽度变化才更新。Actions、电脑名和surface tab仅截断或折成图标时提示，split箭头只有aria-label，面包屑／文件树行不放tooltip。T3原有状态／Woke动作提示保留。
+
 `on_size_change` 返回乘 zoom 后像素；布局 resize 用逻辑像素，要除 `settings().zoom`。Actions/end 自定 block 宽，`tabs-row` 不可拖。Compact 在不受标签控件宽度影响的 `bar-measure` 测工作列；在标签区测会因控件收缩而反复开合。macOS traffic lights 是未缩放屏幕点，文件热加载补偿与并发安全写见 storage。
 
 Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切、`tab-strip.ml()` 偏移；零高全名副本量完整宽，只有 active/room 改变才修正。侧栏普通列表不能代码 scroll-to-current；搜索/树用可控虚拟列表。
@@ -52,10 +54,14 @@ Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切�
 
 ## 壁纸转换而非用户生命周期
 
-`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 内置图和运行时导入使用。asciicn 没有 CLI/包；图片经 sips/ImageMagick 缩到 `imageGrid`（96 格行，按比例16–480列、每格2×4像素），BMP base64 回读，`decodeBmp` 支持24/32位、两种行序。Braille 沿 Studio image 默认两端各裁0.5%的 autoLevels、阈值0.5、每格八像素平均色、五取偶。Blocks/Dots 也走完整画布，不能按内容边界裁掉空白。
+`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 和运行时导入使用。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形及统一高质量RGBA草稿；sips/ImageMagick先居中裁切再缩放，BMP base64回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`按网站每模式最多4倍超采样画布重采，再做k×k块平均；RGBA在草稿中复用，不重读原图。原生高质量内核不保证与浏览器canvas逐像素一致；同一份采样RGBA的字形及每格RGB必须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
 
-字符用 SVG 而非 text：宿主 text 会吞空格/换行、字体可能把 `##` 连写。Braille/block/quadrant/shade/halftone/diagonal 用上游 glyph 形状，其他字符以暗度条近似。纯半调圆点按正方格，其余按 Studio 文字格宽高比0.5。转换器 version2 的40大小 tiles 避免阴影展开 SVG 超宿主单次1MiB写上限；逐 tile 让出 tick，图片生成器也按 yield 让出，避免阻塞界面。
+宿主`exec`静默丢弃stdout超过8MiB的尾部。BMP用786432字节、3字节对齐块传输，每块base641MiB；直接交给分块解码器，避免大join／全量清洗。分配RGBA前检查头部、尺寸与实际解码字节完整度；RGBA转码每4096像素yield，不能按固定64行分块（大宽图会单步卡近200ms）。
+
+Dots/Blocks每格1×1采样，Quadrants为2×2，Braille为2×4；autoLevels两端各裁0.5%，色调夹到[0,1]。Dots是**6档**（空白加5个点），阈值0.1/0.3/0.5/0.7/0.9；Blocks是` ░▒▓█`5档；两种packed字形严格大于0.5才亮。每格颜色平均保留上游gradeRgb默认浮点运算及Uint8ClampedArray取偶行为。新图片取VGA16的OKLab最近槽，不用RGB欧氏距离或6个色相桶；不透明度按HSV value分8档。旧无标记`.ans`仍走原颜色映射。完整画布和空白边都保留，不按内容裁切。
+
+字符用SVG而非text：宿主text吞空格/换行，字体可能把`##`连写。几何字形沿上游glyph，其他字符以暗度条近似（Classic/Dense留待字形支持）。不改 `convert` 的纯半调方格推断；新图片调用方显式传0.5，重启识别方式见storage。version3仍用40大小tiles，避免阴影展开超过单次1MiB。采样、色调、映射生成器分块yield，调用方在6ms预算内批处理便宜yield，再让input/paint运行；取消在下一块前结束生成器。切模式先立即绘制选中／busy，独立代次目录防止迟到写入污染新scene。
 
 构图预览不逐帧缩放 `svg()`：宿主的 SVG mask 缓存键包含绘制尺寸，Zoom 每改一个尺寸就同步重新解析、栅格化所有图块。草稿转换后把同一批图形按当前主题合成一张固定分辨率 SVG，交给原生 `image()`，它只解码一次，随后 GPU 缩放同一纹理。拖动、Zoom 和方向键只改几何，不转换、读写文件。换主题才在绘制外重建预览纹理；Apply 后仍用原始主题色 SVG 图块，不改变保存的画。预览纹理最长边4096px，缩放极大时可能比最终 SVG 软；它只在草稿期间存在。
 
-原生 chooser 按 `window().platform`，不加 macOS `activate`（多等约2s）或 `default location`（Downloads 会请求目录权限）。Windows 只留目录入口。EXIF 方向不处理。导入/草稿/保存的路径、缓存键、分块原子发布、并发作废与清理条件只在 storage 维护，改这些先读它，不在这里写第二套规则。
+原生 chooser 按 `window().platform`，不加 macOS `activate`（多等约2s）或 `default location`（Downloads 会请求目录权限）。Windows 只留目录入口。EXIF 方向：`sips -g` 报存储尺寸，写PNG保留方向标签，写BMP才应用它；按存储尺寸算的裁切会让6/8（侧放）照片变形，sips 自行旋转再写PNG则会被后续BMP导出转两次。故 macOS 用 `osascript -l JavaScript` 经 ImageIO 读 Orientation，2–8 时先 `sips -s format bmp` 写草稿目录的 `upright.bmp`（无标签、像素已转正），后续尺寸与裁切都读它；读不到当作1。Linux 每次 `convert` 带 `-auto-orient`，尺寸也经它读。浅色主题判断用背景相对亮度>0.5；纸面取反在 `ascii-art.js` 的 `PAPER`：ramp 倒读、象限／Braille 掩码取补，色阶按暗度（1−亮度）而非HSV明度。导入/草稿/保存的路径、缓存键、分块原子发布、并发作废与清理条件只在 storage 维护，改这些先读它，不在这里写第二套规则。

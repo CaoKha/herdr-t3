@@ -9,14 +9,20 @@ function element() {
   } }); return e;
 }
 const find = (n, id) => !n || typeof n !== 'object' ? undefined : n.id === id ? n : n.items.map(x => find(x, id)).find(Boolean);
-const calls = []; let props = { part: 'surface-empty' }, s = { pages: ['files', 'review', 'panel-empty'], tabs: [], active: null };
-const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_flex: element, svg: element, image: element,
+const calls = [], tips = []; let props = { part: 'surface-empty' }, s = { pages: ['files', 'review', 'panel-empty'], tabs: [], active: null };
+const glyph = src => { const el = element(); el.src = src; return el; };
+const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_flex: element, svg: glyph, image: glyph,
   props: () => props, panelState: () => s, spaces: () => [{ id: 's', active: true }], settings: () => ({ zoom: 1 }), window: () => ({ platform: 'macos' }), shared: () => null,
   showPage: id => calls.push(['add', id]), closeSurface: (id, mode) => calls.push(['close', id, mode]), activateSurface: id => calls.push(['select', id]),
   hidePanel() {}, toggleWide() {}, openOverlay: p => calls.push(['overlay', p]), closeOverlay: () => calls.push(['dismiss']), run() {},
   drawButton: (_t, id) => element().id(id), radiusOf: () => 8, fileIcon: () => 'icons/cat/js.svg',
-  tip: (_v, _t, _i, _s, el) => el, stop: (_v, _t, _i, el) => el, focusRoot: (_v, el) => el, within: () => false, glow: () => () => {},
+  tip: (_v, _t, id, label, el) => { tips.push([id, label]); return new Proxy(el, { get(target, key) {
+    assert.notEqual(key, 'on_mouse_down', 'a tooltip Popup cannot own native input listeners; attach to its trigger');
+    return target[key];
+  } }); }, stop: (_v, _t, _i, el) => el, focusRoot: (_v, el) => el, within: () => false, glow: () => () => {},
 });
+vm.runInContext(['pierre-icons-data.js', 'pierre-icons.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
+vm.runInContext(fs.readFileSync(__dirname + '/../../shared/measured-text.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import .*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
 const view = new c.Mod(), t = { foreground: '#ffffff', muted: '#888888', selected: '#333333' }, cx = { notify() {}, stop_propagation() {} };
 view.surfaceKeys = { focus() {} }; view.surfaceAt = -1; view.reviewReason = 'Remote space';
@@ -36,4 +42,18 @@ find(root, 'surface-file:file-29.js').handlers.middle({}, cx); assert.deepEqual(
 props = { part: 'surface-context', space: 's', target: s.active }; view.surfaceAt = -1;
 root = view.surfaceView(t); assert.equal(find(root, 'surface-option-3').style.opacity, 0.5, 'rightmost cannot close to the right');
 find(root, 'surface-option-2').handlers.on_click({}, cx); assert.deepEqual(calls.pop(), ['close', s.active, 'others']);
+s.tabs = [{ id: 'file:docs', path: 'docs', folder: true }]; s.active = 'file:docs'; props = { part: 'panel' };
+assert.equal(find(view.panelHead(t), 'surface-close-file:docs').items[0].src, 'mods/t3-chrome/icons/folder-tree.svg', 'a folder surface uses the Files glyph, never a file extension icon');
+s.tabs = [{ id: 'file:app.js', path: 'app.js' }]; s.active = 'file:app.js';
+assert.match(find(view.panelHead(t), 'surface-close-file:app.js').items[0].src, /icons\/pierre\/file-tree-builtin-javascript\.svg$/, 'a file tab shares Files Pierre shapes');
+s.tabs = [{ id: 'file:src/app.js', path: 'src/app.js' }]; s.active = s.tabs[0].id;
+tips.length = 0; root = view.panelHead(t);
+assert.equal(tips.some(([id]) => id === 'surface-file:src/app.js'), false, 'an unmeasured path does not make a permanent tooltip');
+const measure = (id, width) => { const node = find(root, id); assert.ok(node, id); node.handlers.on_size_change({ width }, cx); };
+measure('text-name-surface-file:src/app.js', 36); measure('text-measure-surface-file:src/app.js', 36);
+tips.length = 0; root = view.panelHead(t);
+assert.equal(tips.some(([id]) => id === 'surface-file:src/app.js'), false, 'a whole basename has no tooltip even when its path differs');
+measure('text-name-surface-file:src/app.js', 20);
+tips.length = 0; root = view.panelHead(t);
+assert.deepEqual(tips.find(([id]) => id === 'surface-file:src/app.js'), ['surface-file:src/app.js', 'src/app.js'], 'only text actually clipped gets its path tooltip');
 console.log('ok: surface startup keys, availability, overflow controls, middle close and tab context menu');

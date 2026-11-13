@@ -43,11 +43,11 @@ T3 唯一例外是整行当触发器：`components/sidebar/SidebarThreadRow.tsx:
 | 1 | `main.js:511` 的 `control()`（`:593`、`:598`、`:599`、`:633`、`:667`、`:674` 共 6 个按钮） | 纯图标 | 动作名（Show preview / Enable word wrap / Show file explorer / Locate / Refresh files / Collapse all folders） | R1：`FileBrowserPanel.tsx:56-75`、`:500-524` | 保持 |
 | 2 | `main.js:578` 的 `crumb()`（根 + 每一段，`delay: 600`） | 面包屑文字（`max_w(160)` 可截断） | 完整路径 | T3 有（R3，`FileBreadcrumbs.tsx:51-77`），但用户明确不要 | **删除**（截图 `Snapzy_2026-11-14_01-00-56_291.png`） |
 | 3 | `main.js:616` | 纯图标（目标 app 的图标） | `Open in <target>` / "本地应用打不开远程文件" | 无直接对应（T3 的 Open in 是带文字的下拉） | 保持 |
-| 4 | `main.js:618` | 纯图标 `⌄` | Choose editor | 无 | 保持 |
+| 4 | `main.js:618` | 纯图标 `⌄` | Choose editor | T3分体箭头只留aria-label | **已删除**（用户决定）；保留Choose editor无障碍标签 |
 | 5 | `main.js:734` `.tooltip(r.path)` | **每个文件树行的整行** | 相对路径 | R6：pierre 的行没有，T3 的树也没有 | **删除**：根层行的名字和路径一模一样（用户举的 `.pi`）。要保留"名字被切时能看全"，改成只在名字被切时给（用 `nameText` 的量法），别用整行 + 路径 |
 | 6 | `shared/file-menu.js:80`（`mods/t3-files/file-menu.js:80` 是同步副本） | 禁用的菜单行 | `it.hint ?? "Not available"` | R4：`RightPanelTabs.tsx:284-291` | 保持 |
 
-删除 2，改 0，保持 4。
+Files已实施：#2面包屑、#4分体箭头、#5树行tooltip全部删除；#5即使截断也不另加提示，按用户最终决定。#1动作图标、#3主按钮、#6禁用原因保留。回归检查先RED再GREEN，并确认三个tooltip调用点消失；不以对齐T3为由恢复面包屑提示。
 
 ## t3-actions（负责人：panel-ab / t34b）
 
@@ -55,7 +55,7 @@ T3 唯一例外是整行当触发器：`components/sidebar/SidebarThreadRow.tsx:
 |---|---|---|---|---|---|
 | 7 | `main.js:66` | 窄时纯图标，宽时图标 + "Add action" | Add action (+键) | R2：`GitActionsControl.tsx:1568-1591` | **改：仅图标态显示**（`compact` 时有理，宽时只是重念） |
 | 8 | `main.js:72` | 图标 + 名字（`max_w(140)` 可截断） | `Run <名字>` (+键) | 同上 | **改：仅图标态或名字被切时显示** |
-| 9 | `main.js:76` | 纯图标 `⌄` | Actions | T3 的分裂 `⌄` 只给 `aria-label`（`:1604-1633`），但 R1 覆盖纯图标 | 保持（T3 那条可作删除理由，见边界 3） |
+| 9 | `main.js:76` | 纯图标 `⌄` | Actions | T3 的分体箭头仅 `aria-label` | **已删除**（用户决定）；保留无障碍标签 |
 | 10 | `main.js:134` | 纯图标（齿轮） | `Edit <名字>` | R1 | 保持 |
 | 11 | `main.js:293` | 纯图标（Details）+ 键 | Details (⌘…) | R1 | 保持 |
 | 12 | `main.js:92` `.tooltip(...)` | 详情行（图标 + 名字，行本身 `truncate`） | `Run <名字>` | R2/R6：T3 的详情行不给 | **删除**：行里就写着这个名字 |
@@ -175,3 +175,7 @@ T3 唯一例外是整行当触发器：`components/sidebar/SidebarThreadRow.tsx:
 
 - 没开 demo 窗口，没看截图，没验证真实悬停；行号与 T3 源码位置是代码事实，观感结论要照 `AGENTS.md` 的要求用 demo 截图验收。
 - 没改任何 mods 代码；`scripts/sync.sh`、`scripts/check.sh` 未跑（本次只加一份文档）。
+
+## Actions / Chrome / Tabs 实施结果
+
+测宽统一为`shared/measured-text.js`的nameText／named／measuredTooltip。#7仅图标态提示，#8与#16的名字仅实测截断时提示；#12行提示与#16电脑glyph提示已删，#23 surface仅截断时提示。Open in和Actions的分体箭头仅aria-label。自然测量副本与truncate文字必须是兄弟：原生长名回放曾抓到继承ellipsis导致假自然宽，修后长电脑名336.36>容器190、长surface292.73>112.27；短电脑名177.27<190。整窗及门禁见[本轮验收](panel-ab-validation/quick-review-validation.md)。未把handler回放当作真实鼠标操作。

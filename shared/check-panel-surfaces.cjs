@@ -7,7 +7,7 @@ const context = vm.createContext({ KEY: { panels: 't3.panels' }, layout, spaces:
   shared: k => saved[k], setShared: (k, v) => { saved[k] = v; }, Date, Math,
   run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
 });
-vm.runInContext(fs.readFileSync(__dirname + '/panel.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel };', context);
+vm.runInContext(fs.readFileSync(__dirname + '/panel.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { panelState, showPage, openFile, navigateFolder, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel };', context);
 const p = context.api, tabs = () => p.panelState().tabs.map(t => t.id).join(',');
 p.togglePanel(); assert.equal(ui.page, 'panel-empty'); assert.equal(tabs(), '');
 p.showPage('files'); p.openFile('a.js'); p.openFile('b.js'); p.openFile('a.js');
@@ -34,6 +34,18 @@ p.restorePanel(view, 'home'); p.syncPanel(view); assert.equal(ui.open, false);
 ui.space = 'home'; p.syncPanel(view); ui.space = 'a'; p.syncPanel(view); assert.equal(tabs(), 'file:a.js');
 saved['t3.panels'].legacy = { open: true, page: 'review', wide: false }; ui.space = 'legacy';
 assert.equal(tabs(), 'review', 'old page becomes a surface, not an old mode');
+ui.space = 'folders';
+p.openFile('src/a.ts');
+p.navigateFolder('src', 'src/a.ts', true);
+assert.equal(tabs(), 'file:src/a.ts,file:src', 'a directory opens beside its source file');
+assert.equal(p.panelState().tabs.at(-1).folder, true);
+assert.equal(p.panelState().tabs.at(-1).trail, 'src/a.ts');
+p.navigateFolder('', 'src/a.ts');
+assert.equal(tabs(), 'file:src/a.ts,files', 'directory navigation replaces the directory surface with root');
+p.openFile('src/b.ts');
+p.navigateFolder('src', 'src/b.ts', true);
+p.openFile('src/a.ts'); p.navigateFolder('src', 'src/a.ts', true);
+assert.equal(tabs(), 'file:src/a.ts,file:src/b.ts,file:src', 'navigating to an existing folder activates it without duplicates');
 const root = JSON.parse(fs.readFileSync(__dirname + '/../layouts/herdr-t3.json', 'utf8'));
 const find = (n, id) => n.id === id ? n : (n.children ?? []).map(c => find(c, id)).find(Boolean);
 assert.equal(find(root, 'panel').resizable, false);

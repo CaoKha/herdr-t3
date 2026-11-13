@@ -8,8 +8,8 @@ const src = fs.readFileSync(path.join(__dirname, "file-tree.js"), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
   + "\nglobalThis.tree = { treeRows, pathEntries, rowAt, treeKey, naturalCompare, sortEntries };";
 // The row as drawn: each element a tag and what it holds, in order.
-const el = (tag) => { const node = { tag, kids: [] }; const p = new Proxy(node, { get: (t, k) => k in t ? t[k] : k === "child" ? (c) => (t.kids.push(c), p)
-  : k === "when" ? (c, f) => (c ? f(p) : p) : () => p }); return p; };
+const el = (tag) => { const node = { tag, kids: [], calls: {} }; const p = new Proxy(node, { get: (t, k) => k in t ? t[k] : k === "child" ? (c) => (t.kids.push(c), p)
+  : k === "when" ? (c, f) => (c ? f(p) : p) : (...args) => (t.calls[k] = args, p) }); return p; };
 const context = vm.createContext({ div: () => el("div"), svg: () => el("svg"), image: () => el("icon"), h_flex: () => el("row"), fileIcon: () => "", folderIcon: () => "" });
 vm.runInContext(src.replace("globalThis.tree = { treeRows,", "globalThis.tree = { treeRow, treeRows,"), context);
 const { treeRows, pathEntries, rowAt, treeKey, treeRow, naturalCompare, sortEntries } = context.tree;
@@ -38,6 +38,8 @@ const shut = new Set(["packages/cli"]);
 assert.deepEqual(shape(treeRows((rel) => kids.get(rel) ?? [], (p) => !shut.has(p))).slice(0, 2), ["> packages / cli", "README.md"]);
 shut.clear(); shut.add("packages/cli/src");
 assert.deepEqual(shape(treeRows((rel) => kids.get(rel) ?? [], (p) => !shut.has(p))).slice(0, 2), ["> packages / cli / src", "README.md"]);
+shut.clear(); shut.add("packages");
+assert.equal(shape(treeRows(rel => kids.get(rel) ?? [], p => !shut.has(p), true))[0], "> packages / cli / src", "Files keeps a loaded directory chain compact when closed");
 // A lone folder's entries come with the row: the last folder's, as Files dims what Git ignores.
 const lone = new Map([["", [{ name: "a", dir: true }]], ["a", [{ name: "b", dir: true, ignored: true }]], ["a/b", [{ name: "x", dir: false }]]]);
 const loneRows = treeRows((rel) => lone.get(rel) ?? [], () => true);
@@ -60,7 +62,7 @@ assert.equal(treeKey("right", all, 0).at, 1, "into an open folder");
 assert.equal(treeKey("left", all, 3).at, 2, "a file goes to its folder");
 assert.equal(treeKey("left", all, 2).toggle.path, "packages/cli/src/daemon", "an open folder closes");
 assert.equal(treeKey("left", all, 4), null, "nothing above the top level");
-assert.equal(treeKey("right", all, 1), null, "a file has nothing to open");
+assert.equal(treeKey("right", all, 1).at, 2, "Pierre moves right on a file to the next visible row");
 const closed = treeRows((rel) => kids.get(rel) ?? [], (p) => p !== "gone");
 assert.equal(treeKey("right", closed, 5).toggle.path, "gone", "a closed folder opens");
 assert.equal(treeKey("enter", all, 4).pick.path, "README.md");
@@ -76,5 +78,16 @@ assert.deepEqual(shape(treeRows((rel) => grouped.get(rel) ?? [], () => true)), [
 const drawn = treeRow({ dim: "#888888", ring: "#0000ff", foreground: "#ffffff" }, "mods/x", { path: "a.ts", name: "a.ts", depth: 0 }, "r",
   { leading: el("box"), trailing: el("tail"), status: "M" });
 assert.deepEqual(drawn.kids.map((k) => typeof k === "string" ? "text" : k.tag), ["div", "box", "icon", "div", "div", "tail"]);
+
+// Files uses Pierre's single leading slot: the chevron OR a file icon, never both or an empty slot before a file.
+const t = { dim: "#888888", accent: "#0000ff", foreground: "#ffffff" };
+const file = treeRow(t, "mods/t3-files", { path: "a.ts", name: "a.ts", depth: 0 }, "f");
+assert.deepEqual(file.kids.map(k => k.tag), ["icon", "div"], "a file icon leads its label directly");
+const folder = treeRow(t, "mods/t3-files", { path: "src", name: "src", dir: true, depth: 1 }, "d");
+assert.deepEqual(folder.kids.map(k => k.tag), ["div", "div"], "directory uses only a chevron slot");
+assert.equal(folder.calls.pl[0], 25.6, "first indent is 19.2 after the 6.4 row padding");
+const deep = treeRow(t, "mods/t3-files", { path: "a/b/c", name: "c", dir: true, depth: 3 }, "deep");
+assert.ok(Math.abs(deep.calls.pl[0] - 63) < 0.01, "following indents advance by 18.7, not the old doubled icon width");
+assert.equal(treeKey("space", all, 4)?.pick.path, "README.md", "Space activates like Enter");
 
 console.log("ok: file tree: lone folders flatten (groups never), paths keep their order, a path finds its row, the keys move as Pierre's, and a page's box leads the row.");

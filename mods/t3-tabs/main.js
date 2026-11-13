@@ -18,6 +18,7 @@ import { openMenu } from "./menu.js";
 import { panelState, togglePanel, toggleWide, syncPanel, restorePanel } from "./panel.js";
 import { rememberTerminal } from "./terminal-context.js";
 import { button as drawButton, radiusOf } from "./button.js";
+import { nameText, named as namedLabel } from "./measured-text.js";
 
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
@@ -505,14 +506,11 @@ export default class Tabs extends View {
           cx.notify();
         })
         .on_mouse_down("right", (_e, cx) => { detailsFor(this, null, cx); openMenu(this, "tab", { id: c.id, space: space.id }, cx); })
-        // Its name's whole width, whatever the tab's: clipped to nothing, it only measures.
-        .child(div().id(`name-${c.id}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap().child(label)
-          .on_size_change((size, cx) => { this.nameW[c.id] = size.width / settings().zoom; cx.notify(); }))
         // The card belongs to the icon and name, as T3's and Zed's: on the way to the × it goes.
         .child(h_flex().id(`label-${c.id}`).flex_1().min_w(0).h_full().gap(2).items_center()
           .on_hover((on, cx) => { detailsFor(this, on && says ? c.id : null, cx); cx.notify(); })
           .child(ctx && over ? close : div().size(16).flex_none().flex().items_center().justify_center().child(glyph))
-          .child(div().flex_1().min_w(0).truncate().child(label)))
+          .child(nameText(this, c.id, label).flex_1()))
         .when(!ctx, el => el.child(close))
         .when([this.overTab, /** @type {any} */ (this).details, /** @type {any} */ (this).detailsOut].includes(c.id), el => el.child(details));
       // A tab goes by its mouse-up, which a key isn't.
@@ -592,25 +590,13 @@ export default class Tabs extends View {
       .on_mouse_down("left", press).on_click(act(action)).on_hover(glow(this, id)), radius), { below: true });
     // A name shown whole has no label, as a tab's (T3's title only repeats it). Cut short, or down to its icon or `…`, the tab's
     // hover label holds it whole, under it, its words where the name starts (`at`, from the item's left; the label's 1 + 8 in).
-    if (!this.crumbW) this.crumbW = {};
-    const nameText = (id, label) => div().id(`crumb-name-${id}`).min_w(0).truncate().child(label)
-      .on_size_change((size, cx) => { this.crumbW[id] = size.width / settings().zoom; cx.notify(); });
+    const text = (id, label) => nameText(this, id, label, { size: 14, weight: "medium" });
     const named = (id, label, el, action, { agent, titled: own = false, shown = true, at = 0, radius = 4 } = /** @type {{ agent: string, titled?: boolean, shown?: boolean, at?: number, radius?: number }} */ ({ agent: null })) => {
-      // Not yet measured reads as whole.
-      const v = /** @type {any} */ (this), cut = !shown || this.crumbW[id] + 0.5 < this.nameW[`crumb-${id}`], on = v.details === id && v.detailsIn;
-      const fade = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
-      const card = Popup.new(`details-${id}`, div()).absolute().bottom(0).left(at - 9).size(1)
-        .when(v.details === id || v.detailsOut === id, pop => pop.content(div().id(`details-card-${id}`)
-          .mt(4).max_w(320).px(8).py(4).rounded(6).border(1).border_color(t.border).bg(t.chrome).shadow_md().text_size(12).font_normal().text_color(t.foreground)
-          .opacity(on ? 1 : 0).top(on ? 0 : -4).transition("opacity", fade).transition("top", fade).child(label)));
-      return stop(this, t, id, el.id(id).relative().role("button").accessibility_label(label)
-        .on_mouse_down("left", press).on_click(act(action)).on_mouse_down("right", context("agent", { address: own ? titled : agent }))
-        .on_hover((hovered, cx) => { glow(this, id)(hovered, cx); detailsFor(this, hovered && cut ? id : null, cx); })
-        .on_mouse_move((e) => detailsAt(this, id, e))
-        // Its whole name's width, clipped to nothing.
-        .child(div().id(`crumb-measure-${id}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap().child(label)
-          .on_size_change((size, cx) => { this.nameW[`crumb-${id}`] = size.width / settings().zoom; cx.notify(); }))
-        .when([v.details, v.detailsOut].includes(id), e => e.child(card)), radius);
+      return stop(this, t, id, namedLabel(this, t, id, label, el.id(id).role("button").accessibility_label(label)
+        .on_mouse_down("left", press).on_click(act(action)).on_mouse_down("right", context("agent", { address: own ? titled : agent })), {
+        shown, at, onHover: (hovered, cut, cx) => { glow(this, id)(hovered, cx); detailsFor(this, hovered && cut ? id : null, cx); },
+        onMove: e => detailsAt(this, id, e),
+      }), radius);
     };
     // As T3's title: its ⌄ is part of it, 4 after the name, 14px, there only while the title is hovered or has the keyboard.
     const chevron = (id) => {
@@ -624,12 +610,12 @@ export default class Tabs extends View {
       const lit = !dim && !ctx.sub, id = `peer-${address}`, label = nameOf(address);
       const el = h_flex().h(24).gap(4).rounded(6).items_center().min_w(0).flex_shrink(1)
         .text_color(lit || this.hot === id ? t.foreground : t.muted)
-        .child(nameText(id, label))
+        .child(text(id, label))
         .when(lit, e => e.child(chevron(id)));
       return named(id, label, el, lit ? fromTitle : () => focusAgent(address), { agent: address, titled: lit, radius: 6 });
     };
     const sub = ctx.sub && named(`peer-${ctx.sub}`, nameOf(ctx.sub), h_flex().min_w(0).flex_shrink(1).gap(4).items_center().rounded(4)
-      .text_color(dim ? t.muted : t.foreground).child(nameText(`peer-${ctx.sub}`, nameOf(ctx.sub)))
+      .text_color(dim ? t.muted : t.foreground).child(text(`peer-${ctx.sub}`, nameOf(ctx.sub)))
       .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : fromTitle, { agent: ctx.sub, titled: !dim });
     // Its own width and no less (flex weighting alone let the strip win): capped at the row, where its names shorten.
     return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(14).font_medium()
@@ -638,7 +624,7 @@ export default class Tabs extends View {
         .child(projectMark(space, 14, t, ps)).child(div().min_w(0).truncate().child(space.name)), () => run("t3-tabs.open-empty")))
       .when(Boolean(ctx.parent), el => el.child(sep("crumb-sep-parent")).child(named("crumb-parent", nameOf(ctx.parent),
         h_flex().min_w(0).flex_shrink(1).items_center().text_color(this.hot === "crumb-parent" ? t.foreground : t.muted)
-          .child(narrow ? div().child("…") : nameText("crumb-parent", nameOf(ctx.parent))),
+          .child(narrow ? div().child("…") : text("crumb-parent", nameOf(ctx.parent))),
         () => focusAgent(ctx.parent), { agent: ctx.parent, shown: !narrow })))
       .when(Boolean(ctx.head), el => el.child(sep("crumb-sep")).child(title(ctx.head)))
       .when(Boolean(sub), el => el.child(sep("crumb-sep-sub")).child(sub));
@@ -657,10 +643,8 @@ export default class Tabs extends View {
         .role("button").accessibility_label(label)
         .on_mouse_down("left", stopPress).on_click(() => focusPane(p.pane))
         .on_mouse_down("right", (_e, cx) => openMenu(this, "pane", { pane: p.pane, terminal: p.terminal }, cx))
-        .child(div().id(`name-${id}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap().child(label)
-          .on_size_change((size, cx) => { this.nameW[id] = size.width / settings().zoom; cx.notify(); }))
         .child(div().size(16).flex_none().flex().items_center().justify_center().child(glyph))
-        .child(div().flex_1().min_w(0).truncate().child(label)), 6);
+        .child(nameText(this, id, label).flex_1()), 6);
     };
     return h_flex().id(`group-${e.id}`).w(width).h(24).flex_none().rounded(6).border(1).border_dashed().border_color(t.border).items_center().overflow_hidden()
       .children(list.map(segment))

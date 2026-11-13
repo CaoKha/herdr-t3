@@ -10,8 +10,8 @@ const { execFileSync } = require("node:child_process");
 const load = (file) => fs.readFileSync(path.join(__dirname, file), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (async function|function|const) /gm, "$1 ").replace(/^export \{[\s\S]*?\};?\s*$/m, "");
 const context = vm.createContext({});
-vm.runInContext([load("vendor/ufuzzy.js"), load("file-icons-data.js"), load("file-icons.js"), load("file-tree.js"), load("model.js"),
-  "globalThis.m = { join, uFuzzy, fileIcon, folderIcon, FILE_NAMES, FILE_EXTENSIONS, FOLDER_NAMES, LIST, IGNORED, PROBE, REMOTE_SEARCH, RANKED, ancestors, parseListing, parseStatus, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, rank, kindOf, languageOf, readProblem, failedRead, ticket };"].join("\n"), context);
+vm.runInContext([load("file-icons-data.js"), load("file-icons.js"), load("file-tree.js"), load("model.js"),
+  "globalThis.m = { join, fileIcon, folderIcon, FILE_NAMES, FILE_EXTENSIONS, FOLDER_NAMES, LIST, IGNORED, PROBE, REMOTE_SEARCH, RANKED, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, kindOf, languageOf, readProblem, failedRead, ticket };"].join("\n"), context);
 const m = context.m;
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
@@ -39,7 +39,7 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 
 // The page, started in a fake `herdr`: the panel on `page` with Review installed too, every folder holding a.js (changed) and
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
-function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
+function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null } = {}) {
   const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0 };
   const shared = { "t3.wrap": false, "t3.navWidth": 300 }, wrote = [], store = new Map(), timers = [], everies = [], failed = [];
   const commands = [];
@@ -47,19 +47,20 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
   const exec = async (cmd, args, o = {}) => {
     const line = [cmd, ...args].join(" "), cwd = o.cwd ?? (cmd === "sh" ? args[3] : "") ?? "";
     w.ran.push({ line, cwd, on: o.on ?? null });
+    if (cmd === "open" && args[0] === "-Ra") return { code: args[1] === "Zed" ? 0 : 1, stdout: "" };
     if (w.stall?.(line)) await new Promise((r) => w.stalled.push(r));
     if (line.includes("rev-parse")) return cwd.startsWith("/n") ? { code: 128, stdout: "" } : { code: 0, stdout: `${cwd}\n\n` };
     if (cmd === "pwd") return { code: 0, stdout: `${cwd}\n` };
     if (line.includes(" status ")) return { code: 0, stdout: "1 .M N... 100644 100644 100644 h1 h2 a.js\0" };
     if (line.includes("ls-files")) return { code: 0, stdout: w.files.map((f) => `${f}\0`).join("") };
-    if (cmd === "sh" && args[1] === m.LIST) return { code: 0, stdout: cwd.endsWith("/src") ? "d\0d\0" : "f\0a.js\0f\0b.js\0" };
+    if (cmd === "sh" && args[1] === m.LIST) return { code: 0, stdout: listing ? (listing.get(cwd) ?? "") : cwd.endsWith("/src") ? "d\0d\0" : "f\0a.js\0f\0b.js\0" };
     if (cmd === "sh" && args[1] === m.PROBE) return { code: 0, stdout: "12 0\n" };
     return { code: 0, stdout: "" };
   };
   const task = () => ({ cancelled: false, done: false, cancel() { this.cancelled = true; }, is_done() { return this.done || this.cancelled; } });
   // As Herdr's: cancelling a task stops nothing already awaited (a watch, an exec); it only says it's done.
   const cx = {
-    notify() { w.notified++; }, stop_propagation() {}, write_to_clipboard() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }),
+    notify() { w.notified++; }, stop_propagation() { cx.stopped = true; }, write_to_clipboard() {}, focus_handle: () => { const h = { focus() { w.focused = h; }, is_focused: () => w.focused === h }; return h; },
     spawn(f) {
       const t = task();
       Promise.resolve().then(() => { running = t; try { return f(cx); } finally { running = null; } }).then(() => { t.done = true; }, (e) => failed.push(e));
@@ -76,13 +77,13 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
   const layout = { id: "root", children: [{ id: "work" }, { id: "panel", children: [body] }] };
   const ctx = vm.createContext({
     View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element,
-    Input: { new: element }, Editor: { new: element }, TextView: { markdown: element },
-    InputState: { new: () => { let v = ""; return { on() {}, value: () => v, set_value(x) { v = x; } }; } },
+    Input: { new: element }, Editor: { new: element }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
+    InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v, set_value(x) { v = x; }, focus() { events.focus?.({}, cx); } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
     spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
-    theme: () => ({}), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
+    theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
-    run() {}, notify() {}, exec,
+    run() {}, notify() {}, exec, keys: () => [],
     readTextFile: async (p) => { w.read.push(p); return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : "const a = 1;\n"; },
     watchFolder: (p) => new Promise((resolve, reject) => w.watchers.push({ path: p, task: running, resolve, reject })),
     nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise((r) => { wake = r; }),
@@ -90,7 +91,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
     localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     Date, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
-  const files = ["vendor/ufuzzy.js", "store.js", "list.js", "panel.js", "terminal-context.js", "file-icons-data.js", "file-icons.js", "file-tree.js", "nav-column.js", "file-menu.js", "panel-states.js", "model.js", "main.js"];
+  const files = ["store.js", "focus.js", "tip.js", "list.js", "panel.js", "terminal-context.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-icons-data.js", "file-icons.js", "file-tree.js", "nav-column.js", "submenu.js", "file-menu.js", "panel-states.js", "model.js", "main.js"];
   const buttons = "const drawButton = (() => {\n" + load("button.js") + "\nreturn button;\n})();\n";
   vm.runInContext((buttons + files.map(load).join("\n")).replace("export default class", "globalThis.Mod = class"), ctx);
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
@@ -102,7 +103,8 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
 }
 
 async function page() {
-  const { view, cx, settle, fire, send, shared, wrote, store } = makePage();
+  const { view, cx, w, settle, fire, send, shared, wrote, store } = makePage();
+  assert.equal(w.inputEvents.submit, undefined, "hierarchical search is not a flat picker that opens on input submit");
   // Its own choices start from the ones both pages used to share; after that, they're this page's.
   assert.equal(store.get("lines.wrap"), "false", "the old shared wrap is this page's first");
   assert.equal(store.get("nav.width"), "300", "the old shared width is this page's first");
@@ -110,12 +112,41 @@ async function page() {
   await settle();
   root = view.render(cx);
   assert.ok(find(root, "row-a.js") && find(root, "row-b.js"), "the folder's files in the tree");
+  assert.equal(find(root, "t3-files-toolbar"), null, "generic Files starts directly at the tree search, with no root-name toolbar");
+  assert.ok(!w.ran.some(r => r.line.includes(" status ")), "Files reads ignored paths, not Review's change statuses");
+  assert.ok(find(root, "t3-files-search-field"), "the ghost search has its own padded, focusable input boundary");
+  assert.equal(find(root, "row-a.js").calls.tooltip, undefined, "tree rows have no path tooltip, including truncated names");
+  view.search.focus();
+  root = view.render(cx);
+  assert.equal(find(root, "t3-files-search-field").calls.px[0], 9, "caret is inset, not glued to the Search files boundary");
+  assert.equal(find(root, "t3-files-search-field").calls.border_color[0], "#0000ff");
+  assert.ok(find(root, "t3-files-search-ring"), "focus has a visible ring without moving refresh/collapse buttons");
+  find(root, "row-a.js").handlers.on_click({ modifiers: {} }, cx); await settle();
+  root = view.render(cx);
+  find(root, "row-b.js").handlers.on_click({ modifiers: { platform: true } }, cx); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "row-a.js").calls.bg?.[0], "#ffffff1f", "Cmd-click preserves the previous tree selection");
+  assert.equal(find(root, "row-b.js").calls.bg?.[0], "#ffffff1f", "Cmd-click adds the file to selection");
+  find(root, "row-a.js").handlers.on_click({ modifiers: { platform: true } }, cx); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "row-a.js").calls.bg, undefined, "Cmd-click deselects without hover taking selection");
 
   // A file Review also has opens here alone: no Open in Review in the toolbar or the menu, nothing asked of Review.
   send("open:a.js");
   await settle();
   root = view.render(cx);
   assert.ok(find(root, "t3-files-code"), "the file shows");
+  w.focused = "native-editor"; cx.stopped = false;
+  find(root, "t3-files-content").handlers["on_mouse_down:left"]({}, cx);
+  if (!cx.stopped) root.handlers["on_mouse_down:left"]({}, cx);
+  assert.equal(w.focused, "native-editor", "a native Editor drag-start does not bubble up and lose focus to the Files root");
+  assert.equal(find(root, "t3-files-toolbar").calls.h[0], 28, "file subheader follows T3 inline geometry");
+  const crumbHover = element();
+  find(root, "crumb-").calls.hover[0](crumbHover);
+  assert.equal(crumbHover.calls.bg, undefined, "directory breadcrumb hover has no background fill");
+  assert.equal(crumbHover.calls.text_color[0], "#ffffff", "directory breadcrumb hover only brightens its text");
+  assert.equal(find(root, "t3-files-toolbar").calls.bg, undefined, "there is no separate header strip background");
+  assert.equal(find(root, "t3-files-breadcrumbs").calls.bg?.[0], "#00000000", "the scroll frame stays transparent");
   assert.equal(find(root, "t3-files-review"), null, "no Open in Review button");
   assert.ok(!labels(root).includes("Open in Review"));
   find(root, "row-a.js").handlers["on_mouse_down:right"]();
@@ -158,8 +189,100 @@ async function page() {
   send("search:b");
   await settle();
   root = view.render(cx);
-  assert.ok(find(root, "found-0"), "search finds it");
+  assert.ok(find(root, "row-b.js"), "search filters the same tree, not a separate picker");
+  assert.equal(find(root, "row-a.js"), null, "nonmatches are hidden");
+  find(root, "row-b.js").handlers.on_click({ modifiers: {} }, cx);
+  await settle();
+  view.render(cx); await fire(0);
+  assert.equal(view.current().query, "b", "opening a search-tree file keeps the search, unlike external tab reveal");
+  assert.ok(find(view.render(cx), "t3-files-refresh"), "tree header has refresh");
+  send("open:README.md"); await settle();
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-render-mode"), "Markdown has one compact icon toggle, not two text pills");
+  assert.equal(find(root, "tip-over-crumb-"), null, "the user explicitly removed breadcrumb tooltips even where T3 has them");
+  assert.equal(find(root, "tip-over-t3-files-open-more"), null, "the split arrow keeps only its accessibility label");
+  const slots = root => walk(find(root, "t3-files-toolbar")).filter(n => ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"].includes(n.key)).map(n => [n.key,n.calls.w?.[0],n.calls.h?.[0]]);
+  const previewSlots = slots(root);
+  assert.ok(find(root, "t3-files-wrap"), "Preview keeps the word-wrap slot so the other controls do not move");
+  assert.equal(find(root, "t3-files-wrap").calls.opacity?.[0], 0.64, "word wrap is disabled, not removed, in Preview");
+  assert.equal(find(root, "t3-files-wrap").handlers.on_click, undefined);
+  find(root, "t3-files-render-mode").handlers.on_click({}, cx);
+  assert.ok(find(view.render(cx), "t3-files-wrap"), "raw Markdown has word wrap");
+  assert.deepEqual(slots(view.render(cx)), previewSlots, "the same controls keep their order and dimensions in Code");
+  find(view.render(cx), "t3-files-render-mode").handlers.on_click({}, cx);
+  assert.equal(find(view.render(cx), "t3-files-wrap").handlers.on_click, undefined, "cached Editor does not enable word wrap in Preview");
+  send("open:cached.md"); await settle();
+  assert.ok(find(view.render(cx), "t3-files-md"));
+  send("open:README.md"); await settle();
+  find(view.render(cx), "t3-files-render-mode").handlers.on_click({}, cx);
+  send("open:cached.md"); await settle();
+  assert.ok(find(view.render(cx), "t3-files-code"), "a cached Preview-only Markdown gains its Editor when reopened in global Code mode");
+  find(view.render(cx), "t3-files-render-mode").handlers.on_click({}, cx);
+  send("open:README.md"); await settle();
+  find(view.render(cx), "crumb-").handlers.on_click({}, cx); await fire(0);
+  root = view.render(cx);
+  assert.equal(find(root, "t3-files-code"), null, "a directory surface has no file preview");
+  assert.ok(find(root, "crumb-README.md"), "directory navigation retains the source trail");
+  assert.ok(!w.read.includes("/r"), "a directory is never read as text");
+  find(root, "crumb-README.md").handlers.on_click({}, cx); await settle(); await fire(0);
+  assert.ok(find(view.render(cx), "t3-files-md"), "the retained trail returns to its original file");
+  find(view.render(cx), "browse-").handlers.on_click({}, cx);
+  root = view.render(cx);
+  assert.ok(find(root, "file-menu-a.js") && find(root, "file-menu-b.js"), "breadcrumb chevron lists sibling files");
+  find(root, "file-menu-backdrop").handlers["on_mouse_down:left"]({}, cx);
+  view.targets = ["Finder", "Zed"];
+  view.menu = { path: "README.md", context: view.context(), x: 4, y: 4, at: 2 };
+  const menuKey = key => find(view.render(cx), "file-menu-backdrop").handlers.on_key_down({ key }, cx);
+  menuKey("right");
+  assert.ok(find(view.render(cx), "file-submenu-editor:Zed"), "Right opens the target row's editor submenu");
+  menuKey("escape");
+  assert.ok(view.menu && !view.menu.sub, "Escape closes only the child menu first");
+  menuKey("right");
+  const launches = [], launch = view.launch;
+  view.launch = (_st, path, name) => launches.push([path, name]);
+  menuKey("enter");
+  view.launch = launch;
+  assert.deepEqual(launches, [["README.md", "Zed"]], "Enter dispatches the selected editor for the exact menu path");
+  assert.equal(view.menu, null);
+  assert.equal(w.focused, view.treeHandle, "closing a tree menu restores tree focus");
   assert.deepEqual(wrote.filter((k) => /reveal/.test(k)), [], "no cross-page request");
+}
+
+async function collapseDuringExpansion() {
+  const chain = makePage({ listing: new Map([["/r", "d\0src\0"], ["/r/src", "d\0nested\0"], ["/r/src/nested", "f\0a.js\0"]]) });
+  chain.view.render(chain.cx); await chain.settle();
+  chain.w.stall = line => line.includes(m.LIST) && line.endsWith("/src");
+  chain.view.toggle(chain.view.current(), "src", chain.cx); await chain.settle();
+  chain.view.foldAll(chain.view.current(), chain.cx);
+  chain.w.stall = null; chain.w.stalled.splice(0).forEach(done => done()); await chain.settle();
+  assert.equal(chain.view.current().expanded.size, 0, "late compact-chain reads must not reopen after Collapse all");
+  // A home-sized fixture: 24 roots × 6 projects × 30 files, with a later directory read still in flight.
+  const listing = new Map(), names = Array.from({ length: 24 }, (_, i) => `folder-${i}`);
+  listing.set("/r", names.map(n => `d\0${n}\0`).join(""));
+  for (const name of names) {
+    listing.set(`/r/${name}`, Array.from({ length: 6 }, (_, i) => `d\0project-${i}\0`).join(""));
+    for (let j = 0; j < 6; j++) listing.set(`/r/${name}/project-${j}`, Array.from({ length: 30 }, (_, i) => `f\0file-${i}.ts\0`).join(""));
+  }
+  const { view, cx, w, settle } = makePage({ listing });
+  view.render(cx); await settle(); view.render(cx);
+  w.stall = line => line.includes(m.LIST) && line.endsWith("/folder-1");
+  view.foldAll(view.current(), cx); await settle();
+  assert.ok(view.current().expanded.size > 0, "expansion has made visible progress");
+  view.foldAll(view.current(), cx);
+  assert.equal(view.current().expanded.size, 0, "collapse is immediate");
+  w.stall = null; w.stalled.splice(0).forEach(done => done()); await settle();
+  assert.equal(view.current().expanded.size, 0, "late expansion reads must not reopen the tree after Collapse all");
+  view.foldAll(view.current(), cx); await settle();
+  const rows = view.rows(view.current());
+  assert.ok(rows.length > 4000, "the performance guard uses thousands of visible tree rows");
+  view.render(cx);
+  let visited = 0;
+  for (const row of rows) for (const key of ["dir", "path"]) {
+    const value = row[key];
+    Object.defineProperty(row, key, { get() { visited++; return value; }, configurable: true });
+  }
+  view.render(cx);
+  assert.ok(visited < 1000, `a warm render must only inspect visible rows, not scan all ${rows.length}: visited ${visited}`);
 }
 
 // It works only for what shows: the Files page, open, in the window in front, for the active space; nothing is watched, so
@@ -178,21 +301,21 @@ async function resources() {
   // Shown: read at once.
   show("files"); await tick();
   let lines = ran();
-  assert.ok(lines.some((l) => l.includes("rev-parse")) && lines.some((l) => l.includes(" status ")) && lines.some((l) => l.includes(m.LIST)), `read: ${lines}`);
+  assert.ok(lines.some((l) => l.includes("rev-parse")) && lines.some((l) => l.includes(m.LIST)), `read: ${lines}`);
   assert.ok(view.render(cx) && st("s1").entries.has(""));
   // While it shows, asked again every 5 s here; a refresh that took long asks less often (10 times as long), a minute at most.
   await tick();
   assert.deepEqual(ran(), [], "not again within 5 s");
   st("s1").refreshed -= 5000; await tick();
-  assert.ok(ran().some((l) => l.includes(" status ")), "again after 5 s");
+  assert.ok(ran().some((l) => l.includes(m.LIST)), "again after 5 s");
   st("s1").refreshed -= 5000; st("s1").took = 1000; await tick();
   assert.deepEqual(ran(), [], "a 1 s refresh: not again for 10 s");
   st("s1").refreshed -= 5000; await tick();
-  assert.ok(ran().some((l) => l.includes(" status ")), "again after 10 s");
+  assert.ok(ran().some((l) => l.includes(m.LIST)), "again after 10 s");
   st("s1").refreshed -= 59000; st("s1").took = 60000; await tick();
   assert.deepEqual(ran(), []);
   st("s1").refreshed -= 1000; await tick();
-  assert.ok(ran().some((l) => l.includes(" status ")), "a minute at most");
+  assert.ok(ran().some((l) => l.includes(m.LIST)), "a minute at most");
   st("s1").took = 0;
 
   // A search showing is found again with each refresh: a file gone leaves it, a new one joins, the lit one stays lit.
@@ -235,7 +358,7 @@ async function resources() {
 
   // Hidden mid-read: what comes back is dropped, and nothing more is asked, the open file not read again.
   send("open:a.js"); await settle();
-  st("s1").refreshed -= 5000; w.stall = (l) => l.includes(" status "); await tick();
+  st("s1").refreshed -= 5000; w.stall = (l) => l.includes(m.LIST); await tick();
   show("review"); await tick();
   const version = st("s1").version, refreshed = st("s1").refreshed, notified = w.notified;
   ran(); w.read.length = 0; w.stall = null; w.stalled.splice(0).forEach((r) => r()); await settle();
@@ -249,7 +372,7 @@ async function resources() {
   w.windowActive = false; st("s1").refreshed -= 60000; await tick();
   assert.deepEqual(ran(), [], "window behind: no I/O");
   w.windowActive = true; await tick();
-  assert.ok(ran().some((l) => l.includes(" status ")), "in front again: read at once");
+  assert.ok(ran().some((l) => l.includes(m.LIST)), "in front again: read at once");
 
   // Outside Git and on another machine: listed, asked again while shown (another machine every 10 s).
   w.spaces = [...w.spaces, space("n", "/n"), space("v", "/x", false, "vps")];
@@ -267,7 +390,7 @@ async function resources() {
   st("v").refreshed -= 5000; await tick();
   assert.deepEqual(ran(), [], "another machine: not within 10 s");
   st("v").refreshed -= 5000; await tick();
-  assert.ok(ran().some((l) => l.includes(" status ")), "another machine: again after 10 s");
+  assert.ok(ran().some((l) => l.includes(m.LIST)), "another machine: again after 10 s");
   // Hidden while another machine's file is checked: it isn't read after.
   w.stall = (l) => l.includes(m.PROBE); view.open(st("v"), "a.js", cx); await settle();
   assert.equal(w.stalled.length, 1, "probing");
@@ -298,7 +421,7 @@ async function resources() {
   // Back: read again, its file too.
   w.read.length = 0; ran();
   activate("s1"); await tick();
-  assert.ok(ran().some((l) => l.includes(" status ")) && w.read.includes("/r1/a.js"), "back: read again");
+  assert.ok(ran().some((l) => l.includes(m.LIST)) && w.read.includes("/r1/a.js"), "back: read again");
   assert.ok(st("s1").view?.code && !st("s1").view.code.released, "its file in an editor again");
   assert.ok(st("s1").expanded.has("src"), "its folders as they were");
   assert.deepEqual(plain(st("s1").results.map((r) => r.path)), ["b.js"], "its search found again");
@@ -341,28 +464,15 @@ async function surfaceCache() {
   assert.deepEqual(plain(m.ancestors("a/b/c.js")), ["a", "a/b"]);
   assert.deepEqual([m.join("", "a"), m.join("a", ""), m.join("/r/", "a"), m.join("/", "a")], ["a", "a", "/r/a", "/a"]);
 
-  // Porcelain v2: ordinary, renamed (its origin follows), conflicted, untracked; a path with spaces; outside the folder left out.
-  const status = [
-    "# branch.oid abc", "1 .M N... 100644 100644 100644 h1 h2 sub/src/a b.js", "1 A. N... 000000 100644 100644 h0 h1 sub/new.js",
-    "1 .D N... 100644 100644 000000 h1 h1 sub/gone/x.js", "1 MD N... 100644 100644 000000 h1 h2 sub/md.js",
-    "2 R. N... 100644 100644 100644 h1 h1 R100 sub/to.js", "sub/from.js", "u UU N... 100644 100644 100644 100644 h1 h2 h3 sub/conf.txt",
-    "? sub/untracked dir/f.txt", "1 .M N... 100644 100644 100644 h1 h2 other/z.js", "",
-  ].join("\0");
-  const s = m.parseStatus(status, "sub/");
-  assert.deepEqual(Object.fromEntries(s.marks), { "src/a b.js": "M", "new.js": "A", "gone/x.js": "D", "md.js": "D", "to.js": "R", "conf.txt": "M", "untracked dir/f.txt": "A" });
-  assert.deepEqual(plain([...s.dirs].sort()), ["gone", "src", "untracked dir"]);
-  assert.equal(m.parseStatus(status, "").marks.get("other/z.js"), "M", "no prefix: the whole repo");
-  assert.equal(m.parseStatus(status, "").marks.has("sub/from.js"), false, "a rename's origin isn't a change of its own");
-
-  // Ignored: what Git names now, the rest cleared; the tree dims all under an ignored folder, and shows a deleted file.
+  // Files only decorates ignored entries; a deleted path is not invented as a ghost tree row.
   const ignored = new Set(["dist", "old.log"]);
   m.markIgnored(ignored, "", [{ name: "dist", dir: true }, { name: "old.log", dir: false }, { name: "src", dir: true }], m.parseIgnored("dist/\0"));
   assert.deepEqual(plain([...ignored]), ["dist"]);
   const tree = { entries: new Map([["", [{ name: "dist", dir: true }, { name: "src", dir: true }, { name: "a.md", dir: false }]], ["dist", [{ name: "x.js", dir: false }]], ["src", [{ name: "b.js", dir: false }]]]),
     expanded: new Set(["dist", "src"]), ignored, marks: new Map([["src/c.js", "D"], ["src/b.js", "M"]]) };
   const rows = (st) => m.treeRows(m.folderEntries(st), (p) => st.expanded.has(p));
-  assert.deepEqual(plain(rows(tree)).map((r) => [r.path, r.depth, r.ignored, r.gone]),
-    [["dist", 0, true, false], ["dist/x.js", 1, true, false], ["src", 0, false, false], ["src/b.js", 1, false, false], ["src/c.js", 1, false, true], ["a.md", 0, false, false]]);
+  assert.deepEqual(plain(rows(tree)).map((r) => [r.path, r.depth, r.ignored]),
+    [["dist", 0, true], ["dist/x.js", 1, true], ["src", 0, false], ["src/b.js", 1, false], ["a.md", 0, false]]);
   tree.expanded.delete("src");
   assert.equal(rows(tree).some((r) => r.path.startsWith("src/")), false, "a closed folder's rows go");
   // A folder holding just a folder is one row with it once open, ignored as its last folder is.
@@ -385,15 +495,6 @@ async function surfaceCache() {
   assert.deepEqual(plain(narrower), plain(await m.filterPaths(lower, m.terms("pkg-3 component-11"), null, pause)), "from the last matches, the same as from all");
   let calls = 0;
   assert.equal(await m.filterPaths(lower, ["src"], null, pause, () => ++calls < 1), null, "a newer query stops it");
-
-  // Ranking: uFuzzy's best first with the letters it matched; what it can't match (terms out of order) after; at most `limit`.
-  const uf = new m.uFuzzy();
-  const ranked = plain(m.rank(uf, ["docs/review/notes.md", "extras/mods/review/diff.js", "diff/review.js"], "review diff", 10));
-  assert.equal(ranked.length, 3);
-  assert.equal(ranked[0].path, "extras/mods/review/diff.js");
-  assert.deepEqual(ranked[0].ranges.map(([a, b]) => "extras/mods/review/diff.js".slice(a, b)).join("|"), "review|diff");
-  assert.deepEqual(ranked.find((r) => r.path === "diff/review.js").ranges, [], "out of order: kept, unmarked");
-  assert.equal(m.rank(uf, paths.slice(0, 50), "src", 20).length, 20);
 
   // Kinds and the Editor's languages.
   assert.equal(m.kindOf("a/Logo.PNG"), "image");
@@ -460,6 +561,7 @@ async function surfaceCache() {
     fs.rmSync(path.join(dir, ".git"), { recursive: true });
     assert.deepEqual(search("pkg"), ["node_modules/pkg/i.js"], "outside Git: find");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  await collapseDuringExpansion();
   await page();
   await resources();
   await surfaceCache();

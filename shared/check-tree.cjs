@@ -4,7 +4,13 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "tree.js"), "utf8").replace(/^export /gm, "");
-const { agentKids, descendants } = vm.runInNewContext(source + "\n({ agentKids, descendants });");
+const { agentKids, descendants, kidStatus } = vm.runInNewContext(source + "\n({ agentKids, descendants, kidStatus });");
+
+assert.equal(kidStatus({ address: "reply", status: "done" }, new Map()), "done", "a completed sub-agent isn't idle");
+assert.equal(kidStatus({ address: "reply", status: "done" }, new Map([["reply", "idle"]])), "done", "reading its pane doesn't erase the terminal's completed state");
+assert.equal(kidStatus({ address: "reply", status: null }, new Map([["reply", "done"]])), "done");
+assert.equal(kidStatus({ address: "reply", status: "working" }, new Map([["reply", "blocked"]])), "working", "its row is its own state, not a listed aggregate");
+assert.equal(kidStatus({ address: "reply", status: "error" }, new Map()), "blocked", "a failed sub-agent still needs attention in the aggregate");
 
 // An agent ran two commands in shells of its own (`hc run --bg`); one of them started an agent.
 const agent = (address, parent, status = "working") => ({ address, parent, state: "live", status, program: { agent: true } });

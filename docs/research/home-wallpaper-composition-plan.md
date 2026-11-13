@@ -1,6 +1,6 @@
 # Home 壁纸：固定 Dots 与导入构图实施计划
 
-状态：待实施。本文件记录计划；本轮不修改实现、安装配置或已有壁纸。
+状态：历史计划。构图已在28425912落地；后续“四种画法”授权取代这里的固定Dots选择，现行依据见[需求C](herdr-experience-requirements.md#5-c--home-壁纸导入构图)和[图片处理验收](wallpaper-image-alignment/README.md)。以下保留当时目标，不作现行重建说明。
 
 ## 目标与交互
 

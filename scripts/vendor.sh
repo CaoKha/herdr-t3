@@ -1,6 +1,5 @@
 #!/bin/sh
 # Builds what the mods carry from outside, at pinned versions; the output is committed, so installing needs no bun:
-#   - mods/t3-files/vendor/ufuzzy.js: uFuzzy (package.json's version) as one ESM file.
 #   - shared/file-icons-data.js and shared/icons/cat/: catppuccin/vscode-icons' name, extension and folder matches, and the
 #     SVGs they name, for shared/file-icons.js. scripts/sync.sh copies both to the mods that draw file icons.
 #   - extras/mods/review/vendor/char-width.js: each code point's columns, from get-east-asian-width (package.json's version)
@@ -16,13 +15,6 @@ trap 'rm -rf "$tmp"' EXIT
 # Installed beside, not here: no node_modules or lockfile in the repo.
 cp "$src/package.json" "$tmp/"
 (cd "$tmp" && bun install --silent)
-out=$src/mods/t3-files/vendor
-mkdir -p "$out"
-bun build "$tmp/node_modules/@leeoniya/ufuzzy/dist/uFuzzy.mjs" --format esm --outfile "$tmp/ufuzzy.js" >/dev/null
-# Bun's first line names the temp folder it built from. Not type-checked: it's theirs.
-{ echo "// @ts-nocheck"; echo "// @leeoniya/ufuzzy $(jq -r .version "$tmp/node_modules/@leeoniya/ufuzzy/package.json"), bundled by scripts/vendor.sh: don't edit."; tail -n +2 "$tmp/ufuzzy.js"; } > "$out/ufuzzy.js"
-cp "$tmp/node_modules/@leeoniya/ufuzzy/LICENSE" "$out/LICENSE-ufuzzy"
-
 out=$src/extras/mods/review/vendor
 mkdir -p "$out"
 cat > "$tmp/width.ts" <<'EOF'

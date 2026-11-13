@@ -2,13 +2,28 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-14
+
+- Quick Review now opens its range menu directly from the Details row, without a detached second scope button. Base selection stays inside that menu; Review’s choices and keyboard behavior are unchanged.
+
+- asciicn wallpaper: in a light theme, a newly imported picture is drawn like ink on paper, with marks where the photo is dark, instead of looking like a negative. Phone photos stored sideways are turned upright first. A new crop button beside `+` reopens an added wallpaper at its saved framing; Apply saves only the new framing. Pictures imported before this keep their old look in light themes; reimport the original to get the paper look.
+
 ## 2026-11-13
+
+- Removed redundant split-arrow and visible-name tooltips. Actions, computer names and surface tabs now share actual text/container measurement and only reveal a full name when clipped; unchanged widths do not trigger updates.
+
+- Sub-agent menus now contain only the list: the fixed details/footer buttons and automatic initial selection were removed after seeing the installed UI. Click or arrows/Enter still peek; right-click reuses the sidebar's agent menu for Send back, Copy address and other available actions. No external hover card returns. Tree order, program icons, folds beside the icons, one fixed status column, idle age, distinct done/idle and the entry's count tooltip stay.
+- A rebuilt machine's Connect link no longer repeats the visible machine name in a tooltip; its accessibility label stays.
+
+- Open in now detects the full T3 editor list, including VSCodium and JetBrains, instead of only four apps. Files’ split button matches the adjacent controls in size, shape and icon alignment, keeps both slots when disabled, and clickable menus use a pointer rather than a text cursor.
+
+- Files now follows T3's tree structure, original file-icon shapes, directory breadcrumbs and filtered-tree search. Hover, selection and keyboard focus are separate; ignored entries dim without Review's change badges. The file header keeps fixed control slots, disabling unavailable actions instead of shifting them. Search has a padded focus ring. Breadcrumbs, tree rows and the split arrow have no tooltip. Directory breadcrumb hover brightens text without a background fill; keyboard focus rings remain. Collapsing a still-expanding tree cancels the old operation; directory reads are bounded and row statistics are cached.
 
 - Fixed Details registering an invisible, zero-height popup. Its scroll viewport now follows measured content with a visible minimum and bounded maximum.
 - Wallpaper framing no longer rerasterizes every SVG tile at every Zoom step. Dragging, zooming and arrow keys reuse a cached, theme-coloured preview image; saved drawings keep their original SVG detail.
 
-- Image imports now use Dots and, like Studio `.ans` imports, let you frame them before Apply: Fill or Fit, drag or arrow-key positioning, 1–4× zoom and Reset within the current fit mode. Saved framing survives new Homes, restarts and resizing. The preview keeps fixed button slots, aligns its slider, takes keyboard focus on the canvas and shows retryable save errors inline.
-- Details (`cmd-shift-b`) is now an on-demand three-row popup: computer/directory, Open in Finder or an installed editor, and Actions. Its T3 square-menu control stays beside the work area; the panel toggle and platform controls move to the open panel's right edge. The sidebar mode still switches from its own button.
+- Image imports start in Dots and offer Braille, Blocks (`░▒▓█`) and Quadrants in the preview's fixed top row. Their grids, cover/supersampling, autoLevels and glyph thresholds follow asciicn Studio; colours use eight value-opacity steps and the theme's nearest VGA-reference ANSI16 slot. New Dots use 4.5×9 cells; built-ins and existing square `.ans` stay unchanged. Reimport an original for the new processing. Switching only changes the draft, yields during generation and drops stale work; Studio files retain a disabled mode row. Fill/Fit, positioning, zoom, Reset and Apply/Cancel keep their fixed slots, including during mode changes.
+- Details (`cmd-shift-b`) now follows T3's Workspace structure plus Quick Review with this layout's tokens: a locked computer/path row, editor preference versus execution, global Actions, the existing Review scope picker and card visibility/Reset. Split menus match their row's width and retain their open state; editing keeps Details behind the dialog. Its square-menu entry stays by the work area; panel/window controls move to the open panel's right edge. The sidebar keeps its own mode button.
 - Replaced fixed Files/Review pages with closable per-space surface tabs, + and Open a surface. Files shares one tree; duplicate files/Review activate existing tabs. Panel `cmd-t` opens + and `cmd-w` closes the active surface. Hiding retains tabs; closing releases state, including Review's range. Each space retains only three recently displayed file previews/Editors. Tree menus reveal locally, copy relative paths and insert into this tab's last active terminal without Enter, restoring text clipboard safely. Terminal path clicks remain unavailable: the host provides no callback.
 
 - Wallpaper controls now stay in place across built-in and imported pictures, progress, previews, errors and Studio guide expansion. Unavailable actions keep their slots and are disabled; deletion confirmation does not move the switcher.

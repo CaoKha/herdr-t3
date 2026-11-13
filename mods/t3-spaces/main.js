@@ -274,11 +274,11 @@ export default class Spaces extends View {
         .when(!connected && !rebuilt, el => el.child(div().flex_none().child((machine?.state ?? "asleep").replace(/_/g, " "))))
         .when(rebuilt, el => el.child(h_flex().flex_none().gap(4).items_center()
           .child(div().max_w(140).truncate().child(repair?.error || "rebuilt ·"))
-          .child(tip(this, t, `machine-connect-${m}`, `Connect ${m}`, stop(this, t, `machine-connect-${m}`, div().id(`machine-connect-${m}`).text_color(repair?.error ? t.blocked : t.muted)
-            .hover(s => s.text_color(t.foreground)).on_hover(glow(this, `machine-connect-${m}`))
+          .child(stop(this, t, `machine-connect-${m}`, div().id(`machine-connect-${m}`).text_color(repair?.error ? t.blocked : t.muted)
+            .hover(s => s.text_color(t.foreground))
             .role("button").accessibility_label(`Connect ${m}`)
             .on_click((_e, cx) => { cx.stop_propagation(); this.reconnect(machine, cx); })
-            .child(repair?.busy ? "Connecting…" : "Connect"), 4)))))
+            .child(repair?.busy ? "Connecting…" : "Connect"), 4))))
         // T3's folder sizes: a 24px + with a 14px icon (icon-xs) and a 12px chevron, in the heading buttons' two columns, 50 and
         // 22px from the sidebar's edge. The -2 sits on the group: on the chevron's own box it threw the whole group past the edge.
         .child(h_flex().flex_none().mr(-2).gap(10).items_center()

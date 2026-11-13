@@ -36,7 +36,7 @@
 
 验收门槛：三种回放的事件间隔p95≤33ms，所有转换与文件调用计数为0。修复前Zoom p95=260ms，稳定复现；其他两种没有相同持续卡顿，Zoom档位变化后的单次冷栅格化也会污染拖动的最大间隔。性能修复未以降采样原图或跳过输入来掩盖问题。
 
-原生客体输入另做一次背景拖动，读回确认没有变化后才改foreground；真实slider从2.00变3.54，见 `performance-after/native-foreground.png`。这是真实HID拖动的UI确认，不把Driver的 `effect: unverifiable`当成功。逐帧计量用上述受控回放，不把一次人工式手势冒充100步计量。`theme-light.png`确认浅色主题重新着色，整窗没有裁卡片。
+原生客体输入另做一次背景拖动，读回确认没有变化后才改foreground；真实slider从2.00变3.54，见 `performance-after/native-foreground.png`。这是真实HID拖动的UI确认，不把Driver的 `effect: unverifiable`当成功。逐帧计量用上述受控回放，不把一次人工式手势冒充100步计量。原 `app.theme` 只选择明暗各自的主题槽，并未切appearance，该探索图更名 `theme-selection-only.png`，不作浅色证据；明确切appearance后的明暗整窗补验见[模式验收](../wallpaper-image-alignment/README.md)。
 
 ## 门禁与边界
 

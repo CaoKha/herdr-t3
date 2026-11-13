@@ -46,11 +46,19 @@
 | 侧栏 | `Sidebar*.tsx`、`ui/sidebar.tsx` | 见源码；RECIPE 里已写明的是之前量过的值，仍要对照 |
 | 侧栏图标 | `SidebarThreadHeader.tsx`、`SidebarProjectFolderHeader.tsx`、`ui/collapsible-section-header.tsx`、`SidebarThreadRow.tsx` | 图标跟着按钮框走：28 的按钮图标 16，24 的小按钮（`icon-xs`）图标 14；收纳区和文件夹的折叠箭头、行内控件和标记 12 |
 | 面板标签 | `RightPanelTabs.tsx`、`ui/panel-tab-close-button.tsx`（`09a54f01`） | 高24、最宽144、圆角6、左内距6／右8、子项间距2、字号12。左16px槽平时12px surface图标，标签悬停／键盘聚焦换12px ×，关闭圆角4／`tab`面。条左内距8（由layout panel padding提供）、项间距4；+ 为既有 `button()` xs ghost（24方／图标14），紧跟末项在同一滚动条内；菜单左对齐、下偏移6。当前底selected，悬停hover，文字foreground／dim；layout controls最右 |
-| 详情 popup | `chat/threadDetailsPanelStyles.ts`、`threadDetailsCardLayout.ts`（`09a54f01`） | 宽280、自然高50–420（内容实测）、1px 主题 border；字号 13 medium、图标 16、gap 10、横内距 10、行圆角 8；卡片内距 8、圆角 16。split 箭头宽 32，中线高 16，仅悬停时显现 |
+| 详情 popup | `chat/threadDetailsPanelStyles.ts`、`ThreadDetailsSection.tsx`、`threadDetailsCardLayout.ts`（`09a54f01`） | 宽280、内容自然高且最高420、1px主题border、圆角16。分区内距8；行32、字13 medium、图标16、gap10、横距10、圆角8。机器locked行透明、无hover／chevron；folder只作提示。split箭头宽32、中线高16，hover或对应菜单开启时显示；子菜单与整行同宽、下偏移4。Quick Review可见且前区非空时才画border1，不造空分隔线；范围子菜单与Quick Review行同宽、下偏移4，不能另画scope触发按钮；base／commit控制置于同一菜单内，复用Review原有token |
 
-详情与面板入口按 `chat/PanelLayoutControls.tsx` 的形状，用既有 `button()` 的 `ghost / sm / card`：28×28、16px 的 square-menu／panel-right、间距 4，颜色完全取下方「按钮」表的 card 面（悬停 7%、on 12%），不另造 5% 开启底。popup 行属于列表／split 豁免，文字 foreground、图标 dim、底 popover、边 border、悬停同 card 7%。详情机器名是单行截断的电脑名，路径只在 folder 图标的 tooltip／复制菜单里显示。Open in 应用图标是彩色 `image()`；没有专属图标时用本 mod 的 app-window，不引用别的 mod 文件。
+详情与面板入口按 `chat/PanelLayoutControls.tsx` 的形状，用既有 `button()` 的 `ghost / sm / card`：28×28、16px 的 square-menu／panel-right、间距 4，颜色完全取下方「按钮」表的 card 面（悬停 7%、on 12%），不另造 5% 开启底。popup 行属于列表／split 豁免，文字 foreground、图标 dim、底 popover、边 border、悬停同 card 7%，菜单开启用card的12%；父组与半区各自响应hover。详情机器名是单行截断的电脑名，folder仅tooltip，整行右键复制完整路径。Open in 应用图标是彩色 `image()`；没有专属图标时用本 mod 的 app-window，不引用别的 mod 文件。数值采用本仓token，不直接复制T3的foreground/80或黑白alpha。
 
 详情滚动视口最小高50：一行32、上下各8、外边框各1；自然内容超过420时才在限高视口里滚动。这个下界防止宿主把无确定高度的滚动根测成0，不是把卡片固定成50或420高。内容高度在布局回调中测量，外层明确使用测得高度加2px边框。
+
+## Files 文件头与树
+
+对照 `09a54f01` 的 `files/fileSurfaceChrome.tsx`、`FileBrowserPanel.tsx`、`FileBreadcrumbs.tsx` 和 Pierre `style.js`：inline 文件头高28／下距12／横12，无下边线；树头36／下距4／横8，gap4，输入28。行24／字12／圆角6／横内距6.4／外距1.6／图标16／gap4.8，目录只有16px槽里的原Pierre chevron。首层缩进19.2，其后每层18.7，guide1px，foreground14%；hover7%、selected12%、焦点accent1px，ignored文字dim／图标50%。面包屑最高宽160、横2、chevron槽16×20／横外距2／图标14；文件头图标控件用button sm（28）。Open in保留T3 split结构，样式与同排控件统一为button ghost/sm/card：两半各28、图标16、外圆角8／内直角、中线1×16取border，总宽57；菜单开时on底，始终保留箭头槽，禁用不跳位。可点按钮／菜单行显式pointer，不继承内容的选字光标。树宽handle键盘步长16；菜单用既有菜单token。Review 的已看框及其额外图标槽保留原几何。
+
+树 viewport 左内距14.4、右8.4（Pierre `style.js` 的 padding-inline16减行外距1.6，右侧再减6px滚动条槽）；行内距仍见上段。树与文件头都保留原Pierre图形，按主题ansi／dim上色，不使用它的固定light/dark色板。面包屑滚动行透明，目录hover只提亮文字为foreground，不加底色；键盘focus-visible内环保留。用户明确删除面包屑和文件树行tooltip；Open in分体箭头只留无障碍标签，不因T3有提示而恢复。
+
+Files Search 使用既有compact输入框token：高28、横内距9、字12、圆角6；左右控件间距4。ghost静止透明／透明边，hover为foreground7%；焦点背景background、1px accent边及内侧3px accent24% ring（`ui/input-group.tsx` 的focus-visible规则），不改变布局。T3的search输入隐藏浏览器自带clear装饰，Escape清空并退出输入，无额外×槽。
 
 ## 按钮
 

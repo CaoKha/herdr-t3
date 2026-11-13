@@ -29,30 +29,6 @@ export function parseListing(stdout) {
   return sortEntries(out);
 }
 
-// `git status --porcelain=v2 -z`, run at the repo's top, for a space whose folder is `prefix` inside it ("" or "sub/dir/").
-// Paths come back relative to the space's folder; changes outside it are left out. A letter per file (A, M, D or R:
-// untracked counts as added, a conflict as modified) and every folder holding one.
-export function parseStatus(stdout, prefix = "") {
-  const marks = new Map(), dirs = new Set(), records = stdout.split("\0");
-  // The path follows a fixed number of space-separated fields; it may hold spaces itself.
-  const after = (rec, n) => { let at = -1; for (let i = 0; i < n; i++) at = rec.indexOf(" ", at + 1); return at < 0 ? null : rec.slice(at + 1); };
-  for (let i = 0; i < records.length; i++) {
-    const rec = records[i], xy = rec.slice(2, 4);
-    let path = null, letter = "M";
-    if (rec[0] === "1") {
-      path = after(rec, 8);
-      letter = xy.includes("D") ? "D" : xy[0] === "A" ? "A" : "M";
-    } else if (rec[0] === "2") { path = after(rec, 9); letter = "R"; i++; } // the next record is where it came from
-    else if (rec[0] === "u") path = after(rec, 10);
-    else if (rec[0] === "?") { path = rec.slice(2); letter = "A"; }
-    if (!path || !path.startsWith(prefix)) continue;
-    path = path.slice(prefix.length);
-    marks.set(path, letter);
-    for (let at = path.indexOf("/"); at > 0; at = path.indexOf("/", at + 1)) dirs.add(path.slice(0, at));
-  }
-  return { marks, dirs };
-}
-
 // `git check-ignore --stdin -z`'s answer: the paths it was given that Git ignores. A folder was asked with a trailing slash.
 export function parseIgnored(stdout) {
   return new Set(stdout.split("\0").filter(Boolean).map((p) => p.replace(/\/$/, "")));
@@ -65,14 +41,12 @@ export function markIgnored(ignored, rel, entries, found) {
 }
 
 /**
- * A folder's entries as file-tree.js's treeRows takes them: a deleted file where it was (after the files there), and
- * everything under an ignored folder ignored too.
+ * A folder's entries as file-tree.js's treeRows takes them; ignored status is inherited from every ancestor.
  */
-export const folderEntries = ({ entries, ignored, marks }) => (rel) => {
-  const list = entries.get(rel) ?? [], names = new Set(list.map((e) => e.name));
-  const gone = [...marks].filter(([p, l]) => l === "D" && parentOf(p) === rel && !names.has(nameOf(p))).map(([p]) => ({ name: nameOf(p), dir: false, gone: true }));
+export const folderEntries = ({ entries, ignored }) => (rel) => {
+  const list = entries.get(rel) ?? [];
   const dim = Boolean(rel) && [...ancestors(rel), rel].some((p) => ignored.has(p));
-  return [...list, ...gone].map((e) => ({ name: e.name, dir: e.dir, gone: Boolean(e.gone), ignored: dim || ignored.has(join(rel, e.name)) }));
+  return list.map((e) => ({ name: e.name, dir: e.dir, ignored: dim || ignored.has(join(rel, e.name)) }));
 };
 
 // A search's terms: every one must be in the path, case aside.
@@ -95,28 +69,6 @@ export async function filterPaths(lower, words, from, pause, alive = () => true)
     }
     if (start + CHUNK < n) { await pause(); if (!alive()) return null; }
   }
-  return out;
-}
-
-/**
- * At most `limit` of `paths` (all matching `query`), best first, each with the [start, end) ranges uFuzzy matched, for
- * highlighting. uFuzzy wants its terms in order: paths it doesn't match keep their place after the ones it ranks.
- * Only for a few hundred paths: ranking ten thousand takes a frame and more.
- */
-export function rank(uf, paths, query, limit) {
-  const idxs = uf.filter(paths, query) ?? [], seen = new Set();
-  const out = [];
-  if (idxs.length) {
-    const info = uf.info(idxs, paths, query), order = uf.sort(info, paths, query);
-    for (const o of order) {
-      if (out.length >= limit) break;
-      const r = info.ranges[o], ranges = [];
-      for (let k = 0; k < r.length; k += 2) ranges.push([r[k], r[k + 1]]);
-      seen.add(info.idx[o]);
-      out.push({ path: paths[info.idx[o]], ranges });
-    }
-  }
-  for (let i = 0; i < paths.length && out.length < limit; i++) if (!seen.has(i)) out.push({ path: paths[i], ranges: [] });
   return out;
 }
 

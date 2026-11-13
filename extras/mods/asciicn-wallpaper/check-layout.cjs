@@ -26,12 +26,13 @@ const env = { View: class {}, div: element, svg: element, h_flex: element, v_fle
   SCENES: built, settings: () => ({ dark }), theme: () => ({ foreground: dark ? '#ffffff' : '#000000' }),
   window: () => ({ platform }), shared: k => k === 'asciicn-wallpaper.scene' ? selected : undefined, setShared: (k, v) => { if (k === 'asciicn-wallpaper.scene') selected = v; },
   focusRoot: (_v, el) => el, stop: (_v, _t, _id, el) => el };
+env.tip = (_v, _t, _id, _label, el) => el;
 const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8').replace(/^import .*;\r?\n/gm, '').replace('export default class', 'globalThis.Mod = class').replace(/^export /gm, '');
 const source = read('button.js') + '\nconst drawButton = button;\n'
   + 'Object.assign(globalThis, (() => { const KEY = {focus: "test.focus"};\n' + read('focus.js')
   + '\nreturn { stop, focusRoot, stopsInit, stopsEnd, enter }; })());\n' + read('main.js');
-const toolbar = ['wallpaper-back', 'wallpaper-next', 'wallpaper-add', 'wallpaper-remove'];
-const draft = { name: 'Image', placement: { mode: 'cover', zoom: 1, x: .5, y: .5 }, scene: scene('preview:1', 'Image') };
+const toolbar = ['wallpaper-back', 'wallpaper-next', 'wallpaper-add', 'wallpaper-frame', 'wallpaper-remove'];
+const draft = { name: 'Image', style: 'dots', pixels: {}, placement: { mode: 'cover', zoom: 1, x: .5, y: .5 }, scene: scene('preview:1', 'Image') };
 const cases = [
   ['first', {}], ['last', {}, 'last'], ['imported short', { imported: [scene('file:x', 'x')] }, 'file:x'],
   ['imported long', { imported: [scene('file:x', 'A very long Unicode 壁纸 name '.repeat(6))] }, 'file:x'],
@@ -44,6 +45,11 @@ const cases = [
   ['preview error', { draft: { ...draft, error: 'A multiline error message '.repeat(40) } }],
   ['preview Fit', { draft: { ...draft, placement: { mode: 'contain', zoom: 3, x: .1, y: .9 } } }],
   ['preview save error', { draft: { ...draft, saveError: 'A retryable save error '.repeat(40) } }],
+  ...['dots', 'braille', 'blocks', 'quadrants'].flatMap(style => [
+    [`preview ${style}`, { draft: { ...draft, style } }],
+    [`converting ${style}`, { draft: { ...draft, style, busy: true } }],
+  ]),
+  ['Studio fixed glyphs', { draft: { ...draft, pixels: null } }],
 ];
 const baselines = {}, previewBaselines = {}, guideBaselines = {};
 for (const width of [1000, 259]) for (dark of [true, false]) for (platform of ['macos', 'linux', 'windows']) for (const [name, state, choice = 'first', single] of cases) {
@@ -68,17 +74,28 @@ for (const width of [1000, 259]) for (dark of [true, false]) for (platform of ['
   assert.deepEqual(bar.style.gap, [4]);
   for (const id of toolbar) assert.ok(find(bar, id), `${name}: ${id} keeps its slot`);
   const label = bar.items[1];
-  assert.deepEqual(label.style.w, [width === 1000 ? 160 : 115], `${name}: name/progress uses a fixed slot for this viewport`);
+  assert.deepEqual(label.style.w, [width === 1000 ? 160 : 87], `${name}: name/progress uses a fixed slot for this viewport`);
+  // At the narrowest Home the bar still fits: padding, five 24px buttons, the name and five gaps.
+  if (width === 259) assert.equal(8 + 5 * 24 + label.style.w[0] + 5 * 4, 259 - 24, `${name}: toolbar fits the narrowest Home`);
   const footprint = toolbar.map(id => find(bar, id).style.w);
   baselines[width] ??= footprint;
   assert.deepEqual(footprint, baselines[width], `${name}: toolbar button widths`);
   const remove = find(bar, 'wallpaper-remove');
   assert.equal(!!remove.handlers.on_click, choice.startsWith('file:') && !state.draft, `${name}: deletion availability`);
+  assert.equal(!!find(bar, 'wallpaper-frame').handlers.on_click, choice.startsWith('file:') && !state.draft, `${name}: reframing availability`);
   assert.equal(!!find(bar, 'wallpaper-back').handlers.on_click, !state.draft && !single, `${name}: navigation availability`);
   const preview = find(tree, 'wallpaper-preview');
   if (preview) {
     assert.equal(find(tree, 'wallpaper-compose').style.position, 'absolute', `${name}: the real focus ring cannot collapse the full-Home canvas`);
     const d = state.draft, disabled = !d.scene || d.busy || !!d.error || d.applying;
+    const modes = ['dots', 'braille', 'blocks', 'quadrants'].map(s => find(preview, `wallpaper-style-${s}`));
+    assert.ok(modes.every(Boolean), `${name}: all four processing modes keep their slots`);
+    assert.deepEqual(preview.style.h, [352]);
+    for (const mode of modes) {
+      assert.deepEqual(mode.style.flex_1, []);
+      assert.deepEqual(mode.style.min_w, [0]);
+      assert.equal(!!mode.handlers.on_click, !!d.pixels && !d.applying, `${name}: modes can supersede an in-flight conversion, but not .ans or Apply`);
+    }
     for (const id of ['wallpaper-cover', 'wallpaper-contain', 'wallpaper-reset', 'wallpaper-preview-cancel', 'wallpaper-preview-apply']) {
       const button = find(preview, id);
       assert.ok(button, `${name}: ${id} keeps its slot`);
@@ -109,4 +126,4 @@ for (const width of [1000, 259]) for (dark of [true, false]) for (platform of ['
     assert.deepEqual(footprint, guideBaselines[width], `${name}/${platform}: guide rows keep their heights`);
   }
 }
-console.log('ok: wallpaper controls and focused canvas keep their slots in 204 state/theme/platform/viewport combinations.');
+console.log(`ok: wallpaper controls and focused canvas keep their slots in ${cases.length * 12} state/theme/platform/viewport combinations.`);

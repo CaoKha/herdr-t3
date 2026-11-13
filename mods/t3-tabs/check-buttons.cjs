@@ -7,7 +7,7 @@ const vm = require("node:vm");
 function element() {
   const n = { items: [], handlers: {}, style: {}, hoverStyle: {} };
   const p = new Proxy(n, { get: (o, k) => k in o ? o[k] : (...a) => {
-    if (k === "child") n.items.push(a[0]);
+    if (k === "child" || k === "content") n.items.push(a[0]);
     else if (k === "children") n.items.push(...a[0]);
     else if (k === "when") { if (a[0]) a[1](p); }
     else if (k === "id") n.key = a[0];
@@ -36,10 +36,15 @@ const env = {
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {},
   navigation: () => ({ atHome: false, frame: () => ({ tabs: [tab], context: null }) }),
   subAgents: () => () => [], namer: () => p => p.title, programIcon: () => null,
+  POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
+  openMenu: (_view, kind, target) => calls.push([kind, target]), openOverlay: value => calls.push(["overlay", value]),
 };
 function load(dir) {
   const scope = vm.createContext({ ...env });
   const strip = src => src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
+  vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/measured-text.js"), "utf8")), scope);
+  vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/details.js"), "utf8")), scope);
+  vm.runInContext('globalThis.namedLabel = named;', scope);
   vm.runInContext("(() => {\n" + strip(fs.readFileSync(path.join(dir, "button.js"), "utf8")) + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf;\n})();", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return Object.assign(new scope.Mod(), { nameW: {}, strip: 0, pressed: null, over: null, area: 600 });
@@ -88,4 +93,35 @@ part = { part: "panel" };
 root = chrome.render();
 for (const id of ["panel-wide", "panel-close"]) assert.equal(click(root, id).style.h, 28);
 assert.deepEqual(calls.splice(0), [["wide"], ["hide"]]);
+
+let notices = 0;
+const pending = [], timedCx = { ...cx, timer: { after(ms, callback) { const task = { ms, callback, cancel() { this.cancelled = true; } }; pending.push(task); return task; }, every() { return { cancel() {} }; } } };
+const tick = ms => { const i = pending.findIndex(task => !task.cancelled && task.ms === ms); assert.notEqual(i, -1); pending.splice(i, 1)[0].callback(timedCx); };
+const measureCx = { ...cx, notify() { notices++; } }, bounds = { x: 10, y: 20, width: 30, height: 24 };
+const crumbContext = { space: { id: 's', name: 'Space' }, head: 'agent', parent: 'parent' };
+const crumbData = { every: [{ address: 'agent', title: 'Wide title' }, { address: 'parent', title: 'Parent' }], ps: [], name: a => a.title, narrow: false, stopPress() {} };
+env.projectMark = () => element();
+const crumbs = load(__dirname);
+root = crumbs.crumb(t, crumbContext, crumbData);
+assert.ok(find(root, 'text-name-peer-agent'), 'the breadcrumb uses the shared measured text');
+find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 40 }, measureCx);
+find(root, 'text-measure-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
+const first = notices;
+find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 40 }, measureCx);
+find(root, 'text-measure-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
+assert.equal(notices, first, 'unchanged breadcrumb widths do not notify');
+root = crumbs.crumb(t, crumbContext, crumbData);
+const title = find(root, 'peer-agent');
+title.handlers.on_hover(true, timedCx); assert.equal(crumbs.details, undefined, 'cut names retain the opening delay');
+tick(150); tick(34); assert.equal(crumbs.details, 'peer-agent'); assert.equal(crumbs.detailsIn, true, 'the original details timer finishes its fade in');
+title.handlers.on_mouse_move({ bounds }); assert.equal(crumbs.detailsBox.key, 'peer-agent'); assert.equal(crumbs.detailsBox.box, bounds);
+title.handlers.left({ bounds }, timedCx); assert.equal(crumbs.details, null, 'press closes the tooltip');
+title.handlers.on_click({}, cx);
+assert.equal(calls.at(-1)[1].at.x, 10); assert.equal(calls.at(-1)[1].at.y, 48, 'title menu retains its pressed anchor');
+title.handlers.right({}, timedCx); assert.equal(calls.at(-1)[0], 'agent'); assert.equal(calls.at(-1)[1].address, 'agent');
+find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
+root = crumbs.crumb(t, crumbContext, crumbData);
+find(root, 'peer-agent').handlers.on_hover(true, timedCx); assert.equal(crumbs.details, null, 'whole titles show no repeated label');
+root = crumbs.crumb(t, crumbContext, { ...crumbData, narrow: true });
+find(root, 'crumb-parent').handlers.on_hover(true, timedCx); assert.equal(crumbs.details, 'crumb-parent', 'an ellipsis still shows the full parent name');
 console.log("ok: tab/window/sidebar and chrome buttons use the real helper and preserve their clicks, counts and platform glyphs.");

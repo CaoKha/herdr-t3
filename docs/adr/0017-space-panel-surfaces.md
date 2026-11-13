@@ -8,10 +8,10 @@
 - 关闭活动标签选右邻，无右邻选左邻；非活动关闭不换活动标签。最后一个关闭时收起面板；重新打开显示 Open a surface。
 - 面板内 cmd-t 打开添加菜单，cmd-w 关闭活动标签；终端仍保留自己的快捷键。标签右键只管理标签，不改变 Review 树内定位。
 
-详情是主工作区按钮下的原生 popup，不是标签。三行只放机器／目录、Open in、Actions；打开时捕获来源，space／终端标签改变即失效。面板入口在窗口右上，打开面板收起详情；放大时进入详情先恢复工作列。
+详情是主工作区按钮下的原生 popup，不是标签。Workspace 放 locked 机器／目录、Open in、全局 Actions，下面是复用Review范围菜单的Quick Review入口；不含分支切换、PR信息或Git写操作。打开时捕获来源，space／终端标签改变即失效。面板入口在窗口右上，打开面板收起详情；放大时进入详情先恢复工作列。
 
 宿主验证已确认本机 `open -Ra`／`open -a`：Open in 列 Finder 和已装编辑器，全局记上次目标，缺失回退 Finder，远程置灰。Insert 借用文本剪贴板，聚焦当前标签最后一个活动终端，再 paste 而不回车；恢复原文本，但不覆盖图片或用户后来新复制的内容。终端路径点击首版未完成：宿主没有链接／点击回调。旧固定页实现删除，已保存的旧 page 初次读取时转为对应标签，不提供旧模式开关。
 
-详情按 T3 `threadDetailsPanelStyles.ts` 的整行按钮实现，不用标签／值两列表格。入口用 square-menu，开启态淡灰；机器名用本机 ComputerName 或远程机器名，单行截断。目录不另列文字，只在 folder 图标上提供完整提示和复制菜单。Open in 用应用图标；Actions 有动作时 split、空时 + Add action。三个状态的整窗与放大截图列在本任务验证报告。
+详情按 T3 `threadDetailsPanelStyles.ts` 的整行／locked／split 结构实现，尺寸颜色取本仓 token。机器行无 hover／chevron，folder 仅 tooltip，整行右键复制；Open in 菜单只选偏好、主按钮执行。Actions 保持全局数据，有动作 split、空时 Add action，编辑保留父详情。split 菜单同整行宽、开启时保留中线／on底。卡片右键可切四个实际实现项目的显隐并Reset，全隐藏保留恢复入口。Quick Review范围选择和Review页同源，计数／提交在绘制外异步读取、有界缓存、来源变更即作废。证据与宿主差异见本任务报告，不以静态截图声称真实鼠标通过。
 
 Review 的在途读取同时核对标签实例是否仍存在：关闭后即使尚未经过清理定时器，迟到结果也不能恢复 diff、发布旧范围或启动分析。Insert 拒绝含控制字符的路径，保留 Copy path 作为手动操作入口。

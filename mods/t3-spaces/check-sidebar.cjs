@@ -54,7 +54,8 @@ function bundle(dir, file = "main.js", seen = new Set()) {
   // Keep the helper's private tint separate from project.js's exported tint.
   if (file === "button.js") return "const { button, radiusOf } = (() => {\n" + src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nreturn { button, radiusOf }; })();\nconst drawButton = button;";
   const needs = [...src.matchAll(/^import [^;]*? from "\.\/(.+?)";/gm)].map((m) => bundle(dir, m[1], seen)).join("\n");
-  return needs + "\n" + src.replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ").replace("export default class", "globalThis.Mod = class");
+  const alias = src.includes("named as namedLabel") ? "\nconst namedLabel = named;\n" : "";
+  return needs + alias + "\n" + src.replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ").replace("export default class", "globalThis.Mod = class");
 }
 
 const modRoot = path.dirname(__dirname);
@@ -724,7 +725,9 @@ for (const width of [208, 240, 256, 320, 480]) {
   assert.deepEqual(strings(find(inbox.render(cx), "state-t0")), ["Working", "1m"], "read, the run goes on from its start");
   assert.equal(find(f.load("t3-agents").render(cx), "status-t0").style.accessibility_label, "Working (sub-agent)", "a read parent waiting on a sub-agent is working");
   const spins = tree => walk(tree).some(n => n.source === "mods/workspace-chrome/spinner.svg");
-  assert.ok(spins(find(f.load("t3-tabs").render(cx), "tab-b0")) && spins(f.load("t3-pane", { pane: "p0" }).render(cx)), "its tab and pane header show it working");
+  assert.ok(spins(find(f.load("t3-tabs").render(cx), "tab-b0")), "its tab still shows it working");
+  const header = f.load("t3-pane", { pane: "p0" }).render(cx);
+  assert.ok(!spins(header) && find(header, "ph-kids-p0"), "its pane header uses the descendant entry, not another aggregate spinner");
 }
 
 {
@@ -1383,9 +1386,9 @@ for (const width of [208, 240, 256, 320, 480]) {
     const room = (width) => fire(find(view.render(cx), "tab-area"), "on_size_change", { width }, cx);
     const wheel = (x, y) => fire(view.render(cx), "on_scroll_wheel", { delta: { x, y } }, cx);
     // A name's width, so its tab is `whole` wide: 51 around the name.
-    const name = (id, whole) => fire(find(view.render(cx), `name-${id}`), "on_size_change", { width: whole - 51 }, cx);
+    const name = (id, whole) => fire(find(view.render(cx), `text-measure-${id}`), "on_size_change", { width: whole - 51 }, cx);
     assert.equal(w("a"), 144, "before its name is measured");
-    assert.equal(find(view.render(cx), "name-a").style.h, 0, "the measure doesn't show");
+    assert.equal(find(view.render(cx), "text-measure-a").style.h, 0, "the measure doesn't show");
     for (const id of "abcd") name(id, 300);
     room(1212);
     assert.deepEqual([..."abcd"].map(w), [300, 300, 300, 300], "room for them all: every name whole");
@@ -1580,7 +1583,8 @@ for (const width of [208, 240, 256, 320, 480]) {
   const head = pane.render(cx);
   const spinner = tree => walk(tree).find(n => n.source === "mods/workspace-chrome/spinner.svg");
   const open = f.load("t3-agents");
-  for (const tree of [tabs.render(cx), head, open.render(cx)]) assert.equal(spinner(tree).style.text_color, f.theme().working);
+  for (const tree of [tabs.render(cx), open.render(cx)]) assert.equal(spinner(tree).style.text_color, f.theme().working);
+  assert.equal(spinner(head), undefined, "a header with descendants doesn't repeat the tree's spinner");
   for (const id of ["ph-r-p0", "ph-d-p0", "ph-z-p0", "ph-x-p0"]) assert.deepEqual([find(head, id).style.h, find(head, id).style.w], [24, 24]);
   const actions = walk(head).find(n => n.items.some(child => child?.key === "tip-ph-r-p0"));
   assert.equal(actions.style.gap, 4);
@@ -1611,6 +1615,8 @@ for (const width of [208, 240, 256, 320, 480]) {
     sp.machines = [vps];
     assert.equal(find(sp.render(run), "space-s2"), null, "a rebuilt machine's old spaces aren't offered");
     assert.ok(!("tooltip" in find(sp.render(run), "machine-connect-vps").style), "Connect says itself, no hover tooltip");
+    assert.equal(find(sp.render(run), "tip-machine-connect-vps"), null, "the visible machine name doesn't need a custom tooltip either");
+    assert.equal(find(sp.render(run), "machine-connect-vps").style.accessibility_label, "Connect vps");
     const asks = () => f.labelled.splice(0).filter(a => a[1] !== "ls");
     const add = ["machine", "add", "me@vps:2222", "--name", "vps", "--session", "main", "--json"];
     f.answerHc(a => a[1] === "add" ? { code: 1, stdout: '{"error":{"message":"no route"}}' } : { code: 0, stdout: '{"machines":[]}' });
@@ -2364,7 +2370,7 @@ for (const width of [208, 240, 256, 320, 480]) {
     inbox(true);
     assert.deepEqual(shown(), ["kid", "|", "prog", "rev"], "the agent in view is the breadcrumb's; its sub-agent's tab, a rule, then tabs with no agent; no other agent");
     // What shows: a name's measure is clipped to nothing.
-    const shownText = (n) => typeof n === "string" ? [n] : n && typeof n === "object" && !String(n.key).startsWith("crumb-measure-") ? n.items.flatMap(shownText) : [];
+    const shownText = (n) => typeof n === "string" ? [n] : n && typeof n === "object" && !String(n.key).startsWith("text-measure-") ? n.items.flatMap(shownText) : [];
     assert.deepEqual(shownText(find(view.render(cx), "crumb")).filter(s => s !== "/"), ["P", "project 0", "mine"], "the breadcrumb: the space, then the agent in view");
     assert.ok(!spins() && !bang(), "no marks: that's the sidebar's");
     f.slots.sidebar.hidden = true;
@@ -2457,7 +2463,7 @@ for (const width of [208, 240, 256, 320, 480]) {
     fire(find(view.render(cx), "tab-scroll"), "on_size_change", { width: 300 }, cx);
     // Its tabs hug their icon and name, as T3's panel tabs: no 96px floor, no slot kept for the ×, so the group sits flush
     // against Actions and the gaps between them are even. Hovered, the icon turns to the ×, as T3's does.
-    fire(find(view.render(cx), "name-prog"), "on_size_change", { width: 30 }, cx);
+    fire(find(view.render(cx), "text-measure-prog"), "on_size_change", { width: 30 }, cx);
     const progTab = () => find(view.render(cx), "tab-prog");
     assert.equal(progTab().style.w, 30 + 32, "6 in, the 16px icon, 2, the name, 8");
     assert.equal(find(progTab(), "close-prog"), null, "at rest, no × and no room kept for one");
@@ -2492,12 +2498,12 @@ for (const width of [208, 240, 256, 320, 480]) {
     const wait = () => [150, 34].forEach(ms => cx.timers.filter(t => t.ms === ms && !t.gone).forEach(t => { t.gone = true; t.fn(cx); }));
     const hoverTitle = (on) => { fire(find(view.render(cx), "peer-A"), "on_hover", on, cx); wait(); };
     fire(find(view.render(cx), "tab-area"), "on_size_change", { width: 1200 }, cx);
-    fire(find(view.render(cx), "crumb-measure-peer-A"), "on_size_change", { width: 80 }, cx);
-    fire(find(view.render(cx), "crumb-name-peer-A"), "on_size_change", { width: 80 }, cx);
+    fire(find(view.render(cx), "text-measure-peer-A"), "on_size_change", { width: 80 }, cx);
+    fire(find(view.render(cx), "text-name-peer-A"), "on_size_change", { width: 80 }, cx);
     hoverTitle(true);
     assert.equal(crumbCard("peer-A"), undefined, "shown whole: no label");
     hoverTitle(false);
-    fire(find(view.render(cx), "crumb-name-peer-A"), "on_size_change", { width: 40 }, cx);
+    fire(find(view.render(cx), "text-name-peer-A"), "on_size_change", { width: 40 }, cx);
     hoverTitle(true);
     assert.deepEqual([strings(crumbCard("peer-A")), crumbCard("peer-A").style.opacity], [["layout"], 1], "cut short: its whole name");
     assert.deepEqual([find(view.render(cx), "details-peer-A").style.bottom, find(view.render(cx), "details-peer-A").style.left], [0, -9], "under it, its words where the name starts");

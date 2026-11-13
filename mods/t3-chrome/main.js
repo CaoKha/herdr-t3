@@ -8,7 +8,8 @@ import { initSettings, settingsView } from "./settings.js";
 import { KEY } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface } from "./panel.js";
 import { button as drawButton, radiusOf } from "./button.js";
-import { fileIcon } from "./file-icons.js";
+import { pierreFileIcon } from "./pierre-icons.js";
+import { nameText, measuredTooltip } from "./measured-text.js";
 
 // The space panel's pages (docs/adr/0011), as its stack has them: a page the layout lacks has no tab.
 // Review wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image.
@@ -163,10 +164,11 @@ export default class WorkspaceChrome extends View {
       const closeId = `surface-close-${id}`, closing = this.hot === key || within(this, [key, closeId]);
       // docs/internals/t3-tokens.md: 面板标签; icon and close share the leading 16px slot.
       const glyph = closing ? svg("mods/t3-chrome/icons/x.svg").size(12).text_color(t.dim)
-        : tab.path ? image(`mods/t3-chrome/${fileIcon(tab.path)}`).size(12)
+        : tab.folder ? svg("mods/t3-chrome/icons/folder-tree.svg").size(12).text_color(t.dim)
+        : tab.path ? pierreFileIcon(t, "mods/t3-chrome", tab.path, 12)
         : colored ? image(`mods/t3-chrome/icons/${icon}.svg`).size(12).opacity(on ? 1 : 0.7)
         : svg(`mods/t3-chrome/icons/${icon}.svg`).size(12).text_color(t.dim);
-      return tip(this, t, key, tab.path ?? label, stop(this, t, key, own(h_flex().id(key).h(24).max_w(144).pl(6).pr(8).gap(2).flex_none().items_center().rounded(6).text_size(12)
+      return measuredTooltip(this, t, key, tab.path ?? label, stop(this, t, key, own(h_flex().id(key).h(24).max_w(144).pl(6).pr(8).gap(2).flex_none().items_center().rounded(6).text_size(12)
         .bg(on ? t.selected : t.chrome).text_color(on || this.hot === key ? t.foreground : t.dim)
         .when(!on, el => el.hover(st => st.bg(t.hover))).on_hover(glow(this, key))
         .role("tab").accessibility_label(label)
@@ -176,17 +178,18 @@ export default class WorkspaceChrome extends View {
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 148, props: { part: "surface-context", target: id, space: space?.id } }); })
         .child(stop(this, t, closeId, own(drawButton(t, closeId, { size: "tiny", label: `Close ${label}`, surface: "tab" }).child(glyph)
           .on_click((_e, cx) => { cx.stop_propagation(); closeSurface(id); })), 4))
-        .child(div().flex_1().min_w(0).truncate().whitespace_nowrap().child(label))
+        .child(nameText(this, key, label).flex_1().whitespace_nowrap())
         .when(id === "review" && mark != null, el => el.child(mark))), 6), { below: true });
     };
     const button = (id, icon, label, action, key, size = /** @type {"xs" | "sm"} */ ("sm")) => tip(this, t, id, label, stop(this, t, id, own(drawButton(t, id, {
       size, surface: id === "surface-add" ? "chrome" : "card", on: id === "panel-close", icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })
       .on_hover(glow(this, id))
+      .when(id === "surface-add", el => el.on_mouse_down("left", (e, cx) => { this.surfaceAddPress = e.bounds; cx.stop_propagation(); }))
       .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); })), radiusOf(size)), { action: key, below: true });
     const add = button("surface-add", "plus", "Open a surface", () => {
       const b = this.surfaceAddPress, z = Number(settings().zoom) || 1;
       openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 72, ...(b ? { at: { x: b.x, y: b.y + b.height + 6 * z } } : {}), props: { part: "surface-menu" } });
-    }, "t3-tabs.surface-menu", "xs").on_mouse_down("left", (e, cx) => { this.surfaceAddPress = e.bounds; cx.stop_propagation(); });
+    }, "t3-tabs.surface-menu", "xs");
     const widths = s.tabs.map(tab => (this.surfaceWidths?.[tab.id] ?? 100) + 4), total = widths.reduce((a, b) => a + b, 28), room = this.surfaceRoom ?? 300;
     this.surfaceOffset = Math.max(0, Math.min(this.surfaceOffset ?? 0, total - room));
     const measured = `${space?.id}:${s.active}:${room}:${widths.join(",")}`;

@@ -28,7 +28,7 @@ async function runtime(base) {
   await fs.mkdir(path.join(dir, ".preview"), { recursive: true });
   const state = {}, messages = [], overlays = [], hooks = {};
   const art = await sourceFile("extras/mods/asciicn-wallpaper/ascii-art.js");
-  const engine = vm.runInNewContext(art.replace(/^export /gm, "") + "; ({VERSION,convert,imageGrid,decodeBmp,imageAns:typeof imageAns==='undefined'?null:imageAns,brailleAns:typeof brailleAns==='undefined'?null:brailleAns})");
+  const engine = vm.runInNewContext(art.replace(/^export /gm, "") + "; ({VERSION,convert,imageGrid,decodeBmp,imagePlan:typeof imagePlan==='undefined'?null:imagePlan,sampleImage:typeof sampleImage==='undefined'?null:sampleImage,imageAns:typeof imageAns==='undefined'?null:imageAns,brailleAns:typeof brailleAns==='undefined'?null:brailleAns})");
   const env = {
     ...engine, View: class {},
     SliderState: { new: () => ({ on() {}, value() { return 1; }, set_value() {}, release() {} }) },

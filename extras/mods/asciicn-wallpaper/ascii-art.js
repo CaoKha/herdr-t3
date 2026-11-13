@@ -12,10 +12,13 @@
 // tile's whole area in memory however few dots it has.
 
 // Part of each import's cache key: raise it whenever a frame would convert differently, and every import converts again.
-export const VERSION = 3;
+export const VERSION = 4;
 const STEPS = [0.18, 0.32, 0.5, 0.75];
 const IMAGE_STEPS = [0.1, 0.18, 0.28, 0.4, 0.55, 0.7, 0.85, 1];
-const IMAGE_MARK = "\x1b]777;asciicn-wallpaper;image-v3\x07";
+// v3: half-width cells and the 8-step VGA mapping. v4 adds the mode and colours blank opaque cells, so the frame can
+// turn over for light themes (`paper`) without its source picture.
+const IMAGE_HEADER = /^\x1b\]777;asciicn-wallpaper;image-v(3|4)(?:;(dots|blocks|quadrants|braille))?\x07/;
+const imageMark = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
 // Dense shade rectangles must also fit the host's 1 MiB text-write limit.
 const TILE = 40;
 // A line's width, in cell heights.
@@ -118,8 +121,8 @@ function oklab(rgb) {
 }
 const VGA_LAB = VGA.map(oklab);
 
-/** New image colours: nearest VGA theme slot, with eight steps of HSV value (not luminance). */
-export function tintOf(color) {
+/** New image colours: nearest VGA theme slot, with eight steps of HSV value (not luminance); on paper, of darkness. */
+export function tintOf(color, paper = false) {
   if (!color) return { tint: "foreground", step: 7 };
   if (color.ansi !== undefined) return { tint: `ansi${color.ansi}`, step: 7 };
   const lab = oklab(color.rgb);
@@ -128,7 +131,8 @@ export function tintOf(color) {
     const d = (lab[0] - target[0]) ** 2 + (lab[1] - target[1]) ** 2 + (lab[2] - target[2]) ** 2;
     if (d < distance) { nearest = index; distance = d; }
   }
-  return { tint: `ansi${nearest}`, step: Math.min(7, Math.floor(Math.max(...color.rgb) * 8 / 255)) };
+  const [r, g, b] = color.rgb, light = paper ? 1 - (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 : Math.max(r, g, b) / 255;
+  return { tint: `ansi${nearest}`, step: Math.min(7, Math.floor(light * 8)) };
 }
 
 const round = (v) => +v.toFixed(3);
@@ -175,13 +179,16 @@ function svg(cells, aspect, box) {
 
 /**
  * Converts a frame's `.ans` text. Yields `null` now and then, a place to let the UI breathe, and each tile as
- * `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect }`, in cell heights.
+ * `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect }`, in cell heights, plus
+ * `paper: true` for a frame that can turn over for a light theme.
  * New image exports carry a non-drawing OSC header for half-width cells and the new theme mapping. Unmarked frames
  * keep legacy mapping and aspect inference: halftone dots alone are square; other text cells have aspect 0.5.
+ * `paper` turns a v4 frame's tones over (each glyph its opposite, blank opaque cells full); other frames ignore it.
  */
-export function* convert(text, aspect) {
-  const image = text.startsWith(IMAGE_MARK);
-  if (image) { text = text.slice(IMAGE_MARK.length); aspect ??= 0.5; }
+export function* convert(text, aspect, paper = false) {
+  const header = text.match(IMAGE_HEADER), image = !!header, style = header?.[2];
+  if (image) { text = text.slice(header[0].length); aspect ??= 0.5; }
+  const turn = paper && style ? PAPER[style] : null;
   const lines = text.replace(/\r/g, "").split("\n");
   while (lines.length && lines.at(-1) === "") lines.pop();
   const cells = [];
@@ -191,7 +198,9 @@ export function* convert(text, aspect) {
     for (const m of l.matchAll(/\x1b\[([0-9;]*)m|\x1b\[[0-9;?]*[A-Za-z]|([^\x1b])/gu)) {
       if (m[1] !== undefined) color = sgr(m[1], color);
       else if (m[2] !== undefined) {
-        if (shapeOf(m[2]).length) cells.push({ row, column, g: m[2], color });
+        // A v4 blank cell without a colour is transparent: it stays blank on paper too.
+        const g = turn ? (m[2] === " " && !color ? " " : turn(m[2])) : m[2];
+        if (shapeOf(g).length) cells.push({ row, column, g, color });
         column += 1;
       }
     }
@@ -201,7 +210,7 @@ export function* convert(text, aspect) {
   aspect ??= cells.length && cells.every((c) => HALFTONE.has(c.g)) ? 1 : 0.5;
   const layers = new Map();
   for (const [index, c] of cells.entries()) {
-    const { tint, step } = (image ? tintOf : legacyTintOf)(c.color), key = `${tint}-${step}`;
+    const { tint, step } = image ? tintOf(c.color, !!turn) : legacyTintOf(c.color), key = `${tint}-${step}`;
     if (!layers.has(key)) layers.set(key, { tint, step, cells: [] });
     layers.get(key).cells.push(c);
     if (image && index % 1024 === 1023) yield null;
@@ -222,7 +231,7 @@ export function* convert(text, aspect) {
       yield { file: `${key}-${t}.svg`, svg: svg(these, aspect, box), tint, opacity, ...box };
     }
   }
-  return { width: round(columns * aspect), height: lines.length, aspect };
+  return { width: round(columns * aspect), height: lines.length, aspect, ...(style ? { paper: true } : {}) };
 }
 
 // ---- An image, without the Studio: the frame its default for an image in Braille and true colour would make.
@@ -360,6 +369,17 @@ export function* brailleAns(pixels) {
   return yield* imageAns(pixels, "braille");
 }
 
+const RAMPS = { dots: " ·∙•⦁●", blocks: " ░▒▓█" }, QUADRANTS = " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█";
+// Each mode's glyph for the opposite tone: a ramp read backwards, a dot or quadrant mask complemented.
+const backwards = (ramp) => (g) => { const i = ramp.indexOf(g); return i < 0 ? g : ramp[ramp.length - 1 - i]; };
+const PAPER = {
+  dots: backwards(RAMPS.dots), blocks: backwards(RAMPS.blocks),
+  quadrants: (g) => { const i = QUADRANTS.indexOf(g); return i < 0 ? g : QUADRANTS[15 - i]; },
+  braille: (g) => {
+    const mask = g === " " ? 0 : g.codePointAt(0) - 0x2800;
+    return mask < 0 || mask > 255 ? g : mask === 255 ? " " : String.fromCodePoint(0x2800 + (255 ^ mask));
+  },
+};
 const IMAGE_GRIDS = { dots: [1, 1], blocks: [1, 1], quadrants: [2, 2], braille: [2, 4] };
 function imageCell(style) {
   if (!Object.hasOwn(IMAGE_GRIDS, style)) throw new Error("unknown image style");
@@ -379,28 +399,28 @@ export function* imageAns(pixels, style = "braille") {
   for (let row = 0; row < height / gy; row++) {
     let line = "", current = "";
     for (let column = 0; column < width / gx; column++) {
-      let mask = 0, r = 0, g = 0, b = 0, tone = 0;
+      let mask = 0, r = 0, g = 0, b = 0, a = 0, tone = 0;
       for (let dy = 0; dy < gy; dy++) for (let dx = 0; dx < gx; dx++) {
         const i = (row * gy + dy) * width + column * gx + dx;
         tone += tones[i];
         if (tones[i] > 0.5) mask |= style === "braille" ? BRAILLE_BITS[dy][dx] : 1 << (dy * 2 + dx);
-        r += rgba[i * 4]; g += rgba[i * 4 + 1]; b += rgba[i * 4 + 2];
+        r += rgba[i * 4]; g += rgba[i * 4 + 1]; b += rgba[i * 4 + 2]; a += rgba[i * 4 + 3];
       }
-      const ramp = style === "dots" ? " ·∙•⦁●" : " ░▒▓█";
+      const ramp = RAMPS[style];
       const glyph = style === "braille" ? (mask ? String.fromCodePoint(0x2800 + mask) : " ")
-        : style === "quadrants" ? " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[mask]
+        : style === "quadrants" ? QUADRANTS[mask]
         : ramp[Math.floor(tone * (ramp.length - 1) + 0.5)];
-      if (glyph === " ") { line += " "; continue; }
       // Preserve gradeRgb's default arithmetic before byte rounding: its half-integer ties can move by one ulp.
       avg[0] = (r / (gx * gy) / 255 - 0.5 + 0.5) * 255;
       avg[1] = (g / (gx * gy) / 255 - 0.5 + 0.5) * 255;
       avg[2] = (b / (gx * gy) / 255 - 0.5 + 0.5) * 255;
-      const code = `\x1b[38;2;${avg[0]};${avg[1]};${avg[2]}m`;
-      if (code !== current) { line += code; current = code; }
+      // Blank cells keep their colour too (paper inks them); a transparent one resets it, so paper leaves it blank.
+      const code = glyph === " " && !a ? "" : `\x1b[38;2;${avg[0]};${avg[1]};${avg[2]}m`;
+      if (code !== current) { line += code || "\x1b[39m"; current = code; }
       line += glyph;
     }
     lines.push(line + (current ? "\x1b[0m" : ""));
     if (row % 8 === 7) yield null;
   }
-  return IMAGE_MARK + lines.join("\n") + "\n";
+  return imageMark(style) + lines.join("\n") + "\n";
 }
