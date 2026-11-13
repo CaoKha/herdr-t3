@@ -1,0 +1,41 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const saved = {}, ui = { open: false, page: 'files', wide: false, space: 'a' };
+const layout = () => ({ id: 'root', children: [{ id: 'work', hidden: ui.wide }, { id: 'panel', hidden: !ui.open, children: [{ id: 'panel-body', active: ui.page, children: ['files', 'review', 'panel-empty'].map(id => ({ id })) }] }] });
+const context = vm.createContext({ KEY: { panels: 't3.panels' }, layout, spaces: () => [{ id: ui.space, active: true }],
+  shared: k => saved[k], setShared: (k, v) => { saved[k] = v; }, Date, Math,
+  run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
+});
+vm.runInContext(fs.readFileSync(__dirname + '/panel.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel };', context);
+const p = context.api, tabs = () => p.panelState().tabs.map(t => t.id).join(',');
+p.togglePanel(); assert.equal(ui.page, 'panel-empty'); assert.equal(tabs(), '');
+p.showPage('files'); p.openFile('a.js'); p.openFile('b.js'); p.openFile('a.js');
+assert.equal(tabs(), 'file:a.js,file:b.js'); assert.equal(p.panelState().active, 'file:a.js');
+p.showPage('files'); p.openFile('b.js'); assert.equal(tabs(), 'file:a.js,file:b.js');
+p.showPage('files'); p.openFile('c.js'); assert.equal(tabs(), 'file:a.js,file:b.js,file:c.js');
+p.showPage('review'); const born = p.panelState().tabs.at(-1).born;
+p.showPage('review'); assert.equal(p.panelState().tabs.at(-1).born, born);
+saved['review.shown'] = { a: { page: '/old', current: 'a.js' } };
+p.closeSurface('file:b.js'); assert.equal(p.panelState().active, 'review');
+p.closeSurface('review'); assert.equal(p.panelState().active, 'file:c.js'); assert.equal(saved['review.shown'].a, undefined);
+p.showPage('review'); assert.notEqual(p.panelState().tabs.at(-1).born, born);
+p.closeSurface('file:c.js', 'right'); assert.equal(p.panelState().active, 'file:c.js');
+p.closeSurface('file:a.js'); assert.equal(p.panelState().active, 'file:c.js');
+p.closeSurface('file:c.js'); assert.equal(ui.open, false); p.togglePanel(); assert.equal(ui.page, 'panel-empty');
+p.openFile('a.js'); p.openFile('b.js'); p.openFile('c.js'); p.openFile('b.js'); p.closeSurface(); assert.equal(p.panelState().active, 'file:c.js', 'active close takes the right neighbor');
+p.closeSurface('file:a.js', 'others'); assert.equal(tabs(), 'file:a.js');
+p.toggleWide(); p.togglePanel(); assert.equal(ui.wide, false); p.togglePanel(); assert.equal(tabs(), 'file:a.js');
+const view = {}; p.syncPanel(view); p.toggleWide(); p.syncPanel(view);
+ui.space = 'b'; p.syncPanel(view); p.syncPanel(view); assert.equal(ui.open, false); assert.equal(tabs(), '');
+p.showPage('review'); p.syncPanel(view); ui.space = 'a'; p.syncPanel(view); p.syncPanel(view);
+assert.equal(ui.wide, true); assert.equal(tabs(), 'file:a.js');
+p.restorePanel(view, 'home'); p.syncPanel(view); assert.equal(ui.open, false);
+ui.space = 'home'; p.syncPanel(view); ui.space = 'a'; p.syncPanel(view); assert.equal(tabs(), 'file:a.js');
+saved['t3.panels'].legacy = { open: true, page: 'review', wide: false }; ui.space = 'legacy';
+assert.equal(tabs(), 'review', 'old page becomes a surface, not an old mode');
+const root = JSON.parse(fs.readFileSync(__dirname + '/../layouts/herdr-t3.json', 'utf8'));
+const find = (n, id) => n.id === id ? n : (n.children ?? []).map(c => find(c, id)).find(Boolean);
+assert.equal(find(root, 'panel').resizable, false);
+assert.deepEqual([find(root, 'panel-body').background, find(root, 'panel-body').radius], ['background', 8]);
+console.log('ok: surfaces deduplicate, replace Files, close/release, hide/restore and follow their space');

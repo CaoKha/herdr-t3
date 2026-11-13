@@ -8,6 +8,8 @@ Herdr 在绘制中拒绝会再请求绘制的操作：`cx.notify()`、`cx.new()`
 
 `scripts/render-guard.cjs` 在假的 Herdr 中预加载这些约束。`scripts/check.sh` 还在已装 app home 中运行检查，因为有测试查官方图标；类型检查用脚本里的 `tsc --noEmit` 参数，不用 git 忽略的 `jsconfig.json`，官方 check 新生成的默认配置不适合这些 mod。
 
+原生 popup 的自动高度不能直接套 `overflow_y_scrollbar()`：只有 `max_h`、没有确定高度的根滚动容器会被测成0，overlay虽已注册却看不见。详情用不收缩的内容层在 `on_size_change` 量高度，再给外层滚动视口明确高度（至少一行控件，最多420）；只在高度变化时notify，0测量不覆盖有效值。`herdr-app check` 和 `status.errors=[]` 都不验证实际布局，整窗截图与非零布局尺寸仍是必需证据。
+
 ## 隐藏副本与常驻入口
 
 隐藏 stack 子节点/列里的 mod 不绘制、不收 `<mod>.<command>`；启动后的 timer 继续，首次显示前则尚未启动。Inbox/Agents 的行计算独立于 `render()`，由每秒 timer 也调用，只有当前模式写 agent order。必须随时工作的命令/Snooze 维护在根浮动、视觉为空的 `t3-tabs {part:"keys"}`；不能依赖可被面板放大藏住的标签条。
@@ -53,5 +55,7 @@ Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切�
 `extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 内置图和运行时导入使用。asciicn 没有 CLI/包；图片经 sips/ImageMagick 缩到 `imageGrid`（96 格行，按比例16–480列、每格2×4像素），BMP base64 回读，`decodeBmp` 支持24/32位、两种行序。Braille 沿 Studio image 默认两端各裁0.5%的 autoLevels、阈值0.5、每格八像素平均色、五取偶。Blocks/Dots 也走完整画布，不能按内容边界裁掉空白。
 
 字符用 SVG 而非 text：宿主 text 会吞空格/换行、字体可能把 `##` 连写。Braille/block/quadrant/shade/halftone/diagonal 用上游 glyph 形状，其他字符以暗度条近似。纯半调圆点按正方格，其余按 Studio 文字格宽高比0.5。转换器 version2 的40大小 tiles 避免阴影展开 SVG 超宿主单次1MiB写上限；逐 tile 让出 tick，图片生成器也按 yield 让出，避免阻塞界面。
+
+构图预览不逐帧缩放 `svg()`：宿主的 SVG mask 缓存键包含绘制尺寸，Zoom 每改一个尺寸就同步重新解析、栅格化所有图块。草稿转换后把同一批图形按当前主题合成一张固定分辨率 SVG，交给原生 `image()`，它只解码一次，随后 GPU 缩放同一纹理。拖动、Zoom 和方向键只改几何，不转换、读写文件。换主题才在绘制外重建预览纹理；Apply 后仍用原始主题色 SVG 图块，不改变保存的画。预览纹理最长边4096px，缩放极大时可能比最终 SVG 软；它只在草稿期间存在。
 
 原生 chooser 按 `window().platform`，不加 macOS `activate`（多等约2s）或 `default location`（Downloads 会请求目录权限）。Windows 只留目录入口。EXIF 方向不处理。导入/草稿/保存的路径、缓存键、分块原子发布、并发作废与清理条件只在 storage 维护，改这些先读它，不在这里写第二套规则。

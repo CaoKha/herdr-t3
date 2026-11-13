@@ -45,7 +45,12 @@
 | 标题栏按钮 | `index.css`、`ui/sidebar.tsx` 的 `SidebarTrigger` | 28，间距 12，图标 16 |
 | 侧栏 | `Sidebar*.tsx`、`ui/sidebar.tsx` | 见源码；RECIPE 里已写明的是之前量过的值，仍要对照 |
 | 侧栏图标 | `SidebarThreadHeader.tsx`、`SidebarProjectFolderHeader.tsx`、`ui/collapsible-section-header.tsx`、`SidebarThreadRow.tsx` | 图标跟着按钮框走：28 的按钮图标 16，24 的小按钮（`icon-xs`）图标 14；收纳区和文件夹的折叠箭头、行内控件和标记 12 |
-| 面板标签 | 终端和预览面板的标签组件 | 见源码 |
+| 面板标签 | `RightPanelTabs.tsx`、`ui/panel-tab-close-button.tsx`（`09a54f01`） | 高24、最宽144、圆角6、左内距6／右8、子项间距2、字号12。左16px槽平时12px surface图标，标签悬停／键盘聚焦换12px ×，关闭圆角4／`tab`面。条左内距8（由layout panel padding提供）、项间距4；+ 为既有 `button()` xs ghost（24方／图标14），紧跟末项在同一滚动条内；菜单左对齐、下偏移6。当前底selected，悬停hover，文字foreground／dim；layout controls最右 |
+| 详情 popup | `chat/threadDetailsPanelStyles.ts`、`threadDetailsCardLayout.ts`（`09a54f01`） | 宽280、自然高50–420（内容实测）、1px 主题 border；字号 13 medium、图标 16、gap 10、横内距 10、行圆角 8；卡片内距 8、圆角 16。split 箭头宽 32，中线高 16，仅悬停时显现 |
+
+详情与面板入口按 `chat/PanelLayoutControls.tsx` 的形状，用既有 `button()` 的 `ghost / sm / card`：28×28、16px 的 square-menu／panel-right、间距 4，颜色完全取下方「按钮」表的 card 面（悬停 7%、on 12%），不另造 5% 开启底。popup 行属于列表／split 豁免，文字 foreground、图标 dim、底 popover、边 border、悬停同 card 7%。详情机器名是单行截断的电脑名，路径只在 folder 图标的 tooltip／复制菜单里显示。Open in 应用图标是彩色 `image()`；没有专属图标时用本 mod 的 app-window，不引用别的 mod 文件。
+
+详情滚动视口最小高50：一行32、上下各8、外边框各1；自然内容超过420时才在限高视口里滚动。这个下界防止宿主把无确定高度的滚动根测成0，不是把卡片固定成50或420高。内容高度在布局回调中测量，外层明确使用测得高度加2px边框。
 
 ## 按钮
 

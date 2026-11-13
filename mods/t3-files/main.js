@@ -1,4 +1,4 @@
-// The space panel's Files page (docs/adr/0011, docs/research/space-panel-plan.md): the active space's folder, read-only, as
+// The space panel's shared Files view (docs/adr/0017): the active space's folder, read-only, as
 // one block: the file picked on the left, the tree on the right by the window's edge, the split between them dragged.
 // One copy serves every space, here or on another machine: what each one shows is kept by its id.
 import { View, div, svg, image } from "gpui-kit";
@@ -6,12 +6,13 @@ import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from
 import { spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window } from "herdr";
 import * as fs from "fs/promises";
 import uFuzzy from "./vendor/ufuzzy.js";
-import { panelState, hidePanel } from "./panel.js";
+import { panelState, surfacesFor, closeSurface, openFile, surfaceKey } from "./panel.js";
+import { terminalFor } from "./terminal-context.js";
 import { step, scrollList } from "./list.js";
 import { fileIcon } from "./file-icons.js";
 import { TREE_ROW, treeRows, rowAt, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
 import { withNav, navToggle, foldAllButton, ghostButton, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
-import { fileMenuItems, fileMenuView, agentFor, runCommon } from "./file-menu.js";
+import { fileMenuItems, fileMenuView, runCommon } from "./file-menu.js";
 import { migratePagePrefs, wrapLines, setWrapLines } from "./store.js";
 import { loadingState, emptyState, errorBar } from "./panel-states.js";
 import { LIST, IGNORED, PROBE, REMOTE_SEARCH, RANKED, join, parentOf, nameOf, ancestors, parseListing, parseStatus, parseIgnored, markIgnored, folderEntries, terms, narrows,
@@ -37,7 +38,7 @@ const zoom = () => Number(settings()?.zoom) || 1;
 // What one space's page knows and shows.
 function blank(sp) {
   return { id: sp.id, root: sp.folder, on: sp.machine ?? null, git: undefined, entries: new Map(), expanded: new Set(), ignored: new Set(),
-    marks: new Map(), dirs: new Set(), version: 0, file: null, view: null, lit: null, focus: null, query: "", at: -1, results: null, total: 0, paths: null };
+    marks: new Map(), dirs: new Set(), version: 0, file: null, view: null, previews: new Map(), lit: null, focus: null, query: "", at: -1, results: null, total: 0, paths: null };
 }
 
 export default class Files extends View {
@@ -61,11 +62,11 @@ export default class Files extends View {
     // A hidden copy isn't drawn, so this is what sees it go out of view.
     cx.timer.every(1000, (cx) => { this.sync(cx); this.poll(cx); });
     // `t3-files.open:<path from the space's folder>` and `t3-files.search:<words>`, for keys and scripts (the demo's);
-    // `t3-files.close`, cmd-w while it has the keyboard, closes the panel as T3's does.
+    // `t3-files.close`, cmd-w while it has the keyboard, closes the active surface, never the terminal behind it.
     cx.spawn(async (cx) => {
       for (;;) {
         const c = await nextCommand(), st = this.current(), at = c.indexOf(":"), [what, arg] = [c.slice(0, at), c.slice(at + 1)];
-        if (c === "close") hidePanel();
+        if (c === "close") { if (this.menu) this.menu = null; else closeSurface(); cx.notify(); }
         if (!st || at < 0) continue;
         if (what === "open") { this.open(st, arg, cx); this.reveal(st, arg, cx); }
         else if (what === "search") { this.search.set_value(arg); this.find(st, arg, cx); }
@@ -97,23 +98,39 @@ export default class Files extends View {
 
   // What `st` read let go, for whatever still holds it too (a read under way): its editor, image and lists.
   drop(st) {
-    st.view?.code?.release();
-    if (st.view?.image) this.uncache(st.view.image);
+    for (const v of new Set([st.view, ...[...st.previews.values()].map(p => p.view)])) this.releasePreview(v);
+    st.previews.clear();
     Object.assign(st, { view: null, entries: new Map(), ignored: new Set(), marks: new Map(), dirs: new Set(), rows: null, paths: null, lower: null, last: null, results: null });
   }
 
   // A space let go of, keeping its file, open folders and search's words.
   slim(st) {
     this.drop(st);
-    return Object.assign(blank({ id: st.id, folder: st.root, machine: st.on }), { file: st.file, expanded: new Set(st.expanded), focus: st.focus, query: st.query });
+    return Object.assign(blank({ id: st.id, folder: st.root, machine: st.on }), { file: st.file, fileBorn: st.fileBorn, selection: st.selection, expanded: new Set(st.expanded), focus: st.focus, query: st.query });
   }
 
   // It works only while it shows: the page in the open panel, the window in front, for the active space. Shown, it reads at
   // once; hidden, answers still under way are dropped and nothing more is asked. A closed space's state goes.
   sync(cx) {
     const all = spaces(), sp = all.find((s) => s.active);
-    for (const [id, st] of this.states) if (!all.some((s) => s.id === id)) { this.drop(st); this.states.delete(id); }
+    for (const [id, st] of this.states) {
+      if (!all.some((s) => s.id === id)) { this.drop(st); this.states.delete(id); continue; }
+      const tabs = surfacesFor(id).tabs;
+      for (const [path, kept] of st.previews) if (!tabs.some(t => t.path === path && t.born === kept.born)) { this.releasePreview(kept.view); st.previews.delete(path); if (st.view === kept.view) st.view = null; }
+      if (st.file && !tabs.some(t => t.path === st.file && t.born === st.fileBorn)) { st.file = null; st.view = null; }
+    }
     const st = sp && this.shown() ? this.stateFor(sp) : null;
+    if (st) {
+      const s = surfacesFor(sp.id), tab = s.tabs.find(t => t.id === s.active);
+      if (st.selection !== s.selected || st.file !== (tab?.path ?? null)) {
+        st.selection = s.selected;
+        cx.timer.after(0, (cx) => {
+          if (!this.shown() || spaces().find(p => p.active)?.id !== st.id || surfacesFor(st.id).selected !== st.selection) return;
+          if (tab?.path) { this.pick(st, tab.path, cx, true); }
+          else { st.file = null; st.view = null; this.changed(st); cx.notify(); }
+        });
+      }
+    }
     if (st === this.awake) return;
     this.awake = st; this.gen++;
     if (!st?.root) return;
@@ -255,23 +272,26 @@ export default class Files extends View {
   }
 
   // A search result: the file opens, and the tree shows where it is.
-  pick(st, path, cx) {
+  pick(st, path, cx, selected = false) {
     st.query = ""; st.results = null; st.at = -1;
     this.search.set_value("");
-    this.open(st, path, cx);
+    this.open(st, path, cx, false, selected);
     this.reveal(st, path, cx);
   }
 
   // Shows a file; `again` reads it again where it may have changed, and leaves it as it was if it hasn't.
-  open(st, rel, cx, again = false) {
+  open(st, rel, cx, again = false, selected = false) {
     if (!again) {
-      if (st.view?.code) st.view.code.release();
-      st.file = rel; st.lit = null; st.view = { loading: true };
+      if (!selected) openFile(rel);
+      const tab = surfacesFor(st.id).tabs.find(t => t.path === rel), kept = st.previews.get(rel);
+      st.file = rel; st.fileBorn = tab?.born; st.lit = null;
+      st.view = kept?.born === tab?.born ? kept.view : { loading: true };
       this.changed(st);
       cx.notify();
     }
     const fresh = this.fresh(st, "file"), abs = join(st.root, rel), kind = kindOf(rel);
     if (!fresh()) return;
+    if (!again && !st.view.loading) { this.keepPreview(st, rel, st.view); return; }
     cx.spawn(async (cx) => {
       const view = await this.read(st, abs, rel, kind, fresh).catch(() => ({ problem: "This file can't be read." }));
       if (view?.problem) view.failed = failedRead(view.problem);
@@ -281,9 +301,16 @@ export default class Files extends View {
       if (old?.image && old.image !== view.image) this.uncache(old.image);
       if (view.text !== undefined && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(view, rel);
       if (old?.code) old.code.release();
-      st.view = view;
+      st.view = view; this.keepPreview(st, rel, view);
       cx.notify();
     });
+  }
+
+  releasePreview(view) { view?.code?.release(); if (view?.image) this.uncache(view.image); }
+
+  keepPreview(st, rel, view) {
+    st.previews.delete(rel); st.previews.set(rel, { born: st.fileBorn, view });
+    for (const [path, kept] of [...st.previews].slice(0, -3)) { this.releasePreview(kept.view); st.previews.delete(path); }
   }
 
   /** @returns {Promise<any>} */
@@ -388,10 +415,8 @@ export default class Files extends View {
 
   // A row's menu: file-menu.js's items.
   menuItems(st, path) {
-    const abs = join(st.root, path), agent = agentFor(st.id), platform = window()?.platform, dir = Boolean(this.rows(st).find((r) => r.path === path)?.dir);
-    return fileMenuItems({ page: "files", dir, remote: Boolean(st.on), platform, agent }).map((it) => ({ ...it,
-      hint: it.id === "copy-path" ? st.on ?? "" : it.id === "mention" ? agent.program?.name ?? "" : "",
-      run: (cx) => runCommon(it.id, { abs, rel: path, agent, platform }, cx) }));
+    const abs = join(st.root, path), platform = window()?.platform, agent = terminalFor(st.id);
+    return fileMenuItems({ page: "files", remote: Boolean(st.on), platform, agent }).map(it => ({ ...it, run: cx => runCommon(it.id, { abs, rel: path, platform, agent }, cx) }));
   }
 
   rows(st) { return st.rows ??= treeRows(folderEntries(st), (p) => st.expanded.has(p)); }
@@ -401,6 +426,8 @@ export default class Files extends View {
     if (!sp) return div().id("t3-files").size_full();
     this.sync(cx);
     const st = this.stateFor(sp);
+    const context = `${sp.id}:${sp.tabs.find(t => t.active)?.id}`;
+    if (this.menu && this.menu.context !== context) this.menu = null;
     // Lines changed: the editor made again, just after this draw, as an editor can't be made in one.
     const v = st.view;
     if (v?.code && v.wrap !== wrapLines()) cx.timer.after(0, (cx) => {
@@ -414,10 +441,12 @@ export default class Files extends View {
     if (this.searchFor !== st.id) { this.searchFor = st.id; if (this.search.value() !== st.query) this.search.set_value(st.query); }
     const width = this.size?.width ?? 800;
     return v_flex().id("t3-files").relative().size_full().min_h(0).text_color(t.foreground).text_size(13)
+      .track_focus(this.handle).on_mouse_down("left", () => this.handle.focus())
+      .on_key_down((e, cx) => { if (this.menu && e.keystroke === "cmd-w") { this.menu = null; cx.stop_propagation(); cx.notify(); } else surfaceKey(e, cx); })
       .on_size_change((size, cx) => { this.size = { width: size.width / zoom(), height: size.height / zoom() }; cx.notify(); })
       .on_mouse_down("right", (e, cx) => {
         if (!this.menuFor) return;
-        this.menu = { path: this.menuFor, x: e.local_position.x / zoom(), y: e.local_position.y / zoom(), at: -1 };
+        this.menu = { path: this.menuFor, context, x: (e.local_position?.x ?? 0) / zoom(), y: (e.local_position?.y ?? 0) / zoom(), at: -1 };
         this.menuFor = null;
         this.handle.focus();
         cx.notify();
@@ -426,7 +455,8 @@ export default class Files extends View {
       // What failed, under the toolbar: the folder's listing, or the file's read. Retry asks again.
       .when(Boolean(st.error), (el) => el.child(errorBar(t, "t3-files-error", st.error, (cx) => cx.spawn(async (cx) => this.refresh(st, cx)), this)))
       .when(Boolean(!st.error && st.view?.failed), (el) => el.child(errorBar(t, "t3-files-error", st.view.problem, (cx) => this.open(st, st.file, cx), this)))
-      .child(div().flex_1().min_h(0).child(withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: st.results ? this.found(st, t) : this.tree(st, t), open: this.navOpen })))
+      .child(div().flex_1().min_h(0).child(st.file ? withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: st.results ? this.found(st, t) : this.tree(st, t), open: this.navOpen })
+        : v_flex().size_full().min_h(0).child(div().h(40).px(12).flex_none().child(this.searchHead(st, t))).child(div().flex_1().min_h(0).child(st.results ? this.found(st, t) : this.tree(st, t)))))
       .when(Boolean(this.menu), (el) => el.child(fileMenuView(this, t, MOD, this.menuItems(st, this.menu.path), this.handle, this.size ?? { width: 800, height: 600 })));
   }
 
@@ -452,7 +482,7 @@ export default class Files extends View {
         .child(h_flex().flex_none().gap(4).items_center()
           // Wrap or scroll long lines, this page's own choice.
           .when(Boolean(st.view?.code), (el) => el.child(ghostButton(t, MOD, "t3-files-wrap", "text-wrap", wrapLines() ? "Scroll long lines" : "Wrap long lines", (cx) => { setWrapLines(!wrapLines()); cx.notify(); }, { on: wrapLines(), view: this })))
-          .child(navToggle(t, MOD, "t3-files-nav-toggle", this.navOpen, (cx) => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, false, this)));
+          .when(Boolean(st.file), el => el.child(navToggle(t, MOD, "t3-files-nav-toggle", this.navOpen, (cx) => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, false, this))));
   }
 
   // The file: Preview or Code for Markdown, the code, an image or why there's none; with no file, a quiet line.
@@ -462,7 +492,7 @@ export default class Files extends View {
     return div().size_full().min_h(0).min_w(0)
         .child(!v || v.loading ? loadingState(t, "t3-files-loading", "Loading the file…")
           // A read that failed is the error bar's (the toolbar's); a file there's nothing to show of says why, as an empty page.
-          : v.problem && v.failed ? div()
+          : v.problem && v.failed ? v_flex().p(16).gap(8).child(div().child(`${st.file}\n${st.root}`)).child(ghostButton(t, MOD, "t3-files-locate", "folder-tree", "Locate in Files tree", cx => { this.navOpen = true; this.reveal(st, st.file, cx); }, { view: this }))
           : v.problem ? emptyState(t, "t3-files-problem", `${MOD}/icons/file-text.svg`, nameOf(st.file), v.problem)
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
           : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(24).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
@@ -536,6 +566,11 @@ export default class Files extends View {
     return div().id("t3-files-tree").size_full().track_focus(this.treeHandle)
       .on_mouse_down("left", () => this.treeHandle.focus())
       .on_key_down((e, cx) => {
+        if (e.keystroke === "shift-f10") {
+          const path = st.focus ?? st.file;
+          if (path) { const sp = spaces().find(s => s.active); this.menu = { path, context: `${sp?.id}:${sp?.tabs.find(t => t.active)?.id}`, x: Math.max(4, (this.size?.width ?? 800) - 224), y: 84, at: -1 }; this.handle.focus(); cx.stop_propagation(); cx.notify(); }
+          return;
+        }
         const at = st.focus ? rows.findIndex((r) => r.path === st.focus) : rows.findIndex((r) => r.path === st.file);
         const k = treeKey(e.keystroke, rows, at);
         if (!k) return;

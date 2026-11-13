@@ -16,15 +16,15 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 
 ## Features
 
-- **Inbox and Lists**: two sidebars, one key apart. Inbox sorts agents by what needs you, with T3-style Settle and Snooze; Lists shows spaces by project and agents by priority or by space, without Inbox's Settle and Snooze.
+- **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention with Settle and Snooze; Lists shows spaces and agents by project.
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
 - **Go to** (`cmd-p`): jump to any pane, agent or program, by its name.
-- **Actions**: T3 Code's run button for your own commands, in a new tab or a split.
+- **Details** (`cmd-shift-b`): three rows for computer/directory, Open in Finder or an installed editor, and Actions in a new tab or split.
 - **Slim tabs and framed panes**, in T3 Code's look.
 - **Other machines**: their spaces grouped by machine, their Inbox cards marked. In Lists, hover an Agents row to see its machine's name.
-- **Files**: the space's folder, read-only, in a panel at the window's right: the tree at its outer edge, the file you pick beside it. It stays put as you switch tabs and follows you to another space. Hidden pages do no file refreshes, and full data is cached for only three recent spaces per page.
-- **Review** (optional): what's left to review in the worktree, on the same panel's other page. Files and Review keep their own files, reading positions, line wrapping and tree widths; switching pages restores each one.
+- **Files**: one tab per file in the right-hand space panel, one shared read-only tree; + opens Files or Review. Hide keeps tabs; close releases them. Each space caches only three recently displayed files and three recent spaces keep full page data.
+- **Review** (optional): one closable tab per space, with its own range and reading position. Switching retains it; closing and re-adding starts from the default range.
 
 Each in detail: [the guide](docs/user/guide.md).
 
@@ -36,7 +36,7 @@ Only want the Inbox? It is also published alone: [herdr-t3-inbox](https://github
 
 ## Quick start
 
-1. `cmd-shift-b` (or the button at the sidebar's top right) switches between Inbox and Lists.
+1. The sidebar header button switches Inbox and Lists; `cmd-shift-b` opens Details.
 2. In Inbox, hover a finished card and click `✓ Settle` to put it away; new work brings it back. `cmd-shift-s` settles the agent you're looking at and goes Home.
 3. From Home, `cmd-]` opens the top card, so you can work down them one by one.
 4. Hover a card and click the clock to Snooze it until a time you pick.
@@ -47,7 +47,7 @@ Dragging, sweeping across rows, pins and the rest: [Everyday use](docs/user/guid
 
 | Key | Does |
 | --- | --- |
-| `cmd-shift-b` | Switch the sidebar between Inbox and Lists |
+| `cmd-shift-b` | Toggle Details |
 | `cmd-shift-s` | Settle the agent you're looking at and go Home, or bring it back |
 | `cmd-]` / `cmd-[` | Next or previous agent, in the sidebar's order |
 | `cmd-p` | Go to any pane |
@@ -84,7 +84,7 @@ No network requests.
 
 - **pulls.review**: a Review bar and the panel's Review page.
 - **Theme export for Pi**: Pi's colors follow Herdr's.
-- **asciicn wallpaper**: Home in your theme's colours: four pictures built in, or preview your image in Braille, Blocks or Dots before applying it. Import Studio `.ans` files too, including Unicode, leading-dash and hidden filenames. A failed Apply keeps your preview for retry; deleting an added wallpaper asks for confirmation and stops its conversion. See [the extras](docs/user/extras.md#asciicn-wallpaper).
+- **asciicn wallpaper**: Home in your theme's colours: four pictures built in, or import your image as Dots or a Studio `.ans` with its original characters. Frame it with Fill/Fit, drag or arrow keys, zoom and Reset before Apply, reusing a cached preview while moving; saved framing survives restarts and resizing. Failed saves keep the preview for retry; deleting asks for confirmation and cancels conversion. Buttons stay in place across states. See [the extras](docs/user/extras.md#asciicn-wallpaper).
 - **Themes**: Catppuccin and T3 Code, light and dark.
 
 How to add them: [the extras](docs/user/extras.md).

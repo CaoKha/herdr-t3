@@ -29,7 +29,7 @@ const env = {
   Popup: { new: (_id, trigger) => element().child(trigger) },
   theme: () => t, props: () => part, settings: () => ({ zoom: 1 }), window: () => ({ platform, buttons: true }),
   spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => ({}), shared: () => null,
-  sidebarParts: () => ({ stack: { active: "lists" } }), panelState: () => ({ pages: ["files"], page: "files", open: panelOpen }),
+  sidebarParts: () => ({ stack: { active: "lists" } }), panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
   glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
@@ -54,7 +54,9 @@ for (const id of ["minimize", "maximize", "close-window"]) {
 }
 assert.deepEqual(calls.splice(0), [["new", "s"], ["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
 panelOpen = true;
-assert.equal(find(tabs.render(), "panel-toggle").style.bg, t.selected);
+assert.equal(find(tabs.render(), "panel-toggle"), undefined, "open panel owns its rightmost toggle");
+assert.equal(find(tabs.render(), "close-window"), undefined, "platform buttons move to the panel head");
+panelOpen = false;
 platform = "linux";
 root = tabs.render();
 assert.equal(find(root, "minimize").items[0], "−"); assert.equal(find(root, "maximize").items[0], "□");
@@ -84,6 +86,6 @@ for (const id of ["sidebar-mode", "sidebar-toggle"]) assert.equal(click(root, id
 assert.deepEqual(calls.splice(0).map(c => c[0]), ["t3-tabs.sidebar", "layout.toggle"]);
 part = { part: "panel" };
 root = chrome.render();
-for (const id of ["panel-wide", "panel-close"]) assert.equal(click(root, id).style.h, 24);
+for (const id of ["panel-wide", "panel-close"]) assert.equal(click(root, id).style.h, 28);
 assert.deepEqual(calls.splice(0), [["wide"], ["hide"]]);
 console.log("ok: tab/window/sidebar and chrome buttons use the real helper and preserve their clicks, counts and platform glyphs.");

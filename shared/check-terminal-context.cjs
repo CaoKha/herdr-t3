@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+let f = { space: 's', tab: 'b', terminal: 't1', cwd: '/source' }, all = [{ tab: 'b', terminal: 't1' }];
+const c = vm.createContext({ focused: () => f, panes: () => all, spaces: () => [{ id: 's', active: true, tabs: [{ id: 'b', active: true }] }], Map });
+vm.runInContext(fs.readFileSync(__dirname + '/terminal-context.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { rememberTerminal, terminalFor };', c);
+assert.equal(c.api.terminalFor().terminal, 't1');
+f = { space: 's', tab: 'b', terminal: null, cwd: null };
+assert.equal(c.api.terminalFor().cwd, '/source', 'mod focus keeps the source terminal and cwd');
+assert.equal(c.api.terminalFor('s', 'other'), null, 'never fall back to another tab');
+all = []; assert.equal(c.api.terminalFor(), null, 'closed terminals are not paste targets');
+console.log('ok: last active terminal stays per tab and is removed when closed');

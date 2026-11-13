@@ -12,8 +12,10 @@
 // tile's whole area in memory however few dots it has.
 
 // Part of each import's cache key: raise it whenever a frame would convert differently, and every import converts again.
-export const VERSION = 2;
+export const VERSION = 3;
 const STEPS = [0.18, 0.32, 0.5, 0.75];
+const IMAGE_STEPS = [0.1, 0.18, 0.28, 0.4, 0.55, 0.7, 0.85, 1];
+const IMAGE_MARK = "\x1b]777;asciicn-wallpaper;image-v3\x07";
 // Dense shade rectangles must also fit the host's 1 MiB text-write limit.
 const TILE = 40;
 // A line's width, in cell heights.
@@ -92,7 +94,7 @@ function xterm(n) {
 }
 
 /** The theme colour (`foreground` or `ansiN`) and opacity step a cell's colour takes. */
-export function tintOf(color) {
+export function legacyTintOf(color) {
   if (!color) return { tint: "foreground", step: 3 };
   if (color.ansi !== undefined) return { tint: `ansi${color.ansi}`, step: 3 };
   const [r, g, b] = color.rgb;
@@ -103,6 +105,30 @@ export function tintOf(color) {
   const hue = (max === R ? ((G - B) / d + 6) % 6 : max === G ? (B - R) / d + 2 : (R - G) / d + 4) * 60;
   const n = hue < 15 || hue >= 345 ? 1 : hue < 75 ? 3 : hue < 165 ? 2 : hue < 190 ? 6 : hue < 280 ? 4 : 5;
   return { tint: `ansi${l >= 0.45 ? n + 8 : n}`, step };
+}
+
+// asciicn palettes.ts: VGA reference slots and perceptual nearestIndex (MIT, LICENSE-asciicn).
+const VGA = [[0,0,0],[170,0,0],[0,170,0],[170,85,0],[0,0,170],[170,0,170],[0,170,170],[170,170,170],[85,85,85],[255,85,85],[85,255,85],[255,255,85],[85,85,255],[255,85,255],[85,255,255],[255,255,255]];
+function oklab(rgb) {
+  const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+const VGA_LAB = VGA.map(oklab);
+
+/** New image colours: nearest VGA theme slot, with eight steps of HSV value (not luminance). */
+export function tintOf(color) {
+  if (!color) return { tint: "foreground", step: 7 };
+  if (color.ansi !== undefined) return { tint: `ansi${color.ansi}`, step: 7 };
+  const lab = oklab(color.rgb);
+  let nearest = 0, distance = Infinity;
+  for (const [index, target] of VGA_LAB.entries()) {
+    const d = (lab[0] - target[0]) ** 2 + (lab[1] - target[1]) ** 2 + (lab[2] - target[2]) ** 2;
+    if (d < distance) { nearest = index; distance = d; }
+  }
+  return { tint: `ansi${nearest}`, step: Math.min(7, Math.floor(Math.max(...color.rgb) * 8 / 255)) };
 }
 
 const round = (v) => +v.toFixed(3);
@@ -150,10 +176,12 @@ function svg(cells, aspect, box) {
 /**
  * Converts a frame's `.ans` text. Yields `null` now and then, a place to let the UI breathe, and each tile as
  * `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect }`, in cell heights.
- * `aspect` (a cell's width over its height) isn't in the file: by default a frame of halftone dots alone has asciicn's
- * square dot cells, any other its text cells, a 0.6em advance over a 1.2em line.
+ * New image exports carry a non-drawing OSC header for half-width cells and the new theme mapping. Unmarked frames
+ * keep legacy mapping and aspect inference: halftone dots alone are square; other text cells have aspect 0.5.
  */
 export function* convert(text, aspect) {
+  const image = text.startsWith(IMAGE_MARK);
+  if (image) { text = text.slice(IMAGE_MARK.length); aspect ??= 0.5; }
   const lines = text.replace(/\r/g, "").split("\n");
   while (lines.length && lines.at(-1) === "") lines.pop();
   const cells = [];
@@ -172,14 +200,15 @@ export function* convert(text, aspect) {
   }
   aspect ??= cells.length && cells.every((c) => HALFTONE.has(c.g)) ? 1 : 0.5;
   const layers = new Map();
-  for (const c of cells) {
-    const { tint, step } = tintOf(c.color), key = `${tint}-${step}`;
+  for (const [index, c] of cells.entries()) {
+    const { tint, step } = (image ? tintOf : legacyTintOf)(c.color), key = `${tint}-${step}`;
     if (!layers.has(key)) layers.set(key, { tint, step, cells: [] });
     layers.get(key).cells.push(c);
+    if (image && index % 1024 === 1023) yield null;
   }
   yield null;
   for (const [key, { tint, step, cells: mine }] of [...layers].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-    const opacity = step === 3 && tint === "foreground" ? 1 : STEPS[step];
+    const opacity = image ? IMAGE_STEPS[step] : step === 3 && tint === "foreground" ? 1 : STEPS[step];
     const groups = new Map();
     for (const c of mine) {
       const t = `${Math.floor((c.column * aspect) / TILE)}-${Math.floor(c.row / TILE)}`;
@@ -198,55 +227,127 @@ export function* convert(text, aspect) {
 
 // ---- An image, without the Studio: the frame its default for an image in Braille and true colour would make.
 
-/** The sample grid for a `width` by `height` image: rows of Braille cells, columns as its aspect needs, 2×4 pixels a cell. */
-export function imageGrid(width, height) {
+/** 96 rows of half-width cells. Each style requests its own samples per cell. */
+export function imageGrid(width, height, style = "braille") {
+  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) throw new Error("invalid image dimensions");
+  const [gx, gy] = imageCell(style);
   const rows = 96, columns = Math.max(16, Math.min(480, Math.round((2 * rows * width) / height)));
-  return { columns, rows, width: columns * 2, height: rows * 4 };
+  return { columns, rows, width: columns * gx, height: rows * gy };
+}
+
+/** Native decoder crops once to cover, then resizes to this shared RGBA draft; crop coordinates are source pixels. */
+export function imagePlan(width, height) {
+  const { columns, rows } = imageGrid(width, height), aspect = columns * 0.5 / rows;
+  const w = Math.min(width, Math.round(height * aspect)), h = Math.min(height, Math.round(width / aspect));
+  const crop = { x: Math.floor((width - w) / 2), y: Math.floor((height - h) / 2), width: w, height: h };
+  let pw = 0, ph = 0;
+  for (const [gx, gy] of Object.values(IMAGE_GRIDS)) {
+    const sw = columns * gx, sh = rows * gy, k = Math.max(1, Math.min(4, Math.floor(Math.min(w / sw, h / sh))));
+    pw = Math.max(pw, sw * k); ph = Math.max(ph, sh * k);
+  }
+  return { columns, rows, width: pw, height: ph, crop };
+}
+
+// Area filtering bridges the native high-quality draft to each mode's supersampling canvas. Alpha is premultiplied.
+function* areaImage(pixels, width, height) {
+  if (pixels.width === width && pixels.height === height) return pixels;
+  const rgba = new Uint8ClampedArray(width * height * 4), tones = new Float32Array(width * height);
+  const sx = pixels.width / width, sy = pixels.height / height, source = pixels.rgba;
+  const blocks = Number.isInteger(sx) && Number.isInteger(sy);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const x0 = x * sx, x1 = Math.min(pixels.width, (x + 1) * sx), y0 = y * sy, y1 = Math.min(pixels.height, (y + 1) * sy);
+    let r = 0, g = 0, b = 0, a = 0;
+    if (blocks) {
+      for (let py = y0; py < y1; py++) {
+        let at = (py * pixels.width + x0) * 4;
+        for (let px = x0; px < x1; px++, at += 4) {
+          const alpha = source[at + 3];
+          r += source[at] * alpha; g += source[at + 1] * alpha; b += source[at + 2] * alpha; a += alpha;
+        }
+      }
+    } else {
+      for (let py = Math.floor(y0); py < Math.ceil(y1); py++) for (let px = Math.floor(x0); px < Math.ceil(x1); px++) {
+        const weight = (Math.min(x1, px + 1) - Math.max(x0, px)) * (Math.min(y1, py + 1) - Math.max(y0, py));
+        const at = (py * pixels.width + px) * 4, alpha = source[at + 3] * weight;
+        r += source[at] * alpha; g += source[at + 1] * alpha; b += source[at + 2] * alpha; a += alpha;
+      }
+    }
+    const i = y * width + x, color = a === 0 ? 0 : 1 / a, alpha = a / (sx * sy);
+    rgba[i * 4] = r * color; rgba[i * 4 + 1] = g * color; rgba[i * 4 + 2] = b * color; rgba[i * 4 + 3] = alpha;
+    tones[i] = (0.2126 * (r * color) + 0.7152 * (g * color) + 0.0722 * (b * color)) / 255 * (alpha / 255);
+    if (i % 2048 === 2047) yield null;
+  }
+  return { width, height, rgba, tones };
+}
+
+/** Re-sample the shared draft for a style, using the website's k<=4 canvas followed by k×k block means. */
+export function* sampleImage(pixels, style, plan) {
+  const [gx, gy] = imageCell(style), width = plan.columns * gx, height = plan.rows * gy;
+  if (!(Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0 && pixels.width > 0 && pixels.height > 0 && pixels.rgba?.length === pixels.width * pixels.height * 4)) throw new Error("invalid image sample plan");
+  const k = Math.max(1, Math.min(4, Math.floor(Math.min(plan.crop.width / width, plan.crop.height / height))));
+  const canvas = yield* areaImage(pixels, width * k, height * k);
+  return yield* areaImage(canvas, width, height);
 }
 
 const B64 = new Map([..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"].map((c, i) => [c.charCodeAt(0), i]));
 
 /**
- * A BMP (as `sips` or ImageMagick write it: 24 or 32 bits, uncompressed, top-down or bottom-up), given as base64, to
- * RGBA. Yields `null` now and then; returns `{ width, height, rgba }`.
+ * A BMP (24/32-bit, uncompressed, either row order) as base64 text or chunks of that text, to RGBA. Chunks need
+ * not end at quartet boundaries. Cleans/decodes bounded slices and yields; returns `{ width, height, rgba }`.
  */
 export function* decodeBmp(base64) {
-  const text = base64.replace(/[^A-Za-z0-9+/]/g, ""), bytes = new Uint8Array(Math.floor((text.length * 3) / 4));
-  let n = 0;
-  for (let i = 0; i + 1 < text.length; i += 4) {
-    const a = B64.get(text.charCodeAt(i)), b = B64.get(text.charCodeAt(i + 1));
-    const c = B64.get(text.charCodeAt(i + 2)), d = B64.get(text.charCodeAt(i + 3));
-    bytes[n++] = (a << 2) | (b >> 4);
-    if (c !== undefined) bytes[n++] = ((b & 15) << 4) | (c >> 2);
-    if (d !== undefined) bytes[n++] = ((c & 3) << 6) | d;
-    if (i % 65536 === 0) yield null;
+  const parts = typeof base64 === "string" ? [base64] : base64;
+  const bytes = new Uint8Array(Math.floor(parts.reduce((size, part) => size + part.length, 0) * 3 / 4));
+  let n = 0, carry = "";
+  for (const part of parts) for (let from = 0; from < part.length; from += 65536) {
+    const text = carry + part.slice(from, from + 65536).replace(/[^A-Za-z0-9+/]/g, ""), end = text.length - text.length % 4;
+    yield null;
+    for (let i = 0; i < end; i += 4) {
+      const a = B64.get(text.charCodeAt(i)), b = B64.get(text.charCodeAt(i + 1));
+      const c = B64.get(text.charCodeAt(i + 2)), d = B64.get(text.charCodeAt(i + 3));
+      bytes[n++] = (a << 2) | (b >> 4);
+      bytes[n++] = ((b & 15) << 4) | (c >> 2);
+      bytes[n++] = ((c & 3) << 6) | d;
+      if (i % 16384 === 16380) yield null;
+    }
+    carry = text.slice(end);
   }
-  const u32 = (at) => bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24);
+  if (carry.length >= 2) {
+    const a = B64.get(carry.charCodeAt(0)), b = B64.get(carry.charCodeAt(1));
+    bytes[n++] = (a << 2) | (b >> 4);
+    if (carry.length === 3) bytes[n++] = ((b & 15) << 4) | (B64.get(carry.charCodeAt(2)) >> 2);
+  }
+  const u32 = (at) => (bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24)) >>> 0;
   if (bytes[0] !== 0x42 || bytes[1] !== 0x4d) throw new Error("not a BMP");
-  const data = u32(10), width = u32(18), signed = u32(22), bits = bytes[28] | (bytes[29] << 8), compression = u32(30);
+  if (n < 54) throw new Error("incomplete BMP");
+  const data = u32(10), width = u32(18) | 0, signed = u32(22) | 0, bits = bytes[28] | (bytes[29] << 8), compression = u32(30);
   if ((bits !== 24 && bits !== 32) || (compression !== 0 && compression !== 3)) throw new Error(`a ${bits}-bit BMP, compression ${compression}`);
-  const height = Math.abs(signed), stride = Math.ceil((bits * width) / 32) * 4, step = bits / 8, rgba = new Uint8Array(width * height * 4);
+  const height = Math.abs(signed), stride = Math.ceil((bits * width) / 32) * 4, end = data + stride * height;
+  if (width <= 0 || height === 0 || u32(14) < 40 || data < 14 + u32(14) || !Number.isSafeInteger(end) || end > n || u32(2) > n) throw new Error("incomplete BMP");
+  const step = bits / 8, rgba = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++) {
     const from = data + (signed < 0 ? y : height - 1 - y) * stride;
     for (let x = 0; x < width; x++) {
-      const at = from + x * step, to = (y * width + x) * 4;
+      const at = from + x * step, pixel = y * width + x, to = pixel * 4;
       rgba[to] = bytes[at + 2]; rgba[to + 1] = bytes[at + 1]; rgba[to + 2] = bytes[at]; rgba[to + 3] = 255;
+      if (pixel % 4096 === 4095) yield null;
     }
-    if (y % 64 === 63) yield null;
   }
   return { width, height, rgba };
 }
 
 // Studio's autoLevels for an image: tones stretched so 0.5% of them clip at each end.
-function* imageLevels({ width, height, rgba }) {
+function* imageLevels({ width, height, rgba, tones: sampled }) {
   const tones = new Float32Array(width * height), bins = new Uint32Array(256);
+  let counted = 0;
   for (let i = 0; i < tones.length; i++) {
     const t = (0.2126 * rgba[i * 4] + 0.7152 * rgba[i * 4 + 1] + 0.0722 * rgba[i * 4 + 2]) / 255;
-    tones[i] = t;
-    bins[Math.min(255, Math.round(t * 255))]++;
+    tones[i] = sampled?.[i] ?? t * rgba[i * 4 + 3] / 255;
+    if (rgba[i * 4 + 3] !== 0) { bins[Math.min(255, Math.round(tones[i] * 255))]++; counted++; }
+    if (i % 8192 === 8191) yield null;
   }
   yield null;
-  const clip = Math.floor((tones.length * 0.5) / 100);
+  const clip = Math.floor((counted * 0.5) / 100);
   let low = 0, high = 255;
   for (let seen = 0; low < 255; low++) if ((seen += bins[low]) > clip) break;
   for (let seen = 0; high > 0; high--) if ((seen += bins[high]) > clip) break;
@@ -254,65 +355,52 @@ function* imageLevels({ width, height, rgba }) {
   return { tones, from, scale };
 }
 
-/**
- * Pixels on an `imageGrid` as asciicn's mapTones draws an image in Braille and true colour (lib/ascii/frame.ts):
- * autoLevels first, each pixel lighting its dot past 0.5, each cell the average colour of its eight.
- * Yields `null` now and then; returns the `.ans` text, as `toAnsi` writes it.
- */
+/** Braille convenience entry point; new image exports all use the same website mapper. */
 export function* brailleAns(pixels) {
-  const { width, height, rgba } = pixels;
-  const { tones, from, scale } = yield* imageLevels(pixels);
-  // Averages rounded as asciicn's colour bytes are, by a clamped array: half to even.
-  const columns = width / 2, rows = height / 4, lines = [], avg = new Uint8ClampedArray(3);
-  for (let row = 0; row < rows; row++) {
-    let line = "", current = "";
-    for (let column = 0; column < columns; column++) {
-      let mask = 0, r = 0, g = 0, b = 0;
-      for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 2; dx++) {
-        const i = (row * 4 + dy) * width + column * 2 + dx;
-        if ((tones[i] - from) * scale > 0.5) mask |= BRAILLE_BITS[dy][dx];
-        r += rgba[i * 4]; g += rgba[i * 4 + 1]; b += rgba[i * 4 + 2];
-      }
-      if (!mask) { line += " "; continue; }
-      avg[0] = r / 8; avg[1] = g / 8; avg[2] = b / 8;
-      const code = `\x1b[38;2;${avg[0]};${avg[1]};${avg[2]}m`;
-      if (code !== current) { line += code; current = code; }
-      line += String.fromCodePoint(0x2800 + mask);
-    }
-    lines.push(line + (current ? "\x1b[0m" : ""));
-    if (row % 16 === 15) yield null;
-  }
-  return lines.join("\n") + "\n";
+  return yield* imageAns(pixels, "braille");
 }
 
-/** The same image grid as Braille, spatial quadrants, or 2×2-pixel square halftone cells, all in truecolour `.ans`. */
+const IMAGE_GRIDS = { dots: [1, 1], blocks: [1, 1], quadrants: [2, 2], braille: [2, 4] };
+function imageCell(style) {
+  if (!Object.hasOwn(IMAGE_GRIDS, style)) throw new Error("unknown image style");
+  return IMAGE_GRIDS[style];
+}
+
+/** Website mapTones, no dither, autoLevels on. Metadata keeps new image geometry/colours across reloads. */
 export function* imageAns(pixels, style = "braille") {
-  if (style === "braille") return yield* brailleAns(pixels);
-  if (style !== "blocks" && style !== "dots") throw new Error("unknown image style");
-  const { width, height, rgba } = pixels;
+  const [gx, gy] = imageCell(style), { width, height, rgba } = pixels;
+  if (width % gx || height % gy) throw new Error("image sample grid does not fit cells");
   const { tones, from, scale } = yield* imageLevels(pixels);
-  const cellHeight = style === "dots" ? 2 : 4, lines = [], avg = new Uint8ClampedArray(3);
-  for (let row = 0; row < height / cellHeight; row++) {
+  for (let i = 0; i < tones.length; i++) {
+    tones[i] = Math.max(0, Math.min(1, (tones[i] - from) * scale));
+    if (i % 8192 === 8191) yield null;
+  }
+  const lines = [], avg = new Uint8ClampedArray(3);
+  for (let row = 0; row < height / gy; row++) {
     let line = "", current = "";
-    for (let column = 0; column < width / 2; column++) {
-      const quadrants = [0, 0, 0, 0];
-      let r = 0, g = 0, b = 0;
-      for (let dy = 0; dy < cellHeight; dy++) for (let dx = 0; dx < 2; dx++) {
-        const i = (row * cellHeight + dy) * width + column * 2 + dx;
-        quadrants[Math.floor(dy / 2) * 2 + dx] += Math.max(0, Math.min(1, (tones[i] - from) * scale)) / 2;
+    for (let column = 0; column < width / gx; column++) {
+      let mask = 0, r = 0, g = 0, b = 0, tone = 0;
+      for (let dy = 0; dy < gy; dy++) for (let dx = 0; dx < gx; dx++) {
+        const i = (row * gy + dy) * width + column * gx + dx;
+        tone += tones[i];
+        if (tones[i] > 0.5) mask |= style === "braille" ? BRAILLE_BITS[dy][dx] : 1 << (dy * 2 + dx);
         r += rgba[i * 4]; g += rgba[i * 4 + 1]; b += rgba[i * 4 + 2];
       }
-      const mask = quadrants.reduce((mask, tone, bit) => tone > 0.5 ? mask | (1 << bit) : mask, 0);
-      const tone = (quadrants[0] + quadrants[1]) / 2;
-      const glyph = style === "dots" ? (tone > 0 ? "·∙•⦁●"[Math.min(4, Math.floor(tone * 5))] : " ") : " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[mask];
+      const ramp = style === "dots" ? " ·∙•⦁●" : " ░▒▓█";
+      const glyph = style === "braille" ? (mask ? String.fromCodePoint(0x2800 + mask) : " ")
+        : style === "quadrants" ? " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[mask]
+        : ramp[Math.floor(tone * (ramp.length - 1) + 0.5)];
       if (glyph === " ") { line += " "; continue; }
-      avg[0] = r / (cellHeight * 2); avg[1] = g / (cellHeight * 2); avg[2] = b / (cellHeight * 2);
+      // Preserve gradeRgb's default arithmetic before byte rounding: its half-integer ties can move by one ulp.
+      avg[0] = (r / (gx * gy) / 255 - 0.5 + 0.5) * 255;
+      avg[1] = (g / (gx * gy) / 255 - 0.5 + 0.5) * 255;
+      avg[2] = (b / (gx * gy) / 255 - 0.5 + 0.5) * 255;
       const code = `\x1b[38;2;${avg[0]};${avg[1]};${avg[2]}m`;
       if (code !== current) { line += code; current = code; }
       line += glyph;
     }
     lines.push(line + (current ? "\x1b[0m" : ""));
-    if (row % 16 === 15) yield null;
+    if (row % 8 === 7) yield null;
   }
-  return lines.join("\n") + "\n";
+  return IMAGE_MARK + lines.join("\n") + "\n";
 }

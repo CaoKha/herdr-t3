@@ -1,13 +1,14 @@
 import { View, div, svg, image } from "gpui-kit";
-import { h_flex } from "gpui-base";
-import { theme, run, props, updates, layout, shared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify } from "herdr";
+import { h_flex, v_flex } from "gpui-base";
+import { theme, run, props, updates, layout, shared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, exec, openOverlay, closeOverlay } from "herdr";
 import { tip, glow } from "./tip.js";
-import { stopsInit, stopsEnd, stop, focusRoot } from "./focus.js";
+import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { sidebarParts } from "./sidebar.js";
 import { initSettings, settingsView } from "./settings.js";
 import { KEY } from "./store.js";
-import { panelState, showPage, hidePanel, toggleWide } from "./panel.js";
+import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface } from "./panel.js";
 import { button as drawButton, radiusOf } from "./button.js";
+import { fileIcon } from "./file-icons.js";
 
 // The space panel's pages (docs/adr/0011), as its stack has them: a page the layout lacks has no tab.
 // Review wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image.
@@ -19,8 +20,24 @@ export default class WorkspaceChrome extends View {
   async close() { stopsEnd(this); }
 
   init(_props, cx) {
+    this.surfaceWidths = {};
     if (props()?.view === "settings") return initSettings(this, cx);
     stopsInit(this, cx);
+    if (props()?.part?.startsWith("surface-")) {
+      this.surfaceKeys = cx.focus_handle(); this.surfaceAt = -1;
+      this.surfaceKeys.focus();
+      const probe = (cx) => {
+        const sp = spaces().find(s => s.active), key = `${sp?.id}:${sp?.folder}:${sp?.machine}`;
+        if (this.surfaceSpace === key) return;
+        this.surfaceSpace = key; this.reviewReason = sp?.machine ? "Review is unavailable on remote spaces" : "Checking repository…";
+        if (!sp?.machine) cx.spawn(async (cx) => {
+          const r = sp?.folder && await exec("git", ["rev-parse", "--show-toplevel"], { cwd: sp.folder }).catch(() => null);
+          if (this.surfaceSpace !== key) return;
+          this.reviewReason = r?.code === 0 ? "" : "This space is not a Git repository"; cx.notify();
+        });
+      };
+      probe(cx); cx.timer.every(250, probe);
+    }
     if (!props()?.footer && !props()?.part) {
       this.alignLights(cx);
       // The brand copy stays alive with the sidebar hidden; no redraw is needed until a zoom actually changes the file.
@@ -59,6 +76,7 @@ export default class WorkspaceChrome extends View {
   render() {
     if (props()?.view === "settings") return settingsView(this);
     const t = theme();
+    if (props()?.part?.startsWith("surface-")) return this.surfaceView(t);
     if (props()?.part === "panel") return this.panelHead(t);
     if (props()?.footer) {
       // As T3's footer: a row of 32px icon buttons, and at its end, once Herdr has downloaded an update, its restart.
@@ -140,27 +158,93 @@ export default class WorkspaceChrome extends View {
       : word === "blocked" ? div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!")
       : word === "done" ? div().size(6).flex_none().rounded_full().bg(t.done) : null;
     const own = (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation());
-    const page = (id) => {
-      const [label, icon, colored] = PAGES[id] ?? [id, "folder-tree"], on = s.page === id, key = `page-${id}`;
-      return stop(this, t, key, own(h_flex().id(key).h(24).pl(6).pr(8).gap(6).flex_none().items_center().rounded(6).text_size(12)
-        .bg(on ? t.selected : t.chrome).text_color(on || this.hot === key ? t.foreground : t.muted)
+    const page = (tab) => {
+      const id = tab.id, [label, icon, colored] = PAGES[id] ?? [tab.path?.split("/").at(-1) ?? id, "folder-tree"], on = s.active === id, key = `surface-${id}`;
+      const closeId = `surface-close-${id}`, closing = this.hot === key || within(this, [key, closeId]);
+      // docs/internals/t3-tokens.md: 面板标签; icon and close share the leading 16px slot.
+      const glyph = closing ? svg("mods/t3-chrome/icons/x.svg").size(12).text_color(t.dim)
+        : tab.path ? image(`mods/t3-chrome/${fileIcon(tab.path)}`).size(12)
+        : colored ? image(`mods/t3-chrome/icons/${icon}.svg`).size(12).opacity(on ? 1 : 0.7)
+        : svg(`mods/t3-chrome/icons/${icon}.svg`).size(12).text_color(t.dim);
+      return tip(this, t, key, tab.path ?? label, stop(this, t, key, own(h_flex().id(key).h(24).max_w(144).pl(6).pr(8).gap(2).flex_none().items_center().rounded(6).text_size(12)
+        .bg(on ? t.selected : t.chrome).text_color(on || this.hot === key ? t.foreground : t.dim)
         .when(!on, el => el.hover(st => st.bg(t.hover))).on_hover(glow(this, key))
         .role("tab").accessibility_label(label)
-        .on_click(() => showPage(id))
-        // A colored mark waits at 70% until its tab is shown or hovered, as the brand bar's Herdr mark.
-        .child(colored ? image(`mods/t3-chrome/icons/${icon}.svg`).size(14).flex_none().opacity(on || this.hot === key ? 1 : 0.7)
-          : svg(`mods/t3-chrome/icons/${icon}.svg`).size(14).flex_none())
-        .child(label)
-        .when(id === "review" && mark != null, el => el.child(mark))), 6);
+        .on_click(() => activateSurface(id))
+        .on_size_change((size, cx) => { const width = size.width / (Number(settings().zoom) || 1); this.surfaceWidths ??= {}; if (this.surfaceWidths[id] !== width) { this.surfaceWidths[id] = width; cx.notify(); } })
+        .on_mouse_down("middle", (_e, cx) => { cx.stop_propagation(); closeSurface(id); })
+        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 148, props: { part: "surface-context", target: id, space: space?.id } }); })
+        .child(stop(this, t, closeId, own(drawButton(t, closeId, { size: "tiny", label: `Close ${label}`, surface: "tab" }).child(glyph)
+          .on_click((_e, cx) => { cx.stop_propagation(); closeSurface(id); })), 4))
+        .child(div().flex_1().min_w(0).truncate().whitespace_nowrap().child(label))
+        .when(id === "review" && mark != null, el => el.child(mark))), 6), { below: true });
     };
-    const button = (id, icon, label, action, key) => tip(this, t, id, label, stop(this, t, id, own(drawButton(t, id, {
-      icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })
+    const button = (id, icon, label, action, key, size = /** @type {"xs" | "sm"} */ ("sm")) => tip(this, t, id, label, stop(this, t, id, own(drawButton(t, id, {
+      size, surface: id === "surface-add" ? "chrome" : "card", on: id === "panel-close", icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })
       .on_hover(glow(this, id))
-      .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); })), radiusOf("xs")), { action: key, below: true });
+      .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); })), radiusOf(size)), { action: key, below: true });
+    const add = button("surface-add", "plus", "Open a surface", () => {
+      const b = this.surfaceAddPress, z = Number(settings().zoom) || 1;
+      openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 72, ...(b ? { at: { x: b.x, y: b.y + b.height + 6 * z } } : {}), props: { part: "surface-menu" } });
+    }, "t3-tabs.surface-menu", "xs").on_mouse_down("left", (e, cx) => { this.surfaceAddPress = e.bounds; cx.stop_propagation(); });
+    const widths = s.tabs.map(tab => (this.surfaceWidths?.[tab.id] ?? 100) + 4), total = widths.reduce((a, b) => a + b, 28), room = this.surfaceRoom ?? 300;
+    this.surfaceOffset = Math.max(0, Math.min(this.surfaceOffset ?? 0, total - room));
+    const measured = `${space?.id}:${s.active}:${room}:${widths.join(",")}`;
+    if (this.surfaceMeasured !== measured) {
+      this.surfaceMeasured = measured;
+      const i = s.tabs.findIndex(tab => tab.id === s.active), x = widths.slice(0, Math.max(0, i)).reduce((a, b) => a + b, 0);
+      this.surfaceOffset = Math.max(0, Math.min(x, Math.max(this.surfaceOffset, x + (widths[i] ?? 0) + (i === s.tabs.length - 1 ? 28 : 0) - room)));
+    }
     return focusRoot(this, h_flex().id("panel-head").size_full().bg(t.chrome).gap(4).items_center()
-      .children(s.pages.map(page))
-      .child(div().flex_1())
+      .on_size_change(size => { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.panel = size.width; })
+      .when(total > room, el => el.child(button("surface-back", "chevron-left", "Previous surfaces", () => { this.surfaceOffset = Math.max(0, this.surfaceOffset - room / 2); })))
+      .child(div().id("surface-scroll").flex_1().min_w(0).overflow_hidden()
+        .on_size_change((size, cx) => { const width = size.width / (Number(settings().zoom) || 1); if (this.surfaceRoom !== width) { this.surfaceRoom = width; cx.notify(); } })
+        .on_scroll_wheel((e, cx) => { const delta = Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y; this.surfaceOffset = Math.max(0, Math.min(total - room, this.surfaceOffset - delta / (Number(settings().zoom) || 1))); cx.stop_propagation(); cx.notify(); })
+        .child(h_flex().id("surface-strip").ml(-this.surfaceOffset).gap(4).items_center().children(s.tabs.map(page)).child(add)))
+      .when(total > room, el => el.child(button("surface-next", "chevron-right", "Next surfaces", () => { this.surfaceOffset = Math.min(total - room, this.surfaceOffset + room / 2); })))
       .child(button("panel-wide", s.wide ? "minimize-2" : "maximize-2", s.wide ? "Restore panel" : "Expand panel", toggleWide))
-      .child(button("panel-close", "x", "Close panel", hidePanel, "t3-tabs.panel")));
+      .child(button("panel-close", "panel-right", "Hide panel", hidePanel, "t3-tabs.panel"))
+      .when(Boolean(window()?.buttons), el => el.children([["minimize", "−", "win-min"], ["maximize", window().maximized ? "❐" : "□", window().maximized ? "win-restore" : "win-max"], ["close", "×", "win-close"]].map(([cmd, text, icon]) => own(drawButton(t, `panel-window-${cmd}`, { size: "sm", label: `${cmd} window`, ...(window().platform === "windows" ? { icon: `mods/t3-chrome/icons/${icon}.svg` } : { text }) }).w(28).px(0).on_click(() => run(`window.${cmd}`)))))));
+  }
+
+  surfaceView(t) {
+    const p = props(), s = panelState(), empty = p.part === "surface-empty", context = p.part === "surface-context";
+    const at = s.tabs.findIndex(tab => tab.id === p.target), tab = s.tabs[at];
+    const finish = () => { if (!empty) closeOverlay(p.overlay); };
+    const items = context ? [
+      ...(tab?.path ? [{ label: "Copy path", act: cx => cx.write_to_clipboard(tab.path) }] : []),
+      { label: "Close", act: () => closeSurface(p.target) },
+      { label: "Close others", disabled: s.tabs.length < 2, act: () => closeSurface(p.target, "others") },
+      { label: "Close to the right", disabled: at === s.tabs.length - 1, act: () => closeSurface(p.target, "right") },
+      { label: "Close all", act: () => closeSurface(p.target, "all") },
+    ] : [
+      { label: "Files", key: "f", icon: "folder-tree", act: () => showPage("files") },
+      ...(s.pages.includes("review") ? [{ label: "Review", key: "r", icon: "pulls-review", disabled: Boolean(this.reviewReason), reason: this.reviewReason, act: () => showPage("review") }] : []),
+    ];
+    const choose = (i, cx) => { const it = items[i]; if (!it || it.disabled) return; if (context && p.space !== spaces().find(sp => sp.active)?.id) return finish(); finish(); it.act(cx); };
+    const list = v_flex().id("surface-list").w_full().max_w(empty ? 320 : 220).p(4).gap(0).children(items.map((it, i) => h_flex().id(`surface-option-${i}`).h(empty ? 32 : 28).px(8).gap(8).items_center().rounded(4).text_size(14)
+      .text_color(t.foreground).when(it.disabled, el => el.opacity(0.5).tooltip(it.reason ?? "Not available"))
+      .when(!it.disabled, el => el.on_hover((on, cx) => { this.surfaceAt = on ? i : -1; cx.notify(); }).on_click((_e, cx) => choose(i, cx)))
+      .when(this.surfaceAt === i, el => el.bg(t.selected))
+      .role("button").accessibility_label(it.label)
+      .when(Boolean(it.icon), el => el.child(svg(`mods/t3-chrome/icons/${it.icon}.svg`).size(16).flex_none()))
+      .child(div().flex_1().min_w(0).child(it.label))
+      .when(Boolean(it.key), el => el.child(div().text_size(12).text_color(t.dim).child(it.key?.toUpperCase())))));
+    return v_flex().id(empty ? "surface-empty" : "surface-menu").size_full().min_h(0).items_center()
+      .when(empty, el => el.justify_center().gap(12).p(24)).when(!empty, el => el.bg(t.popover))
+      .track_focus(this.surfaceKeys).on_mouse_down("left", () => this.surfaceKeys.focus())
+      .on_key_down((e, cx) => {
+        if (e.key === "escape" && !empty) finish();
+        else if (e.key === "enter") choose(this.surfaceAt, cx);
+        else if (["up", "down"].includes(e.key)) {
+          const enabled = items.map((it, i) => !it.disabled ? i : -1).filter(i => i >= 0), index = enabled.indexOf(this.surfaceAt);
+          this.surfaceAt = enabled[(index + (e.key === "down" ? 1 : enabled.length - 1) + enabled.length) % enabled.length];
+        } else if (e.keystroke === e.key) { const i = items.findIndex(it => it.key === e.key); if (i < 0) return; choose(i, cx); }
+        else return;
+        cx.stop_propagation(); cx.notify();
+      })
+      .when(empty, el => el.child(div().text_size(14).font_medium().text_color(t.muted).child("Open a surface")))
+      .child(list);
   }
 }

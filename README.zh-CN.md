@@ -16,15 +16,15 @@
 
 ## 功能
 
-- **Inbox 和 Lists**：两种侧栏，一键切换。Inbox 按什么需要你来排，带 T3 式的 Settle 和 Snooze；Lists 按项目排 space，agent 按优先级或按 space 分组，不带 Inbox 的 Settle 和 Snooze。
+- **Inbox 和 Lists**：用侧栏顶栏按钮切换。Inbox 按注意力排 agent，带 Settle 和 Snooze；Lists 按项目列 space 和 agent。
 - **Home**：收起正在看的 agent 后，回到一个安静的页面，不会自动跳到下一张卡片。下一步看什么由你决定。也可以在设置（`cmd-shift-,`）里改成跳到下一张卡片，或者把 Home 换成终端或你自己的 mod。
 - **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名、标状态。
 - **跳转**（`cmd-p`）：按名字跳到任何窗格，agent 和普通程序都行。
-- **动作**：类似 T3 Code 的运行按钮，运行你自己的命令，在新标签或分屏里。
+- **详情**（`cmd-shift-b`）：三行放电脑／目录、Open in Finder 或已装编辑器，以及在新标签或分屏运行的 Actions。
 - **窄标签、带框窗格**，照 T3 Code 的外观。
 - **其他机器**：它们的 space 按机器分组，Inbox 卡片带机器标记；Lists 中悬停 Agents 行查看机器名。
-- **Files**：在窗口右侧的面板里只读浏览 space 的文件夹：文件树贴窗口外沿，选中的文件显示在它旁边。切换标签时面板不动，换到别的 space 时跟着换。隐藏时停止文件刷新，每页只缓存最近三个 space 的完整数据。
-- **Review**（可选）：同一个面板的另一页，看当前 worktree 待评审的内容。Files 和 Review 各记文件、阅读位置、换行和树宽，切页恢复各自的状态。
+- **Files**：右侧 space 面板里每文件一个标签，共用只读文件树；+ 添加 Files 或 Review。隐藏保留，关闭释放；每 space 只缓存最近显示的三个文件，每页保留最近三个 space 的完整数据。
+- **Review**（可选）：每 space 最多一个可关闭标签，独立保留范围和阅读位置；切换保留，关闭重加回默认范围。
 
 每项的详细说明见[使用指南](docs/user/guide.zh-CN.md)。
 
@@ -36,7 +36,7 @@
 
 ## 快速上手
 
-1. `cmd-shift-b`（或侧栏右上角的按钮）在 Inbox 和 Lists 之间切换。
+1. 侧栏顶栏按钮切换 Inbox 和 Lists；`cmd-shift-b` 打开详情。
 2. 在 Inbox 里，鼠标移到已结束的卡片上，点 `✓ Settle` 把它 Settle；有新工作时它会自己回来。`cmd-shift-s` Settle 当前查看的 agent 并回到 Home。
 3. 在 Home 按 `cmd-]` 打开最上面的卡片，可以逐张处理。
 4. 鼠标移到卡片上，点时钟，可以把它 Snooze 到你选的时间。
@@ -47,7 +47,7 @@
 
 | 快捷键 | 作用 |
 | --- | --- |
-| `cmd-shift-b` | 侧栏在 Inbox 和 Lists 之间切换 |
+| `cmd-shift-b` | 切换详情 |
 | `cmd-shift-s` | Settle 当前查看的 agent 并回到 Home，已 Settle 的则取回 |
 | `cmd-]` / `cmd-[` | 按侧栏的顺序到下一个或上一个 agent |
 | `cmd-p` | 跳到任一窗格 |
@@ -84,7 +84,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 
 - **pulls.review**：Review 栏和面板里的 Review 页。
 - **给 Pi 用的主题导出**：让 Pi 的配色跟着 Herdr 走。
-- **asciicn 壁纸**：Home 的配色跟着主题：自带 4 张画，也能先用 Braille、Blocks 或 Dots 预览自己的图片再应用，或导入 Studio 的 `.ans`，支持 Unicode、短横开头和隐藏文件名。Apply 失败会保留预览供重试；删除加进来的壁纸前会再次确认，并停止它的转换。见[可选扩展](docs/user/extras.zh-CN.md#asciicn-壁纸)。
+- **asciicn 壁纸**：Home 的配色跟着主题：自带4张画，图片导入固定 Dots，Studio `.ans` 保留原字形。Apply 前用 Fill／Fit、拖动或方向键、缩放和 Reset 构图，移动时复用缓存预览；保存后重启和尺寸变化仍保留构图。保存失败保留预览供重试；删除会再次确认并取消转换。按钮在各状态下保持原位。见[可选扩展](docs/user/extras.zh-CN.md#asciicn-壁纸)。
 - **主题**：Catppuccin 和 T3 Code，各有明暗两套。
 
 安装方法见[可选扩展](docs/user/extras.zh-CN.md)。

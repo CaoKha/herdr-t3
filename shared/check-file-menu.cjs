@@ -5,20 +5,33 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const src = fs.readFileSync(path.join(__dirname, "file-menu.js"), "utf8")
-  .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.menu = { fileMenuItems };";
-const context = vm.createContext({});
+  .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.menu = { fileMenuItems, mention, runCommon };";
+const calls = [], notices = [], jobs = []; let clipboard = "original";
+const context = vm.createContext({ run: (c, a) => calls.push([c, a]), notify: n => notices.push(n) });
 vm.runInContext(src, context);
 const ids = (o) => [...context.menu.fileMenuItems(o).map((it) => it.id)];
-const agent = { address: "t1" };
+const agent = { terminal: "t1" };
 
-assert.deepEqual(ids({ page: "files", platform: "macos", agent }), ["copy-path", "copy-relative", "mention", "reveal", "open"]);
-assert.deepEqual(ids({ page: "files", platform: "macos", agent, changed: true }), ["copy-path", "copy-relative", "mention", "reveal", "open"], "a changed file stays within Files");
-assert.deepEqual(ids({ page: "files", platform: "macos", dir: true, changed: true }), ["copy-path", "copy-relative", "reveal"], "a folder: nothing that opens it");
-assert.deepEqual(ids({ page: "files", platform: "macos", remote: true }), ["copy-path", "copy-relative"], "another machine's: nothing that runs here");
-assert.deepEqual(ids({ page: "files", platform: "linux" }), ["copy-path", "copy-relative", "open"]);
-assert.deepEqual(ids({ page: "review", platform: "macos", agent, files: true }), ["copy-path", "copy-relative", "mention", "reveal", "open", "review"]);
-assert.deepEqual(ids({ page: "review", platform: "macos", reviewed: true }), ["copy-path", "copy-relative", "reveal", "open", "unreview"], "reviewed files can be marked unreviewed");
-assert.deepEqual(ids({ page: "review", platform: "macos", dir: true, files: true }), ["copy-path", "copy-relative", "reveal", "review"], "a folder marks its files");
+assert.deepEqual(ids({ page: "files", platform: "macos", agent }), ["reveal", "copy-path", "mention"]);
+assert.deepEqual(ids({ page: "files", platform: "macos", dir: true }), ["reveal", "copy-path", "mention"]);
+assert.deepEqual(ids({ page: "files", platform: "macos", remote: true }), ["copy-path", "mention"]);
+assert.deepEqual(ids({ page: "files", platform: "linux" }), ["copy-path", "mention"]);
+assert.deepEqual(ids({ page: "review", platform: "macos" }), []);
+assert.equal(context.menu.fileMenuItems({ page: "files" }).at(-1).disabled, true);
 for (const page of ["files", "review"]) assert.ok(!ids({ page, platform: "macos", files: true, changed: true }).some(id => id.startsWith("open-")), "neither page offers a cross-page action");
 
-console.log("ok: file menu: common file actions and Review's marks, with no cross-page actions.");
+const cx = { read_from_clipboard: () => clipboard, write_to_clipboard: v => { clipboard = v; }, sleep: async () => {}, spawn: f => jobs.push(f) };
+(async () => {
+  context.menu.runCommon("copy-path", { abs: "/repo/a.js", rel: "a.js" }, cx); assert.equal(clipboard, "a.js");
+  clipboard = "original"; context.menu.runCommon("mention", { rel: "a.js", agent }, cx); assert.equal(clipboard, " a.js");
+  assert.deepEqual(calls.map(c => c[0]), ["pane.focus", "terminal.paste"]);
+  assert.equal(calls[0][1].terminal, "t1");
+  await jobs.shift()(cx); assert.equal(clipboard, "original", "paste restores the text it borrowed");
+  context.menu.mention("b.js", "t1", cx); clipboard = "new user copy"; await jobs.shift()(cx);
+  assert.equal(clipboard, "new user copy", "a later user copy wins");
+  clipboard = undefined; const before = calls.length; context.menu.mention("c.js", "t1", cx);
+  assert.equal(calls.length, before); assert.equal(clipboard, undefined); assert.equal(notices.length, 1);
+  clipboard = "kept"; context.menu.mention("a\nwhoami", "t1", cx);
+  assert.equal(calls.length, before); assert.equal(clipboard, "kept", "a newline filename cannot execute through an unbracketed paste");
+  console.log("ok: Files menu boundaries, relative paths and clipboard-safe terminal insertion");
+})().catch(e => { console.error(e); process.exitCode = 1; });

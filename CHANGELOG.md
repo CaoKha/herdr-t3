@@ -4,6 +4,14 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-13
 
+- Fixed Details registering an invisible, zero-height popup. Its scroll viewport now follows measured content with a visible minimum and bounded maximum.
+- Wallpaper framing no longer rerasterizes every SVG tile at every Zoom step. Dragging, zooming and arrow keys reuse a cached, theme-coloured preview image; saved drawings keep their original SVG detail.
+
+- Image imports now use Dots and, like Studio `.ans` imports, let you frame them before Apply: Fill or Fit, drag or arrow-key positioning, 1–4× zoom and Reset within the current fit mode. Saved framing survives new Homes, restarts and resizing. The preview keeps fixed button slots, aligns its slider, takes keyboard focus on the canvas and shows retryable save errors inline.
+- Details (`cmd-shift-b`) is now an on-demand three-row popup: computer/directory, Open in Finder or an installed editor, and Actions. Its T3 square-menu control stays beside the work area; the panel toggle and platform controls move to the open panel's right edge. The sidebar mode still switches from its own button.
+- Replaced fixed Files/Review pages with closable per-space surface tabs, + and Open a surface. Files shares one tree; duplicate files/Review activate existing tabs. Panel `cmd-t` opens + and `cmd-w` closes the active surface. Hiding retains tabs; closing releases state, including Review's range. Each space retains only three recently displayed file previews/Editors. Tree menus reveal locally, copy relative paths and insert into this tab's last active terminal without Enter, restoring text clipboard safely. Terminal path clicks remain unavailable: the host provides no callback.
+
+- Wallpaper controls now stay in place across built-in and imported pictures, progress, previews, errors and Studio guide expansion. Unavailable actions keep their slots and are disabled; deletion confirmation does not move the switcher.
 - Shortened and aligned the English and Chinese layout recipes to fit Gallery's collection limit; the previous recipe was too large to be listed. The layout behaves the same.
 
 ## 2026-11-12

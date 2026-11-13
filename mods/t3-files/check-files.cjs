@@ -72,14 +72,14 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
   const fire = async (ms) => { for (const [at, f] of timers.splice(0)) if (at <= ms) f(cx); else timers.push([at, f]); await settle(); };
   // A second of Herdr's clock: what runs on the page's repeating timers, hidden or not.
   const tick = async () => { for (const [, f] of everies) f(cx); await settle(); await fire(0); };
-  const body = { id: "panel-body", active: page, children: [{ id: "files" }, { id: "review" }] };
+  const body = { id: "panel-body", active: page, children: [{ id: "files" }, { id: "review" }, { id: "panel-empty" }] };
   const layout = { id: "root", children: [{ id: "work" }, { id: "panel", children: [body] }] };
   const ctx = vm.createContext({
     View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element,
     Input: { new: element }, Editor: { new: element }, TextView: { markdown: element },
     InputState: { new: () => { let v = ""; return { on() {}, value: () => v, set_value(x) { v = x; } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
-    spaces: () => w.spaces, agents: () => [], layout: () => layout,
+    spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
     theme: () => ({}), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
     run() {}, notify() {}, exec,
@@ -90,7 +90,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)] } = {}) {
     localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     Date, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
-  const files = ["vendor/ufuzzy.js", "store.js", "list.js", "panel.js", "file-icons-data.js", "file-icons.js", "file-tree.js", "nav-column.js", "file-menu.js", "panel-states.js", "model.js", "main.js"];
+  const files = ["vendor/ufuzzy.js", "store.js", "list.js", "panel.js", "terminal-context.js", "file-icons-data.js", "file-icons.js", "file-tree.js", "nav-column.js", "file-menu.js", "panel-states.js", "model.js", "main.js"];
   const buttons = "const drawButton = (() => {\n" + load("button.js") + "\nreturn button;\n})();\n";
   vm.runInContext((buttons + files.map(load).join("\n")).replace("export default class", "globalThis.Mod = class"), ctx);
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
@@ -321,6 +321,19 @@ async function resources() {
   assert.ok(!view.states.has("s3") && gone.released, "a closed space's editor released");
 }
 
+async function surfaceCache() {
+  const { view, cx, settle, fire, send, tick } = makePage();
+  view.render(cx); await settle(); await fire(0);
+  const st = view.current();
+  const editors = [];
+  for (const file of ["a.js", "b.js", "c.js", "d.js"]) { view.open(st, file, cx); await settle(); editors.push(st.view.code); }
+  assert.equal(st.previews.size, 3); assert.equal(editors[0].released, true, "fourth file evicts oldest Editor");
+  view.open(st, "b.js", cx); await settle(); assert.equal(st.view.code, editors[1], "recent file retains its native reading state");
+  send("close"); await settle(); await tick();
+  assert.equal(editors[1].released, true, "closed file releases its Editor");
+  view.open(st, "b.js", cx); await settle(); assert.notEqual(st.view.code, editors[1], "re-add starts with a new Editor");
+}
+
 (async () => {
   // A listing in the tree's order: folders first, then names as people read them (shared/check-file-tree.cjs has the order).
   assert.deepEqual(plain(m.parseListing("f\0file10\0f\0file2\0")).map((e) => e.name), ["file2", "file10"]);
@@ -449,5 +462,6 @@ async function resources() {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   await page();
   await resources();
+  await surfaceCache();
   console.log("t3-files checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

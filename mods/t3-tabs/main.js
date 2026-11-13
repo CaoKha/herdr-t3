@@ -1,6 +1,6 @@
 import { View, div, svg } from "gpui-kit";
 import { h_flex, Popup } from "gpui-base";
-import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
+import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand, exec } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { tip, glow } from "./tip.js";
@@ -15,14 +15,14 @@ import { KEY, migrate } from "./store.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
-import { panelState, togglePanel, syncPanel, restorePanel } from "./panel.js";
+import { panelState, togglePanel, toggleWide, syncPanel, restorePanel } from "./panel.js";
+import { rememberTerminal } from "./terminal-context.js";
 import { button as drawButton, radiusOf } from "./button.js";
 
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
 const ROW_PX = 40;
 // A Review bar with `toggle` in its props draws the panel's toggle as its last part, beside its counts: one control, not two.
-const reviewToggle = (node) => Boolean(node?.content?.mod === "pulls-review" && node.content.props?.toggle) || (node?.children ?? []).some(reviewToggle);
 const findNode = (node, id) => node?.id === id ? node : (node?.children ?? []).reduce((found, c) => found ?? findNode(c, id), undefined);
 
 // What the hidden sidebar's toggle counts, as the selected sidebar shows it. In the Inbox an agent settled there isn't news
@@ -123,8 +123,23 @@ export default class Tabs extends View {
         if (command === "sidebar") run("layout.select", { stack: "sidebar-lists", child: inboxShown() ? "lists" : "inbox" });
         else if (command === "settle") await this.settle(cx);
         // The space panel (docs/adr/0011), keyed as VS Code's: a page opens on it, or closes the panel already showing it; `panel` keeps the last page.
-        else if (command === "files" || command === "review") togglePanel(command);
+        else if (command === "files") togglePanel("files");
+        else if (command === "review") {
+          const p = panelState(), sp = spaces().find(s => s.active);
+          if (!p.pages.includes("review")) continue;
+          if (p.open && p.active === "review") { togglePanel("review"); continue; }
+          const git = !sp?.machine && sp?.folder && await exec("git", ["rev-parse", "--show-toplevel"], { cwd: sp.folder }).catch(() => null);
+          if (spaces().find(s => s.active)?.id !== sp?.id) continue;
+          if (git?.code === 0) togglePanel("review");
+          else notify({ title: "Review unavailable", body: sp?.machine ? "Review is unavailable on remote spaces." : "This space is not a Git repository.", level: "warning" });
+        }
         else if (command === "panel") togglePanel();
+        else if (command === "details") {
+          if (this.navigation.atHome) continue;
+          if (panelState().wide) toggleWide();
+          cx.timer.after(50, () => run("t3-actions.details"));
+        }
+        else if (command === "surface-menu") openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 72, props: { part: "surface-menu" } });
         // An agent's menu (t3-menu): Settle, Un-settle or Wake the agent it was opened on, in view or not.
         else if (command.startsWith("settle:")) await this.settle(cx, command.slice("settle:".length));
         else if (command.startsWith("wake:")) await writeLabel(command.slice("wake:".length), "snoozed", "");
@@ -301,6 +316,7 @@ export default class Tabs extends View {
   // on_size_change reports zoomed pixels; a layout's are logical.
   fit(size) {
     const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1));
+    if (id === "tabs-end") { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.end = size.width; }
     if (!id || px === this.fitted) return;
     this.fitted = px;
     run("layout.resize", { id, px });
@@ -342,6 +358,7 @@ export default class Tabs extends View {
       .on_size_change((size) => setShared(KEY.compact, size.width / (Number(settings()?.zoom) || 1) < 1024));
     const t = theme(), w = window();
     if (props()?.part === "keys") {
+      rememberTerminal();
       syncPanel(this);
       keepRecent();
       this.navigation.frame();
@@ -352,26 +369,21 @@ export default class Tabs extends View {
     // 24 as T3's tab bar +; the window's own buttons 28, as its titlebar controls.
     /** @param {"xs" | "sm"} [size] */
     const button = (id, icon, label, action, key, size = "xs", glyph = undefined) => tip(this, t, id, label, stop(this, t, id,
-      drawButton(t, id, { icon, label, size, hot: this.hot === id, on: id === "panel-toggle" && panelState().open })
+      drawButton(t, id, { icon, label, size, surface: id === "panel-toggle" ? "card" : "chrome", hot: this.hot === id, on: id === "panel-toggle" && panelState().open })
         .on_hover(glow(this, id)).on_mouse_down("left", stopPress).on_click(action)
         .when(Boolean(glyph), el => el.child(glyph)), radiusOf(size)), { action: key, below: true });
-    // The bar's end, a block of its own after the controls other mods put in the bar (Actions, Review): + keeps its spot
-    // however wide they are, and the window's own buttons stay last.
-    // Its last control's box ends 12 from the window's edge, over the pane headers' last button, so its icon stands as far in
-    // from the window's corner as the sidebar's from its edge; the window's own buttons (Windows) 2. Review's toggle before
-    // it ends 2 in itself, so 6 first, the boxes 8 apart. With nothing to draw, 10 after that toggle, so it ends at 12 the
-    // same way; with no toggle either, none, and Actions keeps its own 8.
-    const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = panelState().pages.length > 0 && !reviewToggle(layout());
-    const endShown = newTabShown || toggleShown || w?.buttons;
+    // The work header's end: terminal +, then the panel/window controls only while no panel head owns them (ADR 0017).
+    const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = panelState().pages.length > 0 && !panelState().open;
+    const endShown = newTabShown || toggleShown || (w?.buttons && !panelState().open);
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
-      .child(h_flex().id("tabs-end").flex_none().pl(endShown && reviewToggle(layout()) ? 6 : 0).pr(w?.buttons ? 2 : endShown ? 12 : reviewToggle(layout()) ? 10 : 0).gap(4).items_center().on_size_change((size) => this.fit(size))
+      .child(h_flex().id("tabs-end").flex_none().pr(endShown ? 8 : 0).gap(4).items_center().on_size_change((size) => this.fit(size))
         // With the Inbox, the breadcrumb's space is the way to a new tab.
         .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => newTab(spaces().find(s => s.active)), "t3-tabs.new")))
         // The space panel's toggle, last before the window's buttons, over where it opens: the sidebar's panel-left, mirrored.
         // It opens on the page last shown; the panel's head picks the page. Lit while open.
         .when(toggleShown, el => el.child(button("panel-toggle", "mods/t3-tabs/icons/panel-right.svg",
-          panelState().open ? "Hide panel" : "Show panel", () => togglePanel(), "t3-tabs.panel")))
-        .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, "sm", w.platform === "windows" ? undefined : "−"))
+          "Show panel", () => togglePanel(), "t3-tabs.panel", "sm")))
+        .when(w?.buttons && !panelState().open, el => el.child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, "sm", w.platform === "windows" ? undefined : "−"))
           .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, "sm", w.platform === "windows" ? undefined : "□"))
           .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close"), undefined, "sm")))));
     const space = spaces().find(p => p.active);

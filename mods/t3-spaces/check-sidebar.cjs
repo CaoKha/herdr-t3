@@ -1540,25 +1540,25 @@ for (const width of [208, 240, 256, 320, 480]) {
   assert.deepEqual(f.calls.splice(0), [["layout.resize", { id: "tabs-end", px: 34 }]], "once per change");
   f.scopes.get("t3-tabs").window = () => ({ platform: "windows", buttons: true });
   assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-minimize", "tip-maximize", "tip-close-window"], "the window's buttons stay last");
-  // With the space panel, its toggle before them; unless the Review bar draws it with its counts (`toggle`), as one control.
+  // The layout owns the only toggle, even with the Review extension installed (ADR 0017).
   f.slots.panel = { id: "panel", hidden: true, children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] };
   assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
   f.slots.review = { id: "review-bar", content: { mod: "pulls-review", props: { block: "review-bar", toggle: true } } };
-  assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-minimize", "tip-maximize", "tip-close-window"]);
+  assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
   // The window's buttons (Windows) end 2 in; Review's toggle before them ends 2 in itself, so 6 first, the boxes 8 apart.
-  assert.deepEqual(["pl", "pr"].map(k => find(end.render(cx), "tabs-end").style[k]), [6, 2], "8 from Review's");
+  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
   delete f.slots.review;
-  assert.deepEqual(["pl", "pr"].map(k => find(end.render(cx), "tabs-end").style[k]), [0, 2], "Actions keeps its own 8 after itself");
+  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
   f.slots.review = { id: "review-bar", content: { mod: "pulls-review", props: { block: "review-bar", toggle: true } } };
   f.scopes.get("t3-tabs").window = () => ({ platform: "macos", buttons: false });
   // Without them the last control's box ends 12 from the window's edge, over the pane headers' last button, its icon about
   // as far in as the sidebar's from its edge. With nothing to draw (the Inbox's crumb has the + and the Review bar the
   // toggle), 10, so the toggle's box, 2 in itself, ends at 12 too.
-  assert.deepEqual(["pl", "pr"].map(k => find(end.render(cx), "tabs-end").style[k]), [6, 12], "over the pane headers' buttons, 8 from Review's");
+  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
   f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
-  assert.deepEqual([find(end.render(cx), "tabs-end").items.length, find(end.render(cx), "tabs-end").style.pl, find(end.render(cx), "tabs-end").style.pr], [0, 0, 10], "nothing to draw: the toggle's box 12 in");
+  assert.deepEqual([find(end.render(cx), "tabs-end").items.length, find(end.render(cx), "tabs-end").style.pr], [1, 8], "closed panel keeps one toggle with Inbox");
   delete f.slots.review;
-  assert.deepEqual([find(end.render(cx), "tabs-end").style.pl, find(end.render(cx), "tabs-end").style.pr], [0, 12], "the panel's own toggle back, 12 in");
+  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
   delete f.slots["sidebar-lists"]; f.scopes.get("t3-tabs").window = () => ({ platform: "windows", buttons: true });
   delete f.slots.panel; delete f.slots.review;
   fire(find(end.render(cx), "close-window"), "on_hover", true, cx);
@@ -2167,6 +2167,17 @@ for (const width of [208, 240, 256, 320, 480]) {
     f.slots.lists.active = "lists";
     assert.deepEqual(await press("settle"), [], "Lists have no Settle");
     assert.deepEqual(await press("sidebar"), [["layout.select", { stack: "sidebar-lists", child: "inbox" }]]);
+    // The Review shortcut observes the same availability as + and the startup list.
+    const scope = f.scopes.get("t3-tabs"), reviewSpace = { id: "review-test", active: true, machine: "remote", folder: "/repo", tabs: [] };
+    scope.spaces = () => [reviewSpace];
+    f.slots.panel = { id: "panel", hidden: true, children: [{ id: "panel-body", active: "panel-empty", children: ["files", "panel-empty", "review"].map(id => ({ id })) }] };
+    let gitReads = 0, gitCode = 128;
+    scope.exec = async () => { gitReads++; return { code: gitCode }; };
+    assert.deepEqual(await press("review"), []); assert.equal(gitReads, 0, "remote never asks local Git");
+    reviewSpace.machine = null;
+    assert.deepEqual(await press("review"), [], "not a repository: no surface added");
+    gitCode = 0;
+    assert.ok((await press("review")).some(([cmd, a]) => cmd === "layout.select" && a.child === "review"));
   }
   {
     // Every menu goes by arrows and Enter, and says when a search finds nothing.
