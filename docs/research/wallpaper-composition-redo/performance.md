@@ -8,7 +8,7 @@
 
 只读原图 `~/Pictures/146943457_p0.png`，2756×1654；客体仅用副本，二者 SHA256 都为 `c18f70dc005ec5fa88397ff77ec41d9bfc8de9526e9ec1368595009c66266f83`。经真实 `startPreview`、旧 Dots 生成器建立草稿，不用小图替代。测试副本注入 `performance-probe.py`，生产代码不留 probe。
 
-每种输入100步、每步请求16ms后的下一tick：Zoom从1到3.871；画布拖动和Right键调用生产鼠标／键盘回调。真实窗口实际布局、绘制，不是空元素模拟。记录每步间隔、`render` JS耗时、转换与exec/read/write调用数。`HERDR_APP_BENCH` 的原生计数记录JS、元素materialization和CPU绘制阶段；`native.jsonl` 是每秒原始累计量，帧均值只用完全位于该回放内的桶。事件间隔含16ms调度等待，不等同于CPU帧耗时；不足一帧的JS用Date.now毫秒精度记录，不称微秒精度。
+每种输入100步、每步请求16ms后的下一tick：Zoom从1到3.871；画布拖动和Right键调用生产鼠标／键盘回调。真实窗口实际布局、绘制，不是空元素模拟。记录每步间隔、`render` JS耗时、转换与exec/read/write调用数。`HERDR_APP_BENCH` 的原生计数记录JS、元素materialization和CPU绘制阶段，按秒累计；帧均值只用完全位于该回放内的桶。事件间隔含16ms调度等待，不等同于CPU帧耗时；不足一帧的JS用Date.now毫秒精度记录，不称微秒精度。
 
 ## 根因
 
@@ -26,7 +26,7 @@
 
 ## 对比
 
-原始值在 `performance-before/`、`performance-after/`，验证脚本 `check-performance.py`；旧场景必红，修复后必绿。首次探索的独立100步原始值另保留 `zoom.json`（均值198.16ms，最大635ms），不混进正式对照。
+原始值（含原生每秒计数）未入库，以下表是其汇总；验证脚本 `check-performance.py`：旧场景必红，修复后必绿。首次探索的独立100步 Zoom 均值198.16ms、最大635ms，不混进正式对照。
 
 | 输入 | 旧事件间隔均值 / p95 / 最大(ms) | 新事件间隔均值 / p95 / 最大(ms) | 原生CPU帧均值：旧→新(ms) |
 | --- | --- | --- | --- |
@@ -36,12 +36,14 @@
 
 验收门槛：三种回放的事件间隔p95≤33ms，所有转换与文件调用计数为0。修复前Zoom p95=260ms，稳定复现；其他两种没有相同持续卡顿，Zoom档位变化后的单次冷栅格化也会污染拖动的最大间隔。性能修复未以降采样原图或跳过输入来掩盖问题。
 
-原生客体输入另做一次背景拖动，读回确认没有变化后才改foreground；真实slider从2.00变3.54，见 `performance-after/native-foreground.png`。这是真实HID拖动的UI确认，不把Driver的 `effect: unverifiable`当成功。逐帧计量用上述受控回放，不把一次人工式手势冒充100步计量。原 `app.theme` 只选择明暗各自的主题槽，并未切appearance，该探索图更名 `theme-selection-only.png`，不作浅色证据；明确切appearance后的明暗整窗补验见[模式验收](../wallpaper-image-alignment/README.md)。
+原生客体输入另做一次背景拖动，读回确认没有变化后才改foreground；真实slider从2.00变3.54（截图未入库）。这是真实HID拖动的UI确认，不把Driver的 `effect: unverifiable`当成功。逐帧计量用上述受控回放，不把一次人工式手势冒充100步计量。原 `app.theme` 只选择明暗各自的主题槽，并未切appearance，该探索图更名 `theme-selection-only.png`，不作浅色证据；明确切appearance后的明暗整窗补验见[模式验收](../wallpaper-image-alignment/README.md)。
 
 ## 门禁与边界
 
-- `performance-render-red.log`：旧构图不复用原生image的回归断言确实失败；`check.cjs`修后通过，并检查移动不改变文件集合。
-- `performance-timing-red.log`／`performance-timing-green.log`：同图、同窗口、同输入程序的红绿结果；原生CPU帧与JS成本见绿日志。
+红绿日志未入库，结论如下。
+
+- 旧构图不复用原生image的回归断言确实失败；`check.cjs`修后通过，并检查移动不改变文件集合。
+- 同图、同窗口、同输入程序的时序检查：旧实现失败、修复后通过；原生CPU帧见上表。
 - `check-filesystem.cjs`的17个原文件生命周期场景通过；原204组布局检查通过。处理方式选择的新布局检查在独立后续改动中，不混进本性能提交。
 - 客体 `herdr-app check`通过，`status.errors=[]`；截图已亲看。全仓sync/check在本次算法/UI接续完成后一并收口。
 

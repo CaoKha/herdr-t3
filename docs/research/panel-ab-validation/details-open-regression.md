@@ -19,15 +19,17 @@
 
 ## 原场景回放
 
-| 证据 | 结果 |
+原始截图、尺寸与状态 JSON 未入库，下表记录当时读回的结果。
+
+| 场景 | 结果 |
 | --- | --- |
-| [安装字节、快捷键命令路径整窗](details-regression-zero-height-window.png)／[尺寸](details-regression-zero-height.json) | 已注册但不可见，height0 |
-| [修后同窗口整窗](details-regression-fixed-shortcut-window.png)／[尺寸](details-regression-fixed-height.json) | width308、height249.5，当时的详情内容完整显示 |
-| [修后宿主状态](details-regression-fixed-status.json) | overlay存在、errors为空 |
+| 安装字节、快捷键命令路径的整窗与尺寸 | 已注册但不可见，height0 |
+| 修后同窗口的整窗与尺寸 | width308、height249.5，当时的详情内容完整显示 |
+| 修后宿主状态 | overlay存在、errors为空 |
 
 同一代码中，按钮的真实 `on_mouse_down/on_click` handler 回放会打开 Details 并保留420px可增长空间；快捷键绑定的 `t3-tabs.details` 命令在原生 demo 成功显示。真实鼠标点击、物理按键的焦点路由未伪称已验证。
 
-回归检查先失败于 `an open Details scroll viewport has room for a control, never zero height`，修后通过；另验证内容240→视口242、长内容→限高420。独立提交快照的 Actions 行为检查和 `herdr-app check` 也通过，见 [检查日志](details-regression-check.log)。
+回归检查先失败于 `an open Details scroll viewport has room for a control, never zero height`，修后通过；另验证内容240→视口242、长内容→限高420。独立提交快照的 Actions 行为检查和 `herdr-app check` 也通过（检查日志未入库）。
 
 ## 校正与边界
 

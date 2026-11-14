@@ -4,7 +4,7 @@
 
 - `files/ReadOnlySourcePreview.tsx` 使用 `@pierre/diffs/react` 的 `Virtualizer` / `File`；文件头禁用，代码按 Wrap/Scroll 显示。`FilePreviewPanel.tsx:872-899` 的可编辑分支另有 gutter line selection/comment 回调。
 - `files/fileSurfaceChrome.tsx` 的 `FILE_LINK_REVEAL_UNSAFE_CSS` 将 File 的底色置为代码/文件 surface；`lib/diffRendering.ts` 的 context tint 从同一代码底色混合，不是独立的蓝色 gutter。
-- 原组件 headless fixture 的三行文本实测：gutter 高80px、所在 viewport 高810px；gutter 不铺到视口底部。行号 computed `user-select:none`。真实的 **headless 浏览器**鼠标拖选得到 `first line\nsecond line`，不含行号。源码证据与数值在 `t3-source-facts.json`，图为 `t3-source-selection.png`。这不是 Herdr 的鼠标测试。
+- 原组件 headless fixture 的三行文本实测：gutter 高80px、所在 viewport 高810px；gutter 不铺到视口底部。行号 computed `user-select:none`。真实的 **headless 浏览器**鼠标拖选得到 `first line\nsecond line`，不含行号。原始数值 JSON 未入库，图为 `t3-source-selection.png`。这不是 Herdr 的鼠标测试。
 - Markdown 经 `FileMarkdownPreview.tsx` → `ChatMarkdown` 渲染正文；没有 gutter，也没有禁止正文原生选择的属性。
 
 ## Herdr 的最小修复
@@ -23,14 +23,14 @@ Files 原根元素的左键按下会 `this.handle.focus()`。内容中的原生 
 
 ## 大文件探针（仅在独立 demo，不进入产品）
 
-同一台Mac、同一文件内容、每项三轮：10,000行/220,000字节和40,000行/880,000字节。比较原生只读 Editor 与一个最小 `TextView.html(<pre>…).selectable(true)` 原型。原始记录见 `source-preview-performance.jsonl`。
+同一台Mac、同一文件内容、每项三轮：10,000行/220,000字节和40,000行/880,000字节。比较原生只读 Editor 与一个最小 `TextView.html(<pre>…).selectable(true)` 原型。原始记录未入库。
 
 | 数据 | Editor 创建CPU中位数 | 到布局回调中位数 | HTML创建CPU中位数 | HTML到布局回调中位数 |
 | --- | ---: | ---: | ---: | ---: |
 | 10k行 / 220KB | 4ms | 3,817ms | 5ms | 20ms |
 | 40k行 / 880KB | 10ms | 15,235ms | 22ms | 37ms |
 
-**这些回调不是绘制完成，不能据此宣称 HTML 更快。** HTML大文件随后让 demo 的截图/命令超过30秒不响应、主线程约100% CPU。2秒原生采样的297/297主线程样本落在 `gpui_base::text::inline::Inline::paint` → `TextLayout::position_for_index`；见 `source-preview-paint-sample.txt`。已结束这个仅属于本任务的 demo 进程，未影响用户的窗口。
+**这些回调不是绘制完成，不能据此宣称 HTML 更快。** HTML大文件随后让 demo 的截图/命令超过30秒不响应、主线程约100% CPU。2秒原生采样的297/297主线程样本落在 `gpui_base::text::inline::Inline::paint` → `TextLayout::position_for_index`（采样原文未入库）。已结束这个仅属于本任务的 demo 进程，未影响用户的窗口。
 
 这个原型还没有语法着色、独立行号、保持行号排除的跨行选择，以及受控虚拟滚动。因此它既没有功能等价，也没有通过大文件绘制/滚动验收，**不能直接替换 Editor**。滚动数据不作通过声明：大文件候选已经在 paint 阶段失败，无法完成同场景安全回放。
 

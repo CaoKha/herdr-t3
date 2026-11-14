@@ -49,7 +49,7 @@
 **6. 为 1ms 级耗时写了一套快照状态机**（`main.js:79-83`、`:100-126`、`check-pane.cjs:79-102`、`:333`）
 
 - 现象：每秒在定时器里刷新 `allRows`／`rows`／`labels`，在刷新之间对齐选中项和折叠集合；render 不读 `terminals()`。为了证明这一点，测试里加了 `reads` 计数器，还把一段 `PANE_BENCH` 基准测试塞进了行为检查文件。
-- 为什么错：改之前在 5,000 个终端的 VM 里打开一次是 0.83ms（`performance-before.log`），远低于一帧，这个负载下没有要解决的问题。代价是状态最多滞后 1 秒（一个刚结束的子 agent 在这 1 秒内仍然能点，peek 的是一个已经结束的终端），并且多了约 30 行协调代码。`kidRows` 也因此自己写了一份父子索引（`main.js:29-45`），和 `shared/tree.js` 的 `agentKids` 逻辑重复：两份都要处理“跳过 shell”和“防环”，以后要一起改。
+- 为什么错：改之前在 5,000 个终端的 VM 里打开一次是 0.83ms（基准日志随已否决设计的验收目录删除，未入库），远低于一帧，这个负载下没有要解决的问题。代价是状态最多滞后 1 秒（一个刚结束的子 agent 在这 1 秒内仍然能点，peek 的是一个已经结束的终端），并且多了约 30 行协调代码。`kidRows` 也因此自己写了一份父子索引（`main.js:29-45`），和 `shared/tree.js` 的 `agentKids` 逻辑重复：两份都要处理“跳过 shell”和“防环”，以后要一起改。
 - 修法：render 里直接调用 `descendants`，再加一个返回带深度结果的共享 helper（比如 `shared/tree.js` 导出 `kidTree(all, addr)`，Agents 的 `agentTree` 也改用它）；定时器只负责 `cx.notify()` 和“没有子 agent 就关闭”。删掉 `refreshKids`／`visibleKids`、`reads` 计数器和 `PANE_BENCH`。
 
 **7. 测试锁的是实现细节和已删掉的功能**（`check-pane.cjs:284`、`:308`、`:333`、`:79-102`；`check-sidebar.cjs:730`、`:1587`）
@@ -62,7 +62,7 @@
 - `CHANGELOG.md:27`（中文 `:27`）：“the fixed details/footer buttons … were removed after seeing the installed UI”。对 origin/main 的用户来说，footer 从来没出现过。真正可见的变化是：悬停卡没了；入口从 `3 agents ⌄` 变成 `3 ⌄`；Failed／Done 单独显示；右键能打开 agent 菜单；有子 agent 的窗格不再显示聚合标记。另外这一条放在 `## 2026-11-13` 下面，提交日期却是 11-14。
 - `RECIPE.md:79`：“no footer, details or action buttons, no external hover card, no initial highlighted row” 是在写不存在的东西；“Refresh the tree outside render each second; render has no … terminal enumeration” 是实现细节，按 AGENTS.md 应该放在 `docs/internals/`。RECIPE.md 现在 59,989 字节，离 60,000 上限只剩 11 字节，这段是最值得压缩的地方。
 - `docs/user/guide.md:15`：同样在描述用户从没见过的东西（“no … details footer or external hover card”）。
-- 研究目录：`sub-agent-menu-redesign-validation/` 有 23 个入库文件、约 35KB，验收的是一个已经被否决的设计。里面还有 `check-concurrent-failures.log` 这类别人工作树的失败日志，以及几个 replay patch。`sub-agent-menu-redesign.html` 有 31KB。
+- 研究目录：`sub-agent-menu-redesign-validation/` 有 23 个入库文件、约 35KB，验收的是一个已经被否决的设计。里面还有 `check-concurrent-failures.log` 这类别人工作树的失败日志，以及几个 replay patch。`sub-agent-menu-redesign.html` 有 31KB。（二者已按建议删除，留痕见 [sub-agent-menu-list-only](../sub-agent-menu-list-only/README.md) 「结果」一节。）
 
 ### 低
 

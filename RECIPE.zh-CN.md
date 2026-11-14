@@ -236,19 +236,23 @@ Home 是按需创建、本机一个隐形 space，跨项目／机器共用。只
 
 ### 可选 asciicn 壁纸 Home
 
-装 `extras/mods/asciicn-wallpaper`，在 Home shows 选择。静态主题色画，不做动画；内置 Lighthouse、Mountain dusk、Nebula、Ember，来自 [asciicn](https://asciicn.dev)，MIT。新图片以VGA/OKLab最近槽映射主题ANSI16，明度分8档不透明度；浅色主题画在纸上（字形取反色调、有色空格上墨、按暗度分档）；内置与旧`.ans`保留原4档和几何。SVG保留Braille/方块/象限/阴影/半调点/斜线；其他字符近似圆头竖条，不保留字母轮廓或原图精确颜色。
+装 `extras/mods/asciicn-wallpaper`，在 Home shows 选择。静态主题色画，不做动画；内置 Lighthouse、Mountain dusk、Nebula、Ember，来自 [asciicn](https://asciicn.dev)，MIT。已保存和预览中的画走同一条路：字形按主题色（ANSI16 槽、不透明度分档）合成一张图。浅色主题里，从图片导入的画画在纸上（照片暗处落笔）；Studio／手放的 `.ans` 和内置画明暗不变。几何字形保留形状，其他字符按暗度画成短条。
 
-无构图记录时填满 Home 高、主体横向锚定；较窄的填宽、上下均裁。贴底，高度缩小稳定250ms才采纳。仅右下368×104区域显示距角12的切换器，chrome/圆角8、24px按钮：`‹`、名字（160截断，只随Home宽度缩小）、`›`、`+`、裁切、`×`。预览、进度、长名、主题、Studio展开和错误均保留槽位；内置画删除／裁切、单张翻页、预览浏览置灰。卡片在切换器上方，删除是独立确认弹层。选中新Home也沿用。
+Home 不会空白：上一张画一直留到下一张加载好（换画、换主题、换模式都一样）。等待不到150ms不显示任何提示，显示后至少留300ms：取景卡紧凑态有进度条（图片按步骤显示真实进度，`.ans` 来回扫），换模式时上一个模式的画变暗并在模式按钮和底栏转圈，切换壁纸时名字旁或右下角转圈。尺寸见 [tokens](docs/internals/t3-tokens.md)「壁纸」。
 
-`+` 立即开卡（再点＋／×关）：主 Choose image…、次 Import Studio file (.ans)…，可展开 Create in asciicn Studio…（开 Studio、用 .ans 存 Downloads、回来导入），辅助 Open folder。Studio：`https://asciicn.dev/studio?source=image&charset=braille&color=truecolor`。
+无构图记录时从底部铺满 Home、主体横向锚定，较窄的填宽；高度缩小稳定 250ms 才采纳。
 
-图片默认Dots，卡片首行常驻Dots/Braille/Blocks(`░▒▓█`)/Quadrants，方向键切换；Studio `.ans` 保留原字形，首行占位禁用并提示。切换仅从内存原像素重建草稿，分块让出，连续切换取消旧任务。图片按网站cover/超采样块平均/autoLevels，96行、4.5×9格；内置与旧方格Dots不变，重新导入原图才用新处理。预览卡popover300×352（窄Home宽减24）、right12/bottom60/p16/gap12/r8、标题13/字12；处理/标题/名字/铺放/缩放名/滑条/状态/操作固定28/20/20/28/20/24/60/28高。分段等宽24px槽（p2/gap2/r6，处理项px3），Reset/Cancel/Apply三个等宽compact槽。窄卡Quadrants缩写Quads；默认宽度显示全名。滑轨4/圆点16居中，禁用0.64，长错误区内滚动。模式/转换中/错误/Applying均不挪按钮。导入及点画布即聚焦，Tab逐控件走；构图复用原生纹理，输入不转换或读写文件。
+切换器在右下（指针靠近、键盘模式、菜单或文件对话框开着时，以及 Apply 后 1.5s 显示）：`‹`、名字、`›`、取景（裁切图标）、`+`；只有仅一张画时 `‹ ›` 置灰，没有占位的禁用槽。名字截断，*Choosing…*／*Importing…* 占同一槽。选择共享，新 Home 沿用。尺寸和缩放档位见 [tokens](docs/internals/t3-tokens.md)「壁纸」。
 
-Fill默认cover铺满裁切；Fit用contain，1倍看全图。拖动或方向键移10px，Shift50px；缩放为当前铺放基准1–4倍，缩放控件方向键±0.1。Reset保留mode、恢复居中1倍。调整只改内存。Apply先发布`.ans`，最终场景就绪才写构图/选择；失败保留草稿与卡片内可重试错误，重试只复用自己内容一致的已发布源，否则另存空闲名。Cancel回原选择/构图，保留失败Apply已发布的源。裁切按钮以已存构图按`.ans`重开导入画，Apply只改构图。相对构图经重启/主题/窗口/侧栏变化及缓存重建保留。迟到请求/Apply不能覆盖新选择。
+`+`（提示第二行「Or drop an image or .ans on Home」）在其上方打开本 mod 的 popup 菜单：Choose image…、Import Studio file (.ans)…、asciicn Studio（第二行「Export .ans there, then drop it here」，打开 `https://asciicn.dev/studio?source=image&charset=braille&color=truecolor`）、Open wallpaper folder；Windows 只列后两项。把文件拖到 Home 上效果相同（只取第一个路径，`.ans` 按 Studio 文件，其余按图片）；没有拖入悬停高亮。不监视「下载」文件夹。
 
-手放`<appHome>/asciicn-wallpaper/`的文件按默认构图出现，改动重转。Unicode/短横/普通隐藏名支持，拒绝不安全`.ans/..ans/...ans`。导入画×确认写明名字，取消不动；确认删除源/图块/构图，即使重转时条目暂时移出列表也不跳过，同时取消转换/待提交Apply、选前一张。迟到结果不复活。原图不改。
+新画、或对任何画点取景，都在切换器的位置打开取景卡。从上到下：名字；模式（仅图片：默认 Dots，Braille、Blocks `░▒▓█`、Quadrants，窄时 Quads；方向键切换）；Fill/Fit + Reset；Zoom（− 滑条 + 百分比）；底栏（状态槽、Cancel、Apply）。读取中只有名字、进度条（*Reading image…*、*Drawing Dots…*）或红字原因，以及底栏（读不了时为 Close、Choose another…）；画好后向上展开，底栏位置不动。各模式出自同一张 Braille 采样网格大小的草稿（见 [layout implementation](docs/internals/layout-implementation.md)）：画过的模式立即切回，画失败的退回上一模式并在底栏说明；切换不重读原图、不保存。
 
-macOS 用 `osascript`、Linux `zenity` 选择，等待显示 Opening…；图片转 BMP 用 macOS `sips`、Linux ImageMagick `convert`，没 ImageMagick 导入 Studio 文件。Windows／没选择框用 Open folder、复制 `.ans`。按 EXIF 方向转正。失败／空导入弹提示、不自动重试。更新保留 mod 目录外的用户文件，见存储契约。主题导出、可选配色是另装 extras，不是布局前提。
+Fill 裁切铺满，Fit 1 倍看全图。缩放为铺放基准的 100–400%，滑条对数刻度；− +、`-` `=` 按档位以 Home 中心缩放；带刻度的滚轮（6 格翻倍）和 ⌘／Ctrl 加滚动（200px 翻倍）以指针为中心缩放；触控板双指和 Shift 加滚轮平移，抬指后的惯性丢弃。拖动／方向键 10px，Shift 50px；`0` 或 Reset 回到 1 倍、主体在画面内，保留 Fill/Fit。Enter 等于 Apply，Esc 等于 Cancel。构图期间不转换、不读写文件。Apply 等正在画的模式画好，保存 `.ans` 并沿用预览图，再写构图和选择；失败保留草稿，底栏显示可重试错误，只复用自己内容一致的已存文件。Cancel 保留原选择。已有的画（含内置画）取景时没有模式行、不重新转换，Apply 只存构图；导入的画在底栏左侧有 Delete…。构图是相对的，经重启、换主题、改尺寸和缓存重建保留。迟到任务不覆盖新选择。
+
+手放进 `<appHome>/asciicn-wallpaper/` 的 `.ans` 不经预览出现、铺满 Home，修改后重画。支持 Unicode／短横／隐藏名，拒绝 `.ans/..ans/...ans`。Delete… 按名确认；确认后删文件、缓存和构图，停止其转换或 Apply，选前一张；迟到结果不复活。原图不改。
+
+macOS 用 `osascript`、Linux `zenity` 选择；图片转 BMP 用 macOS `sips`、Linux ImageMagick `convert`，没 ImageMagick 导入 Studio 文件。Windows 没有选择框：拖入文件，或用 Open wallpaper folder 复制 `.ans`。按 EXIF 方向转正。失败／空导入弹提示、不自动重试。更新保留 mod 目录外的用户文件，见存储契约。主题导出、可选配色是另装 extras，不是布局前提。
 
 ### 键盘与焦点
 
@@ -333,7 +337,7 @@ Herdr API：`spaces/panes/agents/terminals/focused/layout/settings/window/keys`�
 | 文件菜单 | 剪贴板保存/粘贴/恢复、`pane.focus`、`terminal.paste`，支持的平台本机 `open -R`／默认程序打开 |
 | Actions | `terminal.open` 执行 `sh -c`、可选目录，全局列表/上次选择 |
 | Review | `jin.review`、共用只读 Git scope/base/ref helpers，本地 daemon/Review 配置，无远程 |
-| 壁纸 | `osascript/zenity` 选择，`sips/ImageMagick` 转 BMP、base64 解码，`open/xdg-open/explorer` 开 Studio/目录；app-home 壁纸目录 `.ans`、生成 `.tiles/`、临时 `.preview/` |
+| 壁纸 | `osascript/zenity` 选择，`sips/ImageMagick` 转 BMP、base64 解码，`open/xdg-open/explorer` 开 Studio/目录；app-home 壁纸目录 `.ans`、生成的 `.tiles/` 与 `.builtin/` 图、临时 `.preview/` |
 
 Git 读取带 `--no-optional-locks -c core.fsmonitor=false`。Spaces 不扫未跟踪，位置/命令/轮次/重连变更才读、前台慢速兜底；Files 包含未跟踪。Files/Review 不用递归 watcher，隐藏/切换停止刷新并作废在途读取，保留最近显示的三个 space 的完整数据；驱逐才释放完整缓存，迟到结果不能补回。
 
@@ -363,6 +367,6 @@ Git 读取带 `--no-optional-locks -c core.fsmonitor=false`。Spaces 不扫未�
 7. Actions 加/改/删/运行 tab/右/下/目录：必填、确认、上次选择、shell 保留、窄栏宽度。
 8. 回放surface创建/替换/去重/Review，关闭/批量/隐藏/放大/space/Home、有界驱逐和关闭重加；本机/远程、菜单/剪贴板、禁用/缺失/长名/多标签、面板与终端快捷键。详情核对空/多动作、locked机器行、选择与执行、分层Escape、来源失效、Git各态/写确认/显隐，测冷暖打开和切标签耗时。默认侧栏/窄窗/明暗整窗；未实测真实指针/键盘须注明。
 9. Review scope/base/remotes/commits/groups/reviewed/j/k/Analyze/Unicode/二进制/空/失败：树/diff 同序，无误分析，安全换行，吸顶头不透明、勾选 alpha 正确。
-10. 壁纸四种模式逐格对齐网站/8档，浅色纸面、EXIF转正、重新构图，内置与旧画不变，切换/转换中按钮零漂移；Studio字形、横/竖/方Fill/Fit、拖动/方向键/缩放/Reset不做I/O，Apply/Cancel/重试/同名/两Home/迟到/转换中删除；构图经重启/缓存/主题/尺寸变化有效。原图不改、不重复保存、不复活。手动/Unicode/短横/隐藏名/密集阴影有效。
+10. 壁纸保存与预览每主题一张图，启动时直接用磁盘上已画好的；`+` 菜单、拖入文件；取景卡先紧凑再向上展开、底栏不动；四种模式/8档，浅色纸面、八种 EXIF 方向转正，任何画取景都不重转，内置与旧画不变；Studio字形、横/竖/方Fill/Fit、拖动/方向键/滚轮/触控板/⌘ 以指针为中心缩放且滑条同步、Reset 不做I/O，Apply/Cancel/重试/同名/两Home/迟到/转换中删除；构图经重启/缓存/主题/尺寸变化有效。原图不改、不重复保存、不复活。手动/Unicode/短横/隐藏名/密集阴影有效。
 
 通过代码检查不能替代可见/真实输入验证。未试真实点击须说明，只清理本次 demo 创建的资源。

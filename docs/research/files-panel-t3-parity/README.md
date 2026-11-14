@@ -63,7 +63,7 @@
 
 ### 原T3组件证据
 
-`harness/`保存可复现fixture与capture。截图来自原`09a54f01`组件，不是手绘复刻，也不是完整T3应用：backend/host hooks stub；Preview正文是fixture，Code则是原`ReadOnlySourcePreview`。`t3-source-facts.json`记录无page errors、Search高28/padding9/原字14/radius8/内环3px24%，目录hover为白4%、nav透明、tooltip为`packages/client`（等待750ms跨过原600ms延迟）；源码gutter高80而viewport810，行号user-select:none，headless拖选文本不含行号。
+`harness/`保存可复现fixture与capture。截图来自原`09a54f01`组件，不是手绘复刻，也不是完整T3应用：backend/host hooks stub；Preview正文是fixture，Code则是原`ReadOnlySourcePreview`。实测（原始JSON未入库）无page errors、Search高28/padding9/原字14/radius8/内环3px24%，目录hover为白4%、nav透明、tooltip为`packages/client`（等待750ms跨过原600ms延迟）；源码gutter高80而viewport810，行号user-select:none，headless拖选文本不含行号。
 
 ### 整窗图
 
@@ -92,4 +92,4 @@
 
 `mods/t3-files/check-files.cjs`覆盖命令/原生元素事件、层级搜索保留、固定槽、内容按下焦点、菜单子级Escape/Right/Enter/焦点恢复、展开race和4k+暖重绘复杂度。`shared/check-file-tree.cjs`、`check-nav-column.cjs`、`check-panel-surfaces.cjs`、`check-file-menu.cjs`、`check-pierre-icons.cjs`及Files独立Open in检查通过。完整`scripts/check.sh`首次只报非Files的sidebar子agent spinner断言，已交父scope修复；最终门禁记录随提交更新，不隐藏失败。
 
-面包屑hover无底色的补修、定向通过记录、真实hover未验边界，以及两次隔离sync和三个关联仓库的提交状态，见[补修与同步交接](crumb-follow-up-validation.md)；关联提交的源副本逐字核对见`associated-files-sync.log`。
+面包屑hover无底色的补修、定向通过记录、真实hover未验边界，以及两次隔离sync和三个关联仓库的提交状态，见[补修与同步交接](crumb-follow-up-validation.md)；关联提交的源副本已逐字核对（日志未入库）。

@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>壁纸创建流程重设计 · Herdr T3</title>
+<style>
+  /* catppuccin-mocha, mapped to the theme slots t3-tokens names */
+  :root {
+    --crust:#11111b; --mantle:#181825; --base:#1e1e2e; --raised:#313244; --border:#45475a;
+    --fg:#cdd6f4; --muted:#bac2de; --dim:#7f849c; --solid:#b4befe; --solid-fg:#11111b;
+    --ansi1:#f38ba8; --teal:#94e2d5; --lav:#b4befe; --peach:#fab387; --hover:rgba(205,214,244,.07); --on:rgba(205,214,244,.12);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--crust); color:var(--fg); font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; }
+  main { max-width:1240px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:15px; margin:40px 0 12px; color:var(--fg); }
+  p.lead, .note { color:var(--muted); max-width:860px; margin:4px 0; }
+  .note { color:var(--dim); font-size:12px; }
+  code { font:12px ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--peach); }
+  a { color:var(--lav); }
+
+  /* frames */
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(560px,1fr)); gap:28px 24px; }
+  @media (max-width:640px){ .grid { grid-template-columns:1fr; } }
+  figure { margin:0; }
+  .scroll { overflow-x:auto; }
+  .home { position:relative; width:560px; height:340px; border-radius:8px; overflow:hidden; border:1px solid var(--raised);
+          background:var(--base); }
+  .pic { position:absolute; inset:0; }
+  .pic.old { background:radial-gradient(circle,#b4befe55 1.1px,transparent 1.6px) 0 0/7px 7px, linear-gradient(160deg,#2a2b3d 0%,#1e1e2e 60%); }
+  .pic.new { background:radial-gradient(circle,#94e2d580 1.2px,transparent 1.7px) 0 0/7px 7px,
+             radial-gradient(ellipse at 35% 60%,#1e1e2e 0 22%,transparent 40%), linear-gradient(200deg,#23303a 0%,#1e1e2e 70%); }
+  .pic.new.zoomed { background-size:10px 10px,100% 100%,100% 100%; background-position:-40px -30px,0 0,0 0; }
+  .pic.fit { inset:18px 60px; border-radius:2px; }
+  .cap { display:flex; gap:10px; align-items:baseline; margin:10px 0 2px; }
+  .cap b { font-size:13px; }
+  .tag { font-size:11px; color:var(--dim); border:1px solid var(--raised); border-radius:4px; padding:0 5px; }
+  figcaption ul { margin:4px 0 0; padding-left:18px; color:var(--muted); font-size:12px; }
+  figcaption li span { color:var(--dim); }
+
+  /* switcher */
+  .switcher { position:absolute; right:12px; bottom:12px; display:flex; align-items:center; gap:4px; padding:4px; border-radius:8px;
+              background:var(--mantle); font-size:12px; color:var(--dim); }
+  .switcher .name { width:120px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ib { width:24px; height:24px; display:grid; place-items:center; border-radius:6px; color:var(--muted); flex:none; }
+  .ib.on { background:var(--on); color:var(--fg); }
+  .ib.hot { background:var(--hover); }
+  .ib.off { opacity:.64; }
+  svg.i { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+  .spin { animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* popup menu (native popup, drawn by the mod) */
+  .menu { position:absolute; right:12px; bottom:48px; width:248px; padding:4px; border-radius:8px; background:var(--base);
+          border:1px solid var(--border); box-shadow:0 10px 30px #0008; font-size:12px; color:var(--fg); }
+  .row { display:flex; align-items:center; gap:8px; height:28px; padding:0 8px; border-radius:4px; }
+  .row.hot { background:var(--hover); }
+  .row.two { height:auto; padding:5px 8px; align-items:flex-start; }
+  .row .sub { color:var(--dim); font-size:11px; }
+  .sep { height:1px; background:var(--raised); margin:4px 0; }
+  .tipcard { position:absolute; padding:4px 8px; border-radius:6px; border:1px solid var(--border); background:var(--mantle); font-size:12px; box-shadow:0 4px 12px #0006; }
+  .tipcard .h { color:var(--dim); }
+
+  /* framing card */
+  .card { position:absolute; right:12px; bottom:12px; width:300px; padding:16px; display:flex; flex-direction:column; gap:12px;
+          border-radius:8px; background:var(--base); border:1px solid var(--border); box-shadow:0 10px 30px #0008; font-size:12px; color:var(--muted); }
+  .title { height:20px; font-size:13px; font-weight:600; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .seg { display:flex; gap:2px; padding:2px; height:28px; border-radius:8px; background:var(--raised); }
+  .seg > div { flex:1; display:flex; align-items:center; justify-content:center; gap:4px; border-radius:6px; color:var(--dim); font-size:12px; }
+  .seg > div.on { background:var(--on); color:var(--fg); box-shadow:inset 0 0 0 1px #ffffff10; }
+  .framing { display:flex; gap:8px; align-items:center; height:28px; }
+  .framing .seg { flex:1; }
+  .zoom { display:flex; align-items:center; gap:8px; height:24px; }
+  .track { flex:1; height:4px; border-radius:4px; background:var(--border); position:relative; }
+  .track i { position:absolute; left:0; top:0; bottom:0; border-radius:4px; background:var(--fg); }
+  .track b { position:absolute; top:-6px; width:16px; height:16px; margin-left:-8px; border-radius:8px; background:var(--fg); }
+  .readout { width:40px; text-align:right; color:var(--dim); font-variant-numeric:tabular-nums; }
+  .foot { display:flex; align-items:center; gap:8px; height:28px; }
+  .status { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .status.err { color:var(--ansi1); }
+  .btn { height:28px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:6px; border-radius:6px; font-size:12px; flex:none; }
+  .btn.outline { border:1px solid var(--border); color:var(--fg); }
+  .btn.primary { background:var(--solid); color:var(--solid-fg); min-width:72px; font-weight:500; }
+  .btn.ghost { color:var(--dim); padding:0 6px; }
+  .btn.off, .off { opacity:.64; }
+  .body { color:var(--muted); }
+  .body.err { color:var(--ansi1); }
+  .inert { opacity:.64; pointer-events:none; }
+
+  /* annotation marks */
+  .mark { position:absolute; border:1.5px dashed var(--peach); border-radius:6px; pointer-events:none; }
+  .mlabel { position:absolute; font-size:11px; color:var(--peach); background:#11111bcc; padding:0 4px; border-radius:3px; white-space:nowrap; }
+  .pointer { position:absolute; width:14px; height:14px; pointer-events:none; }
+  .ghostcard { position:absolute; right:12px; bottom:12px; width:300px; height:208px; border:1.5px dashed var(--dim); border-radius:8px; opacity:.5; }
+
+  table { border-collapse:collapse; font-size:12px; margin-top:8px; }
+  th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--raised); vertical-align:top; }
+  th { color:var(--dim); font-weight:500; }
+  td code { white-space:nowrap; }
+  .panel { background:var(--base); border:1px solid var(--raised); border-radius:8px; padding:16px; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width:900px){ .two-col { grid-template-columns:1fr; } }
+  svg.diagram text { font:12px -apple-system,BlinkMacSystemFont,sans-serif; fill:var(--fg); }
+  svg.diagram .lbl { fill:var(--dim); font-size:11px; }
+  svg.diagram rect.n { fill:var(--base); stroke:var(--border); }
+  svg.diagram rect.ext { fill:none; stroke:var(--dim); stroke-dasharray:4 3; }
+  svg.diagram rect.edit { stroke:var(--lav); }
+  svg.diagram path, svg.diagram line { stroke:var(--dim); fill:none; stroke-width:1.3; }
+  svg.diagram .back { stroke-dasharray:4 3; }
+</style>
+</head>
+<body>
+<main>
+  <h1>壁纸创建流程重设计</h1>
+  <p class="lead">基线：<code>rewrite/wallpaper</code> <code>4586dc3d</code>。决策和规格见 <a href="wallpaper-create-redesign.md">wallpaper-create-redesign.md</a>。尺寸按 1:1 逻辑 px 画（Home 为示意尺寸 560×340），主题用 catppuccin-mocha。橙色虚线是标注，不是界面的一部分。</p>
+  <p class="note">要点：一个入口（<code>+</code> 菜单或拖入文件）→ 一张取景卡，占住切换器的位置 → 底栏位置自始至终不动。删掉添加卡、Studio 卡、两句常驻说明和所有禁用的占位槽。</p>
+
+  <h2>状态转换</h2>
+  <div class="panel scroll">
+    <svg class="diagram" viewBox="0 0 1040 420" width="1040" height="420" role="img" aria-label="状态转换图">
+      <defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#7f849c" stroke="none"/></marker></defs>
+      <!-- nodes -->
+      <rect class="n" x="20" y="190" width="120" height="40" rx="8"/><text x="80" y="214" text-anchor="middle">Idle 切换器</text>
+      <rect class="n" x="180" y="70" width="120" height="40" rx="8"/><text x="240" y="94" text-anchor="middle">Menu</text>
+      <rect class="n" x="360" y="70" width="120" height="40" rx="8"/><text x="420" y="94" text-anchor="middle">Picking 系统对话框</text>
+      <rect class="ext" x="180" y="300" width="120" height="40" rx="8"/><text x="240" y="324" text-anchor="middle">浏览器 · Studio</text>
+      <rect class="n edit" x="520" y="190" width="120" height="40" rx="8"/><text x="580" y="214" text-anchor="middle">Reading 紧凑卡</text>
+      <rect class="n edit" x="520" y="300" width="120" height="40" rx="8"/><text x="580" y="324" text-anchor="middle">ReadFailed</text>
+      <rect class="n edit" x="700" y="190" width="120" height="40" rx="8"/><text x="760" y="214" text-anchor="middle">Editing 取景卡</text>
+      <rect class="n edit" x="700" y="70" width="120" height="40" rx="8"/><text x="760" y="94" text-anchor="middle">Drawing 换模式</text>
+      <rect class="n edit" x="880" y="190" width="120" height="40" rx="8"/><text x="940" y="214" text-anchor="middle">Applying</text>
+      <rect class="n" x="880" y="300" width="120" height="40" rx="8"/><text x="940" y="324" text-anchor="middle">Done</text>
+      <!-- edges -->
+      <line x1="90" y1="190" x2="200" y2="112" marker-end="url(#a)"/><text class="lbl" x="104" y="140">+</text>
+      <line x1="300" y1="86" x2="358" y2="86" marker-end="url(#a)"/><text class="lbl" x="302" y="78">Choose / Import</text>
+      <path class="back" d="M370 110 C 330 170, 190 160, 120 188" marker-end="url(#a)"/><text class="lbl" x="250" y="168">对话框取消</text>
+      <line x1="480" y1="100" x2="540" y2="188" marker-end="url(#a)"/><text class="lbl" x="514" y="138">选中文件</text>
+      <line x1="140" y1="214" x2="518" y2="214" marker-end="url(#a)"/><text class="lbl" x="330" y="230">拖文件到 Home（任何平台）</text>
+      <line x1="240" y1="110" x2="240" y2="298" marker-end="url(#a)"/><text class="lbl" x="246" y="270">asciicn Studio ↗</text>
+      <path class="back" d="M180 330 C 110 330, 80 290, 80 232" marker-end="url(#a)"/><text class="lbl" x="40" y="300">回来拖入 .ans</text>
+      <line x1="580" y1="230" x2="580" y2="298" marker-end="url(#a)"/><text class="lbl" x="586" y="270">读不了</text>
+      <path d="M560 300 C 520 240, 470 150, 440 112" marker-end="url(#a)"/><text class="lbl" x="446" y="160">Choose another…</text>
+      <line x1="640" y1="210" x2="698" y2="210" marker-end="url(#a)"/><text class="lbl" x="646" y="202">画好</text>
+      <path d="M90 190 C 150 30, 640 20, 712 188" marker-end="url(#a)"/><text class="lbl" x="350" y="40">⌗ 重新取景（不读文件、不转换）</text>
+      <line x1="745" y1="190" x2="745" y2="112" marker-end="url(#a)"/><text class="lbl" x="690" y="156">换模式</text>
+      <line x1="778" y1="112" x2="778" y2="188" marker-end="url(#a)"/><text class="lbl" x="784" y="156">画好 / 失败退回</text>
+      <line x1="820" y1="203" x2="878" y2="203" marker-end="url(#a)"/><text class="lbl" x="826" y="196">Apply</text>
+      <line class="back" x1="878" y1="222" x2="822" y2="222" marker-end="url(#a)"/><text class="lbl" x="826" y="240">保存失败</text>
+      <line x1="820" y1="100" x2="900" y2="188" marker-end="url(#a)"/><text class="lbl" x="858" y="130">Apply（排队）</text>
+      <line x1="940" y1="230" x2="940" y2="298" marker-end="url(#a)"/><text class="lbl" x="946" y="270">已保存</text>
+      <!-- return bus -->
+      <path class="back" d="M940 340 V 392 H 80 V 232" marker-end="url(#a)"/>
+      <line class="back" x1="580" y1="340" x2="580" y2="392"/><line class="back" x1="760" y1="230" x2="760" y2="392"/>
+      <text class="lbl" x="300" y="408">Cancel · Esc · Close（Reading / ReadFailed / Editing）· Done → 回到 Idle</text>
+    </svg>
+  </div>
+
+  <h2>各状态一帧</h2>
+  <div class="grid">
+
+    <!-- 1 Idle -->
+    <figure><div class="scroll"><div class="home"><div class="pic old"></div>
+      <div class="switcher"><div class="ib" data-i="chevron-left"></div><div class="name">Lighthouse</div><div class="ib" data-i="chevron-right"></div><div class="ib" data-i="crop"></div><div class="ib hot" data-i="plus"></div></div>
+      <div class="tipcard" style="right:12px;bottom:48px">Add a wallpaper<div class="h">Or drop an image or .ans on Home</div></div>
+    </div></div>
+    <figcaption><div class="cap"><b>1 · Idle：入口</b><span class="tag">改</span></div><ul>
+      <li>切换器 <code>‹ name › ⌗ +</code>，<b>没有禁用的槽</b>：内置画也能取景，× 挪进了取景卡。<span>（决策 4）</span></li>
+      <li><code>+</code> 用共享触发按钮（P6）：提示卡第二行告诉用户还可以拖入文件，菜单打开后提示收起。</li>
+      <li>把文件拖到 Home 任意位置，直接进入第 4 帧。</li></ul></figcaption></figure>
+
+    <!-- 2 Menu -->
+    <figure><div class="scroll"><div class="home"><div class="pic old"></div>
+      <div class="switcher"><div class="ib" data-i="chevron-left"></div><div class="name">Lighthouse</div><div class="ib" data-i="chevron-right"></div><div class="ib" data-i="crop"></div><div class="ib on" data-i="plus"></div></div>
+      <div class="menu">
+        <div class="row hot"><span data-i="image"></span>Choose image…</div>
+        <div class="row"><span data-i="file"></span>Import Studio file (.ans)…</div>
+        <div class="sep"></div>
+        <div class="row two"><span data-i="external-link"></span><div>asciicn Studio<div class="sub">Export .ans there, then drop it here</div></div></div>
+        <div class="row"><span data-i="folder"></span>Open wallpaper folder</div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>2 · Menu：选来源</b><span class="tag">新</span></div><ul>
+      <li>原生 popup，挂在 <code>+</code> 上方，<code>+</code> 保持 on。再点 <code>+</code> 或按 Esc 关闭。</li>
+      <li>Studio 的三步说明只剩一行副标题。添加卡、Studio 卡和「Open asciicn Studio」禁用钮全部删掉。<span>（决策 1）</span></li>
+      <li>Windows：没有文件对话框，两个 Choose 项<b>隐藏</b>，用拖入和 Open folder。</li></ul></figcaption></figure>
+
+    <!-- 3 Picking -->
+    <figure><div class="scroll"><div class="home"><div class="pic old"></div>
+      <div class="switcher"><div class="ib" data-i="chevron-left"></div><div class="name">Choosing…</div><div class="ib" data-i="chevron-right"></div><div class="ib" data-i="crop"></div><div class="ib on" data-i="plus"></div></div>
+      <div style="position:absolute;left:120px;top:50px;width:300px;height:190px;border-radius:10px;background:#2b2c3c;border:1px solid var(--border);display:grid;place-items:center;color:var(--dim);font-size:12px">macOS 文件对话框（osascript）</div>
+    </div></div>
+    <figcaption><div class="cap"><b>3 · Picking：系统对话框</b></div><ul>
+      <li>切换器名字位写「Choosing…」，<code>+</code> 保持 on。不弹任何卡。</li>
+      <li>选中文件 → 第 4 帧。取消 → 回到 Idle，不提示。没有对话框可用（Linux 没装 zenity）→ 沿用现在的 notify。</li></ul></figcaption></figure>
+
+    <!-- 4 Reading -->
+    <figure><div class="scroll"><div class="home"><div class="pic old"></div>
+      <div class="ghostcard"></div><div class="mlabel" style="right:16px;top:118px">展开后的范围：底栏不动，向上长</div>
+      <div class="card">
+        <div class="title">Coast.jpg</div>
+        <div class="body" style="display:flex;gap:6px;align-items:center"><span class="spin" data-i="loader"></span>Reading image…</div>
+        <div class="foot"><div class="status"></div><div class="btn outline">Cancel</div><div class="btn primary off">Apply</div></div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>4 · Reading：紧凑卡</b><span class="tag">新</span></div><ul>
+      <li>切换器原地换成紧凑卡，只有名字、进度、底栏，<b>不显示一排禁用的控件</b>。<span>（决策 5）</span></li>
+      <li>进度文字依次是「Reading image…」→「Drawing Dots…」。旧壁纸保持不动。</li>
+      <li>Apply 可见但不可点，所以读完后不会有按钮跳到指针下面。Cancel / Esc 回到 Idle。</li></ul></figcaption></figure>
+
+    <!-- 5 ReadFailed -->
+    <figure><div class="scroll"><div class="home"><div class="pic old"></div>
+      <div class="card">
+        <div class="title">Scan.heic</div>
+        <div class="body err">Couldn't read this image: sips can't convert this file. Try a PNG or JPEG.</div>
+        <div class="foot"><div class="status"></div><div class="btn outline">Close</div><div class="btn primary">Choose another…</div></div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>5 · ReadFailed</b></div><ul>
+      <li>红字说明原因，最多 3 行，超出的放进提示。Close 占 Cancel 的位置，Choose another… 占 Apply 的位置。</li>
+      <li>Studio 文件出错时，按钮写「Import another…」。画出来一片空白（No visible marks）也在这里报。</li></ul></figcaption></figure>
+
+    <!-- 6 Editing image -->
+    <figure><div class="scroll"><div class="home"><div class="pic new"></div>
+      <div class="card">
+        <div class="title">Coast</div>
+        <div class="seg"><div class="on">Dots</div><div>Braille</div><div>Blocks</div><div>Quads</div></div>
+        <div class="framing"><div class="seg"><div class="on">Fill</div><div>Fit</div></div><div class="ib" data-i="rotate-ccw"></div></div>
+        <div class="zoom"><div class="ib" data-i="minus"></div><div class="track"><i style="width:29%"></i><b style="left:29%"></b></div><div class="ib" data-i="plus"></div><div class="readout">150%</div></div>
+        <div class="foot"><div class="status"></div><div class="btn outline">Cancel</div><div class="btn primary">Apply</div></div>
+      </div>
+      <div class="mark" style="left:8px;top:8px;width:220px;height:310px"></div><div class="mlabel" style="left:14px;top:14px">整片 Home 是画布：拖动 · 滚轮 · 方向键</div>
+    </div></div>
+    <figcaption><div class="cap"><b>6 · Editing：图片来源</b><span class="tag">改</span></div><ul>
+      <li>从上往下：名字（就是标题）→ 模式 → Fill/Fit + Reset → Zoom → 底栏。卡高从 352 降到 208。</li>
+      <li>删掉「Preview wallpaper」和两句常驻说明；拖动、滚轮的用法放进 Zoom 行的提示。</li>
+      <li>滑杆是对数刻度，读数和滑杆跟着滚轮实时变（见下方「缩放」）。</li></ul></figcaption></figure>
+
+    <!-- 7 Drawing -->
+    <figure><div class="scroll"><div class="home"><div class="pic new"></div>
+      <div class="card">
+        <div class="title">Coast</div>
+        <div class="seg"><div>Dots</div><div class="on"><span class="spin" data-i="loader"></span>Braille</div><div>Blocks</div><div>Quads</div></div>
+        <div class="framing"><div class="seg"><div class="on">Fill</div><div>Fit</div></div><div class="ib" data-i="rotate-ccw"></div></div>
+        <div class="zoom"><div class="ib" data-i="minus"></div><div class="track"><i style="width:29%"></i><b style="left:29%"></b></div><div class="ib" data-i="plus"></div><div class="readout">150%</div></div>
+        <div class="foot"><div class="status">Drawing Braille…</div><div class="btn outline">Cancel</div><div class="btn primary">Apply</div></div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>7 · Drawing：换模式</b></div><ul>
+      <li>旧画面保持可见，取景照常可用。所选分段里显示 spinner，状态写进<b>底栏左侧的固定槽</b>，不挤动任何一行。</li>
+      <li>这时按 Apply 会排队，画好后再保存。画失败时退回上一个模式，状态槽显示红字原因。</li></ul></figcaption></figure>
+
+    <!-- 8 Applying -->
+    <figure><div class="scroll"><div class="home"><div class="pic new zoomed"></div>
+      <div class="card">
+        <div class="title">Coast</div>
+        <div class="seg inert"><div class="on">Dots</div><div>Braille</div><div>Blocks</div><div>Quads</div></div>
+        <div class="framing inert"><div class="seg"><div class="on">Fill</div><div>Fit</div></div><div class="ib" data-i="rotate-ccw"></div></div>
+        <div class="zoom inert"><div class="ib" data-i="minus"></div><div class="track"><i style="width:50%"></i><b style="left:50%"></b></div><div class="ib" data-i="plus"></div><div class="readout">200%</div></div>
+        <div class="foot"><div class="status"></div><div class="btn outline off">Cancel</div><div class="btn primary"><span class="spin" data-i="loader"></span>Applying…</div></div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>8 · Applying</b></div><ul>
+      <li>保存 <code>.ans</code> → 合成图就绪 → 写构图和选择（流程同现在）。这期间控件和画布都不可操作。</li></ul></figcaption></figure>
+
+    <!-- 9 Apply failed -->
+    <figure><div class="scroll"><div class="home"><div class="pic new zoomed"></div>
+      <div class="card">
+        <div class="title">Coast</div>
+        <div class="seg"><div class="on">Dots</div><div>Braille</div><div>Blocks</div><div>Quads</div></div>
+        <div class="framing"><div class="seg"><div class="on">Fill</div><div>Fit</div></div><div class="ib" data-i="rotate-ccw"></div></div>
+        <div class="zoom"><div class="ib" data-i="minus"></div><div class="track"><i style="width:50%"></i><b style="left:50%"></b></div><div class="ib" data-i="plus"></div><div class="readout">200%</div></div>
+        <div class="foot"><div class="status err">Couldn't save: no space left on device</div><div class="btn outline">Cancel</div><div class="btn primary">Apply</div></div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>9 · 保存失败</b></div><ul>
+      <li>回到 Editing，草稿和构图都保留。状态槽显示红字，全文放进提示；再按 Apply 就是重试。不再额外弹 notify。</li></ul></figcaption></figure>
+
+    <!-- 10 Done -->
+    <figure><div class="scroll"><div class="home"><div class="pic new zoomed"></div>
+      <div class="switcher"><div class="ib" data-i="chevron-left"></div><div class="name" style="color:var(--fg)">Coast</div><div class="ib" data-i="chevron-right"></div><div class="ib" data-i="crop"></div><div class="ib" data-i="plus"></div></div>
+    </div></div>
+    <figcaption><div class="cap"><b>10 · Done</b></div><ul>
+      <li>卡片在 150ms 内淡出；切换器显示新名字，停留 1.5s 后按悬停规则隐藏。画面本身就是确认，不另外弹提示。</li>
+      <li>如果是用键盘操作的，焦点回到 <code>+</code>。</li></ul></figcaption></figure>
+
+    <!-- 11 Cancelled -->
+    <figure><div class="scroll"><div class="home"><div class="pic old"></div>
+      <div class="switcher"><div class="ib" data-i="chevron-left"></div><div class="name">Lighthouse</div><div class="ib" data-i="chevron-right"></div><div class="ib" data-i="crop"></div><div class="ib" data-i="plus"></div></div>
+    </div></div>
+    <figcaption><div class="cap"><b>11 · Cancelled</b></div><ul>
+      <li>Cancel 或 Esc（Reading、ReadFailed、Editing 三个状态都可以）：恢复原来的画和构图，删掉草稿目录，不提示。</li></ul></figcaption></figure>
+
+    <!-- 12 Reframe saved -->
+    <figure><div class="scroll"><div class="home"><div class="pic new"></div>
+      <div class="card">
+        <div class="title">Coast</div>
+        <div class="framing"><div class="seg"><div>Fill</div><div class="on">Fit</div></div><div class="ib" data-i="rotate-ccw"></div></div>
+        <div class="zoom"><div class="ib" data-i="minus"></div><div class="track"><i style="width:0%"></i><b style="left:0%"></b></div><div class="ib" data-i="plus"></div><div class="readout">100%</div></div>
+        <div class="foot"><div class="status"><div class="btn ghost">Delete…</div></div><div class="btn outline">Cancel</div><div class="btn primary">Apply</div></div>
+      </div>
+    </div></div>
+    <figcaption><div class="cap"><b>12 · 重新取景已保存的画</b><span class="tag">改</span></div><ul>
+      <li>点 ⌗ 直接进入，不读文件、不转换。<b>没有模式行</b>：不显示一整行禁用的控件，卡高 168。</li>
+      <li>导入的画在底栏左侧有「Delete…」，确认对话框同现在。内置画没有这个按钮，Apply 只保存构图。<span>（决策 4）</span></li></ul></figcaption></figure>
+  </div>
+
+  <h2>缩放：以指针为锚，滑杆和滚轮联动</h2>
+  <div class="two-col">
+    <div class="panel">
+      <svg class="diagram" viewBox="-80 -40 660 360" width="100%" role="img" aria-label="以指针为锚缩放">
+        <defs><marker id="b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#fab387" stroke="none"/></marker></defs>
+        <rect x="20" y="20" width="480" height="260" rx="6" style="fill:#1e1e2e;stroke:#45475a"/>
+        <text x="28" y="38" class="lbl">Home  W×H</text>
+        <rect x="20" y="20" width="480" height="260" style="fill:#94e2d512;stroke:#94e2d5;stroke-dasharray:4 3"/>
+        <text x="380" y="270" class="lbl">缩放前 100%</text>
+        <rect x="-64" y="-26" width="624" height="338" style="fill:none;stroke:#b4befe"/>
+        <text x="30" y="296" class="lbl" style="fill:#b4befe">缩放后 130%：从指针那一点向外扩</text>
+        <circle cx="330" cy="120" r="5" style="fill:#fab387;stroke:none"/>
+        <path d="M330 120 l 10 14 l -5 -1 l 3 8 l -3 1 l -3 -8 l -4 3z" style="fill:#cdd6f4;stroke:#11111b"/>
+        <line x1="330" y1="120" x2="20" y2="20" style="stroke:#fab387;stroke-dasharray:2 3"/>
+        <line x1="330" y1="120" x2="-64" y2="-26" style="stroke:#fab387" marker-end="url(#b)"/>
+        <text x="350" y="112" style="fill:#fab387">指针下这一点不动</text>
+        <text x="150" y="160" class="lbl">(u, v) = 该点在画上的比例位置</text>
+        <text x="150" y="176" class="lbl">新左上角 = 指针 − (u·w′, v·h′)，再钳制 x、y 到 [0, 1]</text>
+      </svg>
+    </div>
+    <div class="panel">
+      <b>一份数据，所有入口都写它</b>
+      <p class="note" style="margin-bottom:6px"><code>d.placement.zoom</code> → 读数 <code>150%</code>，滑杆 <code>s = log₄ z</code>。滚轮改了 zoom，滑杆会自动跟上。</p>
+      <svg class="diagram" viewBox="0 0 460 64" width="100%" aria-label="对数滑杆与预设档位">
+        <line x1="10" y1="30" x2="450" y2="30" style="stroke:#45475a;stroke-width:4;stroke-linecap:round"/>
+        <g style="stroke:#cdd6f4">
+          <line x1="10" y1="22" x2="10" y2="38"/><line x1="80.7" y1="22" x2="80.7" y2="38"/><line x1="138.6" y1="22" x2="138.6" y2="38"/>
+          <line x1="230" y1="22" x2="230" y2="38"/><line x1="300.7" y1="22" x2="300.7" y2="38"/><line x1="358.6" y1="22" x2="358.6" y2="38"/><line x1="450" y1="22" x2="450" y2="38"/>
+        </g>
+        <g class="lbl" text-anchor="middle"><text x="10" y="56">100</text><text x="80.7" y="56">125</text><text x="138.6" y="56">150</text><text x="230" y="56">200</text><text x="300.7" y="56">250</text><text x="358.6" y="56">300</text><text x="450" y="56">400%</text></g>
+        <text x="230" y="14" class="lbl" text-anchor="middle">100→200 和 200→400 一样长；⊖ ⊕ / − = 跳到这些档位</text>
+      </svg>
+      <table>
+        <tr><th>输入</th><th>判别</th><th>效果</th><th>锚点</th></tr>
+        <tr><td>鼠标滚轮</td><td>有 <code>delta_lines</code></td><td><code>z·2^(lines.y/6)</code>，6 格放大一倍</td><td>指针</td></tr>
+        <tr><td>⌘ / Ctrl + 任意滚动</td><td><code>modifiers.platform|control</code></td><td><code>z·2^(delta.y/200)</code>（代替捏合）</td><td>指针</td></tr>
+        <tr><td>触控板双指</td><td>没有 <code>delta_lines</code>，没按修饰键</td><td>平移 <code>delta / uiZoom</code></td><td>—</td></tr>
+        <tr><td>惯性</td><td><code>ended</code> 之后间隔 &lt;100ms 的 <code>moved</code></td><td>丢弃，取景要停得准</td><td>—</td></tr>
+        <tr><td>拖动 / 方向键</td><td>—</td><td>平移；方向键 10，Shift 50</td><td>—</td></tr>
+        <tr><td>滑杆 · ⊖ ⊕ · <code>−</code> <code>=</code></td><td>—</td><td>对数刻度 · 跳预设档位</td><td>Home 中心</td></tr>
+        <tr><td>Reset ⟲ · <code>0</code></td><td>—</td><td>100%，x 取主体 focus，y 为 0.5</td><td>—</td></tr>
+        <tr><td>捏合</td><td><b>拿不到</b>：GPUI 有 <code>PinchEvent</code>，gpui-kit 没有暴露 <code>on_pinch</code></td><td>先用 ⌘ + 滚动代替，同时向 Herdr 提需求</td><td>（指针）</td></tr>
+      </table>
+      <p class="note">范围 100–400%，相对当前模式的基准尺寸（Fill 铺满 / Fit 完整显示）。和已有存储一样，不需要迁移。</p>
+    </div>
+  </div>
+
+  <h2>删掉的东西</h2>
+  <div class="panel"><table>
+    <tr><th>现在</th><th>之后</th></tr>
+    <tr><td>添加卡：5 个动作、2 句说明、1 条分隔线</td><td><code>+</code> 菜单 4 项，再加拖入</td></tr>
+    <tr><td>Studio 卡：3 步说明、颜色说明、Open ↗、Import、Back</td><td>菜单项「asciicn Studio」，加一行副标题</td></tr>
+    <tr><td>预览卡标题「Preview wallpaper」、60px 说明区的两句话</td><td>名字作标题；状态放进底栏的固定槽</td></tr>
+    <tr><td>预览时禁用的 ‹ › + ⌗ ×；内置画永远禁用的 ⌗ ×；<code>.ans</code> 禁用的模式行</td><td>编辑时切换器整个让位；内置画可以取景；模式行不显示</td></tr>
+    <tr><td>读取中就出现、全部禁用的控件</td><td>紧凑卡，读完再展开</td></tr>
+  </table></div>
+</main>
+<script>
+  // Lucide 24-grid paths, 1.75 stroke (RECIPE: UI icons)
+  const P = {
+    "chevron-left":'<path d="m15 18-6-6 6-6"/>', "chevron-right":'<path d="m9 18 6-6-6-6"/>',
+    plus:'<path d="M5 12h14"/><path d="M12 5v14"/>', minus:'<path d="M5 12h14"/>',
+    crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+    "rotate-ccw":'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    "external-link":'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+    image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    file:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+    loader:'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  };
+  for (const el of document.querySelectorAll("[data-i]")) {
+    const svg = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[el.dataset.i]}</svg>`;
+    if (el.classList.contains("spin")) { el.outerHTML = svg.replace('class="i"', 'class="i spin"'); } else el.insertAdjacentHTML("afterbegin", svg);
+  }
+</script>
+</body>
+</html>

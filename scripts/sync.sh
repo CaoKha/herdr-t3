@@ -20,7 +20,7 @@ share details mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-tabs extras/mods
 share measured-text mods/t3-actions mods/t3-chrome mods/t3-tabs
 share motion mods/t3-inbox mods/t3-agents mods/t3-spaces
 share focus extras/mods/review mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
-share list mods/t3-chrome mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review
+share list mods/t3-chrome mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share zoom mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-picker
 share sidebar mods/t3-chrome mods/t3-home mods/t3-tabs mods/t3-spaces mods/t3-agents mods/t3-inbox mods/t3-pane mods/t3-menu
 share layout-settings mods/t3-chrome mods/t3-tabs mods/t3-inbox
@@ -41,7 +41,7 @@ share pierre-icons mods/t3-files mods/t3-chrome extras/mods/review
 share pierre-icons-data mods/t3-files mods/t3-chrome extras/mods/review
 share file-tree mods/t3-files extras/mods/review
 share nav-column mods/t3-files extras/mods/review
-share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox extras/mods/review
+share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox extras/mods/review extras/mods/asciicn-wallpaper
 share open-in mods/t3-files mods/t3-actions
 share panel-states mods/t3-files extras/mods/review
 share button mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper

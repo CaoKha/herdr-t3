@@ -167,5 +167,11 @@
     "cmd-t": "t3-chrome.surface-menu",
     "cmd-w": "review.close",
     "ctrl-alt-shift-x": "review.close"
+  },
+  "mod:asciicn-wallpaper": {
+    "cmd-w": "overlay.close",
+    "ctrl-alt-shift-x": "overlay.close",
+    "cmd-shift-w": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
   }
 }

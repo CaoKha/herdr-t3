@@ -88,6 +88,20 @@
 - **顶栏**（`DiffPanel` 头）：高40／横12（R1），下有 border。按钮全用 sm（28）、悬停和 on 面取 `chrome`：范围按钮、commit ‹ ›、Analyze、折叠菜单、设置、导航开关；图标按钮相接，文字按钮与图标组之间8。比较目标（combobox 触发）照 T3 留 xs。弹层在按钮下4（顶38），右对齐按钮。
 - **组页签行**：横12（与顶栏同边）、纵8、间6；页签圆角8、1px 描边、内距8／2；类别图标14、名字12 medium、第二行11、进度环14；当前组 foreground 12%，其余悬停7%。组说明：标题13 medium、正文12 muted、最高160。
 
+## 壁纸
+
+asciicn 壁纸的控件（`extras/mods/asciicn-wallpaper/main.js`）。切换器：距 Home 右下角12，`chrome` 底、圆角8、内距4、gap4，按钮 `xs` 24（‹ › 取景 +，+ 用 `trigger.js`）；名字槽宽160，Home 窄于304时缩为Home宽减144，截断居中，字12 `dim`。只有指针进入右下368×104、菜单或文件对话框开着、Apply 后1.5s或键盘模式时显示，opacity 150ms ease-out。
+
+`+` 的菜单是本 mod 的 popup：宽260，在 `+` 上方6、右缘对齐 `+`；`popover` 底、内距4，`menu-row.js` 的行28，图标 image／file／external-link／folder；asciicn Studio 一行高44，第二行字12 `dim`。
+
+取景卡是 T3 popover，占切换器的位置：右12、底12、宽300（Home 窄时为Home宽减24）、内距16、gap12、圆角8、`popover` 底、`border` 边、阴影lg、字12 `muted`。各行固定高：名字20（13 semibold `foreground`，截断）、模式28、Fill/Fit 28（分段 flex · 8 · Reset `xs` 24，rotate-ccw）、Zoom 24（− `xs` 24 · 8 · 滑条 flex · 8 · + `xs` 24 · 4 · 读数宽40，12 `dim` 右对齐）、底栏28（状态槽 flex，12 `dim`，错误 `ansi1` 截断；Cancel outline、Apply primary 最小宽72，都是 `compact`；Delete… 是 `compact` ghost）。展开高208，没有模式行时168；紧凑态只有名字、一行进度（spinner 14 加12 `dim` 字）或最多48高的红字原因，再加底栏。卡片贴底，所以底栏在紧凑和展开时位置相同。模式行和 Fill/Fit 是 T3 ToggleGroup：`raised` 底、内距2、gap2、圆角8，每段等宽的 `xs` 按钮、圆角6，模式段横内距3，正在画的那段加12的 spinner；Home 宽不足324时 Quadrants 写作 Quads。T3 没有滑条：轨道高4、圆角4，`border` 底、已选段 `foreground`，圆点16，`foreground`；对数刻度；禁用时整个控件0.64。缩放档位 100／125／150／200／250／300／400%。
+
+等待（`main.js` 的 `track`）：等待不到150ms什么都不显示；一旦显示，至少留300ms，避免一闪而过。新的画先以 opacity 0 在上一张画下面加载400ms（`WARM`，见 [layout implementation](layout-implementation.md)「壁纸转换」），这期间上一张一直显示，Home 不会空白。各处的样子：
+- 取景卡紧凑态的进度：名字下面一块高26，字12 `dim` 的步骤名（高16）、间距6、进度条高4（轨道 `border`、圆角4、`overflow_hidden`，进度段 `foreground`）。图片有步骤，所以是确定进度：宽度随步骤变化，transition 300ms ease-out，最后一段在 `WARM` 内 linear 到满；`.ans` 没有步骤，用宽为轨道30%的段 `loop("left")` 来回扫，周期1600ms。等待显示之前这块是空的26高，卡片高度不变。
+- 换模式：上一个模式的画留着，opacity 降到0.7（transition 150ms ease-out）；正在画的那段模式按钮里加12的 spinner，底栏状态槽写 spinner 12 加「Drawing Braille…」，画好后在加载期间写「Loading picture…」。
+- Apply：超过150ms才把 Apply 写成「Applying…」并把卡内控件画成禁用。
+- 切换壁纸、换主题或明暗、Apply 之后：切换器显示时，名字槽（固定宽）里名字左边加12的 spinner、gap6；切换器隐藏时，右12、底12（切换器右端的位置）放一个32见方、`chrome` 底、圆角8的块，中间 spinner 14，随切换器的显隐反向淡入淡出150ms。
+
 ## 按钮
 
 按钮一律用 `shared/button.js` 的 `button()` 画，对照 T3 `ui/button.tsx`；为什么按钮例外于规则 2，见 [ADR 0016](../adr/0016-buttons-share-one-helper.md)。颜色只从这张表取，`accent` 不做按钮的底（它是焦点环和强调文字的色），`accent_foreground` 只配 `accent` 底的非按钮元素（`check.sh` 查）。

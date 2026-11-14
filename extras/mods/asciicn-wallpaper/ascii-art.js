@@ -8,17 +8,19 @@
 //
 // A cell's colour picks a theme colour (an ANSI 16 colour as itself; truecolor by hue, grey as the foreground) and its
 // brightness a step of opacity. Cells of one colour and step are one layer, cut into tiles of at most TILE cell heights
-// across and down: GPUI rasterises an svg at its drawn size, misplaces one much past 3000 device px, and holds every
-// tile's whole area in memory however few dots it has.
+// across and down, each its own small SVG; picture() puts them together, in the theme's colours, as the one image Home draws.
 
-// Part of each import's cache key: raise it whenever a frame would convert differently, and every import converts again.
-export const VERSION = 4;
+// Part of each import's cache key: raise it whenever a frame or its cache would come out differently, and every import
+// converts again.
+export const VERSION = 5;
 const STEPS = [0.18, 0.32, 0.5, 0.75];
 const IMAGE_STEPS = [0.1, 0.18, 0.28, 0.4, 0.55, 0.7, 0.85, 1];
 // v3: half-width cells and the 8-step VGA mapping. v4 adds the mode and colours blank opaque cells, so the frame can
 // turn over for light themes (`paper`) without its source picture.
 const IMAGE_HEADER = /^\x1b\]777;asciicn-wallpaper;image-v(3|4)(?:;(dots|blocks|quadrants|braille))?\x07/;
 const imageMark = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
+/** Whether a frame came from an image here (its mode is then fixed), rather than from Studio or by hand. */
+export const fromImage = (text) => IMAGE_HEADER.test(text);
 // Dense shade rectangles must also fit the host's 1 MiB text-write limit.
 const TILE = 40;
 // A line's width, in cell heights.
@@ -234,6 +236,20 @@ export function* convert(text, aspect, paper = false) {
   return { width: round(columns * aspect), height: lines.length, aspect, ...(style ? { paper: true } : {}) };
 }
 
+/**
+ * Tiles (`{ svg, tint, opacity }`, as convert yields them or scripts/wallpaper.mjs saved them) as one SVG, `side` px on its
+ * long edge, each tile in `colour(tint)`. Opacity goes on strokes and fills, not a group, which would composite offscreen.
+ */
+export function picture(tiles, colour, width, height, side = 4096) {
+  const scale = side / Math.max(width, height);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width * scale)}" height="${Math.ceil(height * scale)}" viewBox="0 0 ${width} ${height}">`
+    + tiles.map(({ svg, tint, opacity }) => {
+      const c = colour(tint);
+      return `<g fill="none" stroke="${c}" stroke-linecap="round" stroke-opacity="${opacity}" fill-opacity="${opacity}">`
+        + svg.replace(/^\s*<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "").replaceAll('fill="#000"', `fill="${c}"`) + "</g>";
+    }).join("") + "</svg>\n";
+}
+
 // ---- An image, without the Studio: the frame its default for an image in Braille and true colour would make.
 
 /** 96 rows of half-width cells. Each style requests its own samples per cell. */
@@ -244,20 +260,19 @@ export function imageGrid(width, height, style = "braille") {
   return { columns, rows, width: columns * gx, height: rows * gy };
 }
 
-/** Native decoder crops once to cover, then resizes to this shared RGBA draft; crop coordinates are source pixels. */
+/**
+ * The draft every image mode is drawn from: the crop that covers the grid (source pixels), resized by the system (sips or
+ * ImageMagick) to Braille's sample grid, the finest any mode takes; the others average its whole blocks (sampleImage).
+ */
 export function imagePlan(width, height) {
   const { columns, rows } = imageGrid(width, height), aspect = columns * 0.5 / rows;
   const w = Math.min(width, Math.round(height * aspect)), h = Math.min(height, Math.round(width / aspect));
   const crop = { x: Math.floor((width - w) / 2), y: Math.floor((height - h) / 2), width: w, height: h };
-  let pw = 0, ph = 0;
-  for (const [gx, gy] of Object.values(IMAGE_GRIDS)) {
-    const sw = columns * gx, sh = rows * gy, k = Math.max(1, Math.min(4, Math.floor(Math.min(w / sw, h / sh))));
-    pw = Math.max(pw, sw * k); ph = Math.max(ph, sh * k);
-  }
-  return { columns, rows, width: pw, height: ph, crop };
+  const [gx, gy] = IMAGE_GRIDS.braille;
+  return { columns, rows, width: columns * gx, height: rows * gy, crop };
 }
 
-// Area filtering bridges the native high-quality draft to each mode's supersampling canvas. Alpha is premultiplied.
+// Each sample the area-weighted mean of the draft pixels under it. Alpha is premultiplied.
 function* areaImage(pixels, width, height) {
   if (pixels.width === width && pixels.height === height) return pixels;
   const rgba = new Uint8ClampedArray(width * height * 4), tones = new Float32Array(width * height);
@@ -289,13 +304,11 @@ function* areaImage(pixels, width, height) {
   return { width, height, rgba, tones };
 }
 
-/** Re-sample the shared draft for a style, using the website's k<=4 canvas followed by k×k block means. */
+/** The draft sampled for a style: its own grid's samples, each the mean of the draft pixels it covers. */
 export function* sampleImage(pixels, style, plan) {
   const [gx, gy] = imageCell(style), width = plan.columns * gx, height = plan.rows * gy;
   if (!(Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0 && pixels.width > 0 && pixels.height > 0 && pixels.rgba?.length === pixels.width * pixels.height * 4)) throw new Error("invalid image sample plan");
-  const k = Math.max(1, Math.min(4, Math.floor(Math.min(plan.crop.width / width, plan.crop.height / height))));
-  const canvas = yield* areaImage(pixels, width * k, height * k);
-  return yield* areaImage(canvas, width, height);
+  return yield* areaImage(pixels, width, height);
 }
 
 const B64 = new Map([..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"].map((c, i) => [c.charCodeAt(0), i]));
@@ -362,11 +375,6 @@ function* imageLevels({ width, height, rgba, tones: sampled }) {
   for (let seen = 0; high > 0; high--) if ((seen += bins[high]) > clip) break;
   const from = high > low ? low / 255 : 0, scale = high > low ? 255 / (high - low) : 1;
   return { tones, from, scale };
-}
-
-/** Braille convenience entry point; new image exports all use the same website mapper. */
-export function* brailleAns(pixels) {
-  return yield* imageAns(pixels, "braille");
 }
 
 const RAMPS = { dots: " ·∙•⦁●", blocks: " ░▒▓█" }, QUADRANTS = " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█";

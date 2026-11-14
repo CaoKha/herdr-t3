@@ -1,6 +1,6 @@
 # 子 agent 菜单重设计：问题、参考与三个画法
 
-2026-11-14。对照稿：[sub-agent-menu-redesign.html](sub-agent-menu-redesign.html)。只出稿，不改 `mods/`。
+2026-11-14。HTML 对照稿未入库：该设计后被否决，结果见[只留列表](sub-agent-menu-list-only/README.md)。只出稿，不改 `mods/`。
 
 现状来自截图 `Snapzy_2026-11-14_01-18-35_748.png`，实现是 `mods/t3-pane/main.js`（入口按钮 `:178`、行 `:118`）、`tree.js`、`details.js`。规范见 [RECIPE §Panes and sub-agents](../../RECIPE.md)，上一版验收见 [sub-agent-menu-validation.md](sub-agent-menu-validation.md)。
 

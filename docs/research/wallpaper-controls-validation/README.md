@@ -38,7 +38,7 @@
 
 ## 每个按钮的屏幕位置
 
-原始截图像素坐标，以整窗左上角为原点；对全部同名按钮取图标或填色矩形中心。34张 after 整窗图中，15个按钮的同名中心坐标**完全相同，偏差为 0**。坐标里的 `.5` 只表示按钮宽或高是奇数像素，中心落在两像素之间，不是偏移。每帧数据见 [positions.json](positions.json)。
+原始截图像素坐标，以整窗左上角为原点；对全部同名按钮取图标或填色矩形中心。34张 after 整窗图中，15个按钮的同名中心坐标**完全相同，偏差为 0**。坐标里的 `.5` 只表示按钮宽或高是奇数像素，中心落在两像素之间，不是偏移。每帧原始坐标未入库。
 
 | 组 | 按钮 | 中心 `(x,y)` |
 | --- | --- | --- |
@@ -80,10 +80,10 @@
 
 ## 检查与同步
 
-- **先红**：原始代码跑新检查失败，缺少 `wallpaper-remove`；初次错误为 `first: wallpaper-remove keeps its slot`。最终加强后的同一检查在原 renderer 上仍失败（toolbar order 缺 Remove），见 [red.log](red.log)，exit 1。
-- **后绿**：[green.log](green.log)：90组布局检查、原导入生命周期、字符转换、真实文件系统回归以及 `herdr-app check` 全部通过；单独 TypeScript 检查通过。
-- **全仓门禁尚不通过**：[repository-check-in-progress.log](repository-check-in-progress.log)。Actions/chrome 的并行施工和旧 panel/sidebar/Review/update 检查失败；没有修改别人的文件去绕过门禁，不声称已打印 `all checks passed`。
-- `scripts/sync.sh` 已执行，见 [sync.log](sync.log)。已装 `~/.config/herdr-app` 的壁纸副本已更新。三个 standalone 仓库无壁纸 mod 分发路径：inbox无变更；actions/review 的同步改动均属于并行 panel-ab，由其各自提交，本任务不抢暂存。
+- **先红**：原始代码跑新检查失败，缺少 `wallpaper-remove`；初次错误为 `first: wallpaper-remove keeps its slot`。最终加强后的同一检查在原 renderer 上仍失败（toolbar order 缺 Remove），exit 1（原始日志未入库，下同）。
+- **后绿**：90组布局检查、原导入生命周期、字符转换、真实文件系统回归以及 `herdr-app check` 全部通过；单独 TypeScript 检查通过。
+- **全仓门禁尚不通过**：Actions/chrome 的并行施工和旧 panel/sidebar/Review/update 检查失败；没有修改别人的文件去绕过门禁，不声称已打印 `all checks passed`。
+- `scripts/sync.sh` 已执行。已装 `~/.config/herdr-app` 的壁纸副本已更新。三个 standalone 仓库无壁纸 mod 分发路径：inbox无变更；actions/review 的同步改动均属于并行 panel-ab，由其各自提交，本任务不抢暂存。
 - 审查结论：生产 diff 仅 `render`／`previewCard`／`guideCard` 的槽位、样式和禁用状态，`choose`／`previewStyle`／`applyPreview`／`remove` 及文件／缓存流程均未改。
 
 ## 未验证与删除项

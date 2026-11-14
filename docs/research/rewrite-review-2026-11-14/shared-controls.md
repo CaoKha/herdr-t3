@@ -40,7 +40,7 @@
 
 - 位置：`shared/file-menu.js:74-79`，`CHANGELOG.md:7`（「it no longer covers the menu it opened from」）。
 - 现象：`place()` 先用 `subPlace` 选左边还是右边，然后又把 x 夹回 `[4, width-224]`。如果两边都放不下，夹完以后子菜单就压在父菜单上。
-- 反例：页宽 464（panel 的 min 是 480，减去 padding），菜单从 x=150 打开。这时 level1 落在 4..224，盖住了 level0（150..370）左侧 74px，打开它的那一行的图标和名字开头都被盖住。复现脚本：`shared-controls/submenu-overlap.cjs`，输出见 `shared-controls/submenu-overlap.txt`。
+- 反例：页宽 464（panel 的 min 是 480，减去 padding），菜单从 x=150 打开。这时 level1 落在 4..224，盖住了 level0（150..370）左侧 74px，打开它的那一行的图标和名字开头都被盖住。复现脚本：`shared-controls/submenu-overlap.cjs`，运行即得上述数值（当时的输出文件未入库）。
 - 这不是本轮引入的回归，旧的「最少重叠」算法给出的位置一样。问题在于注释、测试名和 CHANGELOG 写的保证是假的，测试里只放了宽页的用例。
 
 **M2 tooltip 两套画法，禁用原因也是两种做法**

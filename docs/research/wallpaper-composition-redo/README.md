@@ -18,7 +18,7 @@
 | D4 | 轨道4px、圆点16px但没有垂直补偿，圆点中心比轨道低6px；禁用 slider 用0.5而非 T3 的0.64 | `old-real-slider.png`、`old-ui-loading.png`；对照 t3-tokens 按钮与禁用规则 | 圆点沿轨道中心，禁用0.64且不能拖动／按键 |
 | D5 | 真实鼠标拖动后直接按 Right，构图完全不变；只有先额外用 focus 命令进入键盘模式再 Tab 才能用键盘 | `old-foreground-drag.png`、`old-keyboard-position.png`（x均0.2608827412）；`old-keyboard-slider.png`证明显式 focus 后缩放可用 | 进入预览、点／拖画布后，方向键直接控制画布；Tab 可到缩放、模式及底部动作 |
 | D6 | 预览隐藏整条日常切换器；普通状态删除槽和长画名还会使按钮漂移 | `old-landscape-cover.png`、上一任务 `wallpaper-controls-validation/` | 保留2130051e的固定切换器，在预览中保持原位并置灰，不以新卡片挤走旧控件 |
-| D7 | 最终缓存失败后产生两条 warning，卡片仍显示正常操作说明；实际错误只有短暂 toast，draft.error=null | `old-failed-apply.png`／`old-failed-apply-state.json` | 保留草稿、同一已发布源与可重试 Apply；卡片固定提示槽显示具体保存错误，避免重复 toast |
+| D7 | 最终缓存失败后产生两条 warning，卡片仍显示正常操作说明；实际错误只有短暂 toast，draft.error=null | `old-failed-apply.png` | 保留草稿、同一已发布源与可重试 Apply；卡片固定提示槽显示具体保存错误，避免重复 toast |
 | D8 | 卡片底部距角仅12px，系统更新／错误 toast 会盖住 Apply/Cancel，构图时也失去旧按钮位置基准 | `old-landscape-cover.png`、`old-failed-apply.png` | 卡片在固定切换器上方，底部至少沿用60px定位；不把临时 toast 当作唯一错误说明 |
 | D9 | “Fill/Fit”和“Apply fixes this composition”没有说清裁切／完整显示／保存后固定；键盘提示没有 Shift 步长说明 | `old-landscape-contain.png` | 短标签稳定，固定提示说明当前铺放与移动方式，文档明确1–4倍、10px/Shift50px、Apply后不编辑 |
 | D10 | 已打开删除确认后暂停该文件真实缓存转换，refresh暂时将旧项从 imported 移出；确认时 remove 的列表成员检查直接返回，文件仍存在 | `old-delete-during-conversion.png`（holding=true/importing=square）、`old-confirmed-during-conversion.png`，文件实测EXISTS | 已确认的源文件不因临时列表状态而跳过删除；取消转换，迟到结果不能复活源／缓存／构图 |
@@ -34,7 +34,7 @@
 | 重置 | Fit变Fill（D1） |
 | Apply、保存后固定 | `old-apply-preview.png`、`old-applied.png`、`old-saved-drag-fixed.png`；构图参数一致，保存后真实拖动无变化 |
 | Cancel、同名冲突、失败重试 | `old-before-cancel.png`／`old-cancelled.png`；`old-same-name-conflict.png`新增编号文件而不覆盖；`old-failed-apply.png`／`old-retry-applied.png`实际失败后重试成功，但错误UI有D7 |
-| 连续选图、两Home | `old-continuous-selection.png`只保留latest；`old-two-homes.png`与`old-two-homes-other-state.json`显示不同私有草稿，不互相清理 |
+| 连续选图、两Home | `old-continuous-selection.png`只保留latest；`old-two-homes.png`与另一Home读回的state显示不同私有草稿，不互相清理 |
 | 转换中确认删除 | D10真实暂停／确认／检查文件；原有旧filesystem检查13项也通过，说明旧测试没有覆盖“本副本列表已移除”的窗口 |
 | 重开／重启、窗口／侧栏、明暗 | `old-restarted.png`及state重读保留选择与构图；`old-window-narrow.png`、`old-sidebar-wide.png`、`old-theme-light.png`；D11另覆盖极窄Home |
 | Studio/Braille `.ans` | `old-studio-preview.png`，保留原字形和内容，不转成Dots |
@@ -48,7 +48,7 @@
 | ID | 新版结果与对照 |
 | --- | --- |
 | D1 | `new-fit-selected.png` → `new-reset-after-fit.png`：Reset 后仍为 contain，zoom=1、x=y=0.5。 |
-| D2 | 18 张 `new-slots-{dark,light}-*.png` 覆盖 ready/Fit/4倍/loading/converting/error/save-error/applying/长名。九个按钮中心逐个完全相同，见 `button-positions.json`；不是“允许1px漂移”。 |
+| D2 | 18 张 `new-slots-{dark,light}-*.png` 覆盖 ready/Fit/4倍/loading/converting/error/save-error/applying/长名。九个按钮中心逐个完全相同，坐标见下文；不是“允许1px漂移”。 |
 | D3 | 同组18张截图中卡片312px高，状态槽60px，错误滚动；模式／缩放／底部行不随提示重排。 |
 | D4 | `new-real-slider.png`、`new-keyboard-slider.png`：16px圆点相对4px轨道 top=-6，中心对齐；禁用opacity=0.64。真实点击到2.52倍，直接Right到2.62倍。 |
 | D5 | `new-keyboard-position.png`：打开预览后Right直接使x从0.5变0.4840588494；`new-foreground-drag.png`真实150px拖动至0.2449415906。画布独立focus handle，Tab到独立zoom handle；布局测试加载真实focus helper，防止focus ring把全画布变成0高。 |
@@ -64,22 +64,24 @@
 - 横／竖／方图，Fill/Fit：`new-{landscape,portrait,square}-{cover,contain}.png`，没有重采样或拉伸；4倍及边界见slots图与行为检查。
 - Apply前后：`new-apply-preview.png`、`new-applied.png`，构图为contain/1.7/0.65/0.25；保存后不可拖动，重启仍保留共享选择与构图（`new-restarted.png`）。
 - Cancel：`new-before-cancel.png`、`new-cancelled.png`，不发布草稿且保留原选择。重名另存不覆盖，见`new-same-name-conflict.png`。
-- 连续选择只留latest（`new-continuous-selection.png`）；两个Home草稿独立，见`new-two-homes.png`及`new-two-homes-other-state.json`。
+- 连续选择只留latest（`new-continuous-selection.png`）；两个Home草稿独立，见`new-two-homes.png`及另一Home读回的state。
 - 窗口变窄、侧栏加宽、明暗主题：`new-window-narrow.png`、`new-sidebar-wide.png`、`new-theme-light.png`，只重算相对构图，不重建tiles。
 - Studio原字符画法：`new-studio-preview.png`，不重转Dots；Apply／Cancel流程同图片。
 
-原始新版回放输出见 `native-c4-replay.log`、`native-final-replay.log`。`measure-slots.py`直接从18张1280×699原图测像素：Fill (1042,410)、Fit (1174,410)、Reset (1016,590.5)、Cancel (1107.5,590.5)、Apply (1199,590.5)、Previous (993.5,659.5)、Next (1185.5,659.5)、Add (1213.5,659.5)、Remove (1241.5,659.5)。每个按钮跨状态／主题最大漂移均为0。不同窗口几何不要求绝对屏幕坐标相同。
+原始新版回放输出未入库。`measure-slots.py`直接从18张1280×699原图测像素：Fill (1042,410)、Fit (1174,410)、Reset (1016,590.5)、Cancel (1107.5,590.5)、Apply (1199,590.5)、Previous (993.5,659.5)、Next (1185.5,659.5)、Add (1213.5,659.5)、Remove (1241.5,659.5)。每个按钮跨状态／主题最大漂移均为0。不同窗口几何不要求绝对屏幕坐标相同。
 
 ### 最小实现与门禁
 
 沿用现有Dots转换器、SVG tiles、原子发布、共享focus/button及官方Slider；没有新增依赖。删除旧三样式选择入口与三个`style-*.svg`；通用Braille/Blocks/Dots字形与转换器未删。模式组依据T3 [ToggleGroup](https://github.com/pingdotgg/t3code/blob/337c5858c33bc7f8f6dfd391a2c279fa0f7e4d17/apps/web/src/components/ui/toggle-group.tsx#L30-L31)的2px padding/gap与[segmented Toggle](https://github.com/pingdotgg/t3code/blob/337c5858c33bc7f8f6dfd391a2c279fa0f7e4d17/apps/web/src/components/ui/toggle.tsx#L17-L20)的24px高度、6px圆角，不用会改变自然宽度的勾选字符。
 
-- `first-red.log`先证实旧图片仍生成Braille；当前固定Dots通过。
-- `focused-canvas-red.log`、`queued-zoom-red.log`防真实focus helper覆盖absolute、滑条排队回调误夺焦点；当前行为与布局检查通过。
-- `delete-race-red.log`、`legacy-publication-races-red.log`在旧实现证实确认删除跳过、发布迟到复活源；`closed-scan-red.log`防关闭副本旧扫描误删新构图。`filesystem-green.log`的17个真实文件系统场景全部survived，含shell/Unicode/大文件不覆盖与上述竞态。
+以下红绿日志未入库，只记结论。
+
+- 先红：证实旧图片仍生成Braille；当前固定Dots通过。
+- 两组先红断言防真实focus helper覆盖absolute、滑条排队回调误夺焦点；当前行为与布局检查通过。
+- 先红断言在旧实现证实确认删除跳过、发布迟到复活源；另一组防关闭副本旧扫描误删新构图。修复后17个真实文件系统场景全部survived，含shell/Unicode/大文件不覆盖与上述竞态。
 - `check-layout.cjs`覆盖204组状态×平台×主题×宽度，检查可用性与固定布局；数学／异步／输入生命周期在`check.cjs`。
-- 最终`repository-check.log`为`all checks passed`，退出码0；含sync一致性、类型检查与各mod行为门禁。未重跑并行A/B已通过的独立GUI。
-- 撤去测试适配器后，真实生产`main.js`在客体通过`herdr-app check`，`status.errors=[]`；`production-check.log`和整窗`production-final.png`记录最终状态。
+- 最终全仓检查为`all checks passed`，退出码0；含sync一致性、类型检查与各mod行为门禁。未重跑并行A/B已通过的独立GUI。
+- 撤去测试适配器后，真实生产`main.js`在客体通过`herdr-app check`，`status.errors=[]`；整窗`production-final.png`记录最终状态。
 
 ### 边界与未验证
 

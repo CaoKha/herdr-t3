@@ -2,6 +2,8 @@
 
 调研日期：2026-11-13。asciicn 源码基线 `d5592fc980cad39578f13b16f6e015404160669b`（2026-11-09，MIT，`extras/mods/asciicn-wallpaper/LICENSE-asciicn`）。我们的管线基线 `ee935ef` + 当前工作树里 `ascii-art.js`（`VERSION=2`）。本轮只读调研：没有改实现、没有动原图和已导入的 `.ans`、没有在用户桌面或 Herdr 窗口里操作。
 
+> 2026-11-14 更新：第 5 条（采样）后来改了取舍。草稿不再照网站在 JS 里做 4 倍超采样加 k×k 块平均，而是由 sips 直接把 cover 裁切区缩到 Braille 采样网格，其他模式整块平均它；字形与超采样流程逐格一致 87–99%，选图到预览快 5–10 倍。见 [wallpaper-performance.md](../rewrite-review-2026-11-14/wallpaper-performance.md)。
+
 对比用图：`~/Pictures/146943457_p0.png`（2756×1654，当前壁纸 `file:146943457_p0` 的原图）。
 
 实施复核勘误：Dots的ramp实际为**6档**（空白加5个点），不是5档，阈值为0.1/0.3/0.5/0.7/0.9；以下数字来自真正mapTones，数字不变，原说明的档位／公式已更正。`nearestIndex`实际用OKLab，不是旧颜色试验脚本的RGB欧氏近似。已授权实施的逐格oracle、保持旧画的OSC标记、模式UI和验收见 [图片处理对齐](../wallpaper-image-alignment/README.md)；本报告其余方案保留调研时语境。

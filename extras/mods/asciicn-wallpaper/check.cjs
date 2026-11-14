@@ -1,404 +1,445 @@
-// The import lifecycle on an inert Home: drafts never become saved wallpapers until Apply; deletion needs confirmation.
+// What a person sees and does with the wallpaper, in a temporary app home: pictures drawn in the theme, the + menu, dropped
+// files, the framing card as it reads and opens out, modes, framing by drag, keys, wheel and trackpad, Apply, Cancel,
+// reframing any picture, deletion, and work not done twice. The picture file reader is stood in for (check-source.cjs runs
+// the real one); everything else is the mod's own code, with real files.
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
+const fs = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
-const vm = require("node:vm");
+const { runtime, find, texts } = require("./harness.cjs");
 
-function element() {
-  const n = { items: [], handlers: {}, props: {} };
-  const p = new Proxy(n, { get: (o, k) => k in o ? o[k] : (...a) => {
-    if (k === "child") n.items.push(a[0]);
-    else if (k === "children") n.items.push(...a[0]);
-    else if (k === "when") { if (a[0]) a[1](p); }
-    else if (k === "id") n.key = a[0];
-    else if (k.startsWith("on_")) n.handlers[k] = a.at(-1);
-    else n.props[k] = a[0];
-    return p;
-  } });
-  return p;
-}
-const find = (n, id) => !n || typeof n !== "object" ? null : n.key === id ? n : n.items.map(x => find(x, id)).find(Boolean);
-// The real button.js (sync.sh's copy), as main.js imports it.
-const source = fs.readFileSync(path.join(__dirname, "button.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "")
-  + "\nconst drawButton = button;\n" + fs.readFileSync(path.join(__dirname, "main.js"), "utf8")
-  .replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class");
-const files = new Map(), calls = [], overlays = [], messages = [], state = {};
-let pick = "/photos/Coast.png", failDelete = false, holdWrite = null;
-let beforePublish = null, afterPublish = null, failPart = false;
-let colors = { foreground: '#ffffff' }, beforeRemove = null, failSample = false, orientation = "1";
-const ok = (stdout = "") => ({ code: 0, stdout, stderr: "" });
-const env = {
-  View: class {}, div: element, svg: p => { const e = element(); e.svgPath = p; return e; }, image: p => { const e = element(); e.imagePath = p; return e; }, h_flex: element, v_flex: element,
-  SliderState: { new: () => ({ current: 1, handlers: {}, value() { return this.current; }, on(k, f) { this.handlers[k] = f; }, set_value(n) { this.current = n; }, release() {} }) },
-  Slider: { new: element }, SliderTrack: { new: element }, SliderIndicator: { new: element }, SliderThumb: { new: element },
-  SCENES: [{ id: "lighthouse", name: "Lighthouse", width: 2, height: 1, focus: 0.5, tiles: [] }],
-  VERSION: 1, appHome: () => "/app", settings: () => ({}), theme: () => colors, window: () => ({ platform: "macos" }),
-  stopsInit: view => { view.fs = {}; }, stopsEnd() {}, enter() {}, focusRoot: (_view, el) => el, stop: (_view, _t, _id, el) => el,
-  tip: (_v, _t, _id, _label, el) => el,
-  shared: k => state[k], setShared: (k, v) => { state[k] = v; }, notify: p => messages.push(p),
-  openOverlay: spec => overlays.push(spec), nextCommand: () => new Promise(() => {}),
-  watchFolder: () => new Promise(() => {}),
-  readTextFile: async f => files.get(f) ?? null,
-  writeTextFile: async (f, body, expected) => {
-    if (Buffer.byteLength(body) > 1024 * 1024) throw new Error("Text file exceeds 1 MiB");
-    if (failPart && f.endsWith(".part")) throw new Error("disk full");
-    if (holdWrite && f.endsWith(".svg")) { const wait = holdWrite; holdWrite = null; await wait; }
-    assert.equal(files.get(f) ?? null, expected, `atomic write: ${f}`);
-    files.set(f, body);
-  },
-  exec: async (cmd, args = []) => {
-    calls.push([cmd, args]);
-    if (cmd === "osascript" && args[0] === "-l") return ok(`${orientation}\n`);
-    if (cmd === "osascript" || cmd === "zenity") return pick ? ok(pick) : { code: 1, stdout: "", stderr: "cancelled" };
-    if (cmd === "sips") return args[0] === "-g" ? ok("pixelWidth: 4\npixelHeight: 4") : ok();
-    if (cmd === "cat") return ok(files.get(args[0]) ?? "●\n");
-    if (cmd === "link") {
-      beforePublish?.(args[1]);
-      if (files.has(args[1])) return { code: 1, stdout: "", stderr: "File exists" };
-      assert.ok(files.has(args[0]), "publish only a completed staged file");
-      files.set(args[1], files.get(args[0]));
-      await afterPublish?.(args[1]);
-      return ok();
-    }
-    if (cmd === "rm") { await beforeRemove?.(args); for (const f of files.keys()) if (args.slice(1).some(d => f === d || f.startsWith(`${d}/`))) files.delete(f); return ok(); }
-    if (cmd === "sh") {
-      const s = args[1];
-      if (s.startsWith("cat ")) {
-        const paths = [...s.matchAll(/'([^']*)'/g)].map(m => m[1]), out = paths.pop();
-        assert.ok(paths.every(p => files.has(p)), "all chunks exist before concatenating");
-        files.set(out, paths.map(p => files.get(p)).join(""));
-        return ok();
-      }
-      if (s.startsWith("for f")) return ok([...files.keys()].filter(f => /^\/app\/asciicn-wallpaper\/[^/]+\.ans$/.test(f)).map(f => `1 2\0${f.split("/").at(-1).slice(0, -4)}\0`).join(""));
-      if (s.startsWith("cksum <")) return ok("1 2\n");
-      if (s.startsWith('wc -c')) return ok(String(9 * 1024 * 1024));
-      if (s.startsWith("rm ")) {
-        for (const op of s.split(" && ")) {
-          if (op.includes("'./.tiles/Coast'")) for (const f of files.keys()) if (f.includes("/.tiles/Coast/")) files.delete(f);
-          if (op.includes("'./Coast.ans'")) {
-            if (failDelete) return { code: 1, stdout: "", stderr: "permission denied" };
-            files.delete("/app/asciicn-wallpaper/Coast.ans");
-          }
-        }
-      }
-      return ok("bmp");
-    }
-    return ok();
-  },
-  imageGrid: () => ({ width: 4, height: 4 }),
-  imagePlan: () => ({ columns: 2, rows: 1, width: 4, height: 4, crop: { x: 0, y: 0, width: 4, height: 4 } }),
-  sampleImage: function* (pixels, style) { if (failSample) throw new Error('conversion failed'); calls.push(['sample', style]); yield null; return pixels; },
-  decodeBmp: function* (chunks) { assert.ok(Array.isArray(chunks)); assert.equal(chunks.length, 12, 'images larger than the native stdout cap arrive in complete bounded chunks'); return { width: 4, height: 4, rgba: [] }; },
-  imageAns: function* (_pixels, style) { yield null; return ({ braille: "⡇", blocks: "▓", dots: "●", quadrants: "▘" })[style] + "\n"; },
-  convert: function* (text, _aspect, paper) {
-    if (!text.trim()) return { width: 2, height: 1 };
-    yield { file: "tile.svg", svg: `<svg viewBox="0 0 2 1" stroke="#000"><path fill="#000" d="M0 0h${paper ? 2 : 1}v1z"/></svg>`, tint: "foreground", opacity: 1, x0: 0, x1: 2, y0: 0, y1: 1 };
-    // "◐" stands for a new image frame, which can also be drawn on paper.
-    return { width: 2, height: 1, ...(text.startsWith("◐") ? { paper: true } : {}) };
-  },
-};
-const cx = { notify() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }), stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => fn(cx) } };
-const context = vm.createContext(env);
-vm.runInContext(source, context);
-const mod = new context.Mod();
-mod.init({}, { ...cx, spawn() {} });
-mod.height = 800; mod.width = 1000;
-const saved = () => [...files.keys()].filter(f => f.endsWith(".ans"));
-const watchdog = setTimeout(() => { console.error('wallpaper lifecycle did not finish'); process.exitCode = 1; }, 5000);
+const MOD = "asciicn-wallpaper", KEY = `${MOD}.scene`, PLACEMENTS = `${MOD}.placements`;
+// A photo: its left half black, its right half white.
+const W = 64, H = 32, rgba = new Uint8Array(W * H * 4);
+for (let i = 0; i < W * H; i++) { const v = i % W < W / 2 ? 0 : 255; rgba.set([v, v, v, 255], i * 4); }
+const PHOTO = { width: W, height: H, rgba };
+const watchdog = setTimeout(() => { console.error("wallpaper check did not finish"); process.exit(1); }, 60000);
+const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs ${b}`);
 
 (async () => {
-  await mod.choose(cx);
-  assert.ok(mod.draft?.scene, "choosing a photo previews it before saving");
-  assert.equal(mod.draft.text, "●\n", "new pictures start in Dots");
-  colors = { foreground: '#000000' };
-  const blackImage = await mod.previewImage(mod.draft, cx);
-  assert.doesNotMatch(files.get(`/app/${blackImage.image}`), /#000000000/, 'a valid black theme colour is never replaced twice');
-  colors = { foreground: '#ffffff' };
-  const decoded = mod.draft.pixels, nativeReads = calls.filter(c => c[0] === 'sips').length;
-  assert.ok(decoded, "the decoded source stays in the memory draft for mode changes");
-  for (const [style, glyph] of [['braille', '⡇'], ['blocks', '▓'], ['quadrants', '▘'], ['dots', '●']]) {
-    await mod.setStyle(style, cx);
-    assert.equal(mod.draft.style, style);
-    assert.equal(mod.draft.text, glyph + '\n');
-    assert.equal(mod.draft.pixels, decoded, "switching reuses the source pixels");
-    assert.deepEqual(saved(), [], "a mode switch does not publish .ans");
-  }
-  assert.equal(calls.filter(c => c[0] === 'sips').length, nativeReads, "mode switches never decode or re-read the source image");
-  assert.deepEqual(saved(), []);
-  assert.equal(state["asciicn-wallpaper.scene"], undefined, "preview does not change the shared choice");
-  assert.ok(find(mod.render(cx), "wallpaper-preview"));
-  const previewImage = find(mod.render(cx), "wallpaper-preview-image");
-  assert.ok(previewImage?.imagePath, "framing uses one native cached image, not size-keyed SVG masks");
-  assert.equal(mod.fs.modal, true, "pointer imports make the canvas and all editor controls focusable");
-  assert.ok(find(mod.render(cx), "wallpaper-style-braille"));
-  let releaseMode;
-  holdWrite = new Promise(resolve => { releaseMode = resolve; });
-  const staleMode = mod.setStyle('braille', cx);
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(mod.draft.busy, true);
-  await mod.setStyle('quadrants', cx);
-  const latestImage = mod.draft.image;
-  releaseMode();
-  await staleMode;
-  assert.equal(mod.draft.style, 'quadrants');
-  assert.equal(mod.draft.text, '▘\n', "a late old mode cannot replace the latest drawing");
-  assert.equal(mod.draft.image, latestImage, "a late old mode cannot replace the latest texture");
-  await mod.setStyle('dots', cx);
-  const sampledBeforeBurst = calls.filter(c => c[0] === 'sample').length;
-  await Promise.all(['braille', 'blocks', 'quadrants'].map(style => mod.setStyle(style, cx)));
-  assert.equal(calls.filter(c => c[0] === 'sample').length - sampledBeforeBurst, 1, 'rapid requests drop superseded generators before starting sample work');
-  assert.equal(mod.draft.style, 'quadrants');
-  find(mod.render(cx), 'wallpaper-style-quadrants').handlers.on_key_down({ key: 'right', modifiers: {} }, cx);
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(mod.draft.style, 'dots', 'mode arrow keys wrap and regenerate the draft');
-  const beforeCleanupRace = mod.draft.scene;
-  let releaseCleanup;
-  const cleanup = new Promise(resolve => { releaseCleanup = resolve; });
-  beforeRemove = async args => {
-    if (args.includes(`/app/${beforeCleanupRace.base}`)) { beforeRemove = null; await cleanup; }
-  };
-  const published = mod.setStyle('braille', cx);
-  await new Promise(resolve => setImmediate(resolve));
-  const retainedImage = mod.draft.image;
-  failSample = true;
-  await mod.setStyle('blocks', cx);
-  failSample = false;
-  releaseCleanup();
-  await published;
-  assert.ok(files.has(`/app/${retainedImage}`), 'superseding cleanup cannot delete the still-displayed published frame when the new mode fails');
-  await mod.setStyle('dots', cx);
-  const zoom = find(mod.render(cx), "wallpaper-zoom");
-  zoom.handlers.on_key_down({ key: "right", modifiers: {} }, cx);
-  zoom.handlers.on_key_down({ key: "right", modifiers: {} }, cx);
-  assert.ok(Math.abs(mod.draft.placement.zoom - 1.2) < 1e-8, "queued zoom keys accumulate before the next render");
-  find(mod.render(cx), "wallpaper-reset").handlers.on_click({}, cx);
-  find(mod.render(cx), "wallpaper-contain").handlers.on_click({}, cx);
-  let picture = find(mod.render(cx), `wallpaper-${mod.draft.scene.id}`);
-  assert.equal(picture.props.w, 1000, "Fit preserves a 2:1 scene in a 1000x800 pane");
-  assert.equal(picture.props.h, 500);
-  assert.equal(picture.props.bottom, 150);
-  mod.scale.handlers.change(2, cx);
-  find(mod.render(cx), "wallpaper-reset").handlers.on_click({}, cx);
-  assert.equal(mod.draft.placement.mode, "contain", "Reset must not change the fit mode");
-  assert.equal(mod.draft.placement.zoom, 1);
-  const canvas = find(mod.render(cx), "wallpaper-compose");
-  const beforeMove = calls.length;
-  const filesBeforeMove = [...files.entries()];
-  canvas.handlers.on_mouse_down({ position: { x: 300, y: 300 } }, cx);
-  canvas.handlers.on_mouse_move({ position: { x: 300, y: 450 } }, cx);
-  assert.equal(mod.draft.placement.y, 1, "drag to the lower edge of the available blank space");
-  canvas.handlers.on_mouse_up({}, cx);
-  canvas.handlers.on_key_down({ key: "up", modifiers: {} }, cx);
-  assert.ok(mod.draft.placement.y < 1);
-  assert.equal(mod.fs.keyboard, true, "arrow movement reveals the canvas focus ring");
-  assert.equal(calls.length, beforeMove, "framing never reconverts or writes files");
-  assert.deepEqual([...files.entries()], filesBeforeMove, "moving reuses the prepared preview without file I/O");
-  mod.scale.handlers.change(99, cx);
-  assert.equal(mod.draft.placement.zoom, 4, "zoom cannot exceed 4x");
-  mod.setPlacement(mod.draft, { x: -4, y: 42 }, cx);
-  assert.equal(mod.draft.placement.x, 0);
-  assert.equal(mod.draft.placement.y, 1);
-  await mod.cancelPreview(cx);
-  assert.equal(mod.draft, null);
-  assert.equal(mod.fs.modal, false);
-  assert.deepEqual([...files.keys()], [], "cancel removes preview tiles");
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "herdr-wallpaper-check-"));
+  try {
+    const reads = [];
+    let hold = null, unreadable = false;
+    const source = { "source.js": (m) => ({ readImage: async (from) => {
+      reads.push(from);
+      await hold;
+      if (unreadable) throw new Error("This isn't a picture this computer can read.");
+      return { pixels: PHOTO, plan: m["ascii-art.js"].imagePlan(W, H) };
+    } }) };
+    const base = path.join(root, "home");
+    const r = await runtime(base, { stubs: source });
+    const { cx, state, hooks, look, settle, dir, app } = r;
+    const { toSlider } = r.modules["framing.js"];
+    Object.assign(look.colours, { ansi0: "#000001", ansi15: "#fffffe", ansi7: "#c0c0c1", ansi8: "#808081" });
+    const h = await r.home();
+    const tree = () => h.render(cx);
+    const at = (id) => find(tree(), id);
+    const click = (id) => at(id).handlers.on_click({}, cx);
+    // The picture Home shows once the one for this theme is made and loaded.
+    const shown = async (home = h, rt = r) => {
+      const draw = () => home.render(rt.cx);
+      const now = () => { const { madePicture, pictureKey, isLight } = rt.modules["library.js"], s = home.draft?.scene ?? home.all().find(x => x.id === (rt.state[KEY] ?? "lighthouse"));
+        return madePicture(pictureKey(s, { ...rt.look.colours }, isLight()))?.path; };
+      // Made, then loaded (shown in place of the last one).
+      draw(); await rt.settle(now); await rt.settle(() => find(draw(), "wallpaper-picture")?.props.path === now()); return now();
+    };
+    const svgOf = async (p) => fs.readFile(path.join(app, p), "utf8");
+    const ans = async () => (await fs.readdir(dir)).filter(n => n.endsWith(".ans")).sort();
+    let io = 0, writes = [], cats = [];
+    hooks.beforeExec = (cmd, args) => { io++; if (cmd === "cat") cats.push(args[0]); };
+    hooks.beforeWrite = (file) => { io++; writes.push(file); };
 
-  await mod.choose(cx);
-  await mod.applyPreview(cx);
-  assert.equal(mod.draft, null);
-  assert.deepEqual(saved(), ["/app/asciicn-wallpaper/Coast.ans"]);
-  assert.equal(files.get(saved()[0]), "●\n");
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Coast");
-  assert.equal(state["asciicn-wallpaper.placements"]["file:Coast"].zoom, 1);
-  assert.equal(find(mod.render(cx), "wallpaper-compose"), undefined, "saved pictures are not editable");
-  const kept = state["asciicn-wallpaper.placements"]["file:Coast"];
-  state["asciicn-wallpaper.placements"]["file:Coast"] = { mode: "contain", zoom: 1, x: .2, y: .8 };
-  mod.width = 600;
-  picture = find(mod.render(cx), "wallpaper-file:Coast");
-  assert.equal(picture.props.w, 600);
-  assert.equal(picture.props.h, 300, "saved Fit recomputes proportional geometry at a new width");
-  assert.ok(Math.abs(picture.props.bottom - 100) < 1e-8);
-  mod.width = 1000;
-  state["asciicn-wallpaper.placements"]["file:Coast"] = { mode: "invalid", zoom: Infinity, x: -2, y: 3 };
-  picture = find(mod.render(cx), "wallpaper-file:Coast");
-  assert.equal(picture.props.w, 1600, "invalid persistent parameters use bounded safe defaults");
-  assert.equal(picture.props.left, "0%");
-  assert.equal(picture.props.bottom, 0);
-  state["asciicn-wallpaper.placements"]["file:Coast"] = kept;
-  assert.equal([...files.keys()].some(f => f.includes("/.preview/")), false);
+    // A built-in picture is one image in the theme's colours; a new theme draws another, the old one up until it's made.
+    const dark = await shown();
+    assert.ok(dark && (await svgOf(dark)).includes("#cd3131"), "the built-in picture is drawn in the theme's colours");
+    look.colours.ansi1 = "#aa0000";
+    assert.equal(at("wallpaper-picture")?.props.path, dark, "the old picture stays up while the new one is made");
+    writes = [];
+    const recoloured = await shown();
+    assert.notEqual(recoloured, dark);
+    assert.ok((await svgOf(recoloured)).includes("#aa0000"), "a new palette is a new picture");
+    assert.equal(writes.length, 1, "a picture under 1 MiB is written in one go");
 
-  pick = null;
-  await mod.choose(cx);
-  assert.equal(mod.draft, null, "file dialog cancel stays silent");
-  assert.equal(messages.length, 0);
-  pick = "/photos/Studio.ans";
-  await mod.choose(cx, true);
-  assert.ok(mod.draft, ".ans imports frame their existing drawing before Apply");
-  const originalAns = mod.draft.text;
-  for (const style of ['dots', 'braille', 'blocks', 'quadrants']) assert.equal(!!find(mod.render(cx), `wallpaper-style-${style}`).handlers.on_click, false, ".ans reserves a disabled mode row");
-  await mod.setStyle('braille', cx);
-  assert.equal(mod.draft.text, originalAns, ".ans cannot be regenerated in another mode");
-  await mod.applyPreview(cx);
-  assert.equal(saved().length, 2);
+    // Switching to a picture not made yet keeps the last one up until the new one is ready.
+    state[KEY] = "ember";
+    assert.equal(at("wallpaper-picture").props.path, recoloured, "the last picture stays up meanwhile");
+    const ember = await shown();
+    assert.ok(ember.includes("/ember/"), "then the new one shows");
+    delete state[KEY];
+    await shown();
 
-  // A detailed Dots image exceeds the host's per-write limit even at the usual image grid.
-  pick = "/photos/Detailed.png";
-  await mod.choose(cx);
-  const large = "\x1b[38;2;123;234;210m⦁🌅\n".repeat(70000);
-  assert.ok(Buffer.byteLength(large) > 1024 * 1024);
-  mod.draft.text = large;
-  await mod.applyPreview(cx);
-  assert.ok(!mod.draft, "Apply saves a detailed image larger than the native per-write limit");
-  assert.ok(files.get("/app/asciicn-wallpaper/Detailed.ans") === large, "large UTF-8 drawing is preserved byte for byte");
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Detailed");
-  assert.equal([...files.keys()].some(f => f.includes("/.preview/")), false);
-  files.set("/photos/Studio detailed.ans", large);
-  pick = "/photos/Studio detailed.ans";
-  await mod.choose(cx, true);
-  await mod.applyPreview(cx);
-  assert.ok(files.get("/app/asciicn-wallpaper/Studio detailed.ans") === large, "Studio imports share the large-file save path");
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Studio detailed");
-  files.delete("/photos/Studio detailed.ans");
+    // The switcher: ‹ name › frame +, nothing greyed out to hold a place; framing works for a built-in picture too.
+    assert.equal(at("wallpaper-remove"), undefined, "deleting isn't on the switcher");
+    for (const id of ["wallpaper-back", "wallpaper-next", "wallpaper-frame", "wallpaper-add"]) assert.ok(at(id).handlers.on_click, `${id} works`);
 
-  pick = "/photos/Unwritten.png";
-  await mod.choose(cx);
-  failPart = true;
-  await mod.applyPreview(cx);
-  failPart = false;
-  assert.ok(mod.draft, "a chunk write failure retains the preview to retry");
-  assert.equal(files.has("/app/asciicn-wallpaper/Unwritten.ans"), false);
-  assert.equal([...files.keys()].some(f => f.includes("/.preview/save-")), false, "failed save removes its own staging files");
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Studio detailed");
-  await mod.cancelPreview(cx);
+    // + opens this mod's menu as a popup above it; its rows send the pick back to this Home.
+    at("wallpaper-add").handlers.on_mouse_down({ bounds: { x: 900, y: 760, width: 24, height: 24 } }, cx);
+    click("wallpaper-add");
+    const menu = r.overlays.at(-1);
+    assert.equal(menu.mod, MOD);
+    assert.equal(menu.kind, "popup");
+    assert.ok(menu.at.y + menu.height <= 760, "the menu opens above +");
+    r.view.props = { ...menu.props, overlay: "o1" };
+    const Mod = r.modules["main.js"].default, m = new Mod();
+    m.init({}, cx);
+    const rows = m.render(cx);
+    for (const id of ["wallpaper-menu-image", "wallpaper-menu-ans", "wallpaper-menu-studio", "wallpaper-menu-folder"]) assert.ok(find(rows, id), `the menu has ${id}`);
+    assert.ok(texts(find(rows, "wallpaper-menu-studio")).some(s => /drop it here/.test(s)), "Studio's row says what to do with its file");
+    hooks.picked = "/photos/Coast.png";
+    find(rows, "wallpaper-menu-image").handlers.on_click({}, cx);
+    const [sent] = r.runs.at(-1);
+    assert.ok(sent.startsWith(`${MOD}.`), "the pick goes to the mod's commands");
+    m.close();
+    assert.ok(state[`${MOD}.menuClosed`] > 0, "closing stamps the menu closed, for + to toggle");
+    r.view.props = null;
 
-  // Another Home may receive the .ans event before the applying copy does.
-  const other = new context.Mod();
-  other.init({}, { ...cx, spawn() {} });
-  pick = "/photos/Shared.png";
-  await mod.choose(cx);
-  let finishOther, otherJob;
-  holdWrite = new Promise(r => { finishOther = r; });
-  afterPublish = async destination => {
-    if (destination.endsWith("/Shared.ans")) {
-      otherJob = other.refresh(cx);
-      for (let n = 0; n < 20; n++) await Promise.resolve();
+    // Choosing reads the picture; the card shows only its name until it's drawn, its footer already in place. A wait under
+    // 150 ms shows nothing; past that, progress, kept on screen at least 300 ms.
+    const sleep = (ms) => new Promise(go => setTimeout(go, ms));
+    let release;
+    hold = new Promise(go => { release = go; });
+    const choosing = h.command(sent.slice(MOD.length + 1), cx);
+    await settle(() => reads.length === 1);
+    let card = at("wallpaper-card");
+    assert.ok(card, "the card takes the switcher's place");
+    assert.equal(at("wallpaper-switcher"), undefined);
+    assert.equal(card.props.bottom, 12);
+    assert.equal(find(card, "wallpaper-zoom"), undefined, "no framing controls while reading");
+    assert.equal(find(card, "wallpaper-progress"), undefined, "nothing says it is waiting before 150 ms");
+    assert.ok(find(card, "wallpaper-apply") && !find(card, "wallpaper-apply").handlers.on_click, "Apply stands where it will be, not yet pressable");
+    assert.equal(card.items.at(-1).key, "wallpaper-card-footer", "the footer ends the card");
+    await sleep(200);
+    card = at("wallpaper-card");
+    assert.ok(find(card, "wallpaper-progress"), "a longer wait shows progress");
+    assert.ok(texts(card).some(s => /Reading/.test(s)), "and says it is reading");
+    release(); hold = null;
+    await choosing;
+    let d = h.draft;
+    assert.equal(d.phase, "ready");
+    assert.ok(find(at("wallpaper-card"), "wallpaper-progress"), "progress that showed doesn't vanish at once");
+    await sleep(350);
+    card = at("wallpaper-card");
+    assert.equal(find(card, "wallpaper-progress"), undefined, "it goes once it has shown long enough");
+    assert.equal(card.props.bottom, 12);
+    assert.equal(card.items.at(-1).key, "wallpaper-card-footer", "opened out upward, the footer stays where it was");
+    assert.ok(find(card, "wallpaper-zoom") && find(card, "wallpaper-styles") && find(card, "wallpaper-apply").handlers.on_click);
+    assert.equal(find(card, "wallpaper-card-name").items.join(""), "Coast", "the name heads the card");
+    assert.match(d.text, /image-v4;dots/, "new pictures start in Dots");
+    const preview = await shown();
+    assert.ok(preview?.includes("/.preview/"), "the preview is drawn the same way, from its own folder");
+    assert.equal(state[KEY], undefined);
+    assert.deepEqual(await ans(), []);
+
+    // A mode that can't be drawn goes back to the one before and says why, in the footer.
+    hooks.beforeWrite = (file) => { if (/\.preview\//.test(file)) throw new Error("No room left"); };
+    await h.setStyle("braille", cx);
+    hooks.beforeWrite = (file) => { io++; writes.push(file); };
+    assert.equal(h.draft.style, "dots", "the mode goes back");
+    assert.equal(h.draft.phase, "ready");
+    assert.match(texts(at("wallpaper-card-status")).join(""), /No room left/);
+
+    // While a mode draws, the last one stays up, faded a little, and says so once it takes a while.
+    let gate;
+    const shownBefore = at("wallpaper-picture").props.path;
+    hooks.beforeWrite = async (file) => { io++; writes.push(file); if (/\.preview\//.test(file)) await gate; };
+    gate = new Promise(go => { release = go; });
+    const drawing2 = h.setStyle("blocks", cx);
+    assert.equal(at("wallpaper-picture").props.path, shownBefore, "the last mode stays up");
+    assert.doesNotMatch(texts(at("wallpaper-card-status")).join(""), /Drawing/, "nothing says so before 150 ms");
+    await sleep(200);
+    assert.equal(at("wallpaper-picture").props.path, shownBefore, "still up while drawing");
+    assert.match(texts(at("wallpaper-card-status")).join(""), /Drawing Blocks/);
+    assert.ok(find(at("wallpaper-styles"), "wallpaper-style-spinner"), "the mode being drawn spins");
+    release();
+    await drawing2;
+    hooks.beforeWrite = (file) => { io++; writes.push(file); };
+    await sleep(350);
+    await shown();
+    assert.notEqual(at("wallpaper-picture").props.path, shownBefore, "then the new mode replaces it");
+    assert.doesNotMatch(texts(at("wallpaper-card-status")).join(""), /Drawing/);
+    await h.setStyle("dots", cx);
+
+    // Modes redraw the same pixels; a quick new choice replaces unfinished work; a mode drawn before comes back for free.
+    for (const style of ["braille", "blocks", "quadrants", "dots"]) {
+      await h.setStyle(style, cx);
+      assert.match(h.draft.text, new RegExp(`image-v4;${style}`));
+      assert.equal(h.draft.message, null, "a drawing clears what went wrong before");
     }
-  };
-  const applying = mod.applyPreview(cx);
-  for (let n = 0; n < 80; n++) await Promise.resolve();
-  try { assert.ok(mod.draft, "Apply keeps the preview until another Home finishes the drawing"); }
-  finally { finishOther(); }
-  await applying; await otherJob;
-  afterPublish = null;
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Shared");
-  assert.ok(mod.imported.some(s => s.id === "file:Shared"), "the applying Home loads the other copy's cache");
+    await Promise.all(["braille", "blocks", "quadrants"].map(s => h.setStyle(s, cx)));
+    assert.match(h.draft.text, /image-v4;quadrants/, "the last choice wins");
+    assert.equal(h.draft.phase, "ready");
+    assert.equal(reads.length, 1, "switching modes never reads the picture file again");
+    assert.deepEqual(await ans(), [], "nor saves a drawing");
+    io = 0;
+    await h.setStyle("braille", cx);
+    assert.match(h.draft.text, /image-v4;braille/);
+    assert.equal(io, 0, "a mode drawn before shows again without drawing");
+    at("wallpaper-style-braille").handlers.on_key_down({ key: "right", modifiers: {} }, cx);
+    await settle(() => h.draft.phase === "ready" && /image-v4;blocks/.test(h.draft.text));
+    assert.match(h.draft.text, /image-v4;blocks/, "arrow keys move along the modes");
 
-  pick = "/photos/Coast.png";
-  await mod.choose(cx);
-  let collision;
-  beforePublish = destination => { collision = destination; files.set(collision, "another Home's picture"); };
-  await mod.applyPreview(cx);
-  beforePublish = null;
-  assert.ok(mod.draft, "an atomic save conflict keeps the preview available to retry");
-  assert.equal(files.get(collision), "another Home's picture", "a concurrent save is never overwritten");
-  assert.match(mod.draft.saveError, /File exists/, "an Apply error stays inline without disabling retry");
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Shared");
-  await mod.cancelPreview(cx);
-  files.delete(collision);
+    // On paper: in a light theme the photo's dark half carries the marks, in a dark theme its bright half.
+    const inks = async () => { const s = await svgOf(await shown()); return [s.includes("#fffffe"), s.includes("#000001")]; };
+    assert.deepEqual(await inks(), [true, false], "dark theme: the white half is drawn");
+    look.dark = false;
+    assert.deepEqual(await inks(), [false, true], "light theme: the black half is drawn");
+    look.dark = true;
+    await shown();
 
-  let finishRead;
-  holdWrite = new Promise(r => { finishRead = r; });
-  const oldRead = mod.startPreview("/photos/Old.png", "Old", cx);
-  await new Promise(resolve => setImmediate(resolve));
-  await mod.startPreview("/photos/New.png", "New", cx);
-  finishRead(); await oldRead;
-  assert.equal(mod.draft.name, "New", "a slow old image cannot overwrite the latest selection");
-  assert.equal(mod.draft.busy, false);
-  await mod.cancelPreview(cx);
+    // Framing: Fill/Fit, drag, keys, the zoom buttons, slider, wheel and trackpad, and Reset, with no file read or written.
+    await settle();
+    io = 0;
+    click("wallpaper-contain");
+    const geometry = () => at(`wallpaper-${h.draft.scene.id}`).props;
+    const sceneRatio = h.draft.scene.width / h.draft.scene.height;
+    assert.ok(Math.abs(geometry().w - 1000) < 1e-6 && Math.abs(geometry().h - 1000 / sceneRatio) < 1e-6, "Fit shows the whole picture");
+    const canvas = () => at("wallpaper-compose");
+    canvas().handlers.on_mouse_down({ position: { x: 300, y: 300 } }, cx);
+    canvas().handlers.on_mouse_move({ position: { x: 300, y: 2000 } }, cx);
+    canvas().handlers.on_mouse_up({}, cx);
+    assert.equal(h.draft.placement.y, 1, "dragging stops at the edge");
+    canvas().handlers.on_key_down({ key: "up", modifiers: {} }, cx);
+    assert.ok(h.draft.placement.y < 1, "arrow keys move it");
+    click("wallpaper-zoom-in");
+    near(h.draft.placement.zoom, 1.25, "+ steps to the next preset");
+    near(h.scale.value(), toSlider(1.25), "the slider follows");
+    assert.equal(texts(at("wallpaper-zoom-value")).join(""), "125%");
+    canvas().handlers.on_key_down({ key: "-", key_char: "-", modifiers: {} }, cx);
+    near(h.draft.placement.zoom, 1, "- steps back");
+    h.scale.handlers.change(toSlider(2), cx);
+    near(h.draft.placement.zoom, 2, "the slider is logarithmic: halfway is 2×");
+    h.scale.handlers.change(99, cx);
+    assert.equal(h.draft.placement.zoom, 4, "zoom stops at 4×");
+    h.setPlacement(h.draft, { zoom: 1 }, cx);
+    const wheel = (o) => canvas().handlers.on_scroll_wheel({ delta: { x: 0, y: 0 }, touch_phase: "moved", modifiers: {}, position: { x: 500, y: 400 }, ...o }, cx);
+    wheel({ delta: { x: 0, y: 60 }, delta_lines: { x: 0, y: 6 } });
+    near(h.draft.placement.zoom, 2, "6 notches of a wheel double the zoom");
+    near(h.scale.value(), toSlider(2), "and the slider moves with it");
+    h.setPlacement(h.draft, { y: 0.5 }, cx);
+    wheel({ delta: { x: 0, y: -40 } });
+    near(h.draft.placement.y, 0.7, "a trackpad pans with the fingers: 40 px up of the 200 px to spare");
+    assert.equal(h.draft.placement.zoom, 2);
+    wheel({ delta: { x: 0, y: -200 }, modifiers: { platform: true } });
+    near(h.draft.placement.zoom, 1, "⌘-scroll zooms");
+    h.setPlacement(h.draft, { zoom: 3, x: 0.1, y: 0.9 }, cx);
+    click("wallpaper-reset");
+    assert.deepEqual({ ...h.draft.placement }, { mode: "contain", zoom: 1, x: 0.5, y: 0.5 }, "Reset goes back to 1×, the subject in view, and keeps Fit");
+    assert.equal(at("wallpaper-reset").handlers.on_click, undefined, "Reset rests while there is nothing to reset");
+    assert.equal(io, 0, "framing reads and writes nothing");
+    h.setPlacement(h.draft, { zoom: 2, x: 0.25 }, cx);
 
-  pick = "/photos/Coast.png";
-  let release;
-  holdWrite = new Promise(r => { release = r; });
-  const stale = mod.startPreview(pick, "Cancelled", cx);
-  await new Promise(resolve => setImmediate(resolve));
-  await mod.cancelPreview(cx);
-  release(); await stale;
-  assert.equal(mod.draft, null, "late drawing cannot reopen a cancelled preview");
-  assert.equal([...files.keys()].some(f => f.includes("/.preview/")), false, "late drawing leaves no draft files");
+    // Cancel leaves no trace; Apply saves one drawing, its framing and the selection, reusing the preview's picture.
+    const kept = { ...h.draft.placement };
+    canvas().handlers.on_key_down({ key: "escape", modifiers: {} }, cx);
+    await settle(() => h.draft === null);
+    await settle();
+    assert.deepEqual(await fs.readdir(path.join(dir, ".preview")), []);
+    await h.choose(cx);
+    h.setPlacement(h.draft, kept, cx);
+    const drawn = await svgOf(await shown());
+    cats = []; writes = [];
+    await h.applyPreview(cx);
+    assert.equal(h.draft, null);
+    assert.deepEqual(await ans(), ["Coast.ans"]);
+    assert.equal(state[KEY], "file:Coast");
+    assert.deepEqual({ ...state[PLACEMENTS]["file:Coast"] }, kept);
+    assert.deepEqual(cats.filter(f => f.endsWith("Coast.ans")), [], "Apply doesn't convert the drawing again");
+    assert.equal(writes.filter(f => f.endsWith(".svg") || /\.stage-/.test(f)).length, 0, "nor draws its picture again");
+    assert.equal(at("wallpaper-compose"), undefined, "a saved picture can't be dragged");
+    assert.equal(at("wallpaper-switcher").props.opacity, 1, "the switcher shows the new name for a moment");
+    assert.ok(texts(at("wallpaper-switcher")).includes("Coast"));
+    const saved = await shown();
+    assert.ok(saved?.includes("/.tiles/Coast/"), "the saved picture is drawn from its own cache");
+    assert.equal(await svgOf(saved), drawn, "the same picture the preview showed");
+    h.width = 600;
+    const at600 = at("wallpaper-file:Coast").props;
+    assert.ok(Math.abs(at600.w - 1200) < 1e-6, "saved Fit at 2× recomputes for a narrower Home");
+    h.width = 1000;
+    state[PLACEMENTS]["file:Coast"] = { mode: "nonsense", zoom: Infinity, x: -2, y: 3 };
+    assert.equal(at("wallpaper-file:Coast").props.bottom, 0, "nonsense framing falls back to bounded values");
+    state[PLACEMENTS]["file:Coast"] = kept;
 
-  let finishReady;
-  mod.ready = new Promise(r => { finishReady = r; });
-  const first = mod.startPreview(pick, "First", cx), latest = mod.startPreview(pick, "Latest", cx);
-  finishReady(); await Promise.all([first, latest]);
-  assert.equal(mod.draft.name, "Latest", "request identity also protects the setup-before-draft window");
-  await mod.cancelPreview(cx);
+    // The next run of the app shows a saved picture from disk, converting and writing nothing.
+    const again = await runtime(base, { stubs: source });
+    Object.assign(again.look.colours, look.colours);
+    Object.assign(again.state, state);
+    const cats2 = [], writes2 = [];
+    again.hooks.beforeExec = (cmd, args) => { if (cmd === "cat") cats2.push(args[0]); };
+    again.hooks.beforeWrite = (file) => { writes2.push(file); };
+    const h2 = await again.home();
+    assert.equal(await shown(h2, again), saved, "the picture on disk is shown again");
+    assert.deepEqual([cats2.filter(f => f.endsWith(".ans")), writes2], [[], []], "without converting or writing");
+    h2.close();
 
-  // A new image keeps a paper set beside its tiles, and a light theme draws that set.
-  const drawn = await mod.drawTiles("◐\n", "/app/asciicn-wallpaper/.tiles/Paper", cx, null, true);
-  assert.deepEqual([...drawn.paper.map(t => t.file)], ["paper-tile.svg"]);
-  assert.ok(files.has("/app/asciicn-wallpaper/.tiles/Paper/paper-tile.svg") && files.has("/app/asciicn-wallpaper/.tiles/Paper/tile.svg"));
-  assert.match(drawn.layers.paper[0].body, /h2v1/, "the preview keeps the paper drawing too");
-  assert.equal((await mod.drawTiles("●\n", "/app/asciicn-wallpaper/.tiles/Old", cx)).paper, undefined, "older frames have one set");
-  mod.imported.push({ ...drawn, id: "file:Paper", name: "Paper", base: "asciicn-wallpaper/.tiles/Paper" });
-  state["asciicn-wallpaper.scene"] = "file:Paper";
-  const drawnFiles = () => find(mod.render(cx), "wallpaper-file:Paper").items.map(e => e.svgPath);
-  colors = { foreground: '#000000', background: '#fffffe' };
-  assert.deepEqual(drawnFiles(), ["asciicn-wallpaper/.tiles/Paper/paper-tile.svg"], "a light theme draws on paper");
-  colors = { foreground: '#ffffff', background: '#1e1e1f' };
-  assert.deepEqual(drawnFiles(), ["asciicn-wallpaper/.tiles/Paper/tile.svg"], "a dark theme draws the original tones");
-  mod.imported = mod.imported.filter(s => s.id !== "file:Paper");
+    // Reframing a saved image opens its framing over the same picture, without modes, and saves only framing.
+    click("wallpaper-frame");
+    await settle(() => h.draft?.phase === "ready");
+    d = h.draft;
+    assert.deepEqual({ ...d.placement }, kept, "it opens where it was left");
+    near(h.scale.value(), toSlider(2), "the slider shows its zoom");
+    assert.equal(await shown(), saved, "nothing is converted again");
+    assert.equal(at("wallpaper-styles"), undefined, "a saved picture keeps its mode: no mode row");
+    assert.ok(at("wallpaper-delete")?.handlers.on_click, "an added picture can be deleted from here");
+    h.setPlacement(d, { zoom: 3 }, cx);
+    at("wallpaper-compose").handlers.on_key_down({ key: "enter", modifiers: {} }, cx);
+    await settle(() => h.draft === null);
+    assert.deepEqual(await ans(), ["Coast.ans"], "no second drawing");
+    assert.equal(state[PLACEMENTS]["file:Coast"].zoom, 3);
 
-  // A photo stored on its side is first written to a BMP, which sips writes upright; an upright one is read as it is.
-  for (const tag of ["6", "1"]) {
-    orientation = tag;
-    const from = calls.length;
-    await mod.startPreview("/photos/Side.jpg", "Side", cx);
-    const sips = calls.slice(from).filter(c => c[0] === "sips").map(c => [...c[1]]);
-    if (tag === "1") assert.ok(sips.every(a => a.at(-3) === "/photos/Side.jpg" || a.at(-1) === "/photos/Side.jpg"), "an upright photo is read directly");
-    else {
-      assert.deepEqual(sips[0], ["-s", "format", "bmp", "/photos/Side.jpg", "--out", `${mod.draft.dir}/upright.bmp`]);
-      assert.ok(sips.slice(1).every(a => !a.includes("/photos/Side.jpg")), "every later step reads the upright copy");
-    }
-    await mod.cancelPreview(cx);
+    // A built-in picture reframes the same way, keeps its framing, and has nothing to delete.
+    state[KEY] = "lighthouse";
+    click("wallpaper-frame");
+    await settle(() => h.draft?.phase === "ready");
+    assert.equal(at("wallpaper-delete"), undefined, "a built-in picture can't be deleted");
+    assert.equal(at("wallpaper-styles"), undefined);
+    h.setPlacement(h.draft, { zoom: 1.5 }, cx);
+    await h.applyPreview(cx);
+    assert.equal(state[PLACEMENTS].lighthouse.zoom, 1.5, "a built-in picture's framing is saved under its id");
+    assert.equal(state[KEY], "lighthouse");
+    await h.lib.refresh(cx);
+    assert.equal(state[PLACEMENTS].lighthouse?.zoom, 1.5, "and a rescan of the folder keeps it");
+
+    // A Studio file keeps its characters: no mode row.
+    const studio = path.join(root, "Studio.ans");
+    await fs.writeFile(studio, "\x1b[38;2;200;150;220m⣿⣿⡇\n⣿⠁⣿\n");
+    hooks.picked = studio;
+    await h.choose(cx, true);
+    assert.equal(h.draft.phase, "ready");
+    assert.equal(at("wallpaper-styles"), undefined, "a Studio file keeps its fixed characters");
+    await h.setStyle("dots", cx);
+    assert.equal(h.draft.text, await fs.readFile(studio, "utf8"), "it can't be redrawn in another mode");
+    await h.applyPreview(cx);
+    assert.equal(state[KEY], "file:Studio");
+
+    // Dropped on Home: an image previews as one chosen, a .ans as a Studio file; a new drop replaces the draft.
+    at("wallpaper").handlers.on_drop({ paths: ["/photos/Dropped.jpg", "/photos/Other.jpg"] }, cx);
+    await settle(() => h.draft?.phase === "ready");
+    assert.equal(h.draft.name, "Dropped");
+    assert.ok(h.draft.pixels, "a dropped image is drawn in a mode");
+    at("wallpaper").handlers.on_drop({ paths: [studio] }, cx);
+    await settle(() => h.draft?.name === "Studio" && h.draft.phase === "ready");
+    assert.equal(h.draft.pixels, null, "a dropped .ans is a Studio file");
+    await h.cancelPreview(cx);
+
+    // An unreadable picture: the card says why, offers another, and closes.
+    unreadable = true;
+    hooks.picked = "/photos/Broken.png";
+    await h.choose(cx);
+    unreadable = false;
+    card = at("wallpaper-card");
+    assert.ok(texts(card).some(s => /can read/.test(s)), "the reason shows");
+    assert.equal(texts(find(card, "wallpaper-card-status")).length, 0, "once, not again in the footer");
+    assert.equal(find(card, "wallpaper-zoom"), undefined);
+    assert.equal(card.items.at(-1).key, "wallpaper-card-footer");
+    find(card, "wallpaper-choose-another").handlers.on_click({}, cx);
+    await settle(() => h.draft?.name === "Broken" && h.draft.phase === "ready");
+    await h.cancelPreview(cx);
+
+    // Apply while a mode is drawing waits for it, then saves that mode.
+    hooks.picked = "/photos/Wait.png";
+    await h.choose(cx);
+    const drawing = h.setStyle("quadrants", cx);
+    await h.applyPreview(cx);
+    await drawing;
+    await settle(() => h.draft === null);
+    assert.match(await fs.readFile(path.join(dir, "Wait.ans"), "utf8"), /image-v4;quadrants/, "the mode chosen last is the one saved");
+
+    // A drawing past the host's 1 MiB write limit saves whole.
+    const large = "\x1b[38;2;123;234;210m⦁🌅\n".repeat(70000);
+    await fs.writeFile(path.join(root, "Large.ans"), large);
+    hooks.picked = path.join(root, "Large.ans");
+    await h.choose(cx, true);
+    await h.applyPreview(cx);
+    assert.ok((await fs.readFile(path.join(dir, "Large.ans"), "utf8")) === large);
+
+    // Another Home's file under the same name is never overwritten: the preview stays, the error in the footer, Apply retryable.
+    hooks.picked = "/photos/Coast.png";
+    await h.choose(cx);
+    hooks.beforeExec = async (cmd, args) => { if (cmd === "link" && args[1].endsWith(".ans")) await fs.writeFile(args[1], "another Home's picture"); };
+    await h.applyPreview(cx);
+    hooks.beforeExec = null;
+    assert.equal(await fs.readFile(path.join(dir, "Coast 2.ans"), "utf8"), "another Home's picture");
+    assert.equal(h.draft.phase, "ready");
+    assert.match(texts(at("wallpaper-card-status")).join(""), /exists/);
+    assert.equal(state[KEY], "file:Large");
+    await h.applyPreview(cx);
+    assert.equal(state[KEY], "file:Coast 3", "a retry takes the next free name");
+
+    // Cancelling while progress shows takes it away with the card.
+    hold = new Promise(go => { release = go; });
+    const slow = h.startPreview("/photos/Slow.png", "Slow", cx, true);
+    await settle(() => reads.at(-1) === "/photos/Slow.png");
+    tree();
+    await sleep(200);
+    assert.ok(find(at("wallpaper-card"), "wallpaper-progress"));
+    await h.cancelPreview(cx);
+    assert.equal(at("wallpaper-card"), undefined);
+    assert.equal(at("wallpaper-progress"), undefined, "no progress is left behind");
+    assert.equal(at("wallpaper-wait"), undefined);
+    release(); hold = null;
+    await slow;
+
+    // A slow picture can't replace a newer choice, nor reopen a cancelled one.
+    hold = new Promise(go => { release = go; });
+    const old = h.startPreview("/photos/Old.png", "Old", cx, true);
+    await settle(() => reads.at(-1) === "/photos/Old.png");
+    const latest = h.startPreview("/photos/New.png", "New", cx, true);
+    release(); hold = null;
+    await Promise.all([old, latest]);
+    assert.equal(h.draft.name, "New");
+    hold = new Promise(go => { release = go; });
+    const late = h.startPreview("/photos/Late.png", "Late", cx, true);
+    await settle(() => reads.at(-1) === "/photos/Late.png");
+    await h.cancelPreview(cx);
+    release(); hold = null;
+    await late;
+    assert.equal(h.draft, null);
+    assert.deepEqual(await fs.readdir(path.join(dir, ".preview")), [], "and leaves no files");
+
+    // A cancelled dialog says nothing.
+    const said = r.messages.length;
+    hooks.picked = null;
+    await h.choose(cx);
+    assert.equal(h.draft, null);
+    assert.equal(r.messages.length, said);
+
+    // Deleting asks by name first; a failed deletion changes nothing, a confirmed one moves the selection back.
+    state[KEY] = "file:Coast";
+    const coast = h.lib.imported.find(s => s.name === "Coast");
+    click("wallpaper-frame");
+    await settle(() => h.draft?.phase === "ready");
+    io = 0;
+    hooks.beforeExec = () => { io++; };
+    click("wallpaper-delete");
+    assert.equal(io, 0, "asking does nothing to the files");
+    assert.match(r.overlays.at(-1).props.title, /Coast/);
+    await h.cancelPreview(cx);
+    hooks.beforeExec = async (cmd, args) => { if (cmd === "sh" && args[1].startsWith("rm -f")) await fs.chmod(dir, 0o500); };
+    assert.equal(await h.lib.remove(coast, h.all(), cx), false);
+    await fs.chmod(dir, 0o700);
+    hooks.beforeExec = null;
+    assert.equal(state[KEY], "file:Coast", "a failed deletion keeps the selection");
+    assert.ok(h.lib.imported.includes(coast));
+    assert.ok(await h.lib.remove(coast, h.all(), cx));
+    await assert.rejects(fs.stat(path.join(dir, "Coast.ans")));
+    assert.notEqual(state[KEY], "file:Coast");
+    assert.equal(state[PLACEMENTS]["file:Coast"], undefined, "its framing goes too");
+
+    // On Windows, with no file dialog, the menu offers Studio and the folder; files arrive by dropping them.
+    const win = await runtime(path.join(root, "win"), { stubs: source, platform: "windows" });
+    win.view.props = { menu: "add", token: "t" };
+    const wm = new (win.modules["main.js"].default)();
+    wm.init({}, win.cx);
+    const winRows = wm.render(win.cx);
+    assert.deepEqual(["wallpaper-menu-image", "wallpaper-menu-ans", "wallpaper-menu-studio", "wallpaper-menu-folder"].map(id => Boolean(find(winRows, id))), [false, false, true, true]);
+
+    console.log("ok: wallpaper pictures, + menu, drops, the framing card, modes, paper, framing, Apply/Cancel, reframing, deletion, no work twice.");
+  } finally {
+    clearTimeout(watchdog);
+    await fs.chmod(root, 0o700).catch(() => null);
+    // A picture a last render asked for may still be landing.
+    await new Promise(go => setTimeout(go, 300));
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5 });
   }
-  orientation = "1";
-
-  // Reframing an applied import starts from its saved drawing and framing; Apply rewrites the framing alone.
-  state["asciicn-wallpaper.scene"] = "file:Coast";
-  state["asciicn-wallpaper.placements"] = { ...state["asciicn-wallpaper.placements"], "file:Coast": { mode: "contain", zoom: 2, x: .2, y: .8 } };
-  const ansBefore = saved(), linksBefore = calls.filter(c => c[0] === "link").length;
-  find(mod.render(cx), "wallpaper-frame").handlers.on_click({}, cx);
-  for (let i = 0; i < 50 && !(mod.draft?.scene && !mod.draft.busy); i++) await new Promise(resolve => setImmediate(resolve));
-  assert.equal(mod.draft.name, "Coast");
-  assert.deepEqual({ ...mod.draft.placement }, { mode: "contain", zoom: 2, x: .2, y: .8 }, "the editor opens at the saved framing");
-  assert.equal(mod.scale.value(), 2, "the zoom slider shows the saved zoom");
-  mod.setPlacement(mod.draft, { zoom: 3 }, cx);
-  await mod.applyPreview(cx);
-  assert.equal(mod.draft, null);
-  assert.equal(calls.filter(c => c[0] === "link").length, linksBefore, "reframing never saves another drawing");
-  assert.deepEqual(saved(), ansBefore);
-  assert.equal(state["asciicn-wallpaper.placements"]["file:Coast"].zoom, 3);
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Coast");
-  state["asciicn-wallpaper.scene"] = "lighthouse";
-  assert.equal(find(mod.render(cx), "wallpaper-frame").handlers.on_click, undefined, "built-in pictures have no saved framing to edit");
-
-  state["asciicn-wallpaper.scene"] = "file:Coast";
-  const scene = mod.imported.find(s => s.id === "file:Coast");
-  const before = calls.length;
-  find(mod.render(cx), "wallpaper-remove").handlers.on_click({}, cx);
-  assert.equal(calls.length, before, "delete click does no filesystem work");
-  assert.equal(overlays.at(-1).props.yes, "Delete");
-  assert.match(overlays.at(-1).props.title, /Coast/);
-  assert.ok(files.has("/app/asciicn-wallpaper/Coast.ans"), "dismissing the dialog leaves the file");
-  failDelete = true;
-  const cached = files.get("/app/asciicn-wallpaper/.tiles/Coast/tile.svg");
-  await mod.remove(scene, cx);
-  assert.equal(state["asciicn-wallpaper.scene"], "file:Coast", "failed deletion retains selection");
-  assert.ok(mod.imported.includes(scene));
-  assert.equal(files.get("/app/asciicn-wallpaper/.tiles/Coast/tile.svg"), cached, "source deletion failure leaves its drawing intact");
-  failDelete = false;
-  await mod.remove(scene, cx);
-  assert.equal(files.has("/app/asciicn-wallpaper/Coast.ans"), false);
-  assert.notEqual(state["asciicn-wallpaper.scene"], "file:Coast");
-  console.log("ok: wallpaper preview, apply, cancel, stale jobs, .ans import and confirmed deletion.");
-})().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => clearTimeout(watchdog));
+})().catch(e => { console.error(e); process.exitCode = 1; });

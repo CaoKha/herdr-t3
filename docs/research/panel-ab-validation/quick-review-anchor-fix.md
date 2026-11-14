@@ -21,7 +21,7 @@
 | Commits | [整窗](quick-review-anchor-commits.png)／[局部](quick-review-anchor-commits-detail.png) | 搜索和提交子页向左展开，与 Commits 行对齐，整窗没有截断 |
 | base picker | [整窗](quick-review-anchor-base-picker.png)／[局部](quick-review-anchor-base-picker-detail.png) | 同一 overlay 切到共用 base picker，Automatic、分支、remote 控件完整；`status.errors=[]` |
 
-[原生布局证据](quick-review-anchor-layout.json)：行左1337.50、宽288、高35；菜单左1337.50、宽288、顶215.20。菜单和行左右对齐，间距4个逻辑像素（约4.4窗口像素），不再有旧 header 的40逻辑像素空档。
+原生布局读回（原始JSON未入库）：行左1337.50、宽288、高35；菜单左1337.50、宽288、顶215.20。菜单和行左右对齐，间距4个逻辑像素（约4.4窗口像素），不再有旧 header 的40逻辑像素空档。
 
 驱动只在 demo 副本：在真实 Details view context 回放原行 handler，行宽高来自原生 `on_size_change`，位置由父 popup 和分区布局推导；Commits 用真实 `scopeKey` Right，base 用原 `togglePopup`。没有把脚本回放说成真实鼠标点击。截图短暂聚焦 demo 后恢复原窗口；没有修改用户窗口的布局或项目。
 
@@ -29,7 +29,7 @@
 
 - 先加回归观察 RED：旧菜单顶263.6，而行锚定期望219.6。修复后检查菜单左右边、4px间隔、无第二个 scope trigger、base 为同一菜单的后代。
 - 共享检查保留 Review 默认320px菜单；Details 使用行宽264px fixture；加入菜单内28px header 后，Commits 子页相应下移28px。原 Review 范围／base／Commits／键盘检查仍通过。
-- [全仓门禁](quick-review-anchor-check.log)：`scripts/check.sh` 输出 `all checks passed`，包括所有行为检查、strict tsc、原生 mod 检查和共享副本一致性。`git diff --check` 通过。
+- 全仓门禁：`scripts/check.sh` 输出 `all checks passed`，包括所有行为检查、strict tsc、原生 mod 检查和共享副本一致性。`git diff --check` 通过。
 - 按 ponytail-review 自查共用 header/menu/submenu 的所有调用方及数据流，无待修发现；单用户本地窗口，无新增进程、轮询、缓存或依赖。
 - C 的列表精简已先独立提交 `363ef6fc`，确认 `mods/t3-pane` 无未提交改动后才正常运行 `scripts/sync.sh`。已安装 Actions／Review 原生检查通过，installed scope 与共享源一致，pane 与已提交版本一致；没有装入 C 的半成品。
 - 删除独立 scope header／触发器的渲染，不删除用户数据，不保留旧布局备用。双语 Recipe、README、changelog 和用户指南已同步。

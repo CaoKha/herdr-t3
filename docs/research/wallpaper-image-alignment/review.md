@@ -11,7 +11,7 @@ Both findings below are **resolved** in the reviewed working tree. This follow-u
 - Finding 1: `previewImage` replaces the original tile colours **before** inserting the theme-coloured group. The original black-theme case now produces exactly `stroke="#000000"`, with no duplicated prefix.
 - Finding 2: `renderDraft` uses one `base` for its scene and output path. Its finalizer retains that output while `d.scene.base === base`, even if another generation has superseded its job. Abandoned, unpublished output still gets removed, and a cancelled draft still clears its own root.
 - Independently replayed the report's original two in-memory scenarios against the fixed code, changing only the assertions to require the desired result. Both passed. The cleanup replay still starts the next mode while the previous job's old-folder removal waits, then injects a failure in that next mode: the published scene's folder remains intact (`publishedFolderDeleted: false`).
-- Read the added regression checks and existing evidence: `black-theme-red.log` fails on `#000000000`; `published-frame-red.log` fails on deletion of the displayed frame; `lifecycle-green.log` reports the complete lifecycle passing; `layout-green.log` reports 312 passing combinations. Did not rerun these gates.
+- Read the added regression checks and their logs (not kept in the repo): the black-theme check failed on `#000000000`; the published-frame check failed on deletion of the displayed frame; the lifecycle check reported the complete lifecycle passing; the layout check reported 312 passing combinations. Did not rerun these gates.
 - Fixed `main.js` SHA256: `fa0b9b4a4345832e70c38d392d2bf4ba21f178f2297aeaa0d70d0bc2783850e4`.
 
 ## Original findings — both resolved

@@ -6,10 +6,10 @@ const vm = require("node:vm");
 const crypto = require("node:crypto");
 
 const src = fs.readFileSync(path.join(__dirname, "ascii-art.js"), "utf8").replace(/^export (function\*?|const) /gm, "$1 ")
-  + "\nglobalThis.art = { convert, tintOf, legacyTintOf, imageGrid, decodeBmp, brailleAns, imageAns, imagePlan: typeof imagePlan === 'function' ? imagePlan : null, sampleImage: typeof sampleImage === 'function' ? sampleImage : null };";
+  + "\nglobalThis.art = { convert, picture, fromImage, tintOf, legacyTintOf, imageGrid, decodeBmp, imageAns, imagePlan: typeof imagePlan === 'function' ? imagePlan : null, sampleImage: typeof sampleImage === 'function' ? sampleImage : null };";
 const context = vm.createContext({});
 vm.runInContext(src, context);
-const { convert, tintOf, legacyTintOf, imageGrid, decodeBmp, brailleAns, imageAns, imagePlan, sampleImage } = context.art;
+const { convert, picture, fromImage, tintOf, legacyTintOf, imageGrid, decodeBmp, imageAns, imagePlan, sampleImage } = context.art;
 
 // All of a conversion: the tiles and what it returns.
 function run(text, aspect, paper) {
@@ -150,11 +150,11 @@ const pixelsOf = (rows) => finish(decodeBmp(bmp(rows)));
   assert.equal(run(text).aspect, 0.5, "new halftone images are half-width cells, including after reload");
   assert.equal(plain(text), " ·∙•⦁●\n", "website six-glyph dots ramp includes a blank level");
 }
-// Every mode starts from the same high-quality draft, rather than resampling another mode's output.
-assert.equal(typeof imagePlan, "function", "image import exposes the high-quality resize/crop plan");
+// Every mode starts from the same draft: the crop resized by the system to Braille's sample grid, the finest any mode takes.
+assert.equal(typeof imagePlan, "function", "image import exposes the resize/crop plan");
 {
   const plan = imagePlan(2756, 1654);
-  assert.deepEqual([plan.columns, plan.rows, plan.width, plan.height], [320, 96, 2560, 1536]);
+  assert.deepEqual([plan.columns, plan.rows, plan.width, plan.height], [320, 96, 640, 384], "the draft is the Braille sample grid");
   assert.deepEqual(JSON.parse(JSON.stringify(imageGrid(1000, 500, "dots"))), { columns: 384, rows: 96, width: 384, height: 96 });
   assert.deepEqual(JSON.parse(JSON.stringify(imageGrid(1000, 500, "quadrants"))), { columns: 384, rows: 96, width: 768, height: 192 });
   const source = pixelsOf([0, 1, 2, 3].map(() => [[255, 0, 0], [0, 0, 255]]));
@@ -292,3 +292,16 @@ console.log("ok: six legacy conversion hashes and all 263 builtin scene files ar
   }
 }
 console.log("ok: new images turn over on paper; older frames draw unchanged.");
+
+// One picture of every tile, each in its theme colour at its opacity, 4096px on the long edge; a new image says it is one.
+{
+  const { tiles, width, height } = run(`${E("38;2;255;255;255")}█${E("31")}▒\n`);
+  const svg = picture(tiles, (tint) => ({ ansi15: "#fffffe", ansi1: "#cd3131", foreground: "#000000" })[tint], width, height);
+  assert.match(svg, /^<svg [^>]*width="4096" height="4096" viewBox="0 0 1 1"/, "two half-width cells: a square");
+  assert.equal(count(svg, "<svg"), 1, "the tiles are one picture");
+  assert.match(svg, /stroke="#000000"[^>]*stroke-opacity="1"[^>]*fill-opacity="1"><path fill="#000000"/, "white truecolor: the ink colour, full");
+  assert.match(svg, /stroke="#cd3131"[^>]*stroke-opacity="0.75"[^>]*fill-opacity="0.75"><path fill="#cd3131"/, "ANSI red at its step");
+  assert.ok(!svg.includes("#000\""), "no tile keeps its placeholder ink");
+  assert.ok(fromImage(finish(imageAns(pixelsOf([[[9, 9, 9]]]), "dots"))) && !fromImage("⣿\n"), "an image's frame is known by its header");
+  console.log("ok: tiles become one theme-coloured picture.");
+}

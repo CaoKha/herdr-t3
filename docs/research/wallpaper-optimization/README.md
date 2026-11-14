@@ -21,7 +21,7 @@
 
 ## 方法
 
-- 导入链路与 mod 一致：`imagePlan` → `sips` 裁切缩放 → `decodeBmp` → `sampleImage` → `imageAns` → `convert`（`scripts/pipe.mjs`、`scripts/render.mjs`）。变体只改 3 处，见 `scripts/art-variant.patch`：`ROWS` 控制密度，`INVERT=1|2` 做浅色转换。
+- 导入链路与 mod 一致：`imagePlan` → `sips` 裁切缩放 → `decodeBmp` → `sampleImage` → `imageAns` → `convert`（`scripts/pipe.mjs`、`scripts/render.mjs`）。变体只改 3 处（patch 未入库）：`ROWS` 控制密度，`INVERT=1|2` 做浅色转换。
 - 合成：每个图块按主题色和透明度叠在主题背景上，用 `rsvg-convert` 出图。
 - 指标（`scripts/metrics.py`）：把渲染结果与原图（按同样方式裁切）都缩到 80 列网格，算 OKLab 明度的 Pearson 相关（“明暗是否同向”）；再算渲染明度 5%–95% 的跨度（“看得见多少层次”）。
 - 样本：4 张图（`~/Pictures/146943457_p0.png`、`120672551_p0.png`、`138149243_p0.png`、`个人壁纸.png`）× 4 种画法 × 6 个主题。
@@ -46,7 +46,7 @@
 | catppuccin-latte | 四种平均 | −0.89 ~ −0.93 | +0.92 ~ +0.96 |
 | maple-dark（参照） | 四种 | +0.91 ~ +0.97 / 0.20 ~ 0.74 | — |
 
-`INVERT=1`（只把透明度档位反成 `7 − step`）也能把相关拉正，但高饱和色（例如纯蓝底）的 HSV 明度高，反转后会太淡。`INVERT=2` 改按亮度的反值取透明度，效果更稳。见 `evidence/sheet-light.jpg`（现状）和 `evidence/sheet-inv2.jpg`（浅色转换）。
+`INVERT=1`（只把透明度档位反成 `7 − step`）也能把相关拉正，但高饱和色（例如纯蓝底）的 HSV 明度高，反转后会太淡。`INVERT=2` 改按亮度的反值取透明度，效果更稳。现状与浅色转换的对照图未入库。
 
 实现约束：
 
@@ -54,7 +54,7 @@
 - 用户的设置是 `theme: { light: maple-light, dark: maple-dark }`，跟随系统切换，所以两份都要事先转换好。
 - 浅色版本的命名不能是 `*.ans`，否则 `sourceFiles` 会把它当成另一张壁纸。存储规则先看 `docs/internals/storage.md`。
 - Studio 导入的 `.ans` 没有像素，只能退而求其次：遇到与背景太接近的颜色槽改用 `foreground`。这样能看见，但仍是底片。
-- 内置画是风格化画面，在浅色主题下读起来像“白天”（灯塔变雪景，星云变云层），可以接受。Ember 和 Mountain dusk 偏淡（`evidence/sheet-builtin.jpg`）。
+- 内置画是风格化画面，在浅色主题下读起来像“白天”（灯塔变雪景，星云变云层），可以接受。Ember 和 Mountain dusk 偏淡（对照图未入库）。
 
 ## 发现 2：切换和改高度时，一帧内同步栅格化全部图块
 
@@ -105,7 +105,7 @@ GPUI 源码（`herdr-app/vendor/gpui-pre`）：
 
 ## 发现 5：点阵密度
 
-`ROWS` 64/96/144/192，同一张 16:9 图（`evidence/sheet-density.jpg`）：
+`ROWS` 64/96/144/192，同一张 16:9 图（对照图未入库）：
 
 | 行数 | 列数 | Dots 图块 | Braille SVG 体积 | 转换耗时 |
 |---|---|---|---|---|
@@ -121,7 +121,7 @@ GPUI 源码（`herdr-app/vendor/gpui-pre`）：
 构造一张原始像素横放、EXIF 方向为 8 的 JPEG：
 
 - ImageMagick 能识别（`LeftBottom`，`-auto-orient` 后是 800×450）。
-- `sips -g all` 里没有方向信息，`-z` 输出是横躺的（`evidence/exif-sideways.jpg`）。
+- `sips -g all` 里没有方向信息，`-z` 输出是横躺的（截图未入库）。
 - `osascript -l JavaScript scripts/orient.js` 通过 ImageIO 读出 `8`，耗时约 50ms。
 
 修法：macOS 先读方向，再用 `sips -r`/`-f` 转正（方向 5–8 时宽高要对调后再算 `imagePlan`）；Linux 加 `-auto-orient`。
@@ -155,7 +155,7 @@ GPUI 源码（`herdr-app/vendor/gpui-pre`）：
 ```sh
 # 在仓库外的临时目录；metrics.py 按文件名到 ~/Pictures/<名>.png 找原图
 R=$PWD; mkdir -p /tmp/wp/out && cp docs/research/wallpaper-optimization/scripts/* /tmp/wp && cd /tmp/wp
-cp "$R/extras/mods/asciicn-wallpaper/ascii-art.js" art.js && patch art.js < art-variant.patch
+cp "$R/extras/mods/asciicn-wallpaper/ascii-art.js" art.js   # 原 art-variant.patch 未入库：照「方法」手加 ROWS 与 INVERT 变体
 bun pipe.mjs ~/Pictures/x.png dots out/x-dots.ans                 # ROWS=144 / INVERT=2 可选
 bun render.mjs out/x-dots.ans ~/.config/herdr-app/themes/maple-light.json out/r-x-dots-maple-light.svg > out/r-x-dots-maple-light.json   # INVERT 须与 pipe 一致；加 MERGE=1 测合并
 rsvg-convert -w 1600 out/r-x-dots-maple-light.svg -o out/r-x-dots-maple-light.png

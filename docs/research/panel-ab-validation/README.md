@@ -26,8 +26,8 @@
 ## 可运行检查
 
 - `sh scripts/sync.sh` 成功：共享源码和图标同步到各 mod、三个关联仓库和本机安装。
-- `sh scripts/check.sh` 输出 **all checks passed**，见 [check.log](check.log)。覆盖共享副本一致性、每 mod 宿主检查／TypeScript、图标字面量路径、render guard、行为测试与更新脚本。
-- 十个相关检查单独运行并通过，命令与输出见 [targeted-checks.log](targeted-checks.log)：面板模型、最后活动终端、文件菜单、Actions、Chrome、Files、标题栏／侧栏、Review、standalone Review。
+- `sh scripts/check.sh` 输出 **all checks passed**（日志未入库，下同）。覆盖共享副本一致性、每 mod 宿主检查／TypeScript、图标字面量路径、render guard、行为测试与更新脚本。
+- 十个相关检查单独运行并通过：面板模型、最后活动终端、文件菜单、Actions、Chrome、Files、标题栏／侧栏、Review、standalone Review。
 - Review 回归包含：pending read → 关闭 Review → 在生命周期 timer 前返回 → 旧 diff／范围不恢复 → 重加新实例默认范围。文件菜单回归包含图片剪贴板、后来新复制、并发 Insert 和控制字符。
 - `git diff --check` 及三个关联仓库的同项检查通过。最终双语 RECIPE 分别为 59,832／55,110 UTF-8 bytes，均低于 60,000；后续 C 提交仍需保持此门禁。
 
@@ -44,7 +44,7 @@
 | 添加入口 | 现有 xs ghost 24 方、icon14；与标签 gap4 同条滚动，菜单 start、offset6 |
 | 菜单／禁用 | 复用现有菜单行和 button 规则；无专属应用图标时本 mod 的 app-window，避免空白 |
 
-[token-audit.log](token-audit.log) 留有 grep 输出：检查范围内无 UI 十六进制色值或被替换的5%／80%自定义色；数值几何逐项可追溯。代码仍有对应 token 的 px 参数，**不是“零硬编码 px”**。Finder／VS Code 用彩色 image；Cursor／Zed／generic 图标也在 demo 菜单中实际见到。
+token 审计的 grep 输出未入库，结论：检查范围内无 UI 十六进制色值或被替换的5%／80%自定义色；数值几何逐项可追溯。代码仍有对应 token 的 px 参数，**不是“零硬编码 px”**。Finder／VS Code 用彩色 image；Cursor／Zed／generic 图标也在 demo 菜单中实际见到。
 
 ## 整窗证据
 
@@ -62,10 +62,10 @@
 | 窄窗暗／亮色 | [暗](panel-narrow-window.png) · [亮](panel-narrow-light-window.png) |
 | 亮色详情 | [整窗](details-light-window.png) |
 | 放大／详情恢复工作列 | [放大](panel-wide-window.png) · [详情恢复](details-restores-work-window.png) |
-| 没装 Review | [整窗](panel-without-review-window.png) · [状态](without-review-status.json) |
+| 没装 Review | [整窗](panel-without-review-window.png)（状态 JSON 未入库） |
 | 应用图标资产 | [整窗](editor-icons-window.png) |
 
-[demo-status.json](demo-status.json) 无运行错误。另创建第二 demo space 后，[source-invalidation-status.json](source-invalidation-status.json) 只剩预期 toast，没有详情 overlay、没有 errors，确认来源失效自动关闭；未改用户窗口的 space／tab／pane。
+demo 读回的状态无运行错误。另创建第二 demo space 后，读回的状态只剩预期 toast，没有详情 overlay、没有 errors，确认来源失效自动关闭（两份状态 JSON 未入库）；未改用户窗口的 space／tab／pane。
 
 ## 验证边界
 

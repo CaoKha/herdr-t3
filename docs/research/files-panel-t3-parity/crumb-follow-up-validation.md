@@ -6,7 +6,7 @@
 
 用户已明确要求目录面包屑不要hover底色。本补修移除文字段的hover填色，仅保留文字提亮；滚动行仍透明，原`stop()`键盘focus-visible内环不变。chevron菜单按钮的按钮态不在这次“文字段”修复范围。
 
-`check-files.cjs`先将“hover有7%底”改为“hover无底、文字foreground”，旧代码失败，见`regressions/crumb-hover-no-fill-red.log`；一行实现后通过。`shared/check-focus.cjs`同时验证键盘模式及焦点环，完整Files定向/原生/严格类型检查记录见`crumb-follow-up-gates.log`。
+`check-files.cjs`先将“hover有7%底”改为“hover无底、文字foreground”，旧代码失败；一行实现后通过。`shared/check-focus.cjs`同时验证键盘模式及焦点环，Files定向/原生/严格类型检查均通过（红绿与门禁日志未入库）。
 
 **真实Herdr hover未验证，未补hover态局部截图。** 没有向用户桌面注入鼠标，也不以假的hover样式图冒充原生悬停验收。原报告第12行对照和“有意差异”已删除“按card7%对齐”的结论；T3参考图/数值仍只描述原组件。
 

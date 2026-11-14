@@ -10,7 +10,7 @@
 
 ## 同fixture结果
 
-原始日志：`performance-before.jsonl`、`performance-after.jsonl`。`settledMs`含每25ms检查与至少三个稳定采样，因此小操作约有100ms探针底噪；它不是鼠标到光子的延迟。`renderMs`为本操作各次JS render总CPU时间，`layoutTailMs`为布局回调尾延迟，不是完整paint时间。
+原始日志未入库。`settledMs`含每25ms检查与至少三个稳定采样，因此小操作约有100ms探针底噪；它不是鼠标到光子的延迟。`renderMs`为本操作各次JS render总CPU时间，`layoutTailMs`为布局回调尾延迟，不是完整paint时间。
 
 | 场景 | 前稳定ms | 后稳定ms | 后状态 / 工作量 |
 | --- | ---: | ---: | --- |
@@ -22,6 +22,6 @@
 | 清搜索 | 112 | 111 | 28行 |
 | 切文件 | 136 | 124 | 64树行，文件头及原生Editor |
 
-最终UI合并后再回放保存在`performance-final.jsonl`：race113ms/0重开，冷展开1,225ms，滚动107/107/110ms且render每次总计2ms，折叠109ms，搜索254ms，清除114ms，切文件132ms。此时fixture多了两份源码候选probe文件，展开4,309行；不是隐藏样本差异。源码renderer的另一项大文件候选测试**失败**，不能与这些树性能混成“所有预览变快”；详见[源码报告](source-selection-and-gutter.md)。
+最终UI合并后再回放（原始日志未入库）：race113ms/0重开，冷展开1,225ms，滚动107/107/110ms且render每次总计2ms，折叠109ms，搜索254ms，清除114ms，切文件132ms。此时fixture多了两份源码候选probe文件，展开4,309行；不是隐藏样本差异。源码renderer的另一项大文件候选测试**失败**，不能与这些树性能混成“所有预览变快”；详见[源码报告](source-selection-and-gutter.md)。
 
 没有测真实滚轮/鼠标/触控拖动；滚动通过同一虚拟列表的scrollTop状态回放。没有占用用户剪贴板、修改用户文件或启动外部编辑器。
