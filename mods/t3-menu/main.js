@@ -11,7 +11,7 @@
 
 import { View } from "gpui-kit";
 import { v_flex } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, keys, terminals, agents, spaces, panes, exec, setShared, layout } from "herdr";
+import { run, props, openOverlay, theme, keys, terminals, agents, spaces, panes, exec, setShared, layout } from "herdr";
 import { menuKeys, propsLit } from "./list.js";
 import { menuRow, menuRule, menuHint } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";

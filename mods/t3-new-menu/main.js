@@ -7,6 +7,7 @@ import { step, scrollList } from "./list.js";
 import { keyOf, keyLabel } from "./tip.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
+import { keycap, footAction, paletteFooter } from "./palette.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
 const ROW = 48;
@@ -106,13 +107,8 @@ export default class NewMenu extends View {
 
   render() {
     const t = theme(), ps = panes(), items = this.items();
-    const key = (label) => div().flex().flex_none().min_w(20).h(20).px(4).items_center().justify_center().rounded(4).bg(t.foreground + "14").text_size(12).text_color(t.foreground).child(label);
-    const hint = (label, what) => h_flex().gap(4).items_center().children(label.split(" ").map(key)).child(what);
     // ⌘N doesn't ask: it only names what this button does when there's nothing to ask.
     const newKey = this.machineRows().length > 1 ? "" : keyOf("space.new");
-    // T3's CommandFooterAction: no fill of its own, its words brighten.
-    const footButton = (id, label) => h_flex().id(id).gap(4).px(8).rounded(8).items_center().flex_none().text_size(12).line_height("16px")
-      .role("button").accessibility_label(label).hover(s => s.text_color(t.foreground));
     return focusRoot(this, v_flex().id("new-menu").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
@@ -131,15 +127,11 @@ export default class NewMenu extends View {
         .when(items.length > 0, el => el.child(scrollList(this, "new-rows", { count: items.length, row: ROW, at: this.at, height: Math.min(items.length * ROW, LIST_MAX),
           draw: (i) => this.row(items[i], i, ps), wheeled: (keep) => { this.at = keep; } })))
         .when(items.length === 0, el => el.child(div().py(40).text_center().text_color(t.dim).child(this.picking ? "No matching machines." : "No matching spaces."))))
-      .child(h_flex().flex_none().px(16).py(10).gap(8).items_center().justify_between().rounded_b(15).border_t(1).border_color(t.foreground + "12").bg(t.foreground + "06").font_medium().text_color(t.muted)
-        .child(h_flex().gap(12).items_center()
-          .child(hint("↑ ↓", "Navigate"))
-          .child(hint("Enter", this.picking ? "New space" : "New tab"))
-          .child(hint("Esc", "Close")))
-        .when(this.picking, el => el.child(stop(this, t, "new-back", footButton("new-back", "Back to spaces").on_click((_e, cx) => this.showMachines(false, cx)).child("← Spaces"), 8)))
-        .when(!this.picking, el => el.child(stop(this, t, "space-new", footButton("space-new", "New space").on_click((_e, cx) => this.newSpace(cx))
+      .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", this.picking ? "New space" : "New tab"], ["Esc", "Close"]], this.picking
+        ? stop(this, t, "new-back", footAction(t, "new-back", "Back to spaces").on_click((_e, cx) => this.showMachines(false, cx)).child("← Spaces"), 8)
+        : stop(this, t, "space-new", footAction(t, "space-new", "New space").on_click((_e, cx) => this.newSpace(cx))
           .child(svg("mods/t3-new-menu/icons/folder-plus.svg").size(14).text_color(t.muted))
           .child("New space")
-          .when(Boolean(newKey), row => row.child(key(newKey))), 8)))));
+          .when(Boolean(newKey), row => row.child(keycap(t, newKey))), 8))));
   }
 }

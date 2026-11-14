@@ -4,19 +4,20 @@ import { theme, run, props, updates, layout, shared, setShared, spaces, window, 
 import { tip, glow } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
-import { noteTitlebar } from "./titlebar.js";
+import { notePanelWidth } from "./titlebar.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { initSettings, settingsView } from "./settings.js";
 import { KEY, closedKey } from "./store.js";
-import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo } from "./panel.js";
+import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo, layoutNode, REVIEW_STATUS } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { stripAt, stripEnds, stripWheel, stripPage, stripFades } from "./scroll-strip.js";
 import { button as drawButton, radiusOf, tint, GROUP_GAP } from "./button.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { statusMark } from "./status-mark.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
+import { keycap } from "./palette.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file: their names and icons. Review wears pulls.review's own mark,
 // as the Review bar does: a review, not a git command. In its colors, so an image.
@@ -24,11 +25,10 @@ const PAGES = { files: ["Files", "folder-tree"], review: ["Review", "pulls-revie
 // The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md「菜单行」).
 const MENU_W = 220, menuHeight = (rows) => rows * MENU_ROW + 8;
 const zoomOf = () => Number(settings()?.zoom) || 1;
-const nodeOf = (n, id) => n?.id === id ? n : (n?.children ?? []).reduce((hit, c) => hit ?? nodeOf(c, id), null);
 const side = (n) => [].concat(n?.padding ?? 0).at(-1);
 // The layout's room each side of the panel head's mod: the panel's and the head's padding put its ends 12 in, as the
 // surfaces' own rows below it (t3-tokens「规则」R1).
-const headPad = (root) => side(nodeOf(root, "panel")) + side(nodeOf(root, "panel-head"));
+const headPad = (root) => side(layoutNode(root, "panel")) + side(layoutNode(root, "panel-head"));
 // Stamped as `+`'s menu closes: a press on `+` that closed it mustn't reopen it (trigger.js).
 const SURFACE_CLOSED = closedKey("t3-chrome", "surface");
 
@@ -184,7 +184,7 @@ export default class WorkspaceChrome extends View {
     const z = zoomOf(), rows = panelState().pages.includes("review") ? 2 : 1;
     let at = hang(press, 0, { align: "start", gap: 6 }).at;
     if (!at && this.headW) {
-      const root = layout(), high = nodeOf(root, "panel-head")?.size?.px ?? 40;
+      const root = layout(), high = layoutNode(root, "panel-head")?.size?.px ?? 40;
       const left = globalThis.window.viewport_size().width - (headPad(root) + this.headW) * z;
       at = { x: left + ((this.addX ?? 0) - (this.surfaceStrip.at ?? 0)) * z, y: (high / 2 + 12 + 6) * z };
     }
@@ -198,7 +198,7 @@ export default class WorkspaceChrome extends View {
   panelHead(t) {
     const s = panelState(), space = spaces().find(p => p.active), z = zoomOf();
     // Review's run for this space, marked as a tab's agent is.
-    const word = space && shared("review.status")?.[space.id];
+    const word = space && shared(REVIEW_STATUS)?.[space.id];
     const mark = statusMark(t, word, 14);
     const own = (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation());
     const widths = this.surfaceWidths;
@@ -241,7 +241,7 @@ export default class WorkspaceChrome extends View {
     const ends = stripEnds(strip), over = (strip.over ?? 0) > 0;
     return focusRoot(this, h_flex().id("panel-head").size_full().bg(t.chrome).gap(8).items_center()
       // What the panel takes from the work column: the head, its padding and the root's divider.
-      .on_size_change((size, cx) => { const root = layout(); noteTitlebar("panel", size.width + (2 * headPad(root) + (root?.divider?.width ?? 0)) * z); if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
+      .on_size_change((size, cx) => { const root = layout(); notePanelWidth(size.width + (2 * headPad(root) + (root?.divider?.width ?? 0)) * z); if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
       .child(div().id("surface-scroll").relative().flex_1().min_w(0).h_full().overflow_hidden()
         .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (this.surfaceRoom !== w) { this.surfaceRoom = w; cx.notify(); } })
         .on_scroll_wheel((e, cx) => { stripWheel(strip, e); cx.notify(); })
@@ -275,11 +275,9 @@ export default class WorkspaceChrome extends View {
     const choose = (i, cx) => { const it = items[i]; if (!it || it.disabled) return; if (context && p.space !== spaces().find(sp => sp.active)?.id) return finish(); finish(); it.act(cx); };
     // menu-row.js's rows. The docked empty page's are T3's RightPanelEmptyState list, as Home's: 32 tall, 10 in and apart,
     // radius 8, the key in a keycap.
-    const keycap = (key) => div().min_w(20).h(20).px(4).flex().flex_none().items_center().justify_center().rounded(4).bg(t.foreground + "12")
-      .text_size(12).font_medium().text_color(t.foreground + "bf").child(key.toUpperCase());
     const list = v_flex().id("surface-list").w_full().max_w(empty ? 320 : MENU_W).p(4).gap(0).children(items.map((it, i) => menuRow(this, t, `surface-option-${i}`, {
       at: [this, "surfaceAt", i], label: it.label, icon: it.icon, disabled: it.disabled, hint: it.reason ?? "Not available",
-      trail: it.key ? (empty ? keycap(it.key) : menuHint(t, it.key.toUpperCase())) : null, pick: (cx) => choose(i, cx),
+      trail: it.key ? (empty ? keycap(t, it.key.toUpperCase()) : menuHint(t, it.key.toUpperCase())) : null, pick: (cx) => choose(i, cx),
       also: (el) => el.when(empty, (el) => el.h(32).px(10).gap(10).rounded(8)) })));
     return v_flex().id(empty ? "surface-empty" : "surface-menu").size_full().min_h(0).items_center()
       // Centred in the column, as T3's: 40 (the top bar) lifted off its bottom.

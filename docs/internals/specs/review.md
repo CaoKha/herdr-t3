@@ -5,7 +5,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 ## Toolbar
 
 - T3 `DiffPanel`'s head: 40 high, 12 horizontal (R1), no rule below (T3's subheaders in the panel). The scope button leading it has 2 left padding, as a Files crumb: its box at 12, its words at 14, where Files' first crumb's are.
-- Buttons are all `sm` (28) with 14px icons (T3's diff toolbar) and the `chrome` hover and on (`foreground` 4% / 7%): range, commit `‹ ›`, Analyze, fold menu, settings, navigation toggle. Icon buttons are 4 apart (P3), the commit `‹ ›` too; text buttons and icon groups are 8 apart. The comparison target (a combobox trigger) stays `xs`, as T3.
+- Buttons are all `sm` (28) with 14px icons (T3's diff toolbar) and the `chrome` hover and on (t3-tokens「按钮」): range, commit `‹ ›`, Analyze, fold menu, settings, navigation toggle. Icon buttons are 4 apart (P3), the commit `‹ ›` too; text buttons and icon groups are 8 apart. The comparison target (a combobox trigger) stays `xs`, as T3.
 - Popovers open 4 below their button (top 38), right-aligned to it. Page popovers write `review.<name>Closed` when an outside press closes them (see [storage](../storage.md)).
 - No repository, or another machine: the toolbar says `Review` and navigation is disabled. A range with no changes says `No changes`.
 
@@ -27,7 +27,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 - With two or more groups: one horizontal, scrolling, non-wrapping row under the toolbar, across diff and tree, on the toolbar's edge, with no rule below. Rule-based groups count as well as AI groups.
 - Row: 12 horizontal (the toolbar's edge), 8 vertical, 6 apart. Tabs radius 8, no outline, padding 8/2. Line 1: 14px category icon, 12px medium name, critical mark. Line 2 (11px): additions/deletions, file count, and a 14px progress ring once reviewed. Binary-only groups get no meaningless line-count separator.
-- Current group `foreground` 7%, others 4% on hover, as the panel's tabs.
+- Current group on the `chrome` on fill, others the hover fill, as the panel's tabs.
 - Clicking a group starts it at the top in diff and tree.
 - An AI group's summary heads the diff: 13px medium title over 12px `muted` text, at most 160 high, with no rule under it. Rule-based boilerplate is left out.
 

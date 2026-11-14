@@ -3,7 +3,7 @@
 // One copy serves every space, here or on another machine: what each one shows is kept by its id.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from "gpui-base";
-import { spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, notify, props } from "herdr";
+import { spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
 import * as fs from "fs/promises";
 import { panelState, surfacesFor, closeSurface, openFile, navigateFolder } from "./panel.js";
 import { terminalFor } from "./terminal-context.js";

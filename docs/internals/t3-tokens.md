@@ -59,7 +59,7 @@
 | Select | `ui/select.tsx` | 同尺寸的按钮；面板内边距 4，圆角 8；箭头 14 |
 | 按钮 | `ui/button.tsx` | 默认高 32；sm 高 28；xs 高 24，字号 12，图标 14 |
 | 图标按钮 | `ui/button.tsx` | 32、28、24（图标 14）、20（圆角 4，图标 12）、16（图标 12） |
-| 键帽 | `ui/kbd.tsx` | 高 20，最小宽 20，横向 4，字号 12，圆角 4 |
+| 键帽 | `ui/kbd.tsx` | 高 20，最小宽 20，横向 4，字号 12 medium，圆角 4；`foreground` 7% 底、75% 字；全布局一种，`shared/palette.js` `keycap` |
 | 徽章 | `ui/badge.tsx` | 见源码，圆角 4 |
 | 对话框 | `ui/dialog.tsx`、`dialog-styles.ts` | 最宽 512，圆角 16；头部内边距 24、间距 8；标题 20 半粗；正文 24；底部横向 24、纵向 16；默认有上边线，`bare` 变体没有（Actions 编辑器用它） |
 | 确认框 | `ui/alert-dialog.tsx` | 同对话框 |

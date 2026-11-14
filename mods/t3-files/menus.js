@@ -143,12 +143,11 @@ function items(view) {
   })];
 }
 
-// Row `i`'s submenu beside it. `lit`: keys opened it, so its first row is lit, as Base UI's.
+// Row `i`'s submenu beside it, Open with's editors (the one row with one). `lit`: keys opened it, so its first row is lit, as Base UI's.
 function openSub(view, i, lit) {
   const p = props(), it = items(view)[i];
-  const height = it.sub === "editors" ? 8 + p.editors.length * MENU_ROW : FOLDER_H;
-  openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: "t3-files", width: MENU_W, height,
-    props: { files: it.sub, source: p.source, path: p.path, editors: p.editors, dir: it.sub === "folder" ? it.id : null, file: p.file } }, null, lit);
+  openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: "t3-files", width: MENU_W, height: 8 + p.editors.length * MENU_ROW,
+    props: { files: it.sub, source: p.source, path: p.path, editors: p.editors } }, null, lit);
 }
 
 function choose(view, i, cx, lit = false) {

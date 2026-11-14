@@ -248,8 +248,8 @@ async function page() {
   assert.deepEqual(wrote.filter((k) => /reveal/.test(k)), [], "no cross-page request");
 }
 
-// The menus are popups of their own (menus.js): a folder's read as it opens; a folder in it opens its own beside it, as deep
-// as they go; a file picked asks the page to show it and closes every level; a row's menu offers what its row can do.
+// The menus are popups of their own (menus.js): a breadcrumb's folder read as it opens, a folder in it shown in place; a file
+// picked asks the page to show it and closes the menu; a row's menu offers what its row can do, Open with beside it.
 async function menus() {
   const { cx, w, settle, menu, ctx } = makePage();
   const source = { space: "s1", tab: "t1", root: "/r", on: null };

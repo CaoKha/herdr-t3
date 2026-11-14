@@ -14,7 +14,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 ## File header
 
 - Inline: 40 high, controls centred, as Review's toolbar, so Tree and its neighbours keep their place between the pages; 12 horizontal (R1, the panel head's edge), no bottom rule.
-- Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; hovered 4%, on 7% while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
+- Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; the `chrome` hover fill, on while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
 - On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, `sm` (28) buttons 4 apart with 14px icons (T3's file toolbar; the Open in icon too, its chevron 16). All take the `chrome` hover and on (`foreground` 4% / 7%, P7). Open in is 24 high, as T3's xs beside its 28 toolbar toggles.
 - Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Wrap; deliberate).
 - Clickable buttons and menu rows show the pointer cursor.
@@ -22,7 +22,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 ## Open in
 
 - `split()` `xs` (`surface: "chrome"`), T3's OpenInPicker in a header (`outline`): 24 high, radius 8, an `input` outline and a full-height `input` rule at rest, no fill; a 25 wide icon half (14px icon) and a 24 wide chevron half (16), 50 in all ([t3-tokens「按钮」](../t3-tokens.md)).
-- The half under the pointer takes the `chrome` hover (4%) alone; with its menu open the chevron's half is on (7%). Disabled (remote), the whole control, outline too, fades to 0.64, nothing shifting. The chevron has only an aria-label.
+- The half under the pointer takes the `chrome` hover fill alone; with its menu open the chevron's half is on. Disabled (remote), the whole control, outline too, fades to 0.64, nothing shifting. The chevron has only an aria-label.
 - Its menu is Details' (`shared/open-in.js` `targetsMenu`): 220 wide, 28px rows, right edge on the group's (`align="end"`), 4 below. No check mark: the main icon already says the target. App icons from `targetIcon`: coloured brand art, single-colour brand marks in `foreground`, others a `dim` generic window.
 - Choosing saves the target; the main half opens it.
 

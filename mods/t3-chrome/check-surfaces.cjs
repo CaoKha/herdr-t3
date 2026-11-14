@@ -21,13 +21,14 @@ const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_fl
   showPage: id => calls.push(['add', id]), closeSurface: (id, mode) => calls.push(['close', id, mode]), activateSurface: id => calls.push(['select', id]),
   hidePanel() {}, toggleWide() {}, updates: () => ({ app: {} }), openOverlay: p => calls.push(['overlay', p]), closeOverlay: () => calls.push(['dismiss']), run() {},
   reviewRepo: async () => ({ root: problem ? null : '/repo', problem }), workFolder: () => folder,
+  REVIEW_STATUS: 'review.status', layoutNode: (n, id) => n?.id === id ? n : (n?.children ?? []).reduce((hit, x) => hit ?? c.layoutNode(x, id), null),
   nextCommand: () => new Promise(r => commands.push(r)),
   stopsInit() {}, stopsEnd() {}, setShared() {}, pressed() {}, justClosed: () => false, DISABLED: 0.64,
   tip: (_v, _t, id, label, el) => { tips.push([id, label]); return el; }, stop: (_v, _t, _i, el) => el, focusRoot: (_v, el) => el, within: () => false,
   glow: () => () => {}, litOnHover: () => () => {},
 });
 const load = f => vm.runInContext(fs.readFileSync(__dirname + '/' + f, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), c);
-['list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js', 'status-mark.js', 'store.js', 'titlebar.js'].forEach(load);
+['list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js', 'status-mark.js', 'store.js', 'titlebar.js', 'palette.js'].forEach(load);
 vm.runInContext('(() => {\n' + ['button.js', 'trigger.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.tint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang;\n})();', c);
 load('menu-row.js');
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import [^;]*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);

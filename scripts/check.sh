@@ -28,8 +28,8 @@ done
 
 # The options live here, not in each mod's jsconfig.json: that file is gpui-shell's, gitignored and written fresh by
 # `herdr-app check` with defaults that fail these mods. These are the ones its notes explain, plus skipLibCheck, which a
-# jsconfig.json implies.
-ts="--noEmit --allowJs --checkJs --target ES2022 --module ES2022 --moduleResolution bundler --lib ES2022 --strict
+# jsconfig.json implies. --noUnusedLocals: an import or local nobody reads fails, so dead code doesn't pile up between rounds.
+ts="--noUnusedLocals --noEmit --allowJs --checkJs --target ES2022 --module ES2022 --moduleResolution bundler --lib ES2022 --strict
   --strictNullChecks false --noImplicitAny false --useUnknownInCatchVariables false --skipLibCheck"
 for d in mods/t3-*/ extras/mods/*/; do
   out=$(herdr-app check "$d" 2>&1) || { echo "FAIL herdr-app check $d"; echo "$out" | tail -20; fail=1; }

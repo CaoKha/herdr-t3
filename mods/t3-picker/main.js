@@ -14,6 +14,7 @@ import { programIcon } from "./program.js";
 import { step, scrollList } from "./list.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
+import { footAction, paletteFooter } from "./palette.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
 const ROW = 48;
@@ -95,8 +96,6 @@ export default class Picker extends View {
     // Opens on the first row: the pane you were in before, or another; never the one you're in, where Enter would go nowhere.
     if (this.at === null) this.at = 0;
     this.at = Math.min(this.at, Math.max(0, items.length - 1));
-    const key = (label) => div().flex().flex_none().min_w(20).h(20).px(4).items_center().justify_center().rounded(4).bg(t.foreground + "14").text_size(12).text_color(t.foreground).child(label);
-    const hint = (label, what) => h_flex().gap(4).items_center().children(label.split(" ").map(key)).child(what);
     return focusRoot(this, v_flex().id("picker").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
@@ -118,16 +117,9 @@ export default class Picker extends View {
         .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ROW, at: this.at, height: Math.min(items.length * ROW, LIST_MAX),
           draw: (i) => this.row(items[i], i, ps), wheeled: (keep) => { this.at = keep; } })))
         .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
-      .child(h_flex().flex_none().px(16).py(10).gap(8).items_center().justify_between().rounded_b(15).border_t(1).border_color(t.foreground + "12").bg(t.foreground + "06").font_medium().text_color(t.muted)
-        .child(h_flex().gap(12).items_center()
-          .child(hint("↑ ↓", "Navigate"))
-          .child(hint("Enter", "Go"))
-          .child(hint(window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"))
-          .child(hint("Esc", "Close")))
-        // New work goes through New, which picks the space (and for a new space, the machine).
-        // T3's CommandFooterAction: no fill of its own, its words brighten.
-        .child(stop(this, t, "picker-new", h_flex().id("picker-new").gap(4).px(8).rounded(8).items_center().flex_none().text_size(12).line_height("16px")
-          .role("button").accessibility_label("New tab").hover((s) => s.text_color(t.foreground))
+      // New work goes through New, which picks the space (and for a new space, the machine).
+      .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"], ["Esc", "Close"]],
+        stop(this, t, "picker-new", footAction(t, "picker-new", "New tab")
           .on_click(() => { closeOverlay(props().overlay); run("mod.open", { name: "t3-new-menu" }); })
           .child(svg("mods/t3-picker/icons/square-pen.svg").size(14).text_color(t.muted))
           .child("New tab"), 8))));

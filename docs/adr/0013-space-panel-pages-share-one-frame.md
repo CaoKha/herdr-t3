@@ -15,6 +15,8 @@ Files 和 Review 是同一个 space 面板的两页，但头部、导航列、�
 - **状态**：加载、空、错误用一套组件。
 - **字体**：面板里的界面文字跟随布局字体，等宽字体只给 diff 和代码，取自设置，不写死字体名。
 
+2026-11-15（19b6e9eb、b56b35ad）：「框架」一条的卡片取消。面板头和 `panel-body` 同为一整面 `chrome`，靠分隔线和工作区分开；内容区（Files 的文件、Review 的 diff）在 `background` 上，导航列和工具栏留在 `chrome`，照 T3 右侧面板。
+
 现行规格见 [space-panel](../internals/specs/space-panel.md)、[files](../internals/specs/files.md) 和 [review](../internals/specs/review.md)。
 
 ## Considered Options

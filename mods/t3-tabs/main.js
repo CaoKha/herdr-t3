@@ -10,7 +10,6 @@ import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
-import { noteTitlebar } from "./titlebar.js";
 import { litProp } from "./list.js";
 import { sidebarParts } from "./sidebar.js";
 import { navigation } from "./navigation.js";
@@ -19,7 +18,7 @@ import { KEY, closedKey, migrate } from "./store.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
-import { panelState, togglePanel, toggleWide, syncPanel, restorePanel, reviewRepo } from "./panel.js";
+import { panelState, togglePanel, toggleWide, syncPanel, restorePanel, reviewRepo, layoutNode } from "./panel.js";
 import { rememberTerminal } from "./terminal-context.js";
 import { stripAt, stripWheel, stripFades } from "./scroll-strip.js";
 import { button as drawButton, radiusOf, tint as ghostTint, GROUP_GAP } from "./button.js";
@@ -29,7 +28,6 @@ const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
 const ROW_PX = 40;
 // A Review bar with `toggle` in its props draws the panel's toggle as its last part, beside its counts: one control, not two.
-const findNode = (node, id) => node?.id === id ? node : (node?.children ?? []).reduce((found, c) => found ?? findNode(c, id), undefined);
 
 // What the hidden sidebar's toggle counts, as the selected sidebar shows it. In the Inbox an agent settled there isn't news
 // while it stays settled, and a snoozed one, until it wakes, isn't news either, working or done; while it or what's under it
@@ -295,8 +293,6 @@ export default class Tabs extends View {
   fit(size) {
     // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
     const z = Number(settings()?.zoom) || 1, id = props()?.block, px = Math.ceil(size.width / z - 0.5);
-    // What stands right of Details: this part and the layout's tabs-end-inset.
-    if (id === "window-end") noteTitlebar("end", size.width + (findNode(layout(), "tabs-end-inset")?.size?.px ?? 0) * z);
     if (!id || px === this.fitted) return;
     this.fitted = px;
     run("layout.resize", { id, px });
@@ -307,7 +303,7 @@ export default class Tabs extends View {
   // click, so it reads the row's size and corrects it whatever left it so (a quit at Home, another layout). Home's pane shows in
   // `home-main`, the same frame with no header: a blank header still took its 28px, a strip over Home's terminal.
   fitRow(w) {
-    const root = layout(), row = findNode(root, "tabs-row"), work = findNode(root, "work-main");
+    const root = layout(), row = layoutNode(root, "tabs-row"), work = layoutNode(root, "work-main");
     const child = this.navigation.atHome ? "home-main" : "main";
     if (work && work.active !== child) run("layout.select", { stack: "work-main", child });
     if (!row) return;

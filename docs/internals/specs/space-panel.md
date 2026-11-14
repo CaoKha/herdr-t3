@@ -12,10 +12,10 @@ The rightmost full-height column: initially hidden, initially equal in weight to
 
 - The head's ends sit 12 inside the column, by `panel-head`'s layout padding (t3-tokens R1): the first tab's box and the last button's box on the same edges as the page header below. The head's mod draws no inset of its own.
 - Tabs: 24 high, at most 144 wide, radius 6, padding 6 left and 8 right, children 2 apart, 12px text. A 16px slot on the left holds the 12px surface icon; on tab hover or keyboard focus it becomes a 12px `×` (radius 4, `tab` surface).
-- Active tab `foreground` 7%, hover 4%, as the tab bar's; text `foreground` / `muted`, as the tab strip's unselected tabs.
+- Active and hovered tabs take the `chrome` on and hover fills, as the tab bar's (t3-tokens「按钮」); text `foreground` / `muted`, as the tab strip's unselected tabs.
 - `+` follows the last tab, 4 apart, inside the same scrolled strip: `trigger()`, xs ghost (24 square, 14px icon).
 - Overflow: wheel scrolls; T3's `‹ ›` (xs, 4 apart, P3) sit after the strip, greyed at the ends (`DISABLED`). Both ends of the strip fade over 16px (`shared/scroll-strip.js`, shared with the tab bar). The active tab, and a last tab's `+`, scroll into view.
-- Then maximize/restore and panel-right (sm, 4 apart, 16px icons), 8 after the arrows; their `chrome` hover and on are the bar's (`foreground` 4% / 7%). Layout controls are rightmost. With the panel open, the window buttons move here too.
+- Then maximize/restore and panel-right (sm, 4 apart, 16px icons), 8 after the arrows; their `chrome` hover and on are the bar's. Layout controls are rightmost. With the panel open, the window buttons move here too.
 - Same names aren't told apart (T3); a clipped name's tooltip gives it whole.
 
 ## Surface menu

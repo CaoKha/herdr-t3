@@ -59,7 +59,7 @@ export const narrows = (query, last) => Boolean(last) && query.startsWith(last);
  * Every CHUNK candidates it awaits `pause()`: past about 100k paths in one go, Herdr interrupts the script.
  * `alive()` false stops it early (a newer query); it then returns null.
  */
-export const CHUNK = 5000;
+const CHUNK = 5000;
 export async function filterPaths(lower, words, from, pause, alive = () => true) {
   const out = [], n = from ? from.length : lower.length;
   for (let start = 0; start < n; start += CHUNK) {
@@ -91,7 +91,7 @@ export async function rankPaths(paths, words, limit = Infinity, pause = async ()
 
 // What a file is shown as.
 const IMAGES = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
-export const extOf = (name) => name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+const extOf = (name) => name.includes(".") ? name.split(".").pop().toLowerCase() : "";
 export const kindOf = (name) => IMAGES.has(extOf(name)) ? "image" : /^(md|markdown|mdx)$/.test(extOf(name)) ? "markdown" : "text";
 
 // The Editor's languages that color something (docs/internals/specs/files.md, Editor languages); the rest stay plain.
