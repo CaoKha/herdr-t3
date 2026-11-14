@@ -14,7 +14,9 @@ Herdr 在绘制中拒绝会再请求绘制的操作：`cx.notify()`、`cx.new()`
 
 隐藏 stack 子节点/列里的 mod 不绘制、不收 `<mod>.<command>`；启动后的 timer 继续，首次显示前则尚未启动。Inbox/Agents 的行计算独立于 `render()`，由每秒 timer 也调用，只有当前模式写 agent order。必须随时工作的命令/Snooze 维护在根浮动、视觉为空的 `t3-tabs {part:"keys"}`；不能依赖可被面板放大藏住的标签条。
 
-子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照：5,000 个终端时打开一次约 0.8ms，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。
+子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。`tree.js` 对每份 `terminals()` 列表只建一次索引（`WeakMap`，按父地址分组的存活终端、按地址的终端）：Herdr 每次调用都返回新列表，所以按列表对象做键不会过期；同一次绘制内把同一份列表传下去才能复用索引。逐层 `filter` 整份列表是 O(agent × 终端)，5,000 个终端时 Tabs/Agents/Inbox 的一次绘制在 QuickJS 里会 `interrupted`（[性能审查](../research/rewrite-review-2026-11-14/performance-audit.md)）。检查里的假 `terminals()` 也要每次返回新数组，原地改同一数组会读到旧索引。
+
+面板的 `surface-*` 副本在 render 里判断 Review 能否读取（`probeReview`，key 不变即返回），不开周期定时器：隐藏副本的 timer 不停，250ms 轮询会在窗口空闲时一直读宿主列表。
 
 `t3-tabs/main.js` 的 `nav()` 给 strip/keys 共用同一导航；strip 绘制前也 track，避免晚一帧。同一帧 track 两次必须幂等，`check-navigation.cjs` 按此回放。`shared/sidebar.js` 查 `sidebar`、`sidebar-lists`；缺 stack 不当作 Lists，独立发布 mod 未必有整个布局。
 
@@ -52,7 +54,7 @@ Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切�
 
 `rows.js` 从 `vendor/char-width.js` 取宽度表（`scripts/vendor.sh` 用 get-east-asian-width 和 Unicode mark/default-ignorable 生成）：宽/全角 2，组合/连接/变体及被连接字符 0，其余 1；断行避开组合和被连接字符。分别量代码字体的 `0` 与 `中`：后备 CJK 字体每字未必等于两倍拉丁宽，未量到前才用两列。行到达时在读取任务 `clipRows` 建累计列宽；宽度变化只算行数，ASCII 除法、非 ASCII 在累计宽上二分，实际切分仅给可见行，不在每次绘制重算整份 diff。
 
-组计数 `tabStats` 在读入/已看变化时算，不因 Herdr 任意重绘反复遍历。读入时一次规范化文件自然顺序，diff、行请求、j/k 同序。子组路径用 `group:<key>/src` 隔离同名目录，不能把子组合并成 lone folder。吸顶文件头需先垫 `background`，半透明 selected 不应透代码；unchecked 颜色先展开短 hex，再缩原 alpha，边框保原色。
+组计数 `tabStats` 在读入/已看变化时算，不因 Herdr 任意重绘反复遍历。树的文件夹行勾选状态用 `files.js` 的 `underFolders`：建树后按组一次建好「文件夹 → 其下文件」，随 `treeOf` 失效；每行过滤整组是行数 × 文件数，悬停显示缩进线也会触发。Files 搜索的 `rankPaths` 只保留前 200 条、每 5,000 条让出一次，和 `filterPaths` 一样：一次排完 11 万条以上的命中会被中断。读入时一次规范化文件自然顺序，diff、行请求、j/k 同序。子组路径用 `group:<key>/src` 隔离同名目录，不能把子组合并成 lone folder。吸顶文件头需先垫 `background`，半透明 selected 不应透代码；unchecked 颜色先展开短 hex，再缩原 alpha，边框保原色。
 
 ## 壁纸转换而非用户生命周期
 

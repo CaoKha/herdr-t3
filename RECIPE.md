@@ -68,7 +68,7 @@ Breadcrumb takes full width up to the row; right-aligned tools yield to zero, en
 
 When Herdr's native zoom is active in a multi-pane tab, replace the tab with a 24px dashed-outline group, radius 6, one icon/name segment per pane; zoomed segment `selected`, max 240px, other segments max 144px. In Lists the group's state remains at its end; it has no group close, tab menu or drag. In Inbox the agent is still the breadcrumb and only non-agent panes form tool segments. Restore splits with the pane's zoom button or `cmd-shift-enter`, not a second bar button.
 
-After tabs, one touching group (t3-tokens P3/R1): Details(square-menu), Lists' terminal +, panel-right. Work owns Details; panel/window controls move to the open panel head. Small chrome buttons, tooltip below. Native end-aligned popup under it, content-sized, capped (t3-tokens). Locked computer name, folder tooltip, row Copy full path; no hover/chevron/migration. Open in: Finder+installed T3 editors (Cursor/Trae/Kiro, VSCode/Insiders/VSCodium, Zed/Antigravity, JetBrains); always menu; selection saves global target, main opens, missing→Finder, remote disabled with reason. Global Actions: empty Add, else primary+menu; Edit only hover/focus. Splits use shared split() (t3-tokens); chevrons/folder share the end slot; menus row-wide; arrows aria-label only. No card shadow: the native popup clips it square. Add action tooltip is icon-only; action/computer names only when actually clipped. Editing keeps parent; running closes menu. Capture source before focus; explicit cwd wins, source change closes. Tab/Enter/Space buttons, arrows menus. Card right-click four visibility toggles/Reset; all hidden leaves Choose what to show. Panel open closes Details; outside click keeps panel; maximized shortcut restores work. No terminal resize; Home has no Actions.
+After tabs, one touching group (t3-tokens P3/R1): Lists' terminal +, Details(square-menu), then the closed panel's panel-right in the corner; window buttons (Windows/Linux) last, 8 on. Work owns Details; panel/window controls move to the open panel head. Small chrome buttons, tooltip below. Native end-aligned popup under it, content-sized, capped (t3-tokens). Locked computer name, folder tooltip, row Copy full path; no hover/chevron/migration. Open in: Finder+installed T3 editors (Cursor/Trae/Kiro, VSCode/Insiders/VSCodium, Zed/Antigravity, JetBrains); always menu; selection saves global target, main opens, missing→Finder, remote disabled with reason. Global Actions: empty Add, else primary+menu; Edit only hover/focus. Splits use shared split() (t3-tokens); chevrons/folder share the end slot; menus row-wide; arrows aria-label only. No card shadow: the native popup clips it square. Add action tooltip is icon-only; action/computer names only when actually clipped. Editing keeps parent; running closes menu. Capture source before focus; explicit cwd wins, source change closes. Tab/Enter/Space buttons, arrows menus. Card right-click four visibility toggles/Reset; all hidden leaves Choose what to show. Panel open closes Details; outside click keeps panel; maximized shortcut restores work. No terminal resize; Home has no Actions.
 
 Quick Review is a split row; its end shows, dim, the range a live Review tab shows. Main shows Review (that range, else its default). Chevron: a range menu under the row (row-wide, offset 4) with Review's ranges, no base or `‹ ›`; Commits opens beside it in its own popup. Only the shown range is checked. Choosing shows Review on that range. Counts read afresh per opening; stale reads can't apply; no Git writes or PR rows. Missing Review or remote disables it with a reason; outside Git, the menu says so.
 
@@ -86,7 +86,7 @@ Empty: centered Open a surface, Files F, installed Review R. Review reads the re
 
 ×/middle close. Active close picks right else left; others keep active; last hides, reopen empty. Tab menu: Copy path (file/folder), Close, Close others, Close to the right, Close all; impossible greyed; bulk in one step. Hide/switch keep; close lets go: each mod drops what a gone tab instance held; Review re-added starts at default range, ignoring asks for the closed one. Per space three recent file tabs keep preview/Editor/position; older reload at top. Deleted/renamed file keeps its tab, path/root, Locate/Retry. Terminal path clicks: not done, no host callback.
 
-Both surfaces: `background` card, content left/tree right. Review keeps its toolbar and shared states; generic Files is its tree; errors stay in place with path/root.
+Both surfaces: `background` card, content left/tree right; every row's ends sit 12 inside its column (t3-tokens R1). Review keeps its toolbar and shared states; generic Files is its tree; errors stay in place with path/root.
 
 Independent navigation open/width and Wrap/Scroll: start256, min160/max560, content min256, left6px drag handle; Files keyboard ←/→16/Home/End. No breakpoint; reflow after300ms stable width; no cross-page reveal.
 
@@ -299,8 +299,10 @@ root: row, terminal_menu=t3-menu
 ├─ work: column, chrome
 │  ├─ tabs-row: row [40], nonresizable
 │  │  ├─ tabs: t3-tabs [weight1]
+│  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [self-sized]
 │  │  ├─ actions: t3-actions {block:"actions"} [self-sized]
-│  │  └─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [self-sized]
+│  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [self-sized]
+│  │  └─ tabs-end-inset: row [12]
 │  ├─ work-body: row, padding[0,8], gap8
 │  │  └─ work-main: stack, active=main
 │  │     ├─ main: active tab, pane header=t3-pane [28, always, top]

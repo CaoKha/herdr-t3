@@ -104,7 +104,8 @@ function fixture(width) {
     stores.set(name, storage);
     const localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
     const source = bundle(path.join(modRoot, name));
-    const context = vm.createContext({ ...env, t3FocusRun: true, localStorage, props: () => props, fs: fs.promises, appHome: () => path.dirname(modRoot) });
+    // The mod gets a new list each call, as Herdr gives (tree.js indexes each list once); the test keeps editing `terminals`.
+    const context = vm.createContext({ ...env, terminals: () => [...terminals], t3FocusRun: true, localStorage, props: () => props, fs: fs.promises, appHome: () => path.dirname(modRoot) });
     vm.runInContext(source, context, { filename: name });
     scopes.set(name, context);
     const mod = new context.Mod();
@@ -1548,24 +1549,28 @@ for (const width of [208, 240, 256, 320, 480]) {
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 31 }, cx);
   assert.deepEqual(f.calls.splice(0), [["layout.resize", { id: "tabs-end", px: 28 }]], "a zoomed width rounds to its own px");
   f.scopes.get("t3-tabs").settings = wasSettings;
+  // What the end draws before Details, and after it the closed panel's toggle then the window's buttons: the tips over its buttons.
+  const win = f.load("t3-tabs", { part: "window", block: "window-end" });
   f.scopes.get("t3-tabs").window = () => ({ platform: "windows", buttons: true });
-  // What the end draws, in order: the tips over its buttons.
-  const endKeys = () => { const keys = []; const walk = (n) => { if (!n || typeof n !== "object") return; if (n.key?.startsWith?.("tip-") && !n.key.startsWith("tip-over-")) keys.push(n.key); (n.items ?? []).forEach(walk); }; walk(find(end.render(cx), "tabs-end")); return keys; };
-  assert.deepEqual(endKeys(), ["tip-tab-new", "tip-minimize", "tip-maximize", "tip-close-window"], "the window's buttons stay last");
+  const keysOf = (view, id) => { const keys = []; const walk = (n) => { if (!n || typeof n !== "object") return; if (n.key?.startsWith?.("tip-") && !n.key.startsWith("tip-over-")) keys.push(n.key); (n.items ?? []).forEach(walk); }; walk(find(view.render(cx), id)); return keys; };
+  const endKeys = () => keysOf(end, "tabs-end");
+  assert.deepEqual(endKeys(), ["tip-tab-new"]);
+  assert.deepEqual(keysOf(win, "window-end"), ["tip-minimize", "tip-maximize", "tip-close-window"], "the window's buttons stay last, after Details");
   // The layout owns the only toggle, even with the Review extension installed (ADR 0017).
   f.slots.panel = { id: "panel", hidden: true, children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] };
-  assert.deepEqual(endKeys(), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
+  const toggleLast = ["tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"];
+  assert.deepEqual([endKeys(), keysOf(win, "window-end")], [["tip-tab-new"], toggleLast]);
   f.slots.review = { id: "review-bar", content: { mod: "pulls-review", props: { block: "review-bar", toggle: true } } };
-  assert.deepEqual(endKeys(), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
+  assert.deepEqual([endKeys(), keysOf(win, "window-end")], [["tip-tab-new"], toggleLast]);
   f.scopes.get("t3-tabs").window = () => ({ platform: "macos", buttons: false });
   f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
-  assert.deepEqual(endKeys(), ["tip-panel-toggle"], "closed panel keeps one toggle with Inbox");
+  assert.deepEqual([endKeys(), keysOf(win, "window-end")], [[], ["tip-panel-toggle"]], "closed panel keeps one toggle with Inbox; a Mac's window has its own buttons");
   delete f.slots.review;
   delete f.slots["sidebar-lists"]; f.scopes.get("t3-tabs").window = () => ({ platform: "windows", buttons: true });
   delete f.slots.panel; delete f.slots.review;
-  fire(find(end.render(cx), "close-window"), "on_hover", true, cx);
-  assert.equal(find(end.render(cx), "close-window").style.text_color, f.theme().foreground, "the window's close lights as the others do: it's no tab's ×");
-  fire(find(end.render(cx), "close-window"), "on_hover", false, cx);
+  fire(find(win.render(cx), "close-window"), "on_hover", true, cx);
+  assert.equal(find(win.render(cx), "close-window").style.text_color, f.theme().foreground, "the window's close lights as the others do: it's no tab's ×");
+  fire(find(win.render(cx), "close-window"), "on_hover", false, cx);
   // The strip under the work column says whether the bar's controls fold, at 1024.
   const measure = f.load("t3-tabs", { part: "measure" });
   fire(find(measure.render(cx), "bar-measure"), "on_size_change", { width: 1023 }, cx);

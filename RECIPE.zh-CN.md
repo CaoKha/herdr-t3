@@ -68,7 +68,7 @@ Inbox 左边改成面包屑：space／适用时的父级／当前查看的 agent
 
 多 pane 标签进入 Herdr 原生 zoom 后，标签变为高 24、圆角 6、虚线框的分段组：每 pane 一段图标名字，被 zoom 的为 `selected`、最宽 240，其余最宽 144。Lists 在组末尾保留状态，组没有关闭、标签菜单或拖动。Inbox 的 agent 仍在面包屑，工具段只含非 agent pane。用 pane 缩放按钮或 `cmd-shift-enter` 恢复分屏，标签栏不重复放按钮。
 
-标签后Details（square-menu）、Lists的新终端+、panel-right相接成一组（t3-tokens P3／R1）。详情／panel-right用chrome面小按钮、下方快捷键提示；详情属工作列，面板／平台按钮转到展开面板头。点击／cmd-shift-b打开下挂右对齐原生popup，随内容自然高、有上限；尺寸见t3-tokens「详情 popup」。Workspace：locked电脑名（本机ComputerName／远程机器），folder只提示路径，整行右键Copy full path；无hover／chevron／假终端迁移。Open in列Finder和已装T3编辑器（Cursor／Trae／Kiro、VSCode／Insiders／VSCodium、Zed／Antigravity、JetBrains）；菜单始终有入口，只选择全局偏好，主按钮才执行，卸载回退Finder；远程禁用并说明。全局Actions仍全局：空时Add action，有时主动作图标／名字＋菜单，hover／键盘选中才显示Edit。split用共享split()（见t3-tokens）；箭头和folder同在行尾槽；菜单跟整行同宽，箭头仅aria-label。卡片无阴影：原生popup会把它裁成方角。Add action仅图标态提示；动作／电脑／surface名仅实测截断时提示。编辑器打开保留详情，运行只收菜单，来源失效收详情；Tab／Enter／Space走按钮，方向键只走菜单。卡片右键可切四个可用项显隐／Reset，全隐藏保留Choose what to show。打开前捕获space／tab／终端／cwd，动作显式cwd优先。开面板收详情，外点保留面板，放大时快捷键先恢复工作列；不改终端几何，Home无Actions。
+标签后Lists的新终端+、Details（square-menu）、面板关时的panel-right相接成一组（t3-tokens P3／R1），panel-right在角上；平台窗口按钮（Windows／Linux）间隔8在最后。详情／panel-right用chrome面小按钮、下方快捷键提示；详情属工作列，面板／平台按钮转到展开面板头。点击／cmd-shift-b打开下挂右对齐原生popup，随内容自然高、有上限；尺寸见t3-tokens「详情 popup」。Workspace：locked电脑名（本机ComputerName／远程机器），folder只提示路径，整行右键Copy full path；无hover／chevron／假终端迁移。Open in列Finder和已装T3编辑器（Cursor／Trae／Kiro、VSCode／Insiders／VSCodium、Zed／Antigravity、JetBrains）；菜单始终有入口，只选择全局偏好，主按钮才执行，卸载回退Finder；远程禁用并说明。全局Actions仍全局：空时Add action，有时主动作图标／名字＋菜单，hover／键盘选中才显示Edit。split用共享split()（见t3-tokens）；箭头和folder同在行尾槽；菜单跟整行同宽，箭头仅aria-label。卡片无阴影：原生popup会把它裁成方角。Add action仅图标态提示；动作／电脑／surface名仅实测截断时提示。编辑器打开保留详情，运行只收菜单，来源失效收详情；Tab／Enter／Space走按钮，方向键只走菜单。卡片右键可切四个可用项显隐／Reset，全隐藏保留Choose what to show。打开前捕获space／tab／终端／cwd，动作显式cwd优先。开面板收详情，外点保留面板，放大时快捷键先恢复工作列；不改终端几何，Home无Actions。
 
 Quick Review是split行，行尾弱色写现存Review标签正显示的范围（与Review范围按钮同字，提交显示标题）。主半边显示Review（该范围，没有则其默认）；箭头在行下打开范围菜单（与整行同宽、下偏移4），列Review的范围，不含base和`‹ ›`；Commits在旁边另开一个popup。只给Review正显示的范围打勾。选中就显示Review并请求该范围。每次打开重读计数，迟到结果作废；无Git写操作／PR行。未安装Review或远程时禁用并说明原因；不在Git仓库时由菜单说明。
 
@@ -86,7 +86,7 @@ Quick Review是split行，行尾弱色写现存Review标签正显示的范围（
 
 ×／中键关标签。关当前选右邻无则左邻，关其他不换，最后收起重开空。标签菜单：Copy path（文件／目录）、Close、Close others、Close to the right、Close all，不可用置灰，批量一步完成。隐藏／切换保留，关闭释放：各mod按标签实例释放自己的状态；Review重加从默认范围开始，不接旧标签的请求。每space只留最近显示三个文件标签的预览／Editor／位置，更早回顶重读。删除／改名保留标签并显示路径／根、定位和Retry。终端路径点击未完成：宿主无回调。
 
-两类surface共用`background`卡片，内容左、树右。Review保留工具栏和共用状态；通用Files就是树；错误留在各自区域并保留路径／根。
+两类surface共用`background`卡片，内容左、树右；每行首末都在所在列内12（t3-tokens R1）。Review保留工具栏和共用状态；通用Files就是树；错误留在各自区域并保留路径／根。
 
 Files读space的`folder`／机器，不跟终端cwd。文件头、树头尺寸见t3-tokens「Files」。面包屑横滚／截断，无独立底条；目录hover仅文字提亮、不填底色。目录从原文件旁打开，继续导航原位替换目录标签、保留trail；›以原生popup弹出该目录内容菜单（目录：folder图标＋›，文件：类型图标），目录在旁边再开子菜单、层数不限，右侧放不下放左侧，两侧都放不下时压住上一级一部分，悬停（子菜单时序）／点击／→／Enter打开，←／Esc只关一层，选文件打开并全关；不同于T3的原地Back to，是我们的选择。Open in与详情共用目标和菜单，菜单只记偏好、主按钮执行。split静止无底，hover／菜单开时整组一块底并显示中线；菜单右对齐、不画勾；菜单行显式pointer。Preview／Code、Wrap、Tree固定槽，不适用置灰不消失。Markdown预览、语法Editor、图片仍只读；保留原生选择／复制，内容按下不夺焦点。宿主无gutter底色／高度API，已知不能完全匹配T3，用户选择保留原生Editor。
 
@@ -297,8 +297,10 @@ root: row, terminal_menu=t3-menu
 ├─ work: column, chrome
 │  ├─ tabs-row: row [40], 不可拖
 │  │  ├─ tabs: t3-tabs [weight1]
+│  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [自定宽]
 │  │  ├─ actions: t3-actions {block:"actions"} [自定宽]
-│  │  └─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [自定宽]
+│  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [自定宽]
+│  │  └─ tabs-end-inset: row [12]
 │  ├─ work-body: row, padding[0,8], gap8
 │  │  └─ work-main: stack, active=main
 │  │     ├─ main: active tab, pane header=t3-pane [28,always,top]

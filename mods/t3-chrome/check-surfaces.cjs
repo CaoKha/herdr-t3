@@ -32,6 +32,7 @@ vm.runInContext('(() => {\n' + ['button.js', 'trigger.js'].map(f => fs.readFileS
 load('menu-row.js');
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import [^;]*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
 const t = { foreground: '#ffffff', muted: '#888888', dim: '#777777', selected: '#333333', chrome: '#111111', hover: '#222222', popover: '#000000', border: '#444444', raised: '#555555' };
+c.theme = () => t;
 const cx = { notify() {}, stop_propagation() {}, spawn: f => f(cx), timer: { every() {}, after() {} }, focus_handle: () => ({ focus() {} }) };
 const flush = () => new Promise(r => setTimeout(r, 0));
 const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v; };
@@ -46,10 +47,17 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   assert.ok(tips.some(([, label]) => label === problem), 'a greyed Review says why');
   key('down'); key('enter'); assert.deepEqual(calls.pop(), ['add', 'files']);
   // Its tab's terminal moves into a repository: Review is offered, read where that terminal works, though the space folder isn't one.
-  problem = ''; folder = '/repo/sub'; view.probeReview(cx); await flush();
+  // Asked as it draws (Herdr draws again when a terminal's folder or focus moves), never on a clock: a 250 ms poll per copy ran
+  // while the window sat idle (performance-audit.md).
+  problem = ''; folder = '/repo/sub'; view.render(cx); await flush();
   key('r'); assert.deepEqual(calls.pop(), ['add', 'review']);
   s.pages = ['files', 'panel-empty']; assert.equal(find(view.surfaceView(t), 'surface-option-1'), undefined, 'uninstalled Review is absent');
   s.pages = ['files', 'review', 'panel-empty'];
+  for (const part of ['surface-empty', 'surface-menu']) {
+    props = { part }; const clocks = [];
+    new c.Mod().init({}, { ...cx, timer: { every: (ms) => clocks.push(ms), after() {} } });
+    assert.deepEqual(clocks, [], `${part} keeps no clock`);
+  }
   // The docked empty page doesn't take the keyboard from the terminal; a popup menu does.
   for (const [part, takes] of [['surface-empty', false], ['surface-menu', true]]) {
     props = { part }; let took = false; const v = new c.Mod();

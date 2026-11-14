@@ -546,9 +546,16 @@ async function surfaceCache() {
   assert.equal(list(), true);
 
   // Results in order: a file name holding every term first, then the shorter path, then as text.
-  assert.deepEqual(plain(m.rankPaths(["docs/indexing/x.md", "src/a/index.ts", "a/index.js", "index.md", "b/index.js"], m.terms("index"))),
+  assert.deepEqual(plain(await m.rankPaths(["docs/indexing/x.md", "src/a/index.ts", "a/index.js", "index.md", "b/index.js"], m.terms("index"))),
     ["index.md", "a/index.js", "b/index.js", "src/a/index.ts", "docs/indexing/x.md"]);
-  assert.deepEqual(plain(m.rankPaths(["shared/file-menu.js", "docs/file/menu.md"], m.terms("file menu"))), ["shared/file-menu.js", "docs/file/menu.md"], "every term in the name");
+  assert.deepEqual(plain(await m.rankPaths(["shared/file-menu.js", "docs/file/menu.md"], m.terms("file menu"))), ["shared/file-menu.js", "docs/file/menu.md"], "every term in the name");
+  // Only the shown ones are kept in order, and a search matching most of a big repo pauses as the filter does: sorting
+  // 110k matches in one go ran past Herdr's script limit (performance-audit.md).
+  pauses = 0;
+  const ranked = await m.rankPaths(paths, m.terms("src"), 200, pause);
+  assert.equal(pauses, 2, "12000 matches: two pauses");
+  const sorted = [...paths].sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0)).slice(0, 200);
+  assert.deepEqual(plain(ranked), sorted, "the first 200, in the order a full sort gives");
 
   // The shell scripts, run: listing, ignored, the remote probe and search, in a repo with awkward names.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3-files-check-"));

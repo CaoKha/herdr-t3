@@ -299,7 +299,7 @@ export default class Tabs extends View {
   fit(size) {
     // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
     const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1) - 0.5);
-    if (id === "tabs-end") { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.end = size.width; }
+    if (id === "window-end") { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.end = size.width; }
     if (!id || px === this.fitted) return;
     this.fitted = px;
     run("layout.resize", { id, px });
@@ -354,15 +354,17 @@ export default class Tabs extends View {
       drawButton(t, id, { icon, label, size: "sm", surface: "chrome", hot: this.hot === id, on: id === "panel-toggle" && panelState().open })
         .on_hover(glow(this, id)).on_mouse_down("left", stopPress).on_click(action)
         .when(Boolean(glyph), el => el.child(glyph)), radiusOf("sm")), { action: key, below: true });
-    // The work header's end, after Details (t3-actions' block): terminal +, then the panel's toggle while no panel head owns it,
-    // all one group touching Details; the window's buttons a group 8 on. The layout's tabs-end-inset puts the end 12 from the
-    // column's, over the pane header's last control (docs/internals/t3-tokens.md「规则」P3, R1).
+    // The work header's end: Lists' terminal + before Details (t3-actions' block), so it never moves Details; after Details the
+    // `window` part: the panel's toggle while no panel head owns it, in the window's corner, then the window's buttons 8 on. All
+    // touch Details; the layout's tabs-end-inset puts the end 12 from the column's (docs/internals/t3-tokens.md「规则」P3, R1).
     const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = panelState().pages.length > 0 && !panelState().open;
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
       .child(h_flex().id("tabs-end").flex_none().items_center().on_size_change((size) => this.fit(size))
         // With the Inbox, the breadcrumb's space is the way to a new tab.
         // 28 as the panel toggle beside it: one size in a group (「规则」R2).
-        .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => newTab(spaces().find(s => s.active)), "t3-tabs.new")))
+        .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => newTab(spaces().find(s => s.active)), "t3-tabs.new")))));
+    if (props()?.part === "window") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
+      .child(h_flex().id("window-end").flex_none().items_center().on_size_change((size) => this.fit(size))
         // The space panel's toggle, over where it opens: the sidebar's panel-left, mirrored. Lit while open.
         .when(toggleShown, el => el.child(button("panel-toggle", "mods/t3-tabs/icons/panel-right.svg",
           "Show panel", () => togglePanel(), "t3-tabs.panel")))

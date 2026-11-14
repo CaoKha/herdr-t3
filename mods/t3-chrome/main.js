@@ -41,8 +41,8 @@ export default class WorkspaceChrome extends View {
       this.surfaceKeys = cx.focus_handle(); this.surfaceAt = -1; this.reviewReason = "";
       // A popup takes the keyboard; the panel's docked empty page doesn't take it from the terminal.
       if (props()?.part !== "surface-empty") this.surfaceKeys.focus();
-      // Only where Review is offered: whether it can read where the tab works (panel.js reviewRepo), again as that moves.
-      if (props()?.part !== "surface-context") { this.probeReview(cx); cx.timer.every(250, (cx) => this.probeReview(cx)); }
+      // Only where Review is offered: whether it can read where the tab works (panel.js reviewRepo), again as that moves (render).
+      if (props()?.part !== "surface-context") this.probeReview(cx);
     }
     // The panel's cmd-t (keys.json mod:t3-files and mod:review): + 's menu, under +. Only the head's copy listens.
     if (props()?.part === "panel") cx.spawn(async () => { for (;;) if (await nextCommand() === "surface-menu") this.openSurfaceMenu(null); });
@@ -81,9 +81,11 @@ export default class WorkspaceChrome extends View {
     });
   }
 
-  render() {
+  render(cx) {
     if (props()?.view === "settings") return settingsView(this);
     const t = theme();
+    // Herdr draws again when a terminal's folder or the focus moves: that's when where the tab works can change.
+    if (props()?.part?.startsWith("surface-") && props().part !== "surface-context") this.probeReview(cx);
     if (props()?.part?.startsWith("surface-")) return this.surfaceView(t);
     if (props()?.part === "panel") return this.panelHead(t);
     if (props()?.footer) {

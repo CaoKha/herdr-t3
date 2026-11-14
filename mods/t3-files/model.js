@@ -72,11 +72,21 @@ export async function filterPaths(lower, words, from, pause, alive = () => true)
   return out;
 }
 
-/** Matches in the order shown: a path whose file name holds every term first, then the shorter path, then as text. `words`
- *  are terms(); one key per path, so a search matching most of a big repo still sorts in one go. */
-export function rankPaths(paths, words) {
-  return paths.map((p) => { const name = p.slice(p.lastIndexOf("/") + 1).toLowerCase(); return { p, k: (words.every((w) => name.includes(w)) ? 0 : 1e7) + p.length }; })
-    .sort((a, b) => a.k - b.k || (a.p < b.p ? -1 : a.p > b.p ? 1 : 0)).map((x) => x.p);
+/** The first `limit` matches in the order shown: a path whose file name holds every term first, then the shorter path, then
+ *  as text. `words` are terms(). Only those shown are kept in order, and it awaits `pause()` every CHUNK paths as filterPaths
+ *  does: sorting a search that matches most of a big repo in one go runs past Herdr's script limit. */
+export async function rankPaths(paths, words, limit = Infinity, pause = async () => {}) {
+  const before = (a, b) => a.k - b.k || (a.p < b.p ? -1 : a.p > b.p ? 1 : 0), top = [];
+  for (let i = 0; i < paths.length; i++) {
+    if (i && i % CHUNK === 0) await pause();
+    const p = paths[i], name = p.slice(p.lastIndexOf("/") + 1).toLowerCase(), x = { p, k: (words.every((w) => name.includes(w)) ? 0 : 1e7) + p.length };
+    if (top.length >= limit && before(x, top[top.length - 1]) >= 0) continue;
+    let lo = 0, hi = top.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (before(top[mid], x) <= 0) lo = mid + 1; else hi = mid; }
+    top.splice(lo, 0, x);
+    if (top.length > limit) top.pop();
+  }
+  return top.map((x) => x.p);
 }
 
 // What a file is shown as.

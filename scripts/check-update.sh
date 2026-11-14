@@ -44,7 +44,7 @@ is .theme "$app/layouts/herdr-t3.json" win98
 is '[.. | objects | .focus? | objects | .color][0]' "$app/layouts/herdr-t3.json" accent
 is '[.. | objects | select(.id? == "my-review")] | length' "$app/layouts/herdr-t3.json" 1
 # Right before the bar's end, drawing the panel's toggle with its counts: one control.
-is '[.. | objects | select(.id? == "tabs-row") | .children[].id] | join(",")' "$app/layouts/herdr-t3.json" tabs,actions,my-review,tabs-end,tabs-end-inset
+is '[.. | objects | select(.id? == "tabs-row") | .children[].id] | join(",")' "$app/layouts/herdr-t3.json" tabs,my-review,tabs-end,actions,window-end,tabs-end-inset
 is '[.. | objects | select(.id? == "my-review") | .content.props.toggle][0]' "$app/layouts/herdr-t3.json" true
 is .global.a "$app/keys.json" b
 is '.["layout:herdr-t3"]["cmd-p"]' "$app/keys.json" mod.open:t3-picker

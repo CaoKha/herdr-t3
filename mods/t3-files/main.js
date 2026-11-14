@@ -446,7 +446,9 @@ export default class Files extends View {
         st.last = { query, idx };
         found = idx.map((i) => st.paths[i]);
       }
-      done({ results: rankPaths(found, words).slice(0, RESULTS).map(path => ({ path })), total: found.length, more });
+      const ranked = await rankPaths(found, words, RESULTS, () => cx.sleep(0));
+      if (!fresh()) return;
+      done({ results: ranked.map(path => ({ path })), total: found.length, more });
     });
   }
 
@@ -595,7 +597,8 @@ export default class Files extends View {
               .child(this.control(t, "t3-files-retry-file", "refresh-cw", "Try reading the file again", cx => { st.view = { loading: true }; cx.notify(); this.open(st, st.file, cx, true); }))
               .child(this.control(t, "t3-files-locate", "folder-tree", "Locate the file in Files", cx => { this.navOpen = true; this.reveal(st, st.file, cx, true); })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
-          : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(24).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
+          // 12 in, the page's edge (t3-tokens「规则」R1), not T3's px-6.
+          : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
           // Laid out at the width its room last held (nav-column.js holdWidth), cut off or short of it while the room moves.
           : v.code ? this.codeView(v.code)
           : div());

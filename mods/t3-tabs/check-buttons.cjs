@@ -53,16 +53,37 @@ function load(dir) {
 const click = (root, id) => { const el = find(root, id); assert.ok(el, id); el.handlers.on_click({}, cx); return el; };
 const tabs = load(__dirname);
 let root = tabs.render();
-click(root, "tab-new"); click(root, "panel-toggle");
+click(root, "tab-new");
+part = { part: "window" };
+root = tabs.render();
+click(root, "panel-toggle");
 for (const id of ["minimize", "maximize", "close-window"]) {
   const el = click(root, id);
   assert.equal(el.style.h, 28); assert.equal(el.style.w, 28); assert.equal(el.items[0].style.size, 16);
 }
 assert.deepEqual(calls.splice(0), [["new", "s"], ["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
 panelOpen = true;
-assert.equal(find(tabs.render(), "panel-toggle"), undefined, "open panel owns its rightmost toggle");
 assert.equal(find(tabs.render(), "close-window"), undefined, "platform buttons move to the panel head");
+assert.equal(find(tabs.render(), "panel-toggle"), undefined, "open panel owns its rightmost toggle");
 panelOpen = false;
+
+// On a Mac only the closed panel's toggle, then the layout's 12, follow Details: Lists' + never pushes it (「规则」R1).
+{
+  const row = JSON.parse(fs.readFileSync(path.join(__dirname, "../../layouts/herdr-t3.json"), "utf8"));
+  const walk = n => n?.id === "tabs-row" ? n : (n?.children ?? []).map(walk).find(Boolean);
+  const blocks = walk(row).children, at = blocks.findIndex(b => b.id === "actions");
+  const drawn = ["tab-new", "panel-toggle", "minimize", "maximize", "close-window"];
+  const wasWindow = env.window, wasParts = env.sidebarParts;
+  for (const mode of ["lists", "inbox"]) for (const open of [false, true]) {
+    env.window = () => ({ platform: "macos", buttons: false }); env.sidebarParts = () => ({ stack: { active: mode } }); panelOpen = open;
+    const view = load(__dirname), ids = list => list.flatMap(b => b.content ? (part = b.content.props, drawn.filter(id => find(view.render(), id))) : []);
+    const before = ids(blocks.slice(0, at)), after = ids(blocks.slice(at + 1)), state = `${mode}, panel ${open ? "open" : "closed"}`;
+    assert.deepEqual(after, open ? [] : ["panel-toggle"], `only the closed panel's toggle follows Details (${state})`);
+    assert.equal(after.length * 28 + blocks.slice(at + 1).reduce((sum, b) => sum + (b.content ? 0 : b.size.px), 0), open ? 12 : 40, state);
+    assert.deepEqual(before, mode === "lists" ? ["tab-new"] : [], `Lists' + comes before Details (${state})`);
+  }
+  env.window = wasWindow; env.sidebarParts = wasParts; panelOpen = false; part = { part: "window" };
+}
 platform = "linux";
 root = tabs.render();
 assert.equal(find(root, "minimize").items[0], "−"); assert.equal(find(root, "maximize").items[0], "□");
