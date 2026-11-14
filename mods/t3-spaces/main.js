@@ -243,7 +243,7 @@ export default class Spaces extends View {
         || spaces().some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
     };
     const loadingRow = m => plain(`machine-loading-${m ?? "local"}`, m, ghost => div().when(!ghost, el => el.id(`machine-loading-${m ?? "local"}`))
-      .h(ROW).flex_none().px(10).flex().items_center().text_color(t.dim).child("Loading…"));
+      .h(ROW).flex_none().px(8).flex().items_center().text_color(t.dim).child("Loading…"));
     if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : rows.map(entry);
     const machineNames = [null, ...remote];
     return machineNames.flatMap((m) => {
@@ -293,7 +293,7 @@ export default class Spaces extends View {
             .text_color(this.overMachine === `machine-${id}` ? t.foreground : t.dim)
             .child(foldArrow("t3-spaces", `machine-fold-${id}`, !folded, 12, this.overMachine === `machine-${id}` ? t.foreground : t.dim))));
       const empty = plain(`machine-new-${id}`, m, ghost => {
-        const el = h_flex().h(ROW).flex_none().px(10).gap(10).items_center().rounded(8)
+        const el = h_flex().h(ROW).flex_none().px(8).gap(10).items_center().rounded(8)
           .text_color(this.hot === `machine-new-${id}` ? t.foreground : t.dim)
           // Laid out as a space's row: the + in the mark's 16px, the words where a name starts.
           .child(div().size(16).flex_none().flex().items_center().justify_center().child(svg("mods/t3-spaces/icons/plus.svg").size(12))).child("New space here");
@@ -361,7 +361,7 @@ export default class Spaces extends View {
   // so a click opens it, and it becomes the checkout's own row. A bare repo has nothing to open: there the click folds.
   repoHead(r, t, ps, ghost) {
     const { w, g, hiding = 0 } = r, rowId = w.id, foldId = `${rowId}-fold`;
-    const el = h_flex().h(ROW).flex_none().px(10).gap(10).items_center().rounded(8)
+    const el = h_flex().h(ROW).flex_none().px(8).gap(10).items_center().rounded(8)
       .child(div().flex_none().opacity(0.5).child(projectMark(w, 16, t, ps)))
       .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.dim).child(w.name))
       .child(this.foldButton(t, foldId, g.repo, hiding, ghost));
@@ -381,15 +381,15 @@ export default class Spaces extends View {
     const rowId = `space-${w.id}`;
     const el = v_flex()
       .relative()
-      .px(10)
+      .px(8)
       .h(ROW)
       .flex_none()
       .justify_center()
       .rounded(8)
       .when(on, (el) => el.bg(t.selected))
       // The same tree lines as sub-agents: from the checkout's avatar center, turning into the branch icon.
-      .when(tree === "├─", el => el.child(div().absolute().left(17.25).top(0).bottom(-STACK).w(1.5).bg(t.input)))
-      .when(Boolean(tree), el => el.child(div().absolute().left(17.25).top(-4).h(20).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input)))
+      .when(tree === "├─", el => el.child(div().absolute().left(15.25).top(0).bottom(-STACK).w(1.5).bg(t.input)))
+      .when(Boolean(tree), el => el.child(div().absolute().left(15.25).top(-4).h(20).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input)))
       .child(
         h_flex()
           .w_full().min_w(0)

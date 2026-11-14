@@ -4,6 +4,16 @@
 
 ## 2026-11-14
 
+- Agents 列表超过 50 行时只画视口里的行，用滚轮或触控板滚动：200 个 agent 时一次重画约 400 个元素，原来约 13,000 个。这时 Tab 只能走到屏幕上的行。
+
+- 布局里有 Review 栏时，关掉面板里的 Review 标签后，栏上不再点亮那个标签显示过的 diff 的计数，和 Quick Review 一致。
+
+- 窗口刚打开就按 `cmd-shift-b`，详情挂在它的按钮下面，不再偏右 28px。
+
+- 设置页下拉框的选项、Review 的 base 列表和 Commits 列表（Review 页和 Quick Review 的）在指针离开行后熄灭，和其余菜单一致；以前会一直亮着。
+
+- Lists 的 Spaces 和 Agents 行左右内距从 10 改为 8，与 Inbox 卡片一致；子 agent 行以及 worktree、子 agent 的树线随之左移 2。
+
 - 所有菜单里 Space 和 Enter 一样选中亮起的行：agents 排序、面板的 `+`、右键菜单、Actions 菜单和壁纸的添加菜单以前只认 Enter。
 
 - 终端很多时布局照常绘制。以前每个子 agent 计数都要把全部终端再读一遍，每个 agent 一次：终端上千时，标签栏、Agents、Inbox、Go to 和子 agent 列表每次重画都变慢，到 5,000 个左右 Herdr 就画不出它们。Files 在超大仓库里用很短、命中大部分文件的词搜索，不再中途停掉。大型 review 的文件树画文件夹行不再拖慢，空闲时面板也不再每秒四次检查 Review。

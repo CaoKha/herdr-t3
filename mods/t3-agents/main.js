@@ -3,7 +3,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, nextCommand } from "herdr";
+import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, settings, openOverlay, closeOverlay, props, nextCommand } from "herdr";
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { stopsInit, stopsEnd, focusRoot, enter } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
@@ -20,6 +20,8 @@ const SORTS = [
 const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[0];
 
 const SORT_WIDTH = 200;
+// Past this many rows the list is windowed (render); before its first measure it draws this tall, and two rows past each end.
+const WINDOW_AT = 50, FIRST_H = 800, OVERDRAW = 74;
 
 export default class Agents extends View {
   async close() {
@@ -238,7 +240,15 @@ export default class Agents extends View {
       if (this.details === gone) this.details = null;
       if (this.detailsOut === gone) this.detailsOut = null;
     }
-    const rows = entries.map((e) => flying(this, e.key, e.el));
+    // A long list draws only the rows in view, scrolled by the wheel (windowed): a frame that built every row of 200 agents
+    // made some 13,000 elements. shortcut: windowed, Tab reaches only the rows drawn; switch to a host virtual list when its rows can hold handlers.
+    const windowed = entries.length > WINDOW_AT;
+    const z = Number(settings()?.zoom) || 1, at = /** @type {any} */ (this).motion.at, total = entries.reduce((sum, e) => sum + e.h, 0);
+    const seen = this.listH ?? FIRST_H, top = this.listTop = windowed ? Math.max(0, Math.min(this.listTop ?? 0, total - seen)) : 0;
+    const rows = windowed
+      ? entries.filter((e) => at.get(e.key).y + e.h > top - OVERDRAW && at.get(e.key).y < top + seen + OVERDRAW)
+        .map((e) => div().absolute().left(0).right(0).top(at.get(e.key).y - top).child(flying(this, e.key, e.el())))
+      : entries.map((e) => flying(this, e.key, e.el()));
 
     return focusRoot(this, v_flex()
       .id("t3-agents-root")
@@ -266,8 +276,17 @@ export default class Agents extends View {
       .when(list.length === 0, (el) =>
         el.child(div().px(16).py(24).text_center().text_size(12).line_height("16px").text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
-      .child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8).overflow_y_scroll()
+      .when(!windowed, (el) => el.child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8).overflow_y_scroll()
         // The rows in one box that scrolls, so the leaving ones placed in it scroll with them.
-        .child(v_flex().id("ag-content").relative().w_full().flex_none().gap(STACK).children(leavingRows(this)).children(rows))));
+        .child(v_flex().id("ag-content").relative().w_full().flex_none().gap(STACK).children(leavingRows(this)).children(rows))))
+      .when(windowed, (el) => el.child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8)
+        .child(div().id("ag-window").relative().size_full().overflow_hidden()
+          .on_size_change((size, cx) => { const h = size.height / z; if (h !== this.listH) { this.listH = h; cx.notify(); } })
+          .on_scroll_wheel((e, cx) => {
+            cx.stop_propagation();
+            const next = Math.max(0, Math.min(top - e.delta.y / z, total - seen));
+            if (next !== top) { this.listTop = next; cx.notify(); }
+          })
+          .children(leavingRows(this, top)).children(rows)))));
   }
 }

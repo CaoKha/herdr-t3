@@ -45,8 +45,8 @@ function agentSubRow(view, t, s, shown, card, ghost) {
   const over = !ghost && (view.hovered === rowId || within(view, [rowId]));
   const base = h_flex()
     .relative()
-    .pl(30 + s.depth * 20)
-    .pr(10)
+    .pl(28 + s.depth * 20)
+    .pr(8)
     .rounded(6)
     .h(ROW)
     .flex_none()
@@ -54,10 +54,10 @@ function agentSubRow(view, t, s, shown, card, ghost) {
     .gap(10)
     .text_size(14)
     .when(on, (el) => el.bg(t.selected))
-    // Upstream's 9px turn, hung from each ancestor's icon center (18px, then every 20px), ending 4px short of this icon.
+    // Upstream's 9px turn, hung from each ancestor's icon center (16px, then every 20px), ending 4px short of this icon.
     .children(s.lines.flatMap((l, j) => [
-      l === "│" || l === "├" ? div().absolute().left(17.25 + 20 * j).top(0).bottom(-STACK).w(1.5).bg(t.input) : null,
-      l === "├" || l === "└" ? div().absolute().left(17.25 + 20 * j).top(-4).h(22).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input) : null,
+      l === "│" || l === "├" ? div().absolute().left(15.25 + 20 * j).top(0).bottom(-STACK).w(1.5).bg(t.input) : null,
+      l === "├" || l === "└" ? div().absolute().left(15.25 + 20 * j).top(-4).h(22).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input) : null,
     ].filter(Boolean)))
     .child(h_flex().size(16).flex_none().items_center().justify_center()
       .when(Boolean(pic), el => el.child(pic)))
@@ -99,9 +99,9 @@ export function agentStatus(view, t, a, note = "", id) {
 export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPriority, own, shownStatus, groups }) {
   const withKids = (a) => {
     const subs = kidTree(all, a.address);
-    const r = { key: a.address, h: ROW + STACK, el: row(a, subs), ghost: () => row(a, subs, true) };
+    const r = { key: a.address, h: ROW + STACK, el: () => row(a, subs), ghost: () => row(a, subs, true) };
     // A sub-agent with no pane of its own isn't in agents(): it's placed by the agent it hangs from, and has no branch to name, as its folder may be another worktree.
-    const sub = (s) => ({ key: `sub-${s.k.address}`, h: ROW + STACK, el: agentSubRow(view, t, s, shown, (name, key) => details(list.find((x) => x.address === s.k.address) ?? { ...s.k, space: a.space, space_name: a.space_name }, name, key)), ghost: () => agentSubRow(view, t, s, shown, null, true) });
+    const sub = (s) => ({ key: `sub-${s.k.address}`, h: ROW + STACK, el: () => agentSubRow(view, t, s, shown, (name, key) => details(list.find((x) => x.address === s.k.address) ?? { ...s.k, space: a.space, space_name: a.space_name }, name, key)), ghost: () => agentSubRow(view, t, s, shown, null, true) });
     if (!view.isFolded(a.address)) return [r, ...subs.map(sub)];
     // Folded, a sub-agent that needs the person still shows, hung straight from its parent.
     const stuck = subs.filter((s) => ["blocked", "error"].includes(kidStatus(s.k, view.listed)));
@@ -190,7 +190,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
     const base = h_flex()
       .relative()
       .w_full().min_w(0)
-      .px(10)
+      .px(8)
       .h(ROW)
       .flex_none()
       .rounded(6)
@@ -272,7 +272,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
     const dot = top && top !== "idle";
     const space = spaces().find((s) => s.id === g.space) ?? { name: g.label };
     const base = h_flex()
-      .px(10)
+      .px(8)
       .h(HEAD)
       .flex_none()
       .gap(10)
@@ -296,7 +296,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
   const entries = groups.flatMap((g, i) => {
     const open = !view.isFolded(g.id, g.id === "sec-1");
     const head = (ghost) => g.space ? div().flex_none().when(i > 0, (el) => el.pt(HEAD_GAP)).child(folder(g, open, ghost)) : shelf(g, open, ghost);
-    return [{ key: `m:${g.id}`, h: HEAD + STACK + (g.space && i ? HEAD_GAP : 0), el: head(false), ghost: () => head(true) },
+    return [{ key: `m:${g.id}`, h: HEAD + STACK + (g.space && i ? HEAD_GAP : 0), el: () => head(false), ghost: () => head(true) },
       ...(open ? g.members : g.members.filter(viewing)).flatMap(withKids)];
   });
 

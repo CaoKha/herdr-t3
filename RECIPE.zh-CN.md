@@ -48,9 +48,9 @@ Settled、Snoozed 是 36px 窄行，圆角 6、行间隔 1：16px space 标记�
 
 ### Lists
 
-Lists 分成 Spaces 和 Agents。两者标题高 32，与 Inbox 顶行对齐；按钮 28、图标 16。Spaces 列表在标题下 4 开始，行高 32、行间隔 1、内边距 10、间隔 10，16px space 标记加中粗名字。多于一台机器时按机器分组；空机器有 `New space here`。只显示不寻常 git 信息（`repo · branch ↑2 ↓1`，省略 `main`／`master`），worktree 带树线挂在仓库下。
+Lists 分成 Spaces 和 Agents。两者标题高 32，与 Inbox 顶行对齐；按钮 28、图标 16。Spaces 列表在标题下 4 开始，行高 32、行间隔 1、内边距 8、间隔 10，16px space 标记加中粗名字。多于一台机器时按机器分组；空机器有 `New space here`。只显示不寻常 git 信息（`repo · branch ↑2 ↓1`，省略 `main`／`master`），worktree 带树线挂在仓库下。
 
-Agents 行高 36、圆角 6、行间隔 1、内边距 10、间隔 10，16px 程序槽。正在看和需要人的醒目，其余悬停前淡显，working 70%。状态前显示持续时间（`<1m`、`5m`、`3h`、`2d`，12px），悬停 150ms 交叉换成 pin。行内不放机器标记，机器在同 Inbox 的详情卡里。
+Agents 行高 36、圆角 6、行间隔 1、内边距 8、间隔 10，16px 程序槽。正在看和需要人的醒目，其余悬停前淡显，working 70%。状态前显示持续时间（`<1m`、`5m`、`3h`、`2d`，12px），悬停 150ms 交叉换成 pin。行内不放机器标记，机器在同 Inbox 的详情卡里。
 
 可按 space 或优先级排序，两种都有共用的 Pinned。优先级标题用收纳区的 32px 样式；space 标题用项目文件夹样式，上留 8、16px 标记、中粗名字，可右键 space 菜单。折叠时显示隐藏数量和紧急状态，仍露出正在看的行。父级折叠箭头在时间前，默认折叠，带淡色隐藏数量；blocked／error 子 agent 仍缩进一级显示。自己有 pane 的子 agent 只在父级下显示一次，置顶除外。子 agent 也有详情卡，space 取父级，自己有 pane 时才显示分支。
 

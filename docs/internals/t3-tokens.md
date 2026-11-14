@@ -29,7 +29,7 @@
 
 - **R1 末端对齐**：每条顶栏最右的按钮，框的右缘对齐正下方那一行最右的控件。侧栏是两行都离侧栏边 8；工作列对齐窗格头末端（离窗口边 12）；面板列对齐页头（面板内 12）。左侧同理：面板头首个标签的框和页头的面包屑框都在面板内 12。面板页内每一行都按这条边：首末控件的框（静止无底的 ghost 也按框算，与未选中标签一样）或无框的文字，在所在列内 12（导航列从左边线内侧算）。Review：顶栏、组页签行、diff 文件头、hunk 行、文件注释、行注释卡、组说明、导航列头和树行；Files：文件头、树头、树行、Markdown 预览。右对齐的代码行号栏（Review 的 diff 与 Files 的宿主 `Editor`）是一列 gutter，不算。
 - **R2 列内同尺寸**：上下对齐的两行用同一尺寸的按钮，同一组也一样。
-- **R3 内容右缘**：侧栏卡片和 slim 行的横向内边距 8，状态文字和程序图标的右缘落在按钮图标的右缘上，左缘与 Search 图标、底栏齿轮同线。
+- **R3 内容右缘**：侧栏卡片、slim 行和 Lists 的 Spaces／Agents 行（含子 agent 行和树线）横向内边距 8，状态文字和程序图标的右缘落在按钮图标的右缘上，左缘与 Search 图标、底栏齿轮同线。
 
 ## 圆角
 
@@ -133,8 +133,8 @@ asciicn 壁纸的控件（`extras/mods/asciicn-wallpaper/main.js`）。切换器
 
 - 只在指针停在行上或键盘选中时用 `selected` 底；指针离开就熄灭，宿主晚到的 leave 不熄灭指针已进入的下一行（`shared/list.js` 的 `litOnHover`）。子菜单开着时（`open`）父行保持点亮。
 - 禁用：整行透明度 0.64（`DISABLED`），不点亮、不响应点击；`hint` 用 `tip()` 说明原因，不用宿主 `.tooltip()`。
-- 行尾提示用 `menuHint`，分隔线用 `menuRule`。键盘移动、滚动和子菜单仍由各菜单用 `list.js` 的 `menuJump`／`scrollList` 和 `submenu.js` 自己接。
-- 子 agent 列表也用 `menuRow`：每级缩进 16 用 `lead` 放 `16 × 层级 − 8` 的占位（加上行的 gap 8），状态用 `trail`。Review 的 base 和 commit 列表是 combobox，高亮留给 Enter，不用这条规则。
+- 行尾提示用 `menuHint`，分隔线用 `menuRule`。按键用 `list.js` 的 `menuKeys`，滚动用 `scrollList`，子菜单用 `popup-menu.js`／`submenu.js`，由各菜单自己接。`label` 不是文字（元素）时，调用方自己设 `accessibility_label`；role 不是按钮的（设置页 Select 的选项 `list_box_option`、base 的 `radio_button`）在调用方覆盖。
+- 子 agent 列表也用 `menuRow`：每级缩进 16 用 `lead` 放 `16 × 层级 − 8` 的占位（加上行的 gap 8），状态用 `trail`。Review 的 base 和 Commits 列表、设置页 Select 的选项也用 `menuRow`：指针离开即熄灭，和其余菜单一致（2026-11-14 用户决定）。
 
 ## 程序标志
 

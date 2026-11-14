@@ -147,11 +147,11 @@ for (const width of [208, 240, 256, 320, 480]) {
   let at = ag.render(cx);
   assert.ok(find(at, "fold-t0") && !find(at, "sub-grandchild"), "sub-agents start folded");
   // The child is in error: folded, it still shows, one step in, hung from the parent.
-  assert.equal(find(at, "sub-child").style.pl, 30, "a stuck sub-agent shows under its folded parent");
+  assert.equal(find(at, "sub-child").style.pl, 28, "a stuck sub-agent shows under its folded parent");
   if (width === 208) assert.equal(find(at, "sub-status-child").style.accessibility_label, "Failed", "a failed one says so, with the menu's `!`");
   f.terminals().find(k => k.address === "grandchild").status = "blocked";
   const stuck = ag.render(cx);
-  assert.deepEqual([find(stuck, "sub-child").style.pl, find(stuck, "sub-grandchild").style.pl], [30, 30], "every stuck one hangs straight from the parent");
+  assert.deepEqual([find(stuck, "sub-child").style.pl, find(stuck, "sub-grandchild").style.pl], [28, 28], "every stuck one hangs straight from the parent");
   f.terminals().find(k => k.address === "grandchild").status = "working";
   ag.toggleFold("t0", cx);
   Object.assign(ag.folded, { gone: false, "vps/gone": false, "far/t1": false, "sp-gone": true });
@@ -170,7 +170,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   assert.equal(child.style.bg, f.theme().selected, "parent and peeked child share the selection color");
   for (const row of [space, agent, child]) assert.equal(row.hoverStyle.bg, undefined, "hover preserves a selected row");
   for (const row of [find(st, "space-s1"), find(at, "ag-vps/t2"), grandchild]) assert.equal(row.hoverStyle.bg, f.theme().hover);
-  assert.equal(child.style.pl, 30, "first child sits one 20px step in, its turn hung from the parent icon");
+  assert.equal(child.style.pl, 28, "first child sits one 20px step in, its turn hung from the parent icon");
   assert.equal(grandchild.style.pl - child.style.pl, 20);
   assert.equal(child.style.text_size, 14);
   for (const row of [agent, child, grandchild]) {
@@ -179,13 +179,13 @@ for (const width of [208, 240, 256, 320, 480]) {
     assert.equal(row.style.h, 36, "T3's one-line row");
   }
   const lines = row => row.items.filter(n => "absolute" in n.style).map(n => [n.style.left, "border_b" in n.style ? "elbow" : "line"]);
-  assert.deepEqual(lines(child), [[17.25, "elbow"]], "a last child turns in from under its parent's icon");
-  assert.deepEqual(lines(grandchild), [[37.25, "elbow"]], "no line continues past a last child");
+  assert.deepEqual(lines(child), [[15.25, "elbow"]], "a last child turns in from under its parent's icon");
+  assert.deepEqual(lines(grandchild), [[35.25, "elbow"]], "no line continues past a last child");
   f.terminals().push({ address: "child2", parent: "t0", name: "second child", state: "live", status: "idle", program: f.agents()[0].program });
   const branched = ag.render(cx);
-  assert.deepEqual(lines(find(branched, "sub-child")), [[17.25, "line"], [17.25, "elbow"]], "a middle child keeps the line going");
-  assert.deepEqual(lines(find(branched, "sub-grandchild")), [[17.25, "line"], [37.25, "elbow"]], "descendants carry their ancestors' lines");
-  assert.deepEqual(lines(find(branched, "sub-child2")), [[17.25, "elbow"]]);
+  assert.deepEqual(lines(find(branched, "sub-child")), [[15.25, "line"], [15.25, "elbow"]], "a middle child keeps the line going");
+  assert.deepEqual(lines(find(branched, "sub-grandchild")), [[15.25, "line"], [35.25, "elbow"]], "descendants carry their ancestors' lines");
+  assert.deepEqual(lines(find(branched, "sub-child2")), [[15.25, "elbow"]]);
   const elbow = find(child, "sub-child").items.find(n => "border_b" in n.style).style;
   assert.deepEqual([elbow.w, elbow.rounded_bl], [9.75, 6], "upstream-size turn: ends 4px before the icon, 6px radius");
   assert.equal(elbow.left + 1.5 / 2, agent.style.px + inFlow(agent)[0].style.w / 2, "the line runs down the parent icon's center");
@@ -1111,8 +1111,8 @@ for (const width of [208, 240, 256, 320, 480]) {
   assert.equal(inFlow(worktree)[0].style.pl, 20, "worktree icon lines up with a sub-agent's");
   assert.equal(inFlow(worktree)[0].items[0].style.size, 16);
   const treeLines = row => row.items.filter(n => "absolute" in n.style && "left" in n.style).map(n => [n.style.left, "border_b" in n.style ? "elbow" : "line"]);
-  assert.deepEqual(treeLines(worktree), [[17.25, "elbow"]], "last worktree turns in from under its checkout");
-  assert.deepEqual(treeLines(sp.row({ w: f.spaces()[1], i: 1, g: null, tree: "├─" }, f.theme())), [[17.25, "line"], [17.25, "elbow"]], "a middle worktree keeps the line going");
+  assert.deepEqual(treeLines(worktree), [[15.25, "elbow"]], "last worktree turns in from under its checkout");
+  assert.deepEqual(treeLines(sp.row({ w: f.spaces()[1], i: 1, g: null, tree: "├─" }, f.theme())), [[15.25, "line"], [15.25, "elbow"]], "a middle worktree keeps the line going");
   assert.deepEqual(treeLines(sp.row({ w: f.spaces()[1], i: 1, g: null, tree: null }, f.theme())), [], "checkouts draw no lines");
   {
     // project 1 is a worktree of project 0's repo.
@@ -1874,7 +1874,7 @@ for (const width of [208, 240, 256, 320, 480]) {
     // Hover labels name the control, and its key only when the key does the same.
     lists.machines = [{ name: "spare", state: "asleep" }];
     const blank = find(lists.render(cx), "machine-new-spare");
-    assert.deepEqual([blank.style.px, blank.items[0].style.size, blank.style.gap], [10, 16, 10], "New space here lays out as a space's row");
+    assert.deepEqual([blank.style.px, blank.items[0].style.size, blank.style.gap], [8, 16, 10], "New space here lays out as a space's row");
     lists.machines = [{ name: "vps", state: "connected" }];
     const label = (id) => { lists.hot = id; fire(find(lists.render(cx), `tip-over-${id}`), "on_hover", true, cx); while (cx.timers.length) { const t = cx.timers.shift(); if (!t.gone) t.fn(cx); } return strings(find(lists.render(cx), `tip-${id}`).style.content); };
     assert.deepEqual(label("space-new"), ["New space"], "⌘N doesn't ask, as this does");
@@ -2914,5 +2914,28 @@ for (const width of [208, 240, 256, 320, 480]) {
     assert.equal(f.notifications.length, notices, "an unconfirmed layout is left alone");
   }
 
+  {
+    // A long Agents list draws only the rows in view, and the wheel moves them; a short one draws them all, natively scrolled.
+    const f = fixture(256), program = f.agents()[0].program;
+    for (let i = 0; i < 60; i++) {
+      const a = { address: `w${i}`, pane: `pw${i}`, space: "s0", space_name: "project 0", tab: `bw${i}`, title: `w${i}`, seq: 10 + i, program, focused: false, status: "working" };
+      f.agents().push(a); f.terminals().push({ ...a, state: "live" }); f.panes().push({ ...a, terminal: a.address, cwd: "/work/s0" });
+    }
+    const ag = f.load("t3-agents"), drawn = () => {
+      const win = find(ag.render(cx), "ag-window");
+      return win && win.items.filter(n => "absolute" in n.style).map(n => n.items[0].items[0].key).filter(k => typeof k === "string");
+    };
+    assert.ok(drawn().length > 0 && drawn().length < 30, "62 agents: only what fits before the first measure");
+    fire(find(ag.render(cx), "ag-window"), "on_size_change", { width: 240, height: 300 }, cx);
+    const first = drawn();
+    assert.ok(first.length <= Math.ceil((300 + 2 * 74) / 37) + 1 && first.includes("ag-t0"), "measured: the rows in 300px and two past each end");
+    fire(find(ag.render(cx), "ag-window"), "on_scroll_wheel", { delta: { y: -37 * 30 } }, cx);
+    const later = drawn();
+    assert.ok(!later.includes("ag-t0") && later.includes("ag-w25") && later.length <= Math.ceil((300 + 2 * 74) / 37) + 1, "the wheel moves the window down the list");
+    fire(find(ag.render(cx), "ag-window"), "on_scroll_wheel", { delta: { y: 1e6 } }, cx);
+    assert.deepEqual(drawn(), first, "and back to the top, no further");
+    f.agents().splice(2); f.terminals().splice(f.terminals().findIndex(k => k.address === "w0")); f.panes().splice(2);
+    assert.equal(find(ag.render(cx), "ag-window"), null, "two agents: the whole list, natively scrolled");
+  }
   console.log("ok: sidebar widths, folds, pins, tree, shared hidden navigation, Settle/Undo in both modes, status suppression, Review return, Home.");
 })().catch(e => { console.error(e); process.exit(1); });

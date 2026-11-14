@@ -4,6 +4,16 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-14
 
+- A long Agents list (more than 50 rows) draws only the rows in view and scrolls them with the wheel or trackpad: with 200 agents a redraw makes about 400 elements instead of 13,000. While it does, Tab reaches only the rows on screen.
+
+- With the Review bar in the layout, closing Review's panel tab stops the bar lighting the count of the diff that tab showed, as Quick Review already did.
+
+- `cmd-shift-b` right after the window opens hangs Details under its button, not 28px to its right.
+
+- The settings' dropdown options, Review's base list and the Commits list (Review's and Quick Review's) go out when the pointer leaves a row, as every other menu's rows do; they used to stay lit.
+
+- Lists' Spaces and Agents rows are 8 in instead of 10, as Inbox cards are; sub-agent rows and worktree and sub-agent tree lines move 2 left with them.
+
 - Space picks the lit row in every menu, as Enter does: the agents' sort, the panel's `+`, the right-click menus, the Actions menu and the wallpaper's add menu took only Enter.
 
 - With many terminals the layout keeps drawing. Each sub-agent count used to read every terminal again, once per agent: with thousands of terminals the tab bar, Agents, the Inbox, Go to and a sub-agent list slowed every redraw, and around 5,000 Herdr stopped drawing them. Files search in a very large repository no longer stops on a short query that matches most files. Review's file tree draws a big review's folders without delay, and the space panel no longer checks Review four times a second while nothing happens.

@@ -6,6 +6,7 @@ import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFi
 import { SETTINGS, t3Settings } from "./layout-settings.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { menuKeys } from "./list.js";
+import { menuRow } from "./menu-row.js";
 
 const SECTIONS = [{ id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" }];
 const ROWS = [
@@ -79,13 +80,9 @@ export function settingsView(view) {
       .on_mouse_down_out((_e, cx) => { if (view.overPick !== r.key) { show(false); cx.notify(); } })
       // Its Esc here, before the dialog's own, which would close it.
       .on_key_down(menuKeys(view, options.map(([, l]) => l), (at) => choose(options[at][0]), { at: "pickAt", close: () => { show(false); focus.focus(); } }))
-      .children(options.map(([value, name], i) => h_flex().id(`${id}-${value ?? "terminal"}`).h(28).px(8).gap(8).rounded(4).items_center().text_color(t.foreground)
-        .when(i === view.pickAt, (el) => el.bg(t.selected))
-        .on_hover((over, cx) => { if (over && view.pickAt !== i) { view.pickAt = i; cx.notify(); } })
-        .role("list_box_option").aria_selected(value === now[r.key]).accessibility_label(name)
-        .on_click((_e, cx) => { choose(value); cx.notify(); })
-        .child(div().flex_1().min_w(0).truncate().child(name))
-        .when(value === now[r.key], (el) => el.child(svg("mods/t3-chrome/icons/check.svg").size(14).flex_none().text_color(t.foreground)))));
+      .children(options.map(([value, name], i) => menuRow(view, t, `${id}-${value ?? "terminal"}`, { at: [view, "pickAt", i], label: name,
+        trail: value === now[r.key] ? svg("mods/t3-chrome/icons/check.svg").size(14).flex_none().text_color(t.foreground) : null, pick: (cx) => { choose(value); cx.notify(); } })
+        .role("list_box_option").aria_selected(value === now[r.key])));
     return Select.new(id).w(220).flex_none().accessibility_label(r.title).open(open).track_focus(focus).content_focus_handle(keys)
       .on_open_change((on, cx) => { show(on); cx.notify(); })
       .child(Popup.new(`${id}-popup`, trigger).w_full().when(open, (el) => el.content(list)));
