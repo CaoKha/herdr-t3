@@ -1,6 +1,7 @@
-// An agent's status mark, one shape wherever it's drawn: the pane header (14), its sub-agent menu and the Agents list (12).
-// Working spins; blocked and failed share the rounded `!` on 15% of its colour, failed in ansi1 (T3's destructive); done is
-// a 6px dot, 12 wide as the others. Anything else has none: each place says idle its own way.
+// An agent's status mark, one shape wherever it's drawn: tabs, Go to, the pane header, the Review run (14), its sub-agent
+// menu and the Agents list (12), the Inbox card (16). Working spins; blocked and failed share the rounded `!` on 15% of its
+// colour, failed in ansi1 (T3's destructive); done is a bare 6px dot, a column of marks centres it 12 wide. Anything else
+// has none: each place says idle its own way.
 // scripts/sync.sh copies this to the mods that use it.
 import { div, svg } from "gpui-kit";
 
@@ -13,5 +14,5 @@ export function statusMark(t, st, size = 12) {
     return div().size(size).flex_none().rounded(4).bg(c + "26").text_size(size < 14 ? 10 : 11).font_bold().text_color(c)
       .flex().items_center().justify_center().child("!");
   }
-  return st === "done" ? div().size(6).mx(3).flex_none().rounded_full().bg(t.done) : null;
+  return st === "done" ? div().size(6).flex_none().rounded_full().bg(t.done) : null;
 }

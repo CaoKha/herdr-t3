@@ -4,32 +4,25 @@
 // tab it was opened on still show (`source`).
 import { svg } from "gpui-kit";
 import { v_flex } from "gpui-base";
-import { props, openOverlay, closeOverlay, theme, settings, shared, setShared, spaces, exec, run, notify, window } from "herdr";
+import { props, closeOverlay, theme, shared, setShared, spaces, exec, run, notify, window } from "herdr";
 import { focusRoot, stopsInit, stopsEnd } from "./focus.js";
-import { menuJump, scrollList } from "./list.js";
+import { menuKeys, scrollList } from "./list.js";
 import { menuRow, MENU_ROW } from "./menu-row.js";
-import { subPlace, hoverRow, subOpened, subLeft } from "./submenu.js";
+import { hoverRow, subLeft } from "./submenu.js";
+import { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed } from "./popup-menu.js";
 import { targetsMenu, openTarget, targetIcon } from "./open-in.js";
 import { pierreFileIcon } from "./pierre-icons.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 import { LIST, join, parseListing } from "./model.js";
 
 const ICONS = "mods/t3-files"; // whose icons/ it draws
 // As t3-menu's: 220 wide, 4 in, rows of 28; a folder's at most 12 rows before it scrolls.
 export const MENU_W = 220, FOLDER_H = 8 + 12 * MENU_ROW;
 // Stamped as a top menu closes, for the control that opened it (trigger.js); a submenu's, for the menu it hangs off.
-export const MENU_CLOSED = "t3-files.menuClosed", SUB_CLOSED = "t3-files.submenuClosed";
+export const MENU_CLOSED = closedKey("t3-files", "menu"), SUB_CLOSED = closedKey("t3-files", "submenu");
 
-// Only this run: each open menu's id, with the menus it hangs off. Mods share one JS context, as Details' layers.
-const openMenus = () => /** @type {Map<string, string[]>} */ (/** @type {any} */ (globalThis).t3FilesMenus ??= new Map());
-const scale = () => Number(settings()?.zoom) || 1;
-
-/** Opens a Files menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props. */
-export function openMenu(kind, place, extra) {
-  const id = openOverlay({ mod: "t3-files", kind: "popup", width: MENU_W, ...place, props: { ...extra, files: kind } });
-  openMenus().set(id, extra.parents ?? []);
-  return id;
-}
+/** Opens a top Files menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props. */
+export const openMenu = (kind, place, extra) => openPopup({ mod: "t3-files", width: MENU_W, ...place, props: { ...extra, files: kind } });
 
 /** The space and tab a menu was opened on are still the ones shown. */
 const sourceOkay = (s) => { const sp = spaces().find(x => x.active); return sp?.id === s.space && sp.tabs.some(t => t.active && t.id === s.tab); };
@@ -104,18 +97,13 @@ function readFolder(view, cx) {
 }
 
 /** Closes every Files menu open, for cmd-w (keys.json's mod:t3-files runs t3-files.close): whether there was one. */
-export function closeMenus() {
-  const tops = [...openMenus()].filter(([, parents]) => !parents.length).map(([id]) => id);
-  for (const id of tops) closeOverlay(id);
-  return tops.length > 0;
-}
+export const closeMenus = () => closeTops("t3-files");
 
 /** Its submenu goes with it; the control that opened it, or the menu it hangs off, learns it's gone. */
 export function closeMenu(view) {
   const p = props();
   stopsEnd(view);
-  openMenus().delete(p.overlay);
-  if (view.sub) closeOverlay(view.sub.id);
+  menuClosed(p.overlay);
   setShared(p.parents?.length ? SUB_CLOSED : MENU_CLOSED, Date.now());
 }
 
@@ -142,35 +130,18 @@ function items(view) {
 
 // Row `i`'s submenu beside it. `lit`: keys opened it, so its first row is lit, as Base UI's.
 function openSub(view, i, lit) {
-  closeSub(view);
-  const p = props(), list = items(view), it = list[i], z = scale();
-  // shortcut: with no row seen yet (keys only), the row is placed from the pointer where the menu opened, as Herdr opens it
-  // there; a menu Herdr pushed back into the window puts its submenu off by as much. Upgrade if Herdr reports where an element is.
-  const o = view.origin ?? { x: 0, y: 0 };
-  const b = view.rowsAt[i] ?? { x: o.x + 4 * z, y: o.y + (4 + i * MENU_ROW) * z, width: (MENU_W - 8) * z, height: MENU_ROW * z };
+  const p = props(), it = items(view)[i];
   const height = it.sub === "editors" ? 8 + p.editors.length * MENU_ROW : FOLDER_H;
-  // Herdr keeps a popup in the window, but doesn't flip it: subPlace does, in the menu's own px.
-  const at = subPlace({ x: b.x / z, y: b.y / z, width: b.width / z, height: b.height / z }, MENU_W, 0, /** @type {any} */ (globalThis).window.viewport_size().width / z);
-  const id = openMenu(it.sub, { height, at: { x: at.x * z, y: at.y * z } }, { source: p.source, path: p.path, editors: p.editors, dir: it.sub === "folder" ? it.id : null, file: p.file,
-    parents: [...(p.parents ?? []), p.overlay], ...(lit ? { lit: 0 } : {}) });
-  view.sub = { id, row: i };
-  subOpened(view.s, it.id, { x: at.x * z, y: at.y * z, width: MENU_W * z, height: height * z }, at.side);
-}
-
-function closeSub(view) {
-  if (!view.sub) return;
-  closeOverlay(view.sub.id);
-  view.sub = null;
-  subOpened(view.s, null);
-  view.keys.focus();
+  openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: "t3-files", width: MENU_W, height,
+    props: { files: it.sub, source: p.source, path: p.path, editors: p.editors, dir: it.sub === "folder" ? it.id : null, file: p.file, ...(lit ? { lit: 0 } : {}) } });
 }
 
 function choose(view, i, cx, lit = false) {
-  const p = props(), it = items(view)[i];
+  const it = items(view)[i];
   if (!it || it.disabled) return;
   if (it.sub) return openSub(view, i, lit);
   // The whole chain closes, the menus it hangs off too.
-  if (!it.keepOpen) { closeOverlay(p.overlay); for (const id of [...(p.parents ?? [])].reverse()) closeOverlay(id); }
+  if (!it.keepOpen) closeChain();
   it.run?.(cx);
 }
 
@@ -178,25 +149,15 @@ export function menuView(view) {
   const p = props(), t = theme();
   if (p.files === "open-in") return targetsMenu(view, ICONS, p.targets ?? [], p.reason, (name) => { if (sourceOkay(p.source)) setShared(KEY.openTarget, name); closeOverlay(p.overlay); });
   // Its submenu closed itself (← or Esc in it, a click beside it): the keyboard comes back here.
-  shared(SUB_CLOSED);
-  if (view.sub && !openMenus().has(view.sub.id)) { view.sub = null; subOpened(view.s, null); view.keys.focus(); }
+  subGone(view, SUB_CLOSED);
   const list = items(view);
   return focusRoot(view, v_flex().id("files-menu").size_full().p(4).bg(t.popover).text_size(14).track_focus(view.keys)
     // Off the menu, nothing pending opens; a submenu open stays.
     .on_hover((on) => { if (!on) subLeft(view.s); })
+    // A submenu's ← goes back to its menu, as its Esc does. Moving off the row whose submenu is open closes it, as Base UI's.
     .on_key_down((e, cx) => {
-      if (e.key === "enter" || e.key === "space") { if (view.at >= 0) choose(view, view.at, cx, true); }
-      // A submenu's ← goes back to its menu, as its Esc does.
-      else if (e.key === "escape" || (e.key === "left" && p.parents?.length)) closeOverlay(p.overlay);
-      else if (e.key === "right") { if (list[view.at]?.sub) openSub(view, view.at, true); }
-      else {
-        const to = menuJump(view, e, list.map(it => it.label), view.at);
-        if (to < 0) return;
-        view.at = to;
-        // Moving off the row whose submenu is open closes it, as Base UI's.
-        if (view.sub && view.sub.row !== to) closeSub(view);
-      }
-      cx.stop_propagation(); cx.notify();
+      menuKeys(view, list.map(it => it.label), (at, cx, lit) => choose(view, at, cx, lit), { back: Boolean(p.parents?.length), sub: (at) => Boolean(list[at]?.sub) })(e, cx);
+      if (view.sub && view.sub.row !== view.at) closeSub(view);
     })
     .child(scrollList(view, "files-menu-list", { count: list.length, row: MENU_ROW, at: view.at, height: Math.min(list.length * MENU_ROW, FOLDER_H - 8),
       wheeled: (keep) => { if (keep >= 0) view.at = keep; },

@@ -14,7 +14,7 @@ import { openMenu } from "./menu.js";
 import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
 import { trigger } from "./trigger.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 import { button, radiusOf } from "./button.js";
 
 // How long a checkout being opened may take to show up before it's asked for again.
@@ -563,11 +563,11 @@ export default class Spaces extends View {
         // The same two as Inbox's top row, so switching modes moves nothing.
         .child(h_flex().flex_none().items_center()
           // The layout's menu asks which machine, as its mod.json places it; the shipped one can't, so docked alone it's the active space's.
-          .child(tool("space-new", "New space", "folder-plus", `${props()?.newMenu}.pickClosed`, () => {
+          .child(tool("space-new", "New space", "folder-plus", closedKey(props()?.newMenu, "pick"), () => {
             if (!asks) { run("space.new"); return false; }
             openOverlay({ mod: props().newMenu, kind: "popup", frame: "none", at: /** @type {any} */ ("top"), offset: 96, width: 576, height: 420, props: { pick: true } });
           }, asks ? null : "space.new"))
-          .child(tool("space-new-tab", "New tab", "square-pen", `${props()?.newMenu ?? "new-menu"}.closed`, () => run("mod.open", { name: props()?.newMenu ?? "new-menu" })))))
+          .child(tool("space-new-tab", "New tab", "square-pen", closedKey(props()?.newMenu ?? "new-menu"), () => run("mod.open", { name: props()?.newMenu ?? "new-menu" })))))
       .child(v_flex().id("space-list").flex_1().min_h(0).overflow_y_scroll()
         .on_mouse_move((e, cx) => this.dragTo(e, cx))
         // Released anywhere in the list, it lands where the gap is.

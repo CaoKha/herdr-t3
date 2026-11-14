@@ -3,17 +3,19 @@ import { h_flex, v_flex } from "gpui-base";
 import { theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
 import { tip, glow } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
-import { trigger } from "./trigger.js";
-import { menuJump } from "./list.js";
+import { trigger, hang } from "./trigger.js";
+import { noteTitlebar } from "./titlebar.js";
+import { menuKeys } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { initSettings, settingsView } from "./settings.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { stripAt, stripEnds, stripWheel, stripPage, stripFades } from "./scroll-strip.js";
 import { button as drawButton, radiusOf } from "./button.js";
 import { pierreFileIcon } from "./pierre-icons.js";
+import { statusMark } from "./status-mark.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file: their names and icons. Review wears pulls.review's own mark,
@@ -25,7 +27,7 @@ const zoomOf = () => Number(settings()?.zoom) || 1;
 // The panel head's ends, 12 inside the panel card as the surfaces' own headers below it (t3-tokens「规则」R1).
 const HEAD_IN = 12;
 // Stamped as `+`'s menu closes: a press on `+` that closed it mustn't reopen it (trigger.js).
-const SURFACE_CLOSED = "t3-chrome.surfaceClosed";
+const SURFACE_CLOSED = closedKey("t3-chrome", "surface");
 
 // The sidebar shows either Lists (Spaces and Agents) or the Inbox (t3-inbox): a stack in the layout.
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
@@ -177,7 +179,7 @@ export default class WorkspaceChrome extends View {
   // window's right, + after the tabs as the strip has them scrolled. A popup's `at` is in zoomed px.
   openSurfaceMenu(press) {
     const z = zoomOf(), rows = panelState().pages.includes("review") ? 2 : 1;
-    let at = press && { x: press.x, y: press.y + press.height + 6 * z };
+    let at = hang(press, 0, { align: "start", gap: 6 }).at;
     if (!at && this.headW) {
       const find = (n, id) => n?.id === id ? n : (n?.children ?? []).reduce((hit, c) => hit ?? find(c, id), null), root = layout();
       const pad = find(root, "panel")?.padding?.[1] ?? 8, high = find(root, "panel-head")?.size?.px ?? 40;
@@ -194,9 +196,7 @@ export default class WorkspaceChrome extends View {
     const s = panelState(), space = spaces().find(p => p.active), z = zoomOf();
     // Review's run for this space, marked as a tab's agent is.
     const word = space && shared("review.status")?.[space.id];
-    const mark = word === "working" ? svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)
-      : word === "blocked" ? div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!")
-      : word === "done" ? div().size(6).flex_none().rounded_full().bg(t.done) : null;
+    const mark = statusMark(t, word, 14);
     const own = (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation());
     const widths = this.surfaceWidths;
     for (const id of Object.keys(widths)) if (!s.tabs.some(tab => tab.id === id)) delete widths[id];
@@ -237,7 +237,7 @@ export default class WorkspaceChrome extends View {
     this.addX = sizes.slice(0, -1).reduce((sum, w) => sum + w + 4, 0);
     const ends = stripEnds(strip), over = (strip.over ?? 0) > 0;
     return focusRoot(this, h_flex().id("panel-head").size_full().bg(t.chrome).px(HEAD_IN).gap(8).items_center()
-      .on_size_change((size, cx) => { (/** @type {any} */ (globalThis).t3Titlebar ??= {}).panel = size.width; if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
+      .on_size_change((size, cx) => { noteTitlebar("panel", size.width); if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
       .child(div().id("surface-scroll").relative().flex_1().min_w(0).h_full().overflow_hidden()
         .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (this.surfaceRoom !== w) { this.surfaceRoom = w; cx.notify(); } })
         .on_scroll_wheel((e, cx) => { stripWheel(strip, e); cx.notify(); })
@@ -281,17 +281,10 @@ export default class WorkspaceChrome extends View {
       // Centred in the column, as T3's: 40 (the top bar) lifted off its bottom.
       .when(empty, el => el.justify_center().gap(12).px(24).pb(40)).when(!empty, el => el.bg(t.popover))
       .track_focus(this.surfaceKeys).on_mouse_down("left", () => this.surfaceKeys.focus())
+      // A row's own key picks it; else list.js's menu keys over the rows that can be picked. Docked, Escape isn't this page's.
       .on_key_down((e, cx) => {
-        if (e.key === "escape" && !empty) finish();
-        else if (e.key === "enter") choose(this.surfaceAt, cx);
-        // A row's own key picks it; else list.js's menuJump (arrows, Home, End, typeahead) over the rows that can be picked.
-        else if (e.keystroke === e.key && items.some(it => it.key === e.key)) choose(items.findIndex(it => it.key === e.key), cx);
-        else {
-          const enabled = /** @type {any[]} */ (items.filter(it => !it.disabled)), to = menuJump(this, e, enabled.map(it => it.label), enabled.indexOf(items[this.surfaceAt]));
-          if (to < 0) return;
-          this.surfaceAt = /** @type {any[]} */ (items).indexOf(enabled[to]);
-        }
-        cx.stop_propagation(); cx.notify();
+        if (e.keystroke === e.key && items.some(it => it.key === e.key)) { choose(items.findIndex(it => it.key === e.key), cx); cx.stop_propagation(); cx.notify(); }
+        else if (!(empty && e.key === "escape")) menuKeys(this, items.map(it => it.label), choose, { at: "surfaceAt", close: finish, disabled: (i) => Boolean(items[i].disabled) })(e, cx);
       })
       .when(empty, el => el.child(div().text_size(14).font_medium().text_color(t.foreground).child("Open a surface")))
       .child(list);

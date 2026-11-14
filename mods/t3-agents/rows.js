@@ -88,11 +88,11 @@ function agentSubRow(view, t, s, shown, card, ghost) {
 
 export function agentStatus(view, t, a, note = "", id) {
   // Idle: a ring. Every mark is 12 wide, as T3's one-line row, flush right, so the column ends where Spaces' git info does.
-  const mark = statusMark(t, a.status) ?? div().size(6).mx(3).flex_none().rounded_full()
+  const mark = statusMark(t, a.status) ?? div().size(6).flex_none().rounded_full()
     .when(a.status === "idle", (el) => el.border(1.5).border_color(t.idle ?? t.dim));
   const label = (STATUS_WORD[a.status] ?? "Unknown") + note;
   const el = h_flex().size(20).flex_none().items_center().justify_end()
-    .role("status").accessibility_label(label).child(mark);
+    .role("status").accessibility_label(label).child(h_flex().w(12).flex_none().justify_center().child(mark));
   return id ? tipMark(view, t, `${id}-mark`, label, el.id(id)) : el;
 }
 

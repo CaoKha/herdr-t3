@@ -3,16 +3,18 @@ import { h_flex, Popup } from "gpui-base";
 import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
+import { statusMark, STATUS_WORD } from "./status-mark.js";
 import { tip, glow } from "./tip.js";
 import { detailsFor, detailsAt, detailsWatch } from "./details.js";
 import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
-import { opener, popupOpen } from "./trigger.js";
+import { opener, popupOpen, hang } from "./trigger.js";
+import { noteTitlebar } from "./titlebar.js";
 import { sidebarParts } from "./sidebar.js";
 import { navigation } from "./navigation.js";
 import { newTab, projectMark } from "./project.js";
-import { KEY, migrate } from "./store.js";
+import { KEY, closedKey, migrate } from "./store.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
@@ -40,13 +42,6 @@ function awake(st, under, inbox) {
   });
 }
 
-// "Needs you", drawn as the agents list and pane headers draw it.
-const blockedMark = (t) => div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!");
-const mark = (t, s) => s === "working" ? svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)
-  : s === "blocked" ? blockedMark(t)
-  : div().size(6).flex_none().rounded_full().bg(t.done);
-
-const WORDS = { working: "Working", blocked: "Needs you", done: "Done" };
 const TAB_GAP = 4;
 // A tab's name gives way to T3's 144px at most, the active one's to 240px; past that the strip scrolls.
 // Unlike T3's, a tab is 96px at least: a short name (`Pi`) left one too small to aim at.
@@ -291,7 +286,7 @@ export default class Tabs extends View {
       .mr(8).on_hover(glow(this, "sidebar-toggle"))
       // It goes when the sidebar shows, before the pointer can report leaving it.
       .on_mouse_down("left", stopPress).on_click(() => { this.hot = null; run("layout.toggle", { id: "sidebar" }); })
-      .children(counts.map(([s, n]) => h_flex().id(`agents-${s}`).gap(4).items_center().child(mark(t, s)).child(div().text_size(12).text_color(t.muted).child(String(n))))), radiusOf("sm")), { action: "layout.toggle:sidebar", below: true });
+      .children(counts.map(([s, n]) => h_flex().id(`agents-${s}`).gap(4).items_center().child(statusMark(t, s, 14)).child(div().text_size(12).text_color(t.muted).child(String(n))))), radiusOf("sm")), { action: "layout.toggle:sidebar", below: true });
   }
 
   // With props.block, sizes that block to `size`: layout.resize, which Herdr keeps with the layout's clicks.
@@ -299,7 +294,7 @@ export default class Tabs extends View {
   fit(size) {
     // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
     const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1) - 0.5);
-    if (id === "window-end") { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.end = size.width; }
+    if (id === "window-end") noteTitlebar("end", size.width);
     if (!id || px === this.fitted) return;
     this.fitted = px;
     run("layout.resize", { id, px });
@@ -442,13 +437,13 @@ export default class Tabs extends View {
         .when((/** @type {any} */ (this).details === c.id && this.pressed === null) || /** @type {any} */ (this).detailsOut === c.id, pop => pop.content(div().id(`details-card-${c.id}`)
           .mt(4).max_w(320).px(8).py(4).rounded(6).border(1).border_color(t.border).bg(t.chrome).shadow_md().text_size(12).text_color(t.foreground)
           .opacity(cardShown ? 1 : 0).top(cardShown ? 0 : -4).transition("opacity", cardFade).transition("top", cardFade)
-          .child(status ? `${name} · ${WORDS[status]}` : name)));
+          .child(status ? `${name} · ${STATUS_WORD[status]}` : name)));
       // Its label waits longer than a card's 150ms, so a straight click never meets it. Its key closes the active tab only.
       const close = tip(this, t, closeId, "Close tab", drawButton(t, closeId, {
         size: "tiny", surface: "tab", icon: over ? "mods/t3-tabs/icons/x.svg" : undefined, label: `Close ${name}`, hot: over })
         .on_hover(glow(this, closeId))
         .on_mouse_down("left", stopPress).on_click((_e, cx) => { cx.stop_propagation(); run(`t3-tabs.close-tab:${c.id}`); })
-        .when(!over && status != null, el => el.child(mark(t, status)))
+        .when(!over && status != null, el => el.child(statusMark(t, status, 14)))
         .when(over, el => stop(this, t, closeId, el, radiusOf("tiny"))), { action: c.active ? "t3-tabs.close-tab" : undefined, below: true, delay: 500 });
       const tab = h_flex().id(tabId).relative().h(24).w(widths.get(c.id)).pl(6).pr(8).gap(2).rounded(6).items_center().flex_none().text_size(12)
         .bg(c.active ? t.selected : t.chrome).text_color(c.active || over ? t.foreground : t.muted)
@@ -556,11 +551,10 @@ export default class Tabs extends View {
     // closes it.
     const titled = ctx.sub ?? ctx.head;
     const menu = (b) => {
-      const z = Number(settings()?.zoom) || 1;
-      openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...(b ? { at: { x: b.x, y: b.y + b.height + 4 * z } } : {}), props: { tab: "agent", target: { address: titled } } });
+      openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...hang(b, 220, { align: "start" }), props: { tab: "agent", target: { address: titled } } });
     };
     // Its menu up: the title stays lit, its ⌄ shown and its label down, as the layout's other buttons that open one (trigger.js).
-    const menuOn = (id) => popupOpen(this, id, "t3-menu.closed");
+    const menuOn = (id) => popupOpen(this, id, closedKey("t3-menu"));
     // A right-click is the menu of what's under it, on the pointer, as everywhere: the space's (as in Spaces), an agent's (as
     // its card's).
     const context = (kind, target) => (_e, cx) => { detailsFor(this, null, cx); openMenu(this, kind, target, cx); };
@@ -574,7 +568,7 @@ export default class Tabs extends View {
     const text = (id, label) => nameText(this, id, label, { size: 14, weight: "medium" });
     // `action` null: the title, which opens its menu.
     const named = (id, label, el, action, { agent, titled: own = false, shown = true, at = 0, radius = 4 } = /** @type {{ agent: string, titled?: boolean, shown?: boolean, at?: number, radius?: number }} */ ({ agent: null })) => {
-      const wired = action ? el.on_mouse_down("left", press).on_click(act(action)) : opener(this, { id, closed: "t3-menu.closed", onOpen: menu, press })(el);
+      const wired = action ? el.on_mouse_down("left", press).on_click(act(action)) : opener(this, { id, closed: closedKey("t3-menu"), onOpen: menu, press })(el);
       return stop(this, t, id, namedLabel(this, t, id, label, wired.id(id).role("button").accessibility_label(label)
         .on_mouse_down("right", context("agent", { address: own ? titled : agent })), {
         shown, at, onHover: (hovered, cut, cx) => { glow(this, id)(hovered, cx); detailsFor(this, hovered && cut && !menuOn(id) ? id : null, cx); },
@@ -631,7 +625,7 @@ export default class Tabs extends View {
     };
     return h_flex().id(`group-${e.id}`).w(width).h(24).flex_none().rounded(6).border(1).border_dashed().border_color(t.border).items_center().overflow_hidden()
       .children(list.map(segment))
-      .when(Boolean(status), el => el.child(div().w(16).flex_none().flex().items_center().justify_center().child(mark(t, status))));
+      .when(Boolean(status), el => el.child(div().w(16).flex_none().flex().items_center().justify_center().child(statusMark(t, status, 14))));
   }
 
   undoNotice(t) {

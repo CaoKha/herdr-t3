@@ -13,7 +13,7 @@ const context = vm.createContext({ KEY: { panels: 't3.panels' }, layout, Map, Da
   run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
 });
 for (const f of ['terminal-context.js', 'surfaces.js', 'panel.js']) vm.runInContext(fs.readFileSync(`${__dirname}/${f}`, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), context);
-const p = vm.runInContext('({ panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel, activateSurface, reviewRepo, reviewRequest })', context);
+const p = vm.runInContext('({ panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel, activateSurface, reviewRepo, reviewRequest, reviewShown })', context);
 const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active ? '*' : '') + t.id).join(' ');
 
 (async () => {
@@ -57,6 +57,12 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   p.reviewRequest('a', '/work/repo', '/worktree', { analyze: true });
   assert.deepEqual({ ...saved.review }, { space: 'a', root: '/work/repo', page: '/worktree', n: saved.review.n, analyze: true, born });
   assert.ok(saved.review.n > Date.now() + 4000);
+  // What Review showed counts only while the tab that showed it is there: closed and added again, it's gone.
+  saved['review.shown'] = { a: { root: '/work/repo', page: '/worktree', born } };
+  assert.equal(p.reviewShown('a')?.page, '/worktree');
+  p.closeSurface('review'); p.showPage('review');
+  assert.notEqual(p.panelState().tabs.find(t => t.id === 'review').born, born);
+  assert.equal(p.reviewShown('a'), null);
   // Herdr's own layout docks Review in its stack: a page shown, the panel put away; no tabs kept.
   ui.slots = ['review']; ui.open = false; ui.space = 'b'; const before = JSON.stringify(saved['t3.panels'].b);
   p.showPage('review'); assert.deepEqual([ui.open, ui.page], [true, 'review']);

@@ -15,7 +15,7 @@ import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open
 import { split, ghostButton } from "./button.js";
 import { loadingState } from "./panel-states.js";
 import { stopsInit, stopsEnd, enter, focusRoot, stop, within } from "./focus.js";
-import { opener, popupOpen } from "./trigger.js";
+import { opener, popupOpen, hang } from "./trigger.js";
 import { tip, hoverKept, glow } from "./tip.js";
 import { MENU_ROW } from "./menu-row.js";
 import { LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, join, parentOf, nameOf, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, terms, narrows,
@@ -543,8 +543,7 @@ export default class Files extends View {
     // A folder's menu (menus.js), under its ›, its left edge with it; on while it's open, a second press closes it (trigger.js).
     const separator = path => { const id = `browse-${path}`, on = popupOpen(this, id, MENU_CLOSED);
       return stop(this, t, id, opener(this, { id, closed: MENU_CLOSED, onOpen: (b) => {
-        const z = zoom();
-        openMenu("folder", { height: FOLDER_H, ...(b ? { at: { x: b.x, y: b.y + b.height + 4 * z } } : {}) }, { source: this.source(st), dir: path, file: st.file });
+        openMenu("folder", { height: FOLDER_H, ...hang(b, MENU_W, { align: "start" }) }, { source: this.source(st), dir: path, file: st.file });
       } })(div().id(id).w(16).h(20).mx(2).rounded(4).flex_none().flex().items_center().justify_center().cursor_pointer()
         .when(on, s => s.bg(t.foreground + "1f")).when(!on, el => el.hover(s => s.bg(t.foreground + "12"))))
       .child(svg(`${MOD}/icons/chevron-right.svg`).size(14).text_color(on ? t.foreground : t.dim)).role("button").accessibility_label(`Browse ${path || nameOf(st.root)}`), 4); };
@@ -576,8 +575,7 @@ export default class Files extends View {
       main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 16)).on_hover(hover(id))
         .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target); })))),
       more => kept(moreId, more.on_hover(hover(moreId)).when(available, opener(this, { id: moreId, closed: MENU_CLOSED, onOpen: (b, cx) => {
-        const z = zoom();
-        openMenu("open-in", { height: openInHeight(names), ...(b ? { at: { x: b.x + b.width - MENU_W * z, y: b.y + b.height + 4 * z } } : {}) }, { source: this.source(st), targets: names });
+        openMenu("open-in", { height: openInHeight(names), ...hang(b, MENU_W) }, { source: this.source(st), targets: names });
         cx.spawn(async cx => { this.targets = await installedTargets(); cx.notify(); });
       } }))));
   }

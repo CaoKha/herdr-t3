@@ -5,7 +5,7 @@ import { h_flex, v_flex, Select, Popup } from "gpui-base";
 import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFile, exec } from "herdr";
 import { SETTINGS, t3Settings } from "./layout-settings.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
-import { menuJump } from "./list.js";
+import { menuKeys } from "./list.js";
 
 const SECTIONS = [{ id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" }];
 const ROWS = [
@@ -77,18 +77,8 @@ export function settingsView(view) {
       .track_focus(keys)
       // The trigger's own click toggles, so a press on it isn't "elsewhere".
       .on_mouse_down_out((_e, cx) => { if (view.overPick !== r.key) { show(false); cx.notify(); } })
-      .on_key_down((e, cx) => {
-        if (e.key === "enter" || e.key === "space") { if (view.pickAt >= 0) choose(options[view.pickAt][0]); }
-        // Here, before the dialog's own Esc, which would close it.
-        else if (e.key === "escape") { show(false); focus.focus(); }
-        else {
-          const to = menuJump(view, e, options.map(([, l]) => l), view.pickAt);
-          if (to < 0) return;
-          view.pickAt = to;
-        }
-        cx.stop_propagation();
-        cx.notify();
-      })
+      // Its Esc here, before the dialog's own, which would close it.
+      .on_key_down(menuKeys(view, options.map(([, l]) => l), (at) => choose(options[at][0]), { at: "pickAt", close: () => { show(false); focus.focus(); } }))
       .children(options.map(([value, name], i) => h_flex().id(`${id}-${value ?? "terminal"}`).h(28).px(8).gap(8).rounded(4).items_center().text_color(t.foreground)
         .when(i === view.pickAt, (el) => el.bg(t.selected))
         .on_hover((over, cx) => { if (over && view.pickAt !== i) { view.pickAt = i; cx.notify(); } })

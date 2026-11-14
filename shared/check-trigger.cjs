@@ -26,18 +26,18 @@ const find = (n, key) => n?.key === key ? n : (n?.items ?? []).map((c) => find(c
 const findTip = (n) => n?.key?.startsWith?.("tip-body-") ? n : (n?.items ?? []).map(findTip).find(Boolean);
 
 const state = {};
-let now = 1000;
+let now = 1000, zoom = 1;
 const src = ["store.js", "focus.js", "tip.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.tr = { trigger };";
+  + "\nglobalThis.tr = { trigger, hang };";
 const context = vm.createContext({
   div: () => element(), h_flex: () => element(), v_flex: () => element(), svg: () => element("svg"),
   Popup: { new: (id, child) => { const p = element("popup"); p.key = id; p.items.push(child); return p; } },
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, keys: () => [], window: { mouse_position: () => null, viewport_size: () => null },
-  Date: { now: () => now },
+  Date: { now: () => now }, settings: () => ({ zoom }),
 });
 vm.runInContext(src, context);
-const { trigger } = context.tr;
+const { trigger, hang } = context.tr;
 
 const cx = { notify() {}, stop_propagation() {}, timer: { after: (_ms, fn) => { fn(cx); return { cancel() {} }; }, every: () => ({ cancel() {} }) } };
 const t = new Proxy({}, { get: (_t, k) => String(k) });
@@ -82,4 +82,11 @@ kept().handlers.on_click(null, cx);
 assert.ok(kept().style.bg, "opened: on");
 now += 400; state[CLOSED] = now;
 assert.equal(kept().style.bg, undefined, "closed: off");
+// A popup hangs under its control's press: right edges together by default, 4 below, in zoomed px; no press, the app's place.
+const at24 = { x: 100, y: 10, width: 24, height: 24 };
+assert.deepEqual(JSON.parse(JSON.stringify(hang(at24, 220))), { at: { x: -96, y: 38 } });
+assert.deepEqual(JSON.parse(JSON.stringify(hang(at24, 220, { align: "start", gap: 6 }))), { at: { x: 100, y: 40 } });
+zoom = 2;
+assert.deepEqual(JSON.parse(JSON.stringify(hang(at24, 50, { gap: 5, nudge: 1 }))), { at: { x: 26, y: 44 } });
+assert.deepEqual(JSON.parse(JSON.stringify(hang(null, 220))), {});
 console.log("trigger ok");

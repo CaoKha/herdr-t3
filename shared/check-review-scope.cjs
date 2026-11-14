@@ -1,4 +1,4 @@
-// node shared/check-review-scope.cjs: the scope menu's reads, rows and picks, as the Review page and Details share them.
+// node shared/check-review-scope.cjs: the scope menu's reads, rows, picks and keys, as the Review page and Details share them.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -15,7 +15,7 @@ function load(env) {
     return needs + '\n' + src.replace(/^import [^;]*;\r?\n/gm, '').replace(/^export /gm, '');
   };
   const context = vm.createContext(env);
-  vm.runInContext(source('review-scope.js') + '\nglobalThis.api = {openScope,releaseScope,scopeRows,scopeList,pickScopeRow,pickListed,pickBase,scopeKey,openScopePage,scopeMenu};', context);
+  vm.runInContext(source('review-scope.js') + '\nglobalThis.api = {openScope,releaseScope,scopeRows,scopeList,pickScopeRow,pickListed,menuKey,commitsKey};', context);
   return context.api;
 }
 const state = new Map(), reads = [], pending = [];
@@ -34,10 +34,10 @@ const exec = async (_cmd, args, opts) => {
 };
 const input = () => ({text:'',value(){return this.text;},set_value(v){this.text=v;},focus(){}});
 const picked = [];
-const view = (root='/repo', page='/branch/fix') => ({root,space:'s',page,width:736,height:500,popup:'scope',handle:{focus(){}},scopeSearch:input(),refSearch:input(),
-  closePopup(){this.popup=null; api.releaseScope(this);},
+const view = (root='/repo', page='/branch/fix') => ({root,space:'s',page,width:736,height:500,scopeSearch:input(),
+  closePopup(){this.closed=true; api.releaseScope(this);},
   pick(page,opts){picked.push({page,...opts});},
-  openCommits(cx,lit){api.openScopePage(this,'commits',cx,lit);}});
+  openCommits(cx,lit){this.commits=lit;}});
 function element() {
   const el = new Proxy({}, {get(_target,key) {
     if (key === 'when') return (test,fn) => {if(test) fn(el); return el;};
@@ -88,20 +88,21 @@ const flush = async () => { for(let i=0;i<50;i++) await Promise.resolve(); };
   api.pickScopeRow(v, rows[0], cx);
   assert.deepEqual(JSON.parse(JSON.stringify(picked.pop())), {page:'/branch/fix',analyze:true});
   api.pickScopeRow(v, rows.at(-1), cx, 0);
-  assert.ok(v.scopePage === 'commits' && v.scopeListAt === 0);
+  assert.equal(v.commits, 0, 'Commits opens where the view puts it, its first row lit');
   api.pickListed(v, api.scopeList(v)[0], cx);
   assert.deepEqual(JSON.parse(JSON.stringify(picked.pop())), {page:'/commit/abc123',base:'/branch/fix'});
-  // A base picked: the space keeps it, Changes against it; the switch's pick stays open.
-  api.pickBase(v, 'origin/dev', cx, true);
-  assert.equal(state.get('review.bases').s, 'origin/dev');
-  assert.deepEqual(JSON.parse(JSON.stringify(picked.pop())), {page:'/compare/origin/dev...fix',stays:true});
 
-  // Keys: ↓ from nothing lights the first row; → on Commits opens it; Escape goes back, Commits lit.
-  const k = view(); k.popup = 'scope'; api.openScope(k,cx); await flush();
-  api.scopeKey(k,{key:'down'},cx); assert.equal(k.scopeAt,0);
+  // The menu's keys: ↓ from nothing lights the first row; → on Commits opens it; Escape closes the menu.
+  const k = view(); api.openScope(k,cx); await flush();
+  api.menuKey(k,{key:'down'},cx); assert.equal(k.scopeAt,0);
   k.scopeAt = api.scopeRows(k).length - 1;
-  api.scopeKey(k,{key:'right'},cx); assert.equal(k.scopePage,'commits');
-  api.scopeKey(k,{keystroke:'escape'},cx); assert.ok(k.scopePage === null && k.scopeAt === api.scopeRows(k).length - 1);
-  k.popup = 'settings'; assert.equal(api.scopeKey(k,{key:'down'},cx), false);
+  api.menuKey(k,{key:'right'},cx); assert.equal(k.commits,0);
+  api.menuKey(k,{keystroke:'escape'},cx); assert.ok(k.closed);
+  // Commits' keys: ↓ moves in its list; ← with the search empty, or Escape, goes back; ← in a search is the caret's.
+  let back = 0; const goBack = () => back++;
+  k.scopeListAt = -1; api.commitsKey(k,{key:'down'},cx,goBack); assert.equal(k.scopeListAt,0);
+  api.commitsKey(k,{key:'left'},cx,goBack); assert.equal(back,1);
+  k.scopeSearch.set_value('fix'); api.commitsKey(k,{key:'left'},cx,goBack); assert.equal(back,1);
+  api.commitsKey(k,{keystroke:'escape'},cx,goBack); assert.equal(back,2);
   console.log('ok: scope reads afresh and drops late reads; rows count in units, check only the range shown; picks go through the view');
 })().catch(error => { console.error(error); process.exit(1); });

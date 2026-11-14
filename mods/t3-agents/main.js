@@ -3,16 +3,15 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, settings, openOverlay, closeOverlay, props, nextCommand } from "herdr";
+import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, nextCommand } from "herdr";
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
-import { glow, tip } from "./tip.js";
-import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
-import { trigger } from "./trigger.js";
-import { menuJump } from "./list.js";
+import { stopsInit, stopsEnd, focusRoot, enter } from "./focus.js";
+import { trigger, hang } from "./trigger.js";
+import { menuKeys } from "./list.js";
 import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
 import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY, migrateLocal } from "./store.js";
+import { KEY, closedKey, migrateLocal } from "./store.js";
 import { pinList, setPinned } from "./pins.js";
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
@@ -24,7 +23,7 @@ const SORT_WIDTH = 200;
 
 export default class Agents extends View {
   async close() {
-    if (props()?.sortMenu) setShared("t3-agents.sortClosed", Date.now());
+    if (props()?.sortMenu) setShared(closedKey("t3-agents", "sort"), Date.now());
     stopsEnd(this);
   }
 
@@ -131,17 +130,7 @@ export default class Agents extends View {
       .bg(t.popover)
       .text_size(14)
       .opacity(this.shown ? 1 : 0).transition("opacity", MOTION)
-      .track_focus(this.keys).on_key_down((e, cx) => {
-        if (e.key === "enter") { if (this.at >= 0) choose(SORTS[this.at]); }
-        else if (e.key === "escape") closeOverlay(props().overlay);
-        else {
-          const to = menuJump(this, e, SORTS.map((s) => s.label), this.at);
-          if (to < 0) return;
-          this.at = to;
-        }
-        cx.stop_propagation();
-        cx.notify();
-      })
+      .track_focus(this.keys).on_key_down(menuKeys(this, SORTS.map((s) => s.label), (at) => choose(SORTS[at])))
       .child(div().px(8).py(6).text_size(12).line_height("16px").font_medium().text_color(t.muted).child("Sort agents"))
       .children(SORTS.map((s, i) => h_flex()
         .id(`sort-${s.id}`)
@@ -270,8 +259,8 @@ export default class Agents extends View {
             .child(div().text_size(12).font_medium().text_color(t.muted).child("Agents"))
             .child(
               // Hung from the button, right edges together, as T3's menus. No press (the keyboard), the app's default.
-              trigger(this, t, "ag-sort", { icon: `mods/t3-agents/icons/${sort.icon}.svg`, label: `Sort agents: ${sort.label}`, closed: "t3-agents.sortClosed",
-                onOpen: (b) => { const z = Number(settings()?.zoom) || 1; openOverlay({ mod: "t3-agents", kind: "popup", width: SORT_WIDTH, height: 140, ...(b ? { at: { x: b.x + b.width - SORT_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { sortMenu: true } }); } }),
+              trigger(this, t, "ag-sort", { icon: `mods/t3-agents/icons/${sort.icon}.svg`, label: `Sort agents: ${sort.label}`, closed: closedKey("t3-agents", "sort"),
+                onOpen: (b) => { openOverlay({ mod: "t3-agents", kind: "popup", width: SORT_WIDTH, height: 140, ...hang(b, SORT_WIDTH), props: { sortMenu: true } }); } }),
             ),
       )
       .when(list.length === 0, (el) =>

@@ -30,7 +30,8 @@ import { button as drawButton, radiusOf } from "./button.js";
 import { tip } from "./tip.js";
 import { popupOpen, trigger } from "./trigger.js";
 import { MENU_ROW, menuRow } from "./menu-row.js";
-import { menuJump } from "./list.js";
+import { menuKeys } from "./list.js";
+import { closedKey } from "./store.js";
 
 const STYLES = [['dots', 'Dots'], ['braille', 'Braille'], ['blocks', 'Blocks'], ['quadrants', 'Quadrants']];
 const styleName = (style) => STYLES.find(([id]) => id === style)?.[1] ?? style;
@@ -46,7 +47,7 @@ const icon = (name) => `mods/${MOD}/icons/${name}.svg`;
 const token = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 // + 's menu. Windows has no file dialog for mods: there files come by dropping them or through the folder.
-const MENU_CLOSED = `${MOD}.menuClosed`, MENU_W = 260, NOTE = 16;
+const MENU_CLOSED = closedKey(MOD, "menu"), MENU_W = 260, NOTE = 16;
 const menuItems = (windows) => [
   ...(windows ? [] : [{ id: "image", label: "Choose image…", icon: "image" }, { id: "ans", label: "Import Studio file (.ans)…", icon: "file" }]),
   { id: "studio", label: "asciicn Studio", note: "Export .ans there, then drop it here", icon: "external-link" },
@@ -151,17 +152,7 @@ export default class Wallpaper extends View {
       else run(`${MOD}.add:${p.token}:${it.id}`);
     };
     return v_flex().id("wallpaper-menu").size_full().p(4).bg(t.popover).track_focus(this.menuKeys)
-      .on_key_down((e, cx) => {
-        if (e.key === "escape") closeOverlay(p.overlay);
-        else if (e.key === "enter") pick(this.menuAt);
-        else {
-          const to = menuJump(this, e, items.map((it) => it.label), this.menuAt);
-          if (to < 0) return;
-          this.menuAt = to;
-        }
-        cx.stop_propagation();
-        cx.notify();
-      })
+      .on_key_down(menuKeys(this, items.map((it) => it.label), pick, { at: "menuAt" }))
       .children(items.map((it, i) => menuRow(this, t, `wallpaper-menu-${it.id}`, {
         at: [this, "menuAt", i], icon: icon(it.icon), pick: () => pick(i),
         label: it.note ? v_flex().child(div().truncate().child(it.label)).child(div().truncate().text_size(12).text_color(t.dim).child(it.note)) : it.label,

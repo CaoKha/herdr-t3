@@ -69,7 +69,7 @@ function load(...files) {
     .replace(/^import .*;\r?\n/gm, "").replace(/export (function|const) /g, "$1 ").replace("export default class", "globalThis.Mod = class");
   const context = vm.createContext({ ...env });
   // Load the real synced helper, including the alias main.js imports.
-  vm.runInContext("(() => {\n" + ["button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger;\n})();", context);
+  vm.runInContext("(() => {\n" + ["button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang;\n})();", context);
   vm.runInContext(src, context, { filename: files.at(-1) });
   const mod = new context.Mod(); mod.init({}, cx); return mod;
 }
@@ -269,7 +269,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   assert.ok(texts(find(list(), "kid-child")).includes("1h"), "no status change yet: working since it was made");
   const mark = (address) => find(list(), `kid-status-${address}`);
   assert.equal(mark("child").accessibility_label, "Working");
-  assert.equal(mark("child").items[0].svg, "mods/workspace-chrome/spinner.svg");
+  assert.equal(mark("child").items[0].items[0].svg, "mods/workspace-chrome/spinner.svg");
   assert.equal(mark("grandchild").accessibility_label, "Needs you");
   assert.deepEqual(texts(mark("grandchild")), ["!", "Needs you"]);
   find(list(), "kid-grandchild").handlers.click({}, cx);

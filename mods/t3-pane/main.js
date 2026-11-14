@@ -14,16 +14,16 @@ import { statusMark, STATUS_WORD } from "./status-mark.js";
 import { programIcon } from "./program.js";
 import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
-import { trigger } from "./trigger.js";
+import { trigger, hang } from "./trigger.js";
 import { menuKeys, scrollList } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 import { openMenu } from "./menu.js";
 import { button as drawButton, radiusOf } from "./button.js";
 
 // The list as the layout's other menus (the sort menu, the right-click menu): 4 around 28px rows.
-const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = "t3-pane.kidsClosed";
+const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = closedKey("t3-pane", "kids");
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const kidName = (k) => k.name || k.template || k.program?.name || k.address;
 
@@ -87,7 +87,7 @@ export default class Pane extends View {
     // Its status at the row's end, the Agents rows' mark; needing the person or failed, the word too; working or idle, for how long.
     const trail = (k, st) => STATUS_WORD[st] && h_flex().id(`kid-status-${k.address}`).flex_none().gap(4).items_center()
       .role("status").accessibility_label(STATUS_WORD[st])
-      .when(st !== "idle", (el) => el.child(statusMark(t, st)))
+      .when(st !== "idle", (el) => el.child(h_flex().w(12).flex_none().justify_center().child(statusMark(t, st))))
       .when(st === "blocked" || st === "error", (el) => el.child(menuHint(t, STATUS_WORD[st]).text_color(st === "error" ? t.ansi1 : t.blocked)))
       .when((st === "working" || st === "idle") && since(k) > 0, (el) => el.children(took(since(k), now).split(" ").map((part) => menuHint(t, part).font_family(mono))));
     // As tall as it is: the popup opens with no height, so it grows and shrinks as sub-agents come and go.
@@ -113,8 +113,7 @@ export default class Pane extends View {
     const label = stuck ? `${total}, ${stuck} need${stuck === 1 ? "s" : ""} you` : total;
     // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
     return trigger(this, t, `ph-kids-${pane}`, { text: String(kids.length), label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
-      onOpen: (b) => { const z = Number(settings()?.zoom) || 1; openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH,
-        ...(b ? { at: { x: b.x + b.width - KIDS_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { kids: terminal } }); } },
+      onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal } }); } },
     (el) => el.child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 
@@ -215,6 +214,6 @@ export default class Pane extends View {
         ? tipMark(this, t, `ph-mark-${pane}`, "Snoozed", h_flex().gap(4).items_center().text_size(12).text_color(t.accent)
           .child(svg("mods/t3-pane/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(nap, now)))
         : tipMark(this, t, `ph-mark-${pane}`, "Settled", svg("mods/t3-pane/icons/check.svg").size(14).flex_none().text_color(t.dim)))))
-      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", statusMark(t, "done"))))), 8));
+      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", statusMark(t, "done").mx(3))))), 8));
   }
 }

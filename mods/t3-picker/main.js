@@ -8,11 +8,12 @@ import { theme, spaces, panes, agents, terminals, focused, run, closeOverlay, pr
 import { modStatus, namer, programOf } from "./name.js";
 import { focusPane } from "./zoom.js";
 import { notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
+import { statusMark } from "./status-mark.js";
 import { projectMark } from "./project.js";
 import { programIcon } from "./program.js";
 import { step, scrollList } from "./list.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
 const ROW = 48;
@@ -31,7 +32,7 @@ export default class Picker extends View {
   }
 
   // For the buttons that open this: see justClosed in focus.js.
-  close() { setShared("t3-picker.closed", Date.now()); }
+  close() { setShared(closedKey("t3-picker"), Date.now()); }
 
   // Every pane: the ones you were in lately first, newest first (the tab bar keeps them, t3-tabs.recent); then the current
   // space's, then its machine's, as New orders spaces, each space's in tab order; the pane you're in last. Typing, a name that
@@ -67,10 +68,7 @@ export default class Picker extends View {
 
   row(item, i, ps) {
     const t = theme(), on = this.at === i, s = item.s, st = item.status;
-    // The same marks as the pane headers, tabs and agents list.
-    const mark = st === "working" ? svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)
-      : st === "blocked" ? div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!")
-      : st === "done" && !notNews(terminals().find(k => k.address === item.p.terminal), item.p.status, item.under) ? div().size(6).flex_none().rounded_full().bg(t.done) : null;
+    const mark = st === "done" && notNews(terminals().find(k => k.address === item.p.terminal), item.p.status, item.under) ? null : statusMark(t, st, 14);
     return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(item.label)
       .when(on, (el) => el.bg(t.selected))

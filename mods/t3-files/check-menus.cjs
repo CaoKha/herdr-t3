@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const src = fs.readFileSync(path.join(__dirname, "menus.js"), "utf8")
+const src = ["store.js", "menus.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.menu = { rowItems, mention };";
 const calls = [], notices = [], jobs = []; let clipboard = "original";
 const context = vm.createContext({ run: (c, a) => calls.push([c, a]), notify: n => notices.push(n), MENU_ROW: 28 });

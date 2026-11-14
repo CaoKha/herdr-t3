@@ -6,7 +6,7 @@ import { projectMark, placeOf, newTab } from "./project.js";
 import { step, scrollList } from "./list.js";
 import { keyOf, keyLabel } from "./tip.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
 const ROW = 48;
@@ -32,7 +32,7 @@ export default class NewMenu extends View {
   }
 
   // For the buttons that open this: see justClosed in focus.js. New space's and New tab's apart, as each opens the other's step.
-  close() { setShared(this.picking ? "t3-new-menu.pickClosed" : "t3-new-menu.closed", Date.now()); }
+  close() { setShared(closedKey("t3-new-menu", this.picking ? "pick" : undefined), Date.now()); }
 
   // The active space's machine first, as ⌘N would use it.
   machineRows() {

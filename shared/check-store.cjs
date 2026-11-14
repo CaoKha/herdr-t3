@@ -6,13 +6,13 @@ const vm = require("node:vm");
 
 const state = {}, local = new Map();
 const src = fs.readFileSync(path.join(__dirname, "store.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.store = { KEY, migrate, migrateLocal, migratePagePrefs, wrapLines, setWrapLines };";
+  + "\nglobalThis.store = { KEY, closedKey, migrate, migrateLocal, migratePagePrefs, wrapLines, setWrapLines };";
 const context = vm.createContext({
   shared: (k) => state[k] ?? null, setShared: (k, v) => { state[k] = v; },
   localStorage: { getItem: (k) => local.get(k) ?? null, setItem: (k, v) => local.set(k, v), removeItem: (k) => local.delete(k) },
 });
 vm.runInContext(src, context);
-const { KEY, migrate, migrateLocal, migratePagePrefs, wrapLines, setWrapLines } = context.store;
+const { KEY, closedKey, migrate, migrateLocal, migratePagePrefs, wrapLines, setWrapLines } = context.store;
 
 Object.assign(state, { "agents.pins": ["a", "b"], "t3-actions": { list: [{ id: "x" }], last: "x" }, "t3-inbox.notice": { live: true }, "space.icons": { k: "i" }, "t3-home.space": "h1" });
 state[KEY.home] = "h2";
@@ -59,4 +59,12 @@ migratePagePrefs();
 assert.equal(wrapLines(), false, "a choice from before the common wrap setting also survives");
 
 for (const k of Object.values(KEY)) assert.match(k, /^(t3|t3-[a-z-]+)\.[a-z][A-Za-z]*$/, `${k}: <mod>.<name> or t3.<name>, lowerCamel`);
+// A popup's close() and the control that opens it name its stamp through closedKey, never as a literal one side could misspell.
+assert.deepEqual([closedKey("t3-picker"), closedKey("t3-agents", "sort")], ["t3-picker.closed", "t3-agents.sortClosed"]);
+const root = path.join(__dirname, "..");
+for (const dir of ["shared", "mods", "extras/mods"]) for (const f of fs.readdirSync(path.join(root, dir), { recursive: true })) {
+  if (!f.endsWith(".js") || path.basename(f) === "store.js") continue;
+  const hit = fs.readFileSync(path.join(root, dir, f), "utf8").match(/["'`][^"'`\s]*\.([a-z]+C|c)losed["'`]/);
+  assert.equal(hit, null, `${dir}/${f}: ${hit?.[0]} — name a popup's close stamp with closedKey`);
+}
 console.log("ok: store moves old names once, keeps what's worth keeping, and names every key by the rule.");

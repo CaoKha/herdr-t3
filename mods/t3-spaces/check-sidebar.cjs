@@ -426,7 +426,7 @@ for (const width of [208, 240, 256, 320, 480]) {
     const slot = ag.status(f.theme(), { status });
     assert.equal(slot.style.size, 20, `${status} keeps the same status column`);
     const mark = slot.items[0];
-    assert.equal(mark.style.size + 2 * (mark.style.mx ?? 0), 12, `${status} mark is 12 wide, as T3's one-line row, so centers line up`);
+    assert.ok(mark.style.w === 12 && "justify_center" in mark.style, `${status} mark is centred 12 wide, as T3's one-line row, so centers line up`);
     assert.ok("justify_end" in slot.style && !("justify_center" in slot.style), "marks sit flush right in the slot");
     assert.equal(slot.handlers.on_click, undefined, "status remains an indicator, not a pin target");
   }

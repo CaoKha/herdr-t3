@@ -27,8 +27,8 @@ const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_fl
   glow: () => () => {}, litOnHover: () => () => {},
 });
 const load = f => vm.runInContext(fs.readFileSync(__dirname + '/' + f, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), c);
-['list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js'].forEach(load);
-vm.runInContext('(() => {\n' + ['button.js', 'trigger.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger;\n})();', c);
+['list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js', 'status-mark.js', 'store.js', 'titlebar.js'].forEach(load);
+vm.runInContext('(() => {\n' + ['button.js', 'trigger.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang;\n})();', c);
 load('menu-row.js');
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import [^;]*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
 const t = { foreground: '#ffffff', muted: '#888888', dim: '#777777', selected: '#333333', chrome: '#111111', hover: '#222222', popover: '#000000', border: '#444444', raised: '#555555' };

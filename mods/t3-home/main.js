@@ -6,7 +6,7 @@ import { layout, run, shared, theme } from "herdr";
 import { keyOf } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, pressed, justClosed } from "./focus.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 
 // The selected sidebar keeps its rows current while hidden too.
 function hasNext() {
@@ -14,8 +14,8 @@ function hasNext() {
 }
 const ACTIONS = [
   { id: "next", word: "Next agent", action: "t3-tabs.next", go: () => run("t3-tabs.next"), ready: hasNext },
-  { id: "goto", word: "Go to", action: "mod.open:t3-picker", go: () => run("mod.open", { name: "t3-picker" }), pops: "t3-picker.closed" },
-  { id: "new", word: "New tab", action: "t3-tabs.new", go: () => run("t3-tabs.new"), pops: "t3-new-menu.closed" },
+  { id: "goto", word: "Go to", action: "mod.open:t3-picker", go: () => run("mod.open", { name: "t3-picker" }), pops: closedKey("t3-picker") },
+  { id: "new", word: "New tab", action: "t3-tabs.new", go: () => run("t3-tabs.new"), pops: closedKey("t3-new-menu") },
 ];
 // A key as its strokes: each modifier, then the rest ("⇧⌘P", "Ctrl+Shift+P").
 const caps = (key) => key.match(/[⌃⌥⇧⌘]|[^⌃⌥⇧⌘+]+/gu);

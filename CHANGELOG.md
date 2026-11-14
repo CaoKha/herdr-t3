@@ -4,6 +4,8 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-14
 
+- Space picks the lit row in every menu, as Enter does: the agents' sort, the panel's `+`, the right-click menus, the Actions menu and the wallpaper's add menu took only Enter.
+
 - With many terminals the layout keeps drawing. Each sub-agent count used to read every terminal again, once per agent: with thousands of terminals the tab bar, Agents, the Inbox, Go to and a sub-agent list slowed every redraw, and around 5,000 Herdr stopped drawing them. Files search in a very large repository no longer stops on a short query that matches most files. Review's file tree draws a big review's folders without delay, and the space panel no longer checks Review four times a second while nothing happens.
 
 - Review and Files keep to the panel's 12px edge on every row: Review's file headers, hunk headers, line notes and group summary, and both file trees, now start and end where the panel head's first tab and last button do. A long hunk header stops 12 short of the right edge, and Files' Markdown preview is 12 in instead of 24.
