@@ -30,7 +30,7 @@ import { button as drawButton, radiusOf } from "./button.js";
 import { tip } from "./tip.js";
 import { popupOpen, trigger } from "./trigger.js";
 import { MENU_ROW, menuRow } from "./menu-row.js";
-import { menuKeys } from "./list.js";
+import { menuKeys, litProp, propsLit } from "./list.js";
 import { closedKey } from "./store.js";
 
 const STYLES = [['dots', 'Dots'], ['braille', 'Braille'], ['blocks', 'Blocks'], ['quadrants', 'Quadrants']];
@@ -63,7 +63,7 @@ const MOTION = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
 export default class Wallpaper extends View {
   init(_props, cx) {
     if (props()?.menu === "add") {
-      this.menuAt = -1;
+      this.menuAt = propsLit();
       this.menuKeys = cx.focus_handle();
       this.menuKeys.focus();
       return;
@@ -137,7 +137,7 @@ export default class Wallpaper extends View {
     const z = zoom(), height = menuHeight(menuItems(window()?.platform === "windows"));
     this.menuToken = token();
     const at = b && { x: Math.max(0, b.x + b.width - MENU_W * z), y: Math.max(0, b.y - (height + 6) * z) };
-    openOverlay({ mod: MOD, kind: "popup", width: MENU_W, height, ...(at ? { at } : {}), props: { menu: "add", token: this.menuToken } });
+    openOverlay({ mod: MOD, kind: "popup", width: MENU_W, height, ...(at ? { at } : {}), props: { menu: "add", token: this.menuToken, ...litProp(!b) } });
   }
 
   // menu-row.js's rows; Studio's says on a second line what to bring back.

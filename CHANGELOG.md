@@ -2,7 +2,16 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-15
+
+- Files' breadcrumb `›` menu works as T3's again: one menu that changes folder in place instead of opening another beside it. A folder in it shows its contents there; **Back to …** on top, or ←, goes up a folder (no higher than the crumb you opened it from); Escape closes it; picking a file opens it. Opened from the keyboard, its first row is lit.
+- Switching between Files and Review, the header's buttons (Tree, and those beside it) no longer jump up and down: a file's header in Files is now the same 40px bar as Review's, its controls centred. Review's Changes button starts its words where Files' first breadcrumb does.
+
 ## 2026-11-14
+
+- A menu or submenu opened from the keyboard (Enter or Space on its button, →, a shortcut) lights its first row, so Enter picks it at once; opened with the pointer, nothing is lit until the first arrow key or hover. This covers every menu: right-click and title menus, Snooze, Files', Details', Actions, the agents' sort, sub-agents, the panel's `+`, the wallpaper's add menu, the settings' dropdowns, the Inbox card's Snooze and Review's range, fold and settings submenus.
+- Closing the right-click menu's Snooze times with ← or Escape no longer breaks the menu ("This view could not be re-rendered"); the menu takes the keyboard back as they close. The same goes for Files' and Details' submenus.
+- Submenus hang beside the row that opens them and never cover it. Where neither side has room, as Review's settings (Language, Agent, Model) in a narrow panel, the submenu goes to the roomier side and narrows instead of sliding over its menu. This covers the right-click Snooze, Files' and Details' submenus, and Review's Commits and settings.
 
 - A long Agents list (more than 50 rows) draws only the rows in view and scrolls them with the wheel or trackpad: with 200 agents a redraw makes about 400 elements instead of 13,000. While it does, Tab reaches only the rows on screen.
 

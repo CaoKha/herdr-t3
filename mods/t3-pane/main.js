@@ -15,7 +15,7 @@ import { programIcon } from "./program.js";
 import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
-import { menuKeys, scrollList } from "./list.js";
+import { menuKeys, scrollList, litProp, propsLit } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
@@ -50,7 +50,7 @@ export default class Pane extends View {
   init(_props, cx) {
     if (props()?.kids) {
       // Take the keyboard; a row lights only after a key or the pointer arrives.
-      this.at = -1;
+      this.at = propsLit();
       this.keys = cx.focus_handle();
       this.keys.focus();
       // A working one's time runs on, as the Inbox's pill. With all of them ended, the list goes.
@@ -113,7 +113,7 @@ export default class Pane extends View {
     const label = stuck ? `${total}, ${stuck} need${stuck === 1 ? "s" : ""} you` : total;
     // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
     return trigger(this, t, `ph-kids-${pane}`, { text: String(kids.length), label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
-      onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal } }); } },
+      onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal, ...litProp(!b) } }); } },
     (el) => el.child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 

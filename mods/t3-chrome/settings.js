@@ -5,7 +5,7 @@ import { h_flex, v_flex, Select, Popup } from "gpui-base";
 import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFile, exec } from "herdr";
 import { SETTINGS, t3Settings } from "./layout-settings.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
-import { menuKeys } from "./list.js";
+import { menuKeys, openLit } from "./list.js";
 import { menuRow } from "./menu-row.js";
 
 const SECTIONS = [{ id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" }];
@@ -58,7 +58,8 @@ export function settingsView(view) {
   const menu = (r) => {
     const options = r.options(view), id = `st-${r.key}`, label = options.find(([v]) => v === now[r.key])?.[1] ?? now[r.key];
     const { focus, keys } = view.pick[r.key], open = view.picking === r.key;
-    const show = (on) => { view.picking = on ? r.key : null; view.pickAt = -1; };
+    // Opened by keys (Enter or Space on the button: no press), its first row lit; by the pointer, none (list.js openLit).
+    const show = (on, keys = false) => { view.picking = on ? r.key : null; view.pickAt = openLit(on && keys); };
     const choose = (value) => {
       show(false);
       focus.focus();
@@ -67,8 +68,10 @@ export function settingsView(view) {
     const trigger = stop(view, t, id, h_flex().id(id).w_full().h(32).px(11).gap(8).rounded(8).border_1().border_color(t.border).bg(t.raised).items_center().cursor_pointer()
       .hover((s) => s.bg(t.hover)).on_hover((on) => { view.overPick = on ? r.key : null; })
       .role("button").accessibility_label(`${r.title}: ${label}`)
+      .on_mouse_down("left", () => { view.pickPress = true; })
       .on_click((_e, cx) => {
-        show(!open);
+        show(!open, !view.pickPress);
+        view.pickPress = false;
         (open ? focus : keys).focus();
         cx.notify();
       })

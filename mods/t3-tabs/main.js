@@ -11,6 +11,7 @@ import { focusAgent, focusPane } from "./zoom.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { noteTitlebar } from "./titlebar.js";
+import { litProp } from "./list.js";
 import { sidebarParts } from "./sidebar.js";
 import { navigation } from "./navigation.js";
 import { newTab, projectMark } from "./project.js";
@@ -551,7 +552,7 @@ export default class Tabs extends View {
     // closes it.
     const titled = ctx.sub ?? ctx.head;
     const menu = (b) => {
-      openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...hang(b, 220, { align: "start" }), props: { tab: "agent", target: { address: titled } } });
+      openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...hang(b, 220, { align: "start" }), props: { tab: "agent", target: { address: titled }, ...litProp(!b) } });
     };
     // Its menu up: the title stays lit, its ⌄ shown and its label down, as the layout's other buttons that open one (trigger.js).
     const menuOn = (id) => popupOpen(this, id, closedKey("t3-menu"));

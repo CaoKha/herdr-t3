@@ -12,7 +12,7 @@
 import { View } from "gpui-kit";
 import { v_flex } from "gpui-base";
 import { run, props, closeOverlay, openOverlay, theme, keys, terminals, agents, spaces, panes, exec, setShared, layout } from "herdr";
-import { menuKeys } from "./list.js";
+import { menuKeys, propsLit } from "./list.js";
 import { menuRow, menuRule, menuHint } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
 import { openBeside, closeSub, subGone, closeChain, menuClosed } from "./popup-menu.js";
@@ -194,7 +194,7 @@ export default class Menu extends View {
   init(_props, cx) {
     // As T3's, nothing is lit until a key or the pointer gets there.
     const p = props();
-    this.at = p?.lit ?? -1;
+    this.at = propsLit();
     this.git = null;
     // The submenu's pointer state (submenu.js), the one open { id, row }, and each row's bounds as the pointer last found it.
     this.s = {};
@@ -226,7 +226,7 @@ export default class Menu extends View {
     const list = items(props(), this.git), it = list[i];
     const times = items({ tab: "snooze", target: it[2] }, null), h = rowTop(times, times.length) + PAD + 2;
     openBeside(this, i, it[1], { top: rowTop(list, i), width: WIDTH - 2 * PAD },
-      { mod: "t3-menu", width: WIDTH, height: h, props: { tab: "snooze", target: it[2], ...(lit ? { lit: 0 } : {}) } });
+      { mod: "t3-menu", width: WIDTH, height: h, props: { tab: "snooze", target: it[2] } }, null, lit);
   }
 
   choose(i, cx, lit = false) {

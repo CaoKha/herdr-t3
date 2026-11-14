@@ -7,7 +7,7 @@ import { agents, terminals, panes, spaces, focused, theme, layout, shared, setSh
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { stopsInit, stopsEnd, focusRoot, enter } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
-import { menuKeys } from "./list.js";
+import { menuKeys, litProp, propsLit } from "./list.js";
 import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
 import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
@@ -32,7 +32,7 @@ export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) {
       // It takes the keyboard, as the shipped menu does. As T3's menus: nothing's lit until a key or the pointer arrives, and it fades in.
-      this.at = -1;
+      this.at = propsLit();
       this.keys = cx.focus_handle();
       this.keys.focus();
       cx.timer.after(16, (cx) => { this.shown = true; cx.notify(); });
@@ -270,7 +270,7 @@ export default class Agents extends View {
             .child(
               // Hung from the button, right edges together, as T3's menus. No press (the keyboard), the app's default.
               trigger(this, t, "ag-sort", { icon: `mods/t3-agents/icons/${sort.icon}.svg`, label: `Sort agents: ${sort.label}`, closed: closedKey("t3-agents", "sort"),
-                onOpen: (b) => { openOverlay({ mod: "t3-agents", kind: "popup", width: SORT_WIDTH, height: 140, ...hang(b, SORT_WIDTH), props: { sortMenu: true } }); } }),
+                onOpen: (b) => { openOverlay({ mod: "t3-agents", kind: "popup", width: SORT_WIDTH, height: 140, ...hang(b, SORT_WIDTH), props: { sortMenu: true, ...litProp(!b) } }); } }),
             ),
       )
       .when(list.length === 0, (el) =>

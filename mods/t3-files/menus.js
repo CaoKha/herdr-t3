@@ -1,13 +1,13 @@
 // Files' menus (docs/adr/0018): native popups of this mod, as the layout's other menus. A tree row's (right-click, Shift+F10),
-// a breadcrumb's folder (›) and Open in's apps (⌄, drawn by open-in.js as Details' is). A row with › opens its submenu beside it
-// in a popup of its own (submenu.js), folders as deep as they go; they close together. Each acts only while the space and
-// tab it was opened on still show (`source`).
+// a breadcrumb's folder (›) and Open in's apps (⌄, drawn by open-in.js as Details' is). A row's Open with opens its submenu
+// beside it in a popup of its own (submenu.js); they close together. A breadcrumb's folder menu, as T3's FileBreadcrumbs, moves
+// through folders in place, Back on top. Each acts only while the space and tab it was opened on still show (`source`).
 import { svg } from "gpui-kit";
 import { v_flex } from "gpui-base";
 import { props, closeOverlay, theme, shared, setShared, spaces, exec, run, notify, window } from "herdr";
 import { focusRoot, stopsInit, stopsEnd } from "./focus.js";
-import { menuKeys, scrollList } from "./list.js";
-import { menuRow, MENU_ROW } from "./menu-row.js";
+import { menuKeys, scrollList, propsLit } from "./list.js";
+import { menuRow, menuRule, MENU_ROW } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
 import { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed } from "./popup-menu.js";
 import { targetsMenu, openTarget, targetIcon } from "./open-in.js";
@@ -21,8 +21,9 @@ export const MENU_W = 220, FOLDER_H = 8 + 12 * MENU_ROW;
 // Stamped as a top menu closes, for the control that opened it (trigger.js); a submenu's, for the menu it hangs off.
 export const MENU_CLOSED = closedKey("t3-files", "menu"), SUB_CLOSED = closedKey("t3-files", "submenu");
 
-/** Opens a top Files menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props. */
-export const openMenu = (kind, place, extra) => openPopup({ mod: "t3-files", width: MENU_W, ...place, props: { ...extra, files: kind } });
+/** Opens a top Files menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props;
+ *  `keys`: opened by keys, its first row lit. */
+export const openMenu = (kind, place, extra, keys = false) => openPopup({ mod: "t3-files", width: MENU_W, ...place, props: { ...extra, files: kind } }, null, null, keys);
 
 /** The space and tab a menu was opened on are still the ones shown. */
 const sourceOkay = (s) => { const sp = spaces().find(x => x.active); return sp?.id === s.space && sp.tabs.some(t => t.active && t.id === s.tab); };
@@ -76,25 +77,37 @@ export function initMenu(view, cx) {
   view.keys = cx.focus_handle(); view.keys.focus();
   stopsInit(view, cx, "modal");
   // As T3's, nothing is lit until a key or the pointer gets there; keys that opened a submenu light its first row.
-  view.at = p.lit ?? -1;
+  view.at = propsLit();
   // The submenu's pointer state (submenu.js), the one open { id, row }, and each row's bounds as the pointer last found it.
   view.s = {}; view.sub = null; view.rowsAt = [];
   // Where it opened: the pointer, for placing a submenu keys open before the pointer has found its row.
   view.origin = /** @type {any} */ (globalThis).window?.mouse_position?.();
+  // A breadcrumb menu's folder: it starts at its crumb's (`p.dir`), and Back goes no higher.
+  view.dir = p.dir;
   if (p.files === "folder") readFolder(view, cx);
   cx.timer.every(250, () => { if (!sourceOkay(p.source)) closeOverlay(p.overlay); });
 }
 
-// A breadcrumb menu's folder, read as it opens.
+// A breadcrumb menu's folder, read as it opens and each time it moves; a read for a folder it has left counts for nothing.
 function readFolder(view, cx) {
-  const p = props();
+  const p = props(), dir = view.dir;
   view.entries = null;
   cx.spawn(async (cx) => {
-    const r = await exec("sh", ["-c", LIST, "files", join(p.source.root, p.dir)], { on: p.source.on }).catch(() => null);
+    const r = await exec("sh", ["-c", LIST, "files", join(p.source.root, dir)], { on: p.source.on }).catch(() => null);
+    if (view.dir !== dir) return;
     view.entries = r?.code === 0 ? parseListing(r.stdout) : "failed";
     cx.notify();
   });
 }
+
+// The breadcrumb menu shows folder `dir` in place, from the top of its list; keys that moved it light its first row.
+function goTo(view, dir, cx, lit) {
+  view.dir = dir; view.at = lit ? 0 : -1; view.scrollTop = { ...view.scrollTop, "files-menu-list": 0 };
+  readFolder(view, cx);
+}
+
+// Where Back goes: the folder above, while that's still within the crumb's (T3's canGoBack); else null.
+const backDir = (view) => view.dir === props().dir ? null : view.dir.slice(0, Math.max(0, view.dir.lastIndexOf("/")));
 
 /** Closes every Files menu open, for cmd-w (keys.json's mod:t3-files runs t3-files.close): whether there was one. */
 export const closeMenus = () => closeTops("t3-files");
@@ -117,15 +130,17 @@ function items(view) {
     else if (it.id === "copy-path") cx.write_to_clipboard(p.path);
     else if (it.id === "mention" && p.agent) mention(p.path, p.agent.terminal, cx);
   } }));
-  // A breadcrumb's folder, as T3's: a folder opens its own beside it, read as it opens; a file opens in Files.
-  if (view.entries === "failed") return [{ id: "retry", label: "Retry loading folder", icon: "refresh-cw", keepOpen: true, run: (cx) => readFolder(view, cx) }];
-  if (!view.entries) return [{ id: "loading", label: "Loading folder…", disabled: true }];
-  if (!view.entries.length) return [{ id: "empty", label: "This folder is empty.", disabled: true }];
-  return view.entries.map(e => {
-    const path = join(p.dir, e.name);
-    return e.dir ? { id: path, label: e.name, glyph: svg(`${ICONS}/icons/tree/folder.svg`).size(16).flex_none().text_color(t.dim), sub: "folder" }
+  // A breadcrumb's folder, as T3's: Back to the folder above, then its entries; a folder shows in this menu, a file opens in Files.
+  const up = backDir(view), name = (dir) => dir.slice(dir.lastIndexOf("/") + 1) || s.root.replace(/\/$/, "").split("/").pop() || s.root;
+  const back = up === null ? [] : [{ id: "..", label: `Back to ${name(up)}`, icon: "arrow-left", into: up }];
+  if (view.entries === "failed") return [...back, { id: "retry", label: "Retry loading folder", icon: "refresh-cw", keepOpen: true, run: (cx) => readFolder(view, cx) }];
+  if (!view.entries) return [...back, { id: "loading", label: "Loading folder…", disabled: true }];
+  if (!view.entries.length) return [...back, { id: "empty", label: "This folder is empty.", disabled: true }];
+  return [...back, ...view.entries.map(e => {
+    const path = join(view.dir, e.name);
+    return e.dir ? { id: path, label: e.name, glyph: svg(`${ICONS}/icons/tree/folder.svg`).size(16).flex_none().text_color(t.dim), into: path }
       : { id: path, label: e.name, glyph: pierreFileIcon(t, ICONS, path), checked: path === p.file, run: () => run(`t3-files.pick:${path}`) };
-  });
+  })];
 }
 
 // Row `i`'s submenu beside it. `lit`: keys opened it, so its first row is lit, as Base UI's.
@@ -133,12 +148,13 @@ function openSub(view, i, lit) {
   const p = props(), it = items(view)[i];
   const height = it.sub === "editors" ? 8 + p.editors.length * MENU_ROW : FOLDER_H;
   openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: "t3-files", width: MENU_W, height,
-    props: { files: it.sub, source: p.source, path: p.path, editors: p.editors, dir: it.sub === "folder" ? it.id : null, file: p.file, ...(lit ? { lit: 0 } : {}) } });
+    props: { files: it.sub, source: p.source, path: p.path, editors: p.editors, dir: it.sub === "folder" ? it.id : null, file: p.file } }, null, lit);
 }
 
 function choose(view, i, cx, lit = false) {
   const it = items(view)[i];
   if (!it || it.disabled) return;
+  if (it.into !== undefined) return goTo(view, it.into, cx, lit);
   if (it.sub) return openSub(view, i, lit);
   // The whole chain closes, the menus it hangs off too.
   if (!it.keepOpen) closeChain();
@@ -150,22 +166,27 @@ export function menuView(view) {
   if (p.files === "open-in") return targetsMenu(view, ICONS, p.targets ?? [], p.reason, (name) => { if (sourceOkay(p.source)) setShared(KEY.openTarget, name); closeOverlay(p.overlay); });
   // Its submenu closed itself (← or Esc in it, a click beside it): the keyboard comes back here.
   subGone(view, SUB_CLOSED);
-  const list = items(view);
+  const list = items(view), o = list[0]?.id === ".." ? 1 : 0;
+  const row = (i) => { const it = list[i]; return menuRow(view, t, `files-menu-${it.id}`, { at: [view, "at", i], label: it.label, open: i === view.sub?.row,
+    icon: it.glyph ?? (it.icon ? `${ICONS}/icons/${it.icon}.svg` : null), sub: Boolean(it.sub || (it.into !== undefined && it.id !== "..")), disabled: it.disabled, hint: it.hint || "Not available",
+    trail: it.checked ? svg(`${ICONS}/icons/check.svg`).size(14).flex_none().text_color(t.foreground) : null, pick: (cx) => choose(view, i, cx),
+    also: (el) => el.on_mouse_move((e, cx) => {
+      view.rowsAt[i] = e.bounds;
+      hoverRow(view.s, it.sub ? it.id : null, e, cx, (key, _row, cx) => { if (key) openSub(view, i, false); else closeSub(view); cx.notify(); });
+    }) }); };
   return focusRoot(view, v_flex().id("files-menu").size_full().p(4).bg(t.popover).text_size(14).track_focus(view.keys)
     // Off the menu, nothing pending opens; a submenu open stays.
     .on_hover((on) => { if (!on) subLeft(view.s); })
     // A submenu's ← goes back to its menu, as its Esc does. Moving off the row whose submenu is open closes it, as Base UI's.
     .on_key_down((e, cx) => {
+      // ← in a breadcrumb menu goes up a folder, as its Back; at its crumb's folder it does nothing.
+      if (e.key === "left" && p.files === "folder") { const up = backDir(view); if (up !== null) goTo(view, up, cx, true); cx.stop_propagation(); cx.notify(); return; }
       menuKeys(view, list.map(it => it.label), (at, cx, lit) => choose(view, at, cx, lit), { back: Boolean(p.parents?.length), sub: (at) => Boolean(list[at]?.sub) })(e, cx);
       if (view.sub && view.sub.row !== view.at) closeSub(view);
     })
-    .child(scrollList(view, "files-menu-list", { count: list.length, row: MENU_ROW, at: view.at, height: Math.min(list.length * MENU_ROW, FOLDER_H - 8),
-      wheeled: (keep) => { if (keep >= 0) view.at = keep; },
-      draw: (i) => { const it = list[i]; return menuRow(view, t, `files-menu-${it.id}`, { at: [view, "at", i], label: it.label, open: i === view.sub?.row,
-        icon: it.glyph ?? (it.icon ? `${ICONS}/icons/${it.icon}.svg` : null), sub: Boolean(it.sub), disabled: it.disabled, hint: it.hint || "Not available",
-        trail: it.checked ? svg(`${ICONS}/icons/check.svg`).size(14).flex_none().text_color(t.foreground) : null, pick: (cx) => choose(view, i, cx),
-        also: (el) => el.on_mouse_move((e, cx) => {
-          view.rowsAt[i] = e.bounds;
-          hoverRow(view.s, it.sub ? it.id : null, e, cx, (key, _row, cx) => { if (key) openSub(view, i, false); else closeSub(view); cx.notify(); });
-        }) }); } })));
+    // Back, then a rule, stay put over the folder's entries.
+    .when(o > 0, (el) => el.child(row(0)).child(menuRule(t)))
+    .child(scrollList(view, "files-menu-list", { count: list.length - o, row: MENU_ROW, at: view.at - o, height: Math.min((list.length - o) * MENU_ROW, FOLDER_H - 8 - o * (MENU_ROW + 9)),
+      wheeled: (keep) => { if (keep >= 0) view.at = keep + o; },
+      draw: (i) => row(i + o) })));
 }

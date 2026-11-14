@@ -130,6 +130,8 @@ async function page() {
   await settle(); view.render(cx); await fire(0); await settle();
   root = view.render(cx);
   assert.ok(find(root, "t3-files-code"), "the file shows");
+  // Its header is Review's 40 bar, controls centred: the Tree switch stays put between the pages (R1).
+  assert.ok(find(root, "t3-files-toolbar").calls.h[0] === 40 && !find(root, "t3-files-toolbar").calls.mb, "Review's 40 bar, nothing under it");
   assert.equal(w.focused, "terminal", "an external reveal doesn't focus the tree");
   w.focused = "native-editor"; cx.stopped = false;
   find(root, "t3-files-content").handlers["on_mouse_down:left"]({}, cx);
@@ -224,6 +226,9 @@ async function page() {
   shared["t3-files.menuClosed"] = Date.now();
   find(view.render(cx), "browse-").handlers.on_click({}, cx);
   assert.equal(w.overlays.length, made, "the press that closed it doesn't open it again");
+  // Opened from the keys (no press), its first row lit (t3-tokens「菜单行」).
+  find(view.render(cx), "browse-").handlers.on_click({}, cx);
+  assert.equal(w.overlays.at(-1).props.lit, 0, "keys light the first row");
   // A breadcrumb menu's file is the person's pick: it opens and the tree takes the keyboard.
   w.focused = "terminal";
   send("pick:b.js"); await settle(); await fire(0);
@@ -242,19 +247,30 @@ async function menus() {
   // Herdr's window (the fake's `window` is herdr's window() too).
   Object.assign(ctx.window, { mouse_position: () => ({ x: 10, y: 10 }), viewport_size: () => ({ width: 1200, height: 800 }) });
   const top = menu({ files: "folder", source, dir: "", file: "a.js" }); await settle();
-  assert.deepEqual(rowsOf(top), ["files-menu-a.js", "files-menu-b.js"], "the folder's entries, read as it opens");
-  // A folder: Right on it opens its submenu beside it, hanging off this one.
+  assert.deepEqual(rowsOf(top), ["files-menu-a.js", "files-menu-b.js"], "the folder's entries, read as it opens; at its crumb's folder, no Back");
+  // As T3's FileBreadcrumbs: a folder changes this one menu in place, Back to where it was on top; no popup beside it.
   top.entries = [{ name: "src", dir: true }, ...top.entries];
   const keys = (v, key) => v.render(cx).handlers.on_key_down({ key }, cx);
-  keys(top, "down"); keys(top, "right");
-  const sub = w.overlays.at(-1);
-  assert.deepEqual(plain([sub.props.files, sub.props.dir, sub.props.parents, sub.props.lit]), ["folder", "src", ["m1"], 0], "src's submenu, its first row lit");
-  // A file in a submenu: the page asked to show it, every level closed.
-  const deep = menu({ files: "folder", source, dir: "src", parents: ["m0"] }); await settle();
-  deep.entries = [{ name: "x.js", dir: false }];
-  keys(deep, "down"); keys(deep, "enter");
+  const made = w.overlays.length;
+  keys(top, "down"); keys(top, "enter"); await settle();
+  assert.equal(w.overlays.length, made, "no submenu: the same popup");
+  assert.deepEqual(rowsOf(top), ["files-menu-..", "files-menu-src/d"], "src's entries, read, under Back");
+  // ← goes back up, and at the crumb's own folder does nothing; Back does what ← does.
+  keys(top, "left"); await settle();
+  assert.deepEqual(rowsOf(top), ["files-menu-a.js", "files-menu-b.js"], "back at the crumb's folder");
+  keys(top, "left"); assert.deepEqual(plain(w.closed), [], "← at the top stays open");
+  const sub = menu({ files: "folder", source, dir: "src", file: "a.js" }); await settle();
+  assert.ok(!rowsOf(sub).includes("files-menu-.."), "a crumb's menu goes no higher than its crumb");
+  sub.entries = [{ name: "d", dir: true }];
+  keys(sub, "down"); keys(sub, "enter"); await settle();
+  sub.render(cx); walk(sub.render(cx)).find((n) => n.key === "files-menu-..").handlers.on_click({}, cx); await settle();
+  assert.ok(!rowsOf(sub).includes("files-menu-.."), "Back returns to src");
+  // A file: the page asked to show it, this menu closed. Esc closes it too.
+  sub.entries = [{ name: "x.js", dir: false }];
+  keys(sub, "down"); keys(sub, "enter");
   assert.deepEqual(w.commands.at(-1), "t3-files.pick:src/x.js");
-  assert.deepEqual(plain(w.closed.slice(-2)), ["m1", "m0"], "it and the menus it hangs off close");
+  assert.deepEqual(plain(w.closed), ["m1"], "the one menu closes");
+  keys(top, "escape"); assert.equal(w.closed.length, 2, "Esc closes it");
   // A row's: Open with lists the editors beside it; Insert is off with no terminal in the tab.
   const row = menu({ files: "row", source, path: "a.js", agent: null, editors: ["Zed"] });
   assert.deepEqual(rowsOf(row), ["files-menu-open", "files-menu-reveal", "files-menu-open-with", "files-menu-copy-path", "files-menu-mention"]);

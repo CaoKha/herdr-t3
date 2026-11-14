@@ -2,7 +2,16 @@
 
 [English](CHANGELOG.md) · 中文
 
+## 2026-11-15
+
+- Files 面包屑的 `›` 菜单改回 T3 的做法：只有一个菜单，原地换目录，不再在旁边再开一层。点里面的目录就在这里显示它的内容；顶上的 **Back to …** 或 ← 回上一级（最高到打开它的那级面包屑），Esc 关闭，选中文件就打开。用键盘打开时第一行点亮。
+- 在 Files 和 Review 之间切换时，头部的按钮（Tree 和旁边几个）不再上下跳：Files 的文件头改成和 Review 一样的 40px 顶栏，控件居中。Review 的 Changes 按钮文字起点和 Files 第一个面包屑对齐。
+
 ## 2026-11-14
+
+- 用键盘打开的菜单和子菜单（按钮上 Enter 或 Space、→、快捷键）点亮第一行，直接按 Enter 就选中；用鼠标打开的什么都不亮，直到第一次按方向键或指针停上去。所有菜单都这样：右键和标题菜单、Snooze、Files、详情、Actions、agents 排序、子 agent、面板 `+`、壁纸添加菜单、设置页下拉框、Inbox 卡片的 Snooze，以及 Review 的范围、折叠和设置子菜单。
+- 右键菜单的 Snooze 时间用 ← 或 Esc 关掉后，菜单不再报错（「This view could not be re-rendered」），键盘在子菜单关闭时回到菜单。Files 和详情的子菜单同样。
+- 子菜单挂在打开它的那一行旁边，不再盖住它。两侧都放不下时（比如面板窄时 Review 设置的 Language、Agent、Model），放到空间大的一侧并收窄，不再滑到父菜单上。涉及右键 Snooze、Files 和详情的子菜单，以及 Review 的 Commits 和设置。
 
 - Agents 列表超过 50 行时只画视口里的行，用滚轮或触控板滚动：200 个 agent 时一次重画约 400 个元素，原来约 13,000 个。这时 Tab 只能走到屏幕上的行。
 

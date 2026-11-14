@@ -12,7 +12,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ## File header
 
-- Inline: 28 high, 12 below, 12 horizontal (R1, the panel head's edge), no bottom rule.
+- Inline: 40 high, controls centred, as Review's toolbar, so Tree and its neighbours keep their place between the pages; 12 horizontal (R1, the panel head's edge), no bottom rule.
 - Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; on (12%) while its menu is open. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
 - On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, touching `sm` (28) buttons. All take the `chrome` hover and on (P7).
 - Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Wrap; deliberate).
@@ -56,9 +56,9 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 ## Folders from the breadcrumbs
 
 - A folder crumb opens a folder tab beside the source file, keeping its trail; moving between folders then replaces that tab in place. Folders are never read as text.
-- `›` opens that folder's menu, a native popup: folders show a folder icon and `›`, files their type icon. A folder cascades its own menu beside it, any depth. Hover (submenu timing), click, → or Enter opens; ← or Esc closes one level; picking a file opens it and closes all.
-- Placement by `shared/submenu.js` `subPlace`: right if it fits, else left; a page too narrow for either lets the third level overlap the first. The breadcrumb menu's left edge lines up with `›`, 4 below. A folder menu scrolls after 12 rows.
-- No T3 "Back to" in place: our choice.
+- `›` opens that folder's menu, one native popup, as T3's `FileBreadcrumbs` (the user's choice, 2026-11-15, replacing a cascade): folders show a folder icon and `›`, files their type icon. Click or Enter on a folder shows it in the same menu, read afresh; keys that moved it light its first row. Opened from the keys, its first row is lit ([t3-tokens「菜单行」](../t3-tokens.md)).
+- Below the crumb's own folder, the first row is `Back to <folder above>` (the project's name at the root, arrow-left icon), then a rule; both stay put while the entries scroll. Back or ← goes up one folder, never above the crumb that opened it; there ← does nothing. Esc closes; picking a file opens it and closes the menu.
+- The menu's left edge lines up with `›`, 4 below; it keeps its height (12 rows) while it moves, and the entries scroll past that.
 
 ## Search
 

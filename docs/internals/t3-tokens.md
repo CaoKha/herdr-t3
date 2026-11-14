@@ -29,9 +29,10 @@
 
 ### 对齐
 
-- **R1 末端对齐**：每条顶栏最右的按钮，框的右缘对齐正下方那一行最右的控件。侧栏是两行都离侧栏边 8；工作列对齐窗格头末端（离窗口边 12）；面板列对齐页头（面板内 12）。左侧同理：面板头首个标签的框和页头的面包屑框都在面板内 12。面板页内每一行都按这条边：首末控件的框（静止无底的 ghost 也按框算，与未选中标签一样）或无框的文字，在所在列内 12（导航列从左边线内侧算）。Review：顶栏、组页签行、diff 文件头、hunk 行、文件注释、行注释卡、组说明、导航列头和树行；Files：文件头、树头、树行、Markdown 预览。右对齐的代码行号栏（Review 的 diff 与 Files 的宿主 `Editor`）是一列 gutter，不算。
+- **R1 末端对齐**：每条顶栏最右的按钮，框的右缘对齐正下方那一行最右的控件。侧栏是两行都离侧栏边 8；工作列对齐窗格头末端（离窗口边 12）；面板列对齐页头（面板内 12）。左侧同理：面板头首个标签的框和页头的面包屑框都在面板内 12。面板页内每一行都按这条边：首末控件的框（静止无底的 ghost 也按框算，与未选中标签一样）或无框的文字，在所在列内 12；例外：行首静止无底、带文字的按钮（Review 的范围按钮）左内边距 2，同 Files 面包屑，框在 12、文字在 14，切页时首字不动（2026-11-15 用户决定）（导航列从左边线内侧算）。Review：顶栏、组页签行、diff 文件头、hunk 行、文件注释、行注释卡、组说明、导航列头和树行；Files：文件头、树头、树行、Markdown 预览。右对齐的代码行号栏（Review 的 diff 与 Files 的宿主 `Editor`）是一列 gutter，不算。
 - **R2 列内同尺寸**：上下对齐的两行用同一尺寸的按钮，同一组也一样。
 - **R3 内容右缘**：侧栏卡片、slim 行和 Lists 的 Spaces／Agents 行（含子 agent 行和树线）横向内边距 8，状态文字和程序图标的右缘落在按钮图标的右缘上，左缘与 Search 图标、底栏齿轮同线。
+- **R4 子菜单挂在行旁**：子菜单贴着打开它的那一行的右缘，首行与那一行同高（照 T3 `MenuSubPopup` 的 alignOffset，子菜单顶比行顶高 5，抵掉它的边框和内边距）。右侧放得下就放右侧；只有左侧放得下就翻到左侧，右缘贴着行的左缘；两边都放不下，放在空间大的一侧并收窄到那一侧的宽度。无论哪种情况都不盖住那一行。原生 popup 和 Review 页内的子菜单都用 `shared/submenu.js` 的 `subPlace` 定位（页内留出面板两端各 8）；垂直方向只为留在窗口或面板内而移动。
 
 ## 圆角
 
@@ -95,6 +96,7 @@
 
 所有弹出菜单的行用 `shared/menu-row.js` 的 `menuRow(view, t, id, { at: [state, key, i], label, open?, icon?, lead?, trail?, color?, sub?, disabled?, hint?, pick?, also? })`，照 T3 `ui/menu.tsx` 的 MenuItem：
 
+- 打开时：用键盘打开的菜单和子菜单（按钮上 Enter／Space、→、快捷键）点亮第一行；用指针打开的什么都不亮，直到第一次按方向键或指针停到行上（2026-11-14 用户决定）。由 `shared/list.js` 统一给出：页内菜单打开时取 `openLit(keys)`；原生 popup 由打开方在 props 里放 `litProp(keys)`（`popup-menu.js` 的 `openPopup`／`openBeside` 收 `keys` 参数代放），popup 启动时取 `propsLit()`。按钮的 `opener`／`trigger` 的 `onOpen(b)` 没有按下坐标（`b` 为空）就是按键打开，传 `!b`；命令和快捷键传 `true`；右键传 `false`。带搜索框的选择器（Go to、New、Review 栏菜单、base 选择器）按各自的首项规则，不在此列。
 - 只在指针停在行上或键盘选中时用 `selected` 底；指针离开就熄灭，宿主晚到的 leave 不熄灭指针已进入的下一行（`shared/list.js` 的 `litOnHover`）。子菜单开着时（`open`）父行保持点亮。
 - 禁用：整行透明度 0.64（`DISABLED`），不点亮、不响应点击；`hint` 用 `tip()` 说明原因，不用宿主 `.tooltip()`。
 - 行尾提示用 `menuHint`，分隔线用 `menuRule`。按键用 `list.js` 的 `menuKeys`，滚动用 `scrollList`，子菜单用 `popup-menu.js`／`submenu.js`，由各菜单自己接。`label` 不是文字（元素）时，调用方自己设 `accessibility_label`；role 不是按钮的（设置页 Select 的选项 `list_box_option`、base 的 `radio_button`）在调用方覆盖。

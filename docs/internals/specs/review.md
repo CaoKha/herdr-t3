@@ -4,14 +4,14 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Toolbar
 
-- T3 `DiffPanel`'s head: 40 high, 12 horizontal (R1), a `border` below.
+- T3 `DiffPanel`'s head: 40 high, 12 horizontal (R1), a `border` below. The scope button leading it has 2 left padding, as a Files crumb: its box at 12, its words at 14, where Files' first crumb's are.
 - Buttons are all `sm` (28) with the `chrome` hover and on: range, commit `‹ ›`, Analyze, fold menu, settings, navigation toggle. Icon buttons touch; text buttons and icon groups are 8 apart. The comparison target (a combobox trigger) stays `xs`, as T3.
 - Popovers open 4 below their button (top 38), right-aligned to it. Page popovers write `review.<name>Closed` when an outside press closes them (see [storage](../storage.md)).
 - No repository, or another machine: the toolbar says `Review` and navigation is disabled. A range with no changes says `No changes`.
 
 ## Range menu
 
-- Changes, Uncommitted, Outgoing, Incoming, each with its count as `3 commits` / `1 file`; zero disables a row unless it is the one shown. Nothing is lit on opening.
+- Changes, Uncommitted, Outgoing, Incoming, each with its count as `3 commits` / `1 file`; zero disables a row unless it is the one shown. Opened by keys, the first row is lit; by the pointer, none.
 - A separator, then the searchable Commits submenu (list at most 320).
 - Branch ranges show `head → base`, `vs base` under 640px; a commit shows its short SHA with `‹ ›`.
 - `review.scope[:commits]` opens it by command.

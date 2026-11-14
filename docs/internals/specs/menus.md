@@ -34,19 +34,19 @@ Context menus (`t3-menu`, opened through `shared/menu.js`), submenus (`shared/su
 
 ## Submenus
 
-T3's `MenuSub`. Used by the agent menu's Snooze, Files' folder cascade, Details' Commits and Review's Commits and settings.
+T3's `MenuSub`. Used by the agent menu's Snooze, Files' Open with, Details' Commits and Review's Commits and settings.
 
 - **Hover intent**: resting 100ms on a trigger row opens its submenu; with one open, moving to another row also waits 100ms before switching.
 - **Safe triangle**: from the pointer where it left the trigger row to the submenu's near top and bottom corners. Moving inside it neither switches nor closes; the pointer gets 300ms to cross an intervening row.
-- **Placement**: `subPlace(row bounds, width, …, viewport width)` puts the submenu beside the trigger with its first row aligned; if only the left fits, it flips left. Herdr clamps an overlay that leaves the window instead of flipping it, so the flip is computed. When neither side fits, a deeper level may overlap an earlier one.
-- **Keyboard**: → or Enter on the trigger opens it with the first item lit (or its search field focused); ← or Esc closes only the submenu, back to the trigger, and the parent keeps keyboard ownership; a pick closes the whole chain.
+- **Placement**: [t3-tokens R4](../t3-tokens.md): `subPlace(row bounds, width, …, viewport width)` puts the submenu against the trigger row's right edge with its first row level with it; if only the left fits, it flips left; if neither fits, it takes the roomier side, narrowed to it. It never covers the trigger row. Herdr clamps an overlay that leaves the window instead of flipping it, so the flip and the narrowing are computed.
+- **Keyboard**: → or Enter on the trigger opens it with the first item lit (or its search field focused); ← or Esc closes only the submenu, back to the trigger, and the parent takes the keyboard back as the submenu closes (`popup-menu.js` `menuClosed`; Herdr refuses `focus()` while a view draws, so never in render); a pick closes the whole chain.
 - **Carriers**: in `t3-menu`, Files and Details each level is its own native `openOverlay` popup, placed under or beside its row, as Herdr's `win98` menus do. Which menu hangs under which is kept in this run's `globalThis.t3Popups` ([storage](../storage.md)), so closing a parent closes its children. A transparent canvas holding several levels is ruled out: its empty parts still block input. The Review page draws its menus inside the pane: `subPlace` works within the panel's width, and the parent's outside-press handler lets presses in its submenu through.
 - The trigger row keeps its highlight while its submenu is open (`menuRow`'s `open`).
 
 ## Popup lists and keys
 
 - Arrows wrap and scroll the highlight into view, except a row held by the pointer (the wheel follows the pointer).
-- Menus without a search light nothing at first: an immediate Enter does nothing until navigation or hover. Leaving a row clears it, except in the sort menu.
+- Menus without a search: opened by keys (Enter or Space on their button, →, a shortcut), the first row is lit; opened by the pointer, nothing is, and an immediate Enter does nothing until navigation or hover ([t3-tokens「菜单行」](../t3-tokens.md)). Leaving a row clears it, except in the sort menu.
 - Home and End jump in menus without a search; in a search field they stay caret keys.
 - Typeahead lasts 750ms; repeating a letter cycles through items starting with it.
 - Pressing the opening button again closes the popup rather than reopening it (`trigger()`, t3-tokens P6).

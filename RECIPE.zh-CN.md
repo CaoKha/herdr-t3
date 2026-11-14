@@ -64,7 +64,7 @@ Herdr 原生 zoom 中的标签变为虚线分段组，每 pane 一段。标签�
 
 ### Files
 
-Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件后左边是内容，右边可调宽的列里是树。文件头有面包屑（`›` 打开级联的目录菜单）、Open in 分体按钮和 Preview/Code、Wrap、Tree 开关。树没有折叠箭头：目录图标开合两态，文件用 Pierre 图标、颜色取主题，忽略项变暗。搜索过滤同一棵树。内容是 Markdown 预览、原生只读 `Editor` 或图片。规格：[files](docs/internals/specs/files.md)。
+Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件后左边是内容，右边可调宽的列里是树。文件头有面包屑（`›` 打开一个目录菜单，照 T3 原地换目录，顶上是 Back）、Open in 分体按钮和 Preview/Code、Wrap、Tree 开关。树没有折叠箭头：目录图标开合两态，文件用 Pierre 图标、颜色取主题，忽略项变暗。搜索过滤同一棵树。内容是 Markdown 预览、原生只读 `Editor` 或图片。规格：[files](docs/internals/specs/files.md)。
 
 ### 可选 Review
 

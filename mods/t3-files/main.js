@@ -458,11 +458,11 @@ export default class Files extends View {
   // The menus' place: the space and tab they act on (menus.js closes one once they don't show).
   source(st) { return { space: st.id, tab: spaces().find(s => s.id === st.id)?.tabs.find(t => t.active)?.id, root: st.root, on: st.on }; }
 
-  // A tree row's menu, at the pointer (or, from the keys, where the app puts one).
-  rowMenu(st, path) {
+  // A tree row's menu, at the pointer (or, from the keys, where the app puts one, its first row lit).
+  rowMenu(st, path, keys = false) {
     const agent = terminalFor(st.id), editors = (knownTargets() ?? this.targets).filter(name => name !== "Finder");
     const n = rowItems({ remote: Boolean(st.on), platform: window()?.platform, agent, editors }).length;
-    openMenu("row", { height: 8 + n * MENU_ROW }, { source: this.source(st), path, agent: agent ? { terminal: agent.terminal } : null, editors });
+    openMenu("row", { height: 8 + n * MENU_ROW }, { source: this.source(st), path, agent: agent ? { terminal: agent.terminal } : null, editors }, keys);
     this.opened = { id: `row:${path}`, at: Date.now() };
   }
 
@@ -530,7 +530,8 @@ export default class Files extends View {
   }
 
   // Only a file has a subheader; Markdown uses one icon toggle, not a segmented text control. 12 in, as the panel head above
-  // (t3-tokens「规则」R1); Open in, then the three switches touching, 8 between (P3); its buttons on chrome, as the head's (P7).
+  // (t3-tokens「规则」R1); 40 high, its controls centred, as Review's bar, so Tree stays put between the pages. Open in, then
+  // the three switches touching, 8 between (P3); its buttons on chrome, as the head's (P7).
   toolbar(st, t) {
     const md = kindOf(st.file ?? "") === "markdown", code = shared(MARKDOWN) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
@@ -543,11 +544,11 @@ export default class Files extends View {
     // A folder's menu (menus.js), under its ›, its left edge with it; on while it's open, a second press closes it (trigger.js).
     const separator = path => { const id = `browse-${path}`, on = popupOpen(this, id, MENU_CLOSED);
       return stop(this, t, id, opener(this, { id, closed: MENU_CLOSED, onOpen: (b) => {
-        openMenu("folder", { height: FOLDER_H, ...hang(b, MENU_W, { align: "start" }) }, { source: this.source(st), dir: path, file: st.file });
+        openMenu("folder", { height: FOLDER_H, ...hang(b, MENU_W, { align: "start" }) }, { source: this.source(st), dir: path, file: st.file }, !b);
       } })(div().id(id).w(16).h(20).mx(2).rounded(4).flex_none().flex().items_center().justify_center().cursor_pointer()
         .when(on, s => s.bg(t.foreground + "1f")).when(!on, el => el.hover(s => s.bg(t.foreground + "12"))))
       .child(svg(`${MOD}/icons/chevron-right.svg`).size(14).text_color(on ? t.foreground : t.dim)).role("button").accessibility_label(`Browse ${path || nameOf(st.root)}`), 4); };
-    return h_flex().id("t3-files-toolbar").h(28).mb(12).flex_none().px(12).gap(8).items_center()
+    return h_flex().id("t3-files-toolbar").h(40).flex_none().px(12).gap(8).items_center()
         .child(h_flex().id("t3-files-breadcrumbs").flex_1().min_w(0).overflow_x_scroll().bg("#00000000").items_center().text_size(12)
           .when(Boolean(st.root), (el) => el.child(crumb(nameOf(st.root.replace(/\/$/, "")) || st.root, "", current === "")))
           .children(parts.flatMap((part, i) => [separator(parts.slice(0, i).join("/")), crumb(part, parts.slice(0, i + 1).join("/"), parts.slice(0, i + 1).join("/") === current)])))
@@ -575,7 +576,7 @@ export default class Files extends View {
       main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 16)).on_hover(hover(id))
         .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target); })))),
       more => kept(moreId, more.on_hover(hover(moreId)).when(available, opener(this, { id: moreId, closed: MENU_CLOSED, onOpen: (b, cx) => {
-        openMenu("open-in", { height: openInHeight(names), ...hang(b, MENU_W) }, { source: this.source(st), targets: names });
+        openMenu("open-in", { height: openInHeight(names), ...hang(b, MENU_W) }, { source: this.source(st), targets: names }, !b);
         cx.spawn(async cx => { this.targets = await installedTargets(); cx.notify(); });
       } }))));
   }
@@ -704,7 +705,7 @@ export default class Files extends View {
       .on_key_down((e, cx) => {
         const at = rows.findIndex((r) => r.path === (st.focus ?? st.file));
         // Shift+F10 opens the row's menu, as a right-click on it.
-        if (e.keystroke === "shift-f10") { const row = rows[at]; if (row) this.rowMenu(st, row.path); cx.stop_propagation(); cx.notify(); return; }
+        if (e.keystroke === "shift-f10") { const row = rows[at]; if (row) this.rowMenu(st, row.path, true); cx.stop_propagation(); cx.notify(); return; }
         const k = treeKey(e.key, rows, at);
         if (!k) return;
         this.treeKeys = true;

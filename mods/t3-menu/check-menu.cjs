@@ -25,12 +25,12 @@ const find = (node, id) => !node || typeof node !== "object" ? null : node.key =
 const theme = { selected: "#selected", hover: "#hover", foreground: "#fg", ansi1: "#red" };
 let target = {}, calls = [], closed = [], state = {}, list = "inbox", opened = 0, zoom = 1, view = { width: 1200, height: 800 }, mouse = { x: 0, y: 0 };
 let terms = [{ address: "t1", labels: {} }], agentList = [];
-// closeOverlay leaves the popup registry, as Herdr's running a closed popup's close() does.
+// closeOverlay runs what a closed t3-menu's close() does with the registry (popup-menu.js menuClosed), as Herdr calls close().
 const context = vm.createContext({
   // menu-row.js's: button.js's and tip.js's (no row here is disabled).
   DISABLED: 0.64, glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
   View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
-  run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); context.t3Popups?.delete(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
+  run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); context.menuClosed?.(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
   window: { viewport_size: () => view, mouse_position: () => mouse },
   theme: () => theme, keys: () => [], settings: () => ({ zoom }), terminals: () => terms, agents: () => agentList, spaces: () => [{ id: "s1", folder: "/work/p1", tabs: [{ id: "b1" }] }], panes: () => [{ pane: "p1", tab: "b1", cwd: "/work/s1" }], exec: async () => ({ code: 1 }),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, hc: async () => ({ code: 0 }), notify() {},
@@ -255,15 +255,14 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   let s = new context.Menu();
   s.init(target, cx);
   assert.equal(find(s.render(), "mi-0").style.bg, theme.selected, "its first time lit");
+  const focused = m.keys.focused;
   key(s, { key: "left" });
   assert.deepEqual(closed, [sub], "←: it alone closes");
+  assert.equal(m.keys.focused, focused + 1, "and the menu takes the keyboard back as it closes");
   s.close();
   target = { tab: "agent", target: { address: "t1" }, overlay: "root" };
-  const focused = m.keys.focused;
   m.render();
-  assert.equal(m.keys.focused, focused + 1, "the menu takes the keyboard back");
-  m.render();
-  assert.equal(m.keys.focused, focused + 1, "once");
+  assert.equal(m.keys.focused, focused + 1, "drawing again focuses nothing (Herdr refuses focus() there)");
   assert.equal(row(m, 2).style.bg, theme.selected, "on Snooze");
   key(m, { key: "enter" });
   assert.deepEqual(opens().map((o) => o.props.lit), [0], "Enter opens it too");

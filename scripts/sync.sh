@@ -20,7 +20,7 @@ share details mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-tabs extras/mods
 share measured-text mods/t3-actions mods/t3-chrome mods/t3-tabs
 share motion mods/t3-inbox mods/t3-agents mods/t3-spaces
 share focus extras/mods/review mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
-share list mods/t3-chrome mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
+share list mods/t3-chrome mods/t3-tabs mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share zoom mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-picker
 share sidebar mods/t3-chrome mods/t3-home mods/t3-tabs mods/t3-spaces mods/t3-agents mods/t3-inbox mods/t3-pane mods/t3-menu
 share layout-settings mods/t3-chrome mods/t3-tabs mods/t3-inbox

@@ -5,7 +5,7 @@ import { tip, glow } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { noteTitlebar } from "./titlebar.js";
-import { menuKeys } from "./list.js";
+import { menuKeys, litProp, propsLit } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { initSettings, settingsView } from "./settings.js";
@@ -40,7 +40,7 @@ export default class WorkspaceChrome extends View {
     if (props()?.view === "settings") return initSettings(this, cx);
     stopsInit(this, cx);
     if (props()?.part?.startsWith("surface-")) {
-      this.surfaceKeys = cx.focus_handle(); this.surfaceAt = -1; this.reviewReason = "";
+      this.surfaceKeys = cx.focus_handle(); this.surfaceAt = propsLit(); this.reviewReason = "";
       // A popup takes the keyboard; the panel's docked empty page doesn't take it from the terminal.
       if (props()?.part !== "surface-empty") this.surfaceKeys.focus();
       // Only where Review is offered: whether it can read where the tab works (panel.js reviewRepo), again as that moves (render).
@@ -186,7 +186,7 @@ export default class WorkspaceChrome extends View {
       const left = globalThis.window.viewport_size().width - (pad + this.headW) * z;
       at = { x: left + (HEAD_IN + (this.addX ?? 0) - (this.surfaceStrip.at ?? 0)) * z, y: (high / 2 + 12 + 6) * z };
     }
-    openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(rows), ...(at ? { at } : {}), props: { part: "surface-menu" } });
+    openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(rows), ...(at ? { at } : {}), props: { part: "surface-menu", ...litProp(!press) } });
   }
 
   // The space panel's head (docs/internals/specs/space-panel.md): its tabs as T3's, + after them in the same scrolled strip,

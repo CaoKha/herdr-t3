@@ -23,11 +23,11 @@ function element() {
 let now = 0, zoom = 2;
 const src = fs.readFileSync(path.join(__dirname, "list.js"), "utf8")
   .replace(/^import .*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.list = { step, menuJump, scrollList, menuKeys };";
-let closed = [];
-const context = vm.createContext({ div: element, settings: () => ({ zoom }), Date: { now: () => now }, props: () => ({ overlay: "o1" }), closeOverlay: (id) => closed.push(id) });
+  + "\nglobalThis.list = { step, menuJump, scrollList, menuKeys, openLit, litProp, propsLit };";
+let closed = [], popupProps = { overlay: "o1" };
+const context = vm.createContext({ div: element, settings: () => ({ zoom }), Date: { now: () => now }, props: () => popupProps, closeOverlay: (id) => closed.push(id) });
 vm.runInContext(src, context);
-const { step, menuJump, scrollList, menuKeys } = context.list;
+const { step, menuJump, scrollList, menuKeys, openLit, litProp, propsLit } = context.list;
 
 // ↑/↓ go round the ends, and with nothing lit start from one.
 assert.equal(step({ key: "down" }, 2, 3), 0);
@@ -117,6 +117,16 @@ const shown = (list) => list.items.map((n) => [n.key, n.style.top]);
   const end = scrollList({}, "l", { count: 2, row: 10, at: 0, height: 40, draw, wheeled: () => keeps.push("moved") });
   end.handlers.on_scroll_wheel({ delta: { y: 10 } }, cx);
   assert.deepEqual([cx.stopped, keeps], [true, []], "nothing to scroll: still not what's under the popup's");
+}
+
+// A menu opened by keys (Enter, →, a shortcut) lights its first row; opened by the pointer, none until an arrow key.
+{
+  assert.deepEqual([openLit(true), openLit(false)], [0, -1]);
+  popupProps = { overlay: "o1", ...litProp(true) }; assert.equal(propsLit(), 0, "a popup opened by keys");
+  popupProps = { overlay: "o1", ...litProp(false) }; assert.equal(propsLit(), -1, "by the pointer");
+  const cx = { stop_propagation() {}, notify() {} }, v = { at: propsLit() };
+  menuKeys(v, ["A", "B"], () => {})({ key: "down" }, cx); assert.equal(v.at, 0, "its first arrow lights the first row");
+  popupProps = { overlay: "o1" };
 }
 
 // A popup menu's keys (menuKeys), with each of its options.
