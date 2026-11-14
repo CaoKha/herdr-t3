@@ -57,7 +57,7 @@ Apply 和 Studio 导入保存时，在独占的 `.preview/save-<unique-id>/` 写
 
 `selected` 是最后一次选择标签的事件号，用于 Files 在重复选择当前标签时也清空搜索并定位；旧 `page` 字段只作 stack 布局回传的同步记号，不是可见的页签模式。`t3.openTarget` 在Files／详情之间全局只保存一个目标名，不保留本轮旧键迁移；本机每次运行共用 `globalThis.t3OpenInTargets` 的 `{version:3,promise,names}` 并行应用检测，名单版本变化即替换旧缓存，目标卸载时失效并回退Finder。已完成名单可经knownTargets只读访问，避免热加载时旧init任务丢失使Files永久只留Finder；绘制不等待promise或扫描应用。候选仅取T3完整编辑器表，以macOS LaunchServices查安装（GUI进程PATH可能没有CLI）；绘制和打开菜单不扫描。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
 
-Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。Review 标签关闭同步删除 `review.shown[space]`，其内存副本按实例号驱逐，迟到读取失效。详情来源和弹层 id 只通过 popup props 传递，不写持久状态；本机机器名在弹层启动时读取。
+Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。`review.shown[space]` 存 `{ root, page, base, label }`，`label` 是 Review 范围按钮的字（提交读到后为标题），供详情的 Quick Review 照写。Review 标签关闭同步删除 `review.shown[space]`，其内存副本按实例号驱逐，迟到读取失效。详情来源和弹层 id 只通过 popup props 传递，不写持久状态；本机机器名在弹层启动时读取。
 
 `globalThis.t3Titlebar` 只记本次运行测到的标题栏末端和面板宽度，供键盘打开详情时锚定到同一入口；不写共享状态或磁盘。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
 

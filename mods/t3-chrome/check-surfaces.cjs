@@ -16,11 +16,13 @@ const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_fl
   showPage: id => calls.push(['add', id]), closeSurface: (id, mode) => calls.push(['close', id, mode]), activateSurface: id => calls.push(['select', id]),
   hidePanel() {}, toggleWide() {}, openOverlay: p => calls.push(['overlay', p]), closeOverlay: () => calls.push(['dismiss']), run() {},
   drawButton: (_t, id) => element().id(id), radiusOf: () => 8, fileIcon: () => 'icons/cat/js.svg',
+  stopsInit() {}, exec: async () => ({ code: 0 }), setShared() {}, pressed() {}, justClosed: () => false, DISABLED: 0.64,
   tip: (_v, _t, id, label, el) => { tips.push([id, label]); return new Proxy(el, { get(target, key) {
     assert.notEqual(key, 'on_mouse_down', 'a tooltip Popup cannot own native input listeners; attach to its trigger');
     return target[key];
   } }); }, stop: (_v, _t, _i, el) => el, focusRoot: (_v, el) => el, within: () => false, glow: () => () => {},
 });
+vm.runInContext(fs.readFileSync(__dirname + '/list.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
 vm.runInContext(['pierre-icons-data.js', 'pierre-icons.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
 vm.runInContext(fs.readFileSync(__dirname + '/../../shared/measured-text.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import .*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
@@ -40,7 +42,7 @@ for (const id of ['surface-add', 'panel-wide', 'panel-close', 'surface-back', 's
 assert.equal(find(root, 'surface-scroll').style.min_w, 0, 'overflow gives space back to controls');
 find(root, 'surface-file:file-29.js').handlers.middle({}, cx); assert.deepEqual(calls.pop(), ['close', 'file:file-29.js', undefined]);
 props = { part: 'surface-context', space: 's', target: s.active }; view.surfaceAt = -1;
-root = view.surfaceView(t); assert.equal(find(root, 'surface-option-3').style.opacity, 0.5, 'rightmost cannot close to the right');
+root = view.surfaceView(t); assert.equal(find(root, 'surface-option-3').style.opacity, 0.64, 'rightmost cannot close to the right');
 find(root, 'surface-option-2').handlers.on_click({}, cx); assert.deepEqual(calls.pop(), ['close', s.active, 'others']);
 s.tabs = [{ id: 'file:docs', path: 'docs', folder: true }]; s.active = 'file:docs'; props = { part: 'panel' };
 assert.equal(find(view.panelHead(t), 'surface-close-file:docs').items[0].src, 'mods/t3-chrome/icons/folder-tree.svg', 'a folder surface uses the Files glyph, never a file extension icon');
@@ -56,4 +58,11 @@ assert.equal(tips.some(([id]) => id === 'surface-file:src/app.js'), false, 'a wh
 measure('text-name-surface-file:src/app.js', 20);
 tips.length = 0; root = view.panelHead(t);
 assert.deepEqual(tips.find(([id]) => id === 'surface-file:src/app.js'), ['surface-file:src/app.js', 'src/app.js'], 'only text actually clipped gets its path tooltip');
+// The panel's docked empty page doesn't take the keyboard from the terminal; the `+` popup does.
+for (const [part, takes] of [['surface-empty', false], ['surface-menu', true]]) {
+  props = { part }; let took = false;
+  const v = new c.Mod();
+  v.init({}, { focus_handle: () => ({ focus() { took = true; } }), timer: { every() {} }, spawn() {} });
+  assert.equal(took, takes, `${part} ${takes ? 'takes' : 'leaves'} the keyboard`);
+}
 console.log('ok: surface startup keys, availability, overflow controls, middle close and tab context menu');

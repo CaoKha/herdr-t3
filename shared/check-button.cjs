@@ -7,7 +7,7 @@ const vm = require("node:vm");
 
 const src = fs.readFileSync(path.join(__dirname, "button.js"), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.b = { button, radiusOf, DISABLED };";
+  + "\nglobalThis.b = { button, radiusOf, DISABLED, split };";
 // An element that records its calls; `when` runs its branch, `hover` records the style it sets.
 const element = (calls = []) => new Proxy({ calls }, { get: (target, key) => key === "calls" ? target.calls : (...args) => {
   if (key === "when") return args[0] ? args[1](element(calls)) : element(calls);
@@ -15,11 +15,11 @@ const element = (calls = []) => new Proxy({ calls }, { get: (target, key) => key
   calls.push([key, ...args]);
   return element(calls);
 } });
-const context = vm.createContext({ h_flex: () => element(), svg: (p) => element([["svg", p]]) });
+const context = vm.createContext({ h_flex: () => element(), div: () => element(), svg: (p) => element([["svg", p]]) });
 vm.runInContext(src, context);
-const { button } = context.b;
+const { button, split } = context.b;
 const t = { solid: "SOLID", solid_foreground: "INK", raised: "RAISED", input: "INPUT", foreground: "#fff", dim: "DIM",
-  hover: "HOVER", selected: "SELECTED", ansi1: "RED", accent: "ACCENT", accent_foreground: "ACCENT_FG" };
+  hover: "HOVER", selected: "SELECTED", border: "BORDER", ansi1: "RED", accent: "ACCENT", accent_foreground: "ACCENT_FG" };
 const calls = (o) => button(t, "b", o).calls;
 const arg = (c, key) => c.filter(([k]) => k === key).map(([, v]) => v);
 
@@ -61,4 +61,14 @@ assert.deepEqual(calls({ icon: "x.svg", label: "Close", surface: "tab", size: "t
 let clicked = 0;
 calls({ text: "Go", act: () => clicked++ }).find(([k]) => k === "on_click")[1](null, null);
 assert.equal(clicked, 1);
+assert.deepEqual(arg(calls({ icon: "x.svg", label: "Wrap", on: true, disabled: true, surface: "card" }), "bg"), [], "a disabled toggle isn't pressed: no on fill");
+
+// split(): one group, so its fill is the group's; each half only lights.
+const flat = (c) => c.flatMap((call) => call[0] === "child" ? flat(call[1].calls) : [call]);
+const pair = (o) => { const g = flat(split(t, { id: "g", mainId: "m", moreId: "x", chevron: "c.svg", ...o }, (m) => m, (x) => x).calls); return { bg: arg(g, "bg"), svg: arg(g, "svg") }; };
+assert.deepEqual(pair({}).bg, [], "at rest: no fill, no seam");
+assert.deepEqual(pair({ hot: "main" }).bg, ["#fff12", "BORDER"], "hovered: 7% under both halves, the seam shown");
+assert.deepEqual(pair({ on: true }).bg, ["#fff1f", "BORDER"], "menu open: 12%");
+assert.deepEqual(pair({ hot: "main", locked: true }).bg, [], "a locked main half doesn't light the pair");
+assert.deepEqual([pair({ quiet: true }).svg, pair({ quiet: true, hot: "more" }).svg], [[], ["c.svg"]], "quiet: the chevron only while lit");
 console.log("button ok");

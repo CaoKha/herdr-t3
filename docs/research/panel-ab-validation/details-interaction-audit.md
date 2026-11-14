@@ -4,7 +4,7 @@ Latest user decision: **no Git operation section**. Details contains Workspace a
 
 | Control | Required behaviour |
 | --- | --- |
-| Computer/path | T3 locked row; no hover or selector. Folder shows the path; right-click the row copies it. |
+| Computer/path | T3 locked row; no hover or selector. Folder shows the path; right-click the row opens a one-item Copy full path menu (decided 2026-11-14: right-click always opens a menu in this layout). |
 | Open in | Full installed T3 editor list. Choosing only remembers the shared preference; the main button opens it. Uninstalled target falls back to Finder; remote launch is disabled. |
 | Actions | Existing global Actions, not project scripts. Empty means Add action; otherwise primary plus menu. Edit stays behind Details and only shows on hover/keyboard selection. |
 | Quick Review | Reuse Review's scope, Commits and base menus, keys and styling from shared sources. Anchor the child menu to the Quick Review row; no second scope trigger. Keep base controls inside that menu. A pick opens/activates the unique Review tab with that range. No duplicated scope implementation. |

@@ -32,6 +32,8 @@ const sets = [];
 const context = vm.createContext({ KEY: { navWidth: "t3.navWidth" }, shared: (k) => store.get(k) ?? null,
   setShared: (k, v) => { sets.push([k, v]); store.set(k, v); }, settings: () => ({ zoom: 2 }),
   div: make, h_flex: make, v_flex: make, svg: make,
+  // tip.js's.
+  glow: (view, id) => (on, cx) => { if (on) view.hot = id; else if (view.hot === id) view.hot = null; cx.notify(); },
   localStorage: { getItem: (k) => store.get(`local:${k}`) ?? null, setItem: (k, v) => { sets.push([k, String(v)]); store.set(`local:${k}`, String(v)); } } });
 vm.runInContext(src, context);
 const { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth, ghostButton } = context.nav;

@@ -92,7 +92,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     Date, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
   const files = ["store.js", "focus.js", "tip.js", "list.js", "panel.js", "terminal-context.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-icons-data.js", "file-icons.js", "file-tree.js", "nav-column.js", "submenu.js", "file-menu.js", "panel-states.js", "model.js", "main.js"];
-  const buttons = "const drawButton = (() => {\n" + load("button.js") + "\nreturn button;\n})();\n";
+  const buttons = "const { drawButton, split } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split };\n})();\n";
   vm.runInContext((buttons + files.map(load).join("\n")).replace("export default class", "globalThis.Mod = class"), ctx);
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
   const view = new ctx.Mod();
@@ -152,8 +152,8 @@ async function page() {
   find(root, "row-a.js").handlers["on_mouse_down:right"]();
   root.handlers["on_mouse_down:right"]({ local_position: { x: 10, y: 10 } }, cx);
   root = view.render(cx);
-  const items = walk(find(root, "file-menu")).map((n) => n.key).filter((k) => k?.startsWith("file-menu-"));
-  assert.ok(items.includes("file-menu-copy-path"), "the row's menu opens");
+  const items = walk(find(root, "file-menu-backdrop")).map((n) => n.key).filter((k) => k?.startsWith("file-menu-0-"));
+  assert.ok(items.includes("file-menu-0-copy-path"), "the row's menu opens");
   assert.ok(!items.some((k) => /open-review|open-files/.test(k)), `no cross-page items: ${items}`);
   find(root, "file-menu-backdrop").handlers["on_mouse_down:left"]({}, cx);
 
@@ -228,15 +228,26 @@ async function page() {
   assert.ok(find(view.render(cx), "t3-files-md"), "the retained trail returns to its original file");
   find(view.render(cx), "browse-").handlers.on_click({}, cx);
   root = view.render(cx);
-  assert.ok(find(root, "file-menu-a.js") && find(root, "file-menu-b.js"), "breadcrumb chevron lists sibling files");
-  find(root, "file-menu-backdrop").handlers["on_mouse_down:left"]({}, cx);
+  assert.ok(find(root, "file-menu-0-a.js") && find(root, "file-menu-0-b.js"), "breadcrumb chevron lists sibling files");
+  // A folder in it opens its contents beside it, read as it opens, and a folder there opens a third level.
+  const here = view.states.get("s1");
+  here.entries.set("", [{ name: "src", dir: true }, ...here.entries.get("")]);
+  find(view.render(cx), "file-menu-0-src").handlers.on_click({}, cx); await settle();
+  assert.ok(w.ran.some((r) => r.line.includes(m.LIST) && r.line.includes("/r/src")), "a folder is read as its submenu opens");
+  root = view.render(cx);
+  assert.ok(find(root, "file-menu-1-src/d"), "the folder's contents open beside it");
+  here.entries.set("src/d", [{ name: "x.js", dir: false }]);
+  find(root, "file-menu-1-src/d").handlers.on_click({}, cx);
+  find(view.render(cx), "file-menu-2-src/d/x.js").handlers.on_click({}, cx); await settle();
+  assert.equal(view.menu, null, "a file picks and closes every level");
+  assert.ok(find(view.render(cx), "crumb-src/d/x.js"), "the picked file opens");
   view.targets = ["Finder", "Zed"];
-  view.menu = { path: "README.md", context: view.context(), x: 4, y: 4, at: 2 };
+  view.menu = { path: "README.md", context: view.context(), x: 4, y: 4, lv: [{ at: 2, open: null, intent: {} }] };
   const menuKey = key => find(view.render(cx), "file-menu-backdrop").handlers.on_key_down({ key }, cx);
   menuKey("right");
-  assert.ok(find(view.render(cx), "file-submenu-editor:Zed"), "Right opens the target row's editor submenu");
+  assert.ok(find(view.render(cx), "file-menu-1-editor:Zed"), "Right opens the target row's editor submenu");
   menuKey("escape");
-  assert.ok(view.menu && !view.menu.sub, "Escape closes only the child menu first");
+  assert.ok(view.menu && !view.menu.lv[0].open, "Escape closes only the child menu first");
   menuKey("right");
   const launches = [], launch = view.launch;
   view.launch = (_st, path, name) => launches.push([path, name]);
@@ -245,6 +256,9 @@ async function page() {
   assert.deepEqual(launches, [["README.md", "Zed"]], "Enter dispatches the selected editor for the exact menu path");
   assert.equal(view.menu, null);
   assert.equal(w.focused, view.treeHandle, "closing a tree menu restores tree focus");
+  view.browse(view.current(), "targets", "README.md", null, cx);
+  find(view.render(cx), "file-menu-backdrop").handlers.on_key_down({ key: "escape" }, cx);
+  assert.equal(w.focused, view.handle, "closing a toolbar menu by mouse gives the page the keyboard, not the tree, whose ring would light");
   assert.deepEqual(wrote.filter((k) => /reveal/.test(k)), [], "no cross-page request");
 }
 

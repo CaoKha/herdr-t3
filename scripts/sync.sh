@@ -47,8 +47,8 @@ share button mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3
 # file-icons.js's SVGs (scripts/vendor.sh makes them): each mod draws only its own.
 for d in mods/t3-files extras/mods/review; do rsync -a --delete "$src/shared/icons/cat/" "$src/$d/icons/cat/"; done
 for d in mods/t3-files mods/t3-chrome; do rsync -a --delete "$src/shared/icons/pierre/" "$src/$d/icons/pierre/"; done
-# Open in uses the same established app artwork, copied into Files' own folder.
-for icon in finder vscode cursor zed app-window; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
+# Open in's app artwork and the breadcrumb menu's folder icon, the ones Details uses, copied into Files' own folder.
+for icon in finder vscode vscodium cursor zed app-window folder; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
 
 # mod.json stays per repo: here the layout places it ("none"), alone it docks left.
 rsync -a --delete $gen --exclude mod.json "$src/mods/t3-inbox/" "$inbox/mods/t3-inbox/"

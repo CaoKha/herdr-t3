@@ -163,10 +163,12 @@ export default class Pane extends View {
             // Grow the icon group to the right only: icon16 + gap4 + fold12, the program stays at its original x.
             .child(div().w(32).h(16).mx(-2).flex_none().relative().flex().items_center()
               .child(programIcon(k.program, 16, t.muted) ?? svg("mods/workspace-chrome/terminal.svg").size(16).flex_none().text_color(t.muted))
-              .when(r.children, (el) => el.child(div().id(`kid-fold-${k.address}`).absolute().left(20).top(2).size(12).role("button")
+              // Its words in a tooltip as the agents list's fold has (tip.js), the icon where it was.
+              .when(r.children, (el) => el.child(div().absolute().left(20).top(2).child(tip(this, t, `kid-fold-${k.address}`, this.folded.has(k.address) ? "Expand sub-agents" : "Collapse sub-agents",
+                div().id(`kid-fold-${k.address}`).size(12).role("button")
                 .accessibility_label(this.folded.has(k.address) ? "Expand sub-agents" : "Collapse sub-agents")
                 .on_click((_e, cx) => { cx.stop_propagation(); this.foldKid(r, !this.folded.has(k.address)); cx.notify(); })
-                .child(svg(`mods/t3-pane/icons/${this.folded.has(k.address) ? "chevron-right" : "chevron-down"}.svg`).size(12).text_color(t.dim)))))
+                .child(svg(`mods/t3-pane/icons/${this.folded.has(k.address) ? "chevron-right" : "chevron-down"}.svg`).size(12).text_color(t.dim)))))))
             .child(div().flex_1().min_w(0).truncate().child(kidName(k)))
             // T3's shortcut column, one fixed status group. Its width fits Needs you at 12px without squeezing the icon.
             .child(h_flex().id(`kid-status-${k.address}`).w(96).flex_none().gap(4).items_center().justify_end().text_size(12).font_medium().text_color(t.dim)
@@ -185,7 +187,8 @@ export default class Pane extends View {
     const total = plural(n, "sub-agent", "sub-agents"), text = String(n);
     const label = stuck ? `${total}, ${stuck} need${stuck === 1 ? "s" : ""} you` : total;
     return tip(this, t, id, label, stop(this, t, id, drawButton(t, id, {
-      text, label, surface: "card", color: stuck ? t.blocked : undefined, hot: this.hot === id })
+      // Pressed while its list is open, as the panel toggle and the Inbox's scope chip: opened here since the last list closed.
+      text, label, surface: "card", color: stuck ? t.blocked : undefined, hot: this.hot === id, on: this.kidsOpen?.id === id && this.kidsOpen.at > (shared(KIDS_CLOSED) ?? 0) })
       .on_hover(glow(this, id))
       .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); pressed(this); this.kidsFrom = e.bounds; })
       .on_click((_e, cx) => {
@@ -195,6 +198,7 @@ export default class Pane extends View {
         if (justClosed(this, KIDS_CLOSED)) return;
         this.hot = null; // The list covers it, before the pointer can report leaving it.
         // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
+        this.kidsOpen = { id, at: Date.now() };
         openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH,
           ...(b ? { at: { x: b.x + b.width - KIDS_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { kids: terminal } });
         cx.notify();

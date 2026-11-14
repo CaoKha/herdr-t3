@@ -21,20 +21,26 @@ const context = vm.createContext({
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element,
   shared: () => "Finder", KEY: { openTarget: "t3.openTarget" }, window: () => ({ platform: "macos" }),
   knownTargets: () => null, theme: () => t,
-  stop: (_v, _t, _id, el) => el, tip: (_v, _t, _id, _label, el) => el,
+  stop: (_v, _t, _id, el) => el, tip: (_v, _t, _id, _label, el) => el, within: () => false,
 });
-vm.runInContext(load("button") + "\nconst drawButton = button;\n" + load("main").replace("default class", "globalThis.Mod = class"), context);
+vm.runInContext(load("button") + "\nconst drawButton = button;\n" + load("open-in").replace("const knownTargets", "const probed") + "\n" + load("main").replace("default class", "globalThis.Mod = class"), context);
 const view = new context.Mod();
 view.targets = ["Finder"];
 let tree = view.openControl({ on: null, file: "file.js" }, t);
+const group = () => find(tree, "t3-files-open-group"), rule = () => find(tree, "t3-files-open-group-rule");
 const primary = find(tree, "t3-files-open-in"), more = find(tree, "t3-files-open-more");
-assert.equal(primary.style.h, 28, "Open in is centered in the same 28px geometry as adjacent controls");
-assert.equal(primary.style.w, 28);
-assert.equal(primary.style.rounded, 8);
-assert.equal(primary.style.border_1, undefined, "Open in shares the toolbar's ghost style, not its former outlined box");
-assert.ok(more, "one target still keeps the arrow slot");
-assert.equal(more.style.h, 28);
+assert.equal(group().style.h, 28, "Open in sits in the same 28px row as the sm buttons beside it");
+assert.equal(group().style.bg, undefined, "at rest the pair is as bare as the ghost buttons beside it");
+assert.equal(rule().style.bg, undefined, "no seam at rest");
+assert.equal(primary.style.w, 28, "the icon half is an sm square");
+assert.equal(more.style.w, 20, "the chevron half is narrower, so the pair reads as one control");
+assert.equal(primary.style.bg, undefined); assert.equal(more.style.bg, undefined, "the halves never fill on their own: no two glued pills");
 assert.ok(primary.style.cursor_pointer && more.style.cursor_pointer, "clickable halves never inherit the Editor I-beam");
+view.hot = "t3-files-open-in"; tree = view.openControl({ on: null, file: "file.js" }, t);
+assert.deepEqual([group().style.bg, rule().style.bg], [t.foreground + "12", t.border], "hovered: one 7% fill under both halves, the seam shown");
+view.hot = null; view.menu = { kind: "targets" }; tree = view.openControl({ on: null, file: "file.js" }, t);
+assert.deepEqual([group().style.bg, rule().style.bg], [t.foreground + "1f", t.border], "menu open: the whole pair at 12%");
+view.menu = null; tree = view.openControl({ on: null, file: "file.js" }, t);
 let selected = null;
 view.browse = (_st, kind) => { selected = kind; };
 more.handlers.on_click({}, { stop_propagation() {}, spawn() {} });
@@ -44,6 +50,7 @@ assert.ok(find(tree, "t3-files-open-more"), "remote state keeps both fixed slots
 assert.equal(find(tree, "t3-files-open-more").handlers.on_click, undefined, "remote editor launch is disabled");
 assert.equal(find(tree, "t3-files-open-in").handlers.on_click, undefined);
 view.menu = { kind: "targets" };
+assert.ok(view.menuItems({}, "").every(row => !row.checked), "as T3's menu: no check, the primary icon already says which");
 context.knownTargets = () => ["Finder", "VSCodium"];
 assert.deepEqual(Array.from(view.menuItems({}, ""), row => row.id), ["Finder", "VSCodium"], "a hot-reloaded Files view uses the completed shared discovery, not its stale startup list");
-console.log("ok: Files Open in fixed split slots, house button geometry, pointer and remote disabled state");
+console.log("ok: Files Open in as one ghost split, fixed slots, pointer, remote disabled and an unchecked menu");

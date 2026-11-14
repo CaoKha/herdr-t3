@@ -1,36 +1,42 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { theme, run, props, updates, layout, shared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, exec, openOverlay, closeOverlay } from "herdr";
+import { theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, exec, openOverlay, closeOverlay } from "herdr";
 import { tip, glow } from "./tip.js";
-import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
+import { stopsInit, stopsEnd, stop, focusRoot, within, pressed, justClosed } from "./focus.js";
+import { menuJump } from "./list.js";
 import { sidebarParts } from "./sidebar.js";
 import { initSettings, settingsView } from "./settings.js";
 import { KEY } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface } from "./panel.js";
-import { button as drawButton, radiusOf } from "./button.js";
+import { button as drawButton, radiusOf, DISABLED } from "./button.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
 
 // The space panel's pages (docs/adr/0011), as its stack has them: a page the layout lacks has no tab.
 // Review wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image.
 const PAGES = { files: ["Files", "folder-tree"], review: ["Review", "pulls-review", true] };
+// Stamped as `+`'s menu closes: a press on `+` that closed it mustn't reopen it (focus.js justClosed).
+const SURFACE_CLOSED = "t3-chrome.surfaceClosed";
 
 // The sidebar shows either Lists (Spaces and Agents) or the Inbox (t3-inbox): a stack in the layout.
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 export default class WorkspaceChrome extends View {
-  async close() { stopsEnd(this); }
+  async close() { stopsEnd(this); if (props()?.part === "surface-menu") setShared(SURFACE_CLOSED, Date.now()); }
 
   init(_props, cx) {
     this.surfaceWidths = {};
     if (props()?.view === "settings") return initSettings(this, cx);
     stopsInit(this, cx);
     if (props()?.part?.startsWith("surface-")) {
-      this.surfaceKeys = cx.focus_handle(); this.surfaceAt = -1;
-      this.surfaceKeys.focus();
+      this.surfaceKeys = cx.focus_handle(); this.surfaceAt = -1; this.reviewReason = "";
+      // A popup takes the keyboard; the panel's docked empty page doesn't take it from the terminal.
+      if (props()?.part !== "surface-empty") this.surfaceKeys.focus();
       const probe = (cx) => {
         const sp = spaces().find(s => s.active), key = `${sp?.id}:${sp?.folder}:${sp?.machine}`;
         if (this.surfaceSpace === key) return;
-        this.surfaceSpace = key; this.reviewReason = sp?.machine ? "Review is unavailable on remote spaces" : "Checking repository…";
+        // Until Git answers, Review stays as it was (available at first) rather than greying out for a frame.
+        const remote = "Review is unavailable on remote spaces";
+        this.surfaceSpace = key; this.reviewReason = sp?.machine ? remote : this.reviewReason === remote ? "" : this.reviewReason;
         if (!sp?.machine) cx.spawn(async (cx) => {
           const r = sp?.folder && await exec("git", ["rev-parse", "--show-toplevel"], { cwd: sp.folder }).catch(() => null);
           if (this.surfaceSpace !== key) return;
@@ -169,25 +175,27 @@ export default class WorkspaceChrome extends View {
         : colored ? image(`mods/t3-chrome/icons/${icon}.svg`).size(12).opacity(on ? 1 : 0.7)
         : svg(`mods/t3-chrome/icons/${icon}.svg`).size(12).text_color(t.dim);
       return measuredTooltip(this, t, key, tab.path ?? label, stop(this, t, key, own(h_flex().id(key).h(24).max_w(144).pl(6).pr(8).gap(2).flex_none().items_center().rounded(6).text_size(12)
-        .bg(on ? t.selected : t.chrome).text_color(on || this.hot === key ? t.foreground : t.dim)
+        .bg(on ? t.selected : t.chrome).text_color(on || this.hot === key ? t.foreground : t.muted)
         .when(!on, el => el.hover(st => st.bg(t.hover))).on_hover(glow(this, key))
         .role("tab").accessibility_label(label)
         .on_click(() => activateSurface(id))
         .on_size_change((size, cx) => { const width = size.width / (Number(settings().zoom) || 1); this.surfaceWidths ??= {}; if (this.surfaceWidths[id] !== width) { this.surfaceWidths[id] = width; cx.notify(); } })
         .on_mouse_down("middle", (_e, cx) => { cx.stop_propagation(); closeSurface(id); })
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 148, props: { part: "surface-context", target: id, space: space?.id } }); })
-        .child(stop(this, t, closeId, own(drawButton(t, closeId, { size: "tiny", label: `Close ${label}`, surface: "tab" }).child(glyph)
-          .on_click((_e, cx) => { cx.stop_propagation(); closeSurface(id); })), 4))
+        .child(tip(this, t, closeId, `Close ${label}`, stop(this, t, closeId, own(drawButton(t, closeId, { size: "tiny", label: `Close ${label}`, surface: "tab" }).child(glyph)
+          .on_click((_e, cx) => { cx.stop_propagation(); closeSurface(id); })), 4), { below: true }))
         .child(nameText(this, key, label).flex_1().whitespace_nowrap())
         .when(id === "review" && mark != null, el => el.child(mark))), 6), { below: true });
     };
     const button = (id, icon, label, action, key, size = /** @type {"xs" | "sm"} */ ("sm")) => tip(this, t, id, label, stop(this, t, id, own(drawButton(t, id, {
-      size, surface: id === "surface-add" ? "chrome" : "card", on: id === "panel-close", icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })
+      size, on: id === "panel-close" || (id === "panel-wide" && s.wide), icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })
       .on_hover(glow(this, id))
-      .when(id === "surface-add", el => el.on_mouse_down("left", (e, cx) => { this.surfaceAddPress = e.bounds; cx.stop_propagation(); }))
+      .when(id === "surface-add", el => el.on_mouse_down("left", (e, cx) => { this.surfaceAddPress = e.bounds; pressed(this); cx.stop_propagation(); }))
       .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); })), radiusOf(size)), { action: key, below: true });
     const add = button("surface-add", "plus", "Open a surface", () => {
       const b = this.surfaceAddPress, z = Number(settings().zoom) || 1;
+      this.surfaceAddPress = null;
+      if (justClosed(this, SURFACE_CLOSED)) return;
       openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 72, ...(b ? { at: { x: b.x, y: b.y + b.height + 6 * z } } : {}), props: { part: "surface-menu" } });
     }, "t3-tabs.surface-menu", "xs");
     const widths = s.tabs.map(tab => (this.surfaceWidths?.[tab.id] ?? 100) + 4), total = widths.reduce((a, b) => a + b, 28), room = this.surfaceRoom ?? 300;
@@ -200,12 +208,12 @@ export default class WorkspaceChrome extends View {
     }
     return focusRoot(this, h_flex().id("panel-head").size_full().bg(t.chrome).gap(4).items_center()
       .on_size_change(size => { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.panel = size.width; })
-      .when(total > room, el => el.child(button("surface-back", "chevron-left", "Previous surfaces", () => { this.surfaceOffset = Math.max(0, this.surfaceOffset - room / 2); })))
+      .when(total > room, el => el.child(button("surface-back", "chevron-left", "Previous surfaces", () => { this.surfaceOffset = Math.max(0, this.surfaceOffset - room / 2); }, undefined, "xs")))
       .child(div().id("surface-scroll").flex_1().min_w(0).overflow_hidden()
         .on_size_change((size, cx) => { const width = size.width / (Number(settings().zoom) || 1); if (this.surfaceRoom !== width) { this.surfaceRoom = width; cx.notify(); } })
         .on_scroll_wheel((e, cx) => { const delta = Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y; this.surfaceOffset = Math.max(0, Math.min(total - room, this.surfaceOffset - delta / (Number(settings().zoom) || 1))); cx.stop_propagation(); cx.notify(); })
         .child(h_flex().id("surface-strip").ml(-this.surfaceOffset).gap(4).items_center().children(s.tabs.map(page)).child(add)))
-      .when(total > room, el => el.child(button("surface-next", "chevron-right", "Next surfaces", () => { this.surfaceOffset = Math.min(total - room, this.surfaceOffset + room / 2); })))
+      .when(total > room, el => el.child(button("surface-next", "chevron-right", "Next surfaces", () => { this.surfaceOffset = Math.min(total - room, this.surfaceOffset + room / 2); }, undefined, "xs")))
       .child(button("panel-wide", s.wide ? "minimize-2" : "maximize-2", s.wide ? "Restore panel" : "Expand panel", toggleWide))
       .child(button("panel-close", "panel-right", "Hide panel", hidePanel, "t3-tabs.panel"))
       .when(Boolean(window()?.buttons), el => el.children([["minimize", "−", "win-min"], ["maximize", window().maximized ? "❐" : "□", window().maximized ? "win-restore" : "win-max"], ["close", "×", "win-close"]].map(([cmd, text, icon]) => own(drawButton(t, `panel-window-${cmd}`, { size: "sm", label: `${cmd} window`, ...(window().platform === "windows" ? { icon: `mods/t3-chrome/icons/${icon}.svg` } : { text }) }).w(28).px(0).on_click(() => run(`window.${cmd}`)))))));
@@ -227,24 +235,27 @@ export default class WorkspaceChrome extends View {
     ];
     const choose = (i, cx) => { const it = items[i]; if (!it || it.disabled) return; if (context && p.space !== spaces().find(sp => sp.active)?.id) return finish(); finish(); it.act(cx); };
     const list = v_flex().id("surface-list").w_full().max_w(empty ? 320 : 220).p(4).gap(0).children(items.map((it, i) => h_flex().id(`surface-option-${i}`).h(empty ? 32 : 28).px(8).gap(8).items_center().rounded(4).text_size(14)
-      .text_color(t.foreground).when(it.disabled, el => el.opacity(0.5).tooltip(it.reason ?? "Not available"))
-      .when(!it.disabled, el => el.on_hover((on, cx) => { this.surfaceAt = on ? i : -1; cx.notify(); }).on_click((_e, cx) => choose(i, cx)))
+      .text_color(t.foreground).when(it.disabled, el => el.opacity(DISABLED).tooltip(it.reason ?? "Not available"))
+      .when(!it.disabled, el => el.cursor_pointer().on_hover((on, cx) => { const to = on ? i : this.surfaceAt === i ? -1 : this.surfaceAt; if (to !== this.surfaceAt) { this.surfaceAt = to; cx.notify(); } }).on_click((_e, cx) => choose(i, cx)))
       .when(this.surfaceAt === i, el => el.bg(t.selected))
       .role("button").accessibility_label(it.label)
-      .when(Boolean(it.icon), el => el.child(svg(`mods/t3-chrome/icons/${it.icon}.svg`).size(16).flex_none()))
-      .child(div().flex_1().min_w(0).child(it.label))
-      .when(Boolean(it.key), el => el.child(div().text_size(12).text_color(t.dim).child(it.key?.toUpperCase())))));
+      // As t3-menu's rows: the icon muted, 2px into the padding and gap; the words truncate; the key hint 12 medium dim.
+      .when(Boolean(it.icon), el => el.child(svg(`mods/t3-chrome/icons/${it.icon}.svg`).size(16).mx(-2).flex_none().text_color(t.muted)))
+      .child(div().flex_1().min_w(0).truncate().child(it.label))
+      .when(Boolean(it.key), el => el.child(div().flex_none().text_size(12).font_medium().text_color(t.dim).child(it.key?.toUpperCase())))));
     return v_flex().id(empty ? "surface-empty" : "surface-menu").size_full().min_h(0).items_center()
       .when(empty, el => el.justify_center().gap(12).p(24)).when(!empty, el => el.bg(t.popover))
       .track_focus(this.surfaceKeys).on_mouse_down("left", () => this.surfaceKeys.focus())
       .on_key_down((e, cx) => {
         if (e.key === "escape" && !empty) finish();
         else if (e.key === "enter") choose(this.surfaceAt, cx);
-        else if (["up", "down"].includes(e.key)) {
-          const enabled = items.map((it, i) => !it.disabled ? i : -1).filter(i => i >= 0), index = enabled.indexOf(this.surfaceAt);
-          this.surfaceAt = enabled[(index + (e.key === "down" ? 1 : enabled.length - 1) + enabled.length) % enabled.length];
-        } else if (e.keystroke === e.key) { const i = items.findIndex(it => it.key === e.key); if (i < 0) return; choose(i, cx); }
-        else return;
+        // A row's own key picks it; else list.js's menuJump (arrows, Home, End, typeahead) over the rows that can be picked.
+        else if (e.keystroke === e.key && items.some(it => it.key === e.key)) choose(items.findIndex(it => it.key === e.key), cx);
+        else {
+          const enabled = /** @type {any[]} */ (items.filter(it => !it.disabled)), to = menuJump(this, e, enabled.map(it => it.label), enabled.indexOf(items[this.surfaceAt]));
+          if (to < 0) return;
+          this.surfaceAt = /** @type {any[]} */ (items).indexOf(enabled[to]);
+        }
         cx.stop_propagation(); cx.notify();
       })
       .when(empty, el => el.child(div().text_size(14).font_medium().text_color(t.muted).child("Open a surface")))
