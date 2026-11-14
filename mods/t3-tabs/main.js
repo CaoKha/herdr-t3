@@ -1,13 +1,14 @@
 import { View, div, svg } from "gpui-kit";
 import { h_flex, Popup } from "gpui-base";
-import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand, exec } from "herdr";
+import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { tip, glow } from "./tip.js";
 import { detailsFor, detailsAt, detailsWatch } from "./details.js";
 import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
-import { stopsInit, stopsEnd, stop, focusRoot, within, pressed, justClosed } from "./focus.js";
+import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
+import { opener, popupOpen } from "./trigger.js";
 import { sidebarParts } from "./sidebar.js";
 import { navigation } from "./navigation.js";
 import { newTab, projectMark } from "./project.js";
@@ -15,8 +16,9 @@ import { KEY, migrate } from "./store.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
-import { panelState, togglePanel, toggleWide, syncPanel, restorePanel } from "./panel.js";
+import { panelState, togglePanel, toggleWide, syncPanel, restorePanel, reviewRepo } from "./panel.js";
 import { rememberTerminal } from "./terminal-context.js";
+import { stripAt, stripWheel, stripFades } from "./scroll-strip.js";
 import { button as drawButton, radiusOf } from "./button.js";
 import { nameText, named as namedLabel } from "./measured-text.js";
 
@@ -99,7 +101,7 @@ export default class Tabs extends View {
     migrate();
     this.pressed = null;
     this.over = null;
-    this.strip = 0;
+    this.tabStrip = {};
     this.nameW = {};
     this.dragKeys = cx.focus_handle();
     const part = props()?.part;
@@ -123,16 +125,16 @@ export default class Tabs extends View {
         // One at a time: a second press finds the first's pane gone.
         if (command === "sidebar") run("layout.select", { stack: "sidebar-lists", child: inboxShown() ? "lists" : "inbox" });
         else if (command === "settle") await this.settle(cx);
-        // The space panel (docs/adr/0011), keyed as VS Code's: a page opens on it, or closes the panel already showing it; `panel` keeps the last page.
+        // The space panel (docs/adr/0017), keyed as VS Code's: a surface opens on it, or puts away the panel showing it; `panel` keeps it as it was.
         else if (command === "files") togglePanel("files");
         else if (command === "review") {
           const p = panelState(), sp = spaces().find(s => s.active);
           if (!p.pages.includes("review")) continue;
           if (p.open && p.active === "review") { togglePanel("review"); continue; }
-          const git = !sp?.machine && sp?.folder && await exec("git", ["rev-parse", "--show-toplevel"], { cwd: sp.folder }).catch(() => null);
+          const { problem } = await reviewRepo(sp?.id);
           if (spaces().find(s => s.active)?.id !== sp?.id) continue;
-          if (git?.code === 0) togglePanel("review");
-          else notify({ title: "Review unavailable", body: sp?.machine ? "Review is unavailable on remote spaces." : "This space is not a Git repository.", level: "warning" });
+          if (!problem) togglePanel("review");
+          else notify({ title: "Review unavailable", body: problem, level: "warning" });
         }
         else if (command === "panel") togglePanel();
         else if (command === "details") {
@@ -140,7 +142,6 @@ export default class Tabs extends View {
           if (panelState().wide) toggleWide();
           cx.timer.after(50, () => run("t3-actions.details"));
         }
-        else if (command === "surface-menu") openOverlay({ mod: "t3-chrome", kind: "popup", width: 220, height: 72, props: { part: "surface-menu" } });
         // An agent's menu (t3-menu): Settle, Un-settle or Wake the agent it was opened on, in view or not.
         else if (command.startsWith("settle:")) await this.settle(cx, command.slice("settle:".length));
         else if (command.startsWith("wake:")) await writeLabel(command.slice("wake:".length), "snoozed", "");
@@ -270,33 +271,13 @@ export default class Tabs extends View {
     return new Map(shown.map(c => [c.id, c === active ? held : Math.min(want(c), Math.max(cap, TAB_FLOOR))]));
   }
 
-  // Where the tab strip sits: the active tab in view with the least move, as T3's scrollIntoView({ inline: "nearest" }).
-  // Herdr's scroll areas can't be moved from a script, so the strip is a clipped row this offsets itself.
-  // Only when the active tab or the room changes: a swipe to another tab isn't pulled back.
-  // `fromEnd`: the Inbox's strip stands at the right, beside Actions, so it holds its place from its end: short of room its end
-  // shows and its start is cut. A wheel's move (this.strip changed since the last frame) moves that place.
+  // Where the tab strip sits (scroll-strip.js): the tab the keyboard's on, else the active one, in view. The Inbox's strip
+  // stands at the right, beside Actions, so it holds its place from its end.
   stripAt(shown, widths, fromEnd = false) {
-    const total = shown.reduce((sum, c) => sum + widths.get(c.id) + TAB_GAP, -TAB_GAP), over = Math.max(0, total - (this.room ?? 0));
-    if (fromEnd) {
-      if (this.stripShown !== undefined) this.fromEnd = (this.fromEnd ?? 0) + this.stripShown - this.strip;
-      this.strip = over - (this.fromEnd ?? 0);
-    }
-    // The tab the keyboard's on, else the active one: a stop off the strip's end can't be seen.
-    const walked = shown.findIndex(c => within(this, [`tab-${c.id}`, `close-${c.id}`]));
-    const room = this.room ?? 0, i = walked >= 0 ? walked : shown.findIndex(c => c.active), width = (c) => widths.get(c.id);
-    const key = `${shown[i]?.id}:${i}:${room}:${i >= 0 ? width(shown[i]) : 0}`;
+    const walked = shown.findIndex(c => within(this, [`tab-${c.id}`, `close-${c.id}`])), i = walked >= 0 ? walked : shown.findIndex(c => c.active);
     // A rule or a zoomed tab's panes has no name of its own to wait for.
-    if (i >= 0 && room > 0 && key !== this.revealed && shown.every(c => c.rule || c.group || this.nameW[c.id])) {
-      this.revealed = key;
-      const left = shown.slice(0, i).reduce((sum, c) => sum + width(c) + TAB_GAP, 0), right = left + width(shown[i]);
-      if (left < this.strip) this.strip = left;
-      // Wider than the room, its start shows: that's where its icon and the name begin.
-      else if (right > this.strip + room) this.strip = Math.min(left, right - room);
-    }
-    this.strip = Math.max(0, Math.min(this.strip, over));
-    if (fromEnd) { this.fromEnd = over - this.strip; this.stripShown = this.strip; }
-    else this.stripShown = undefined;
-    return this.strip;
+    return stripAt(this.tabStrip, { widths: shown.map(c => widths.get(c.id)), gap: TAB_GAP, room: this.room ?? 0, focus: i, focusKey: shown[i]?.id ?? "",
+      ready: shown.every(c => c.rule || c.group || this.nameW[c.id]), fromEnd });
   }
 
   // With the sidebar hidden, its toggle also says how the agents are doing, with the sidebar's own marks.
@@ -316,7 +297,8 @@ export default class Tabs extends View {
   // With props.block, sizes that block to `size`: layout.resize, which Herdr keeps with the layout's clicks.
   // on_size_change reports zoomed pixels; a layout's are logical.
   fit(size) {
-    const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1));
+    // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
+    const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1) - 0.5);
     if (id === "tabs-end") { const metrics = /** @type {any} */ (globalThis).t3Titlebar ??= {}; metrics.end = size.width; }
     if (!id || px === this.fitted) return;
     this.fitted = px;
@@ -367,26 +349,27 @@ export default class Tabs extends View {
       return div();
     }
     const stopPress = (_e, cx) => cx.stop_propagation();
-    // 24 as T3's tab bar +; the window's own buttons 28, as its titlebar controls.
-    /** @param {"xs" | "sm"} [size] */
-    const button = (id, icon, label, action, key, size = "xs", glyph = undefined) => tip(this, t, id, label, stop(this, t, id,
-      drawButton(t, id, { icon, label, size, surface: id === "panel-toggle" ? "card" : "chrome", hot: this.hot === id, on: id === "panel-toggle" && panelState().open })
+    // 28, as T3's titlebar controls; on the 40px bar, chrome's hover and on, as the brand bar's.
+    const button = (id, icon, label, action, key, glyph = undefined) => tip(this, t, id, label, stop(this, t, id,
+      drawButton(t, id, { icon, label, size: "sm", surface: "chrome", hot: this.hot === id, on: id === "panel-toggle" && panelState().open })
         .on_hover(glow(this, id)).on_mouse_down("left", stopPress).on_click(action)
-        .when(Boolean(glyph), el => el.child(glyph)), radiusOf(size)), { action: key, below: true });
-    // The work header's end: terminal +, then the panel/window controls only while no panel head owns them (ADR 0017).
+        .when(Boolean(glyph), el => el.child(glyph)), radiusOf("sm")), { action: key, below: true });
+    // The work header's end, after Details (t3-actions' block): terminal +, then the panel's toggle while no panel head owns it,
+    // all one group touching Details; the window's buttons a group 8 on. The layout's tabs-end-inset puts the end 12 from the
+    // column's, over the pane header's last control (docs/internals/t3-tokens.md「规则」P3, R1).
     const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = panelState().pages.length > 0 && !panelState().open;
-    const endShown = newTabShown || toggleShown || (w?.buttons && !panelState().open);
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
-      .child(h_flex().id("tabs-end").flex_none().pr(endShown ? 8 : 0).gap(4).items_center().on_size_change((size) => this.fit(size))
+      .child(h_flex().id("tabs-end").flex_none().items_center().on_size_change((size) => this.fit(size))
         // With the Inbox, the breadcrumb's space is the way to a new tab.
+        // 28 as the panel toggle beside it: one size in a group (「规则」R2).
         .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => newTab(spaces().find(s => s.active)), "t3-tabs.new")))
-        // The space panel's toggle, last before the window's buttons, over where it opens: the sidebar's panel-left, mirrored.
-        // It opens on the page last shown; the panel's head picks the page. Lit while open.
+        // The space panel's toggle, over where it opens: the sidebar's panel-left, mirrored. Lit while open.
         .when(toggleShown, el => el.child(button("panel-toggle", "mods/t3-tabs/icons/panel-right.svg",
-          "Show panel", () => togglePanel(), "t3-tabs.panel", "sm")))
-        .when(w?.buttons && !panelState().open, el => el.child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, "sm", w.platform === "windows" ? undefined : "−"))
-          .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, "sm", w.platform === "windows" ? undefined : "□"))
-          .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close"), undefined, "sm")))));
+          "Show panel", () => togglePanel(), "t3-tabs.panel")))
+        .when(w?.buttons && !panelState().open, el => el.child(h_flex().flex_none().ml(8).items_center()
+          .child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, w.platform === "windows" ? undefined : "−"))
+          .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, w.platform === "windows" ? undefined : "□"))
+          .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close")))))));
     const space = spaces().find(p => p.active);
     // At Home, none: the brand bar's lit mark tells where this is.
     const { tabs: shown, context: ctx } = this.navigation.frame(!props()?.part), inbox = inboxShown();
@@ -432,9 +415,6 @@ export default class Tabs extends View {
     const area = this.area ?? 0, stripWant = Math.max(0, entries.reduce((sum, e) => sum + want(e) + TAB_GAP, -TAB_GAP));
     this.room = ctx ? this.stripW ?? Math.min(stripWant, area) : area;
     const widths = this.tabWidths(entries, want), at = this.stripAt(entries, widths, Boolean(ctx));
-    const over = Math.max(0, entries.reduce((sum, e) => sum + widths.get(e.id) + TAB_GAP, -TAB_GAP) - (this.room ?? 0));
-    const fade = (id, start) => h_flex().id(id).absolute().top(0).bottom(0).w(16).when(start, el => el.left(0)).when(!start, el => el.right(0))
-      .children((start ? ["ff", "bf", "80", "40"] : ["40", "80", "bf", "ff"]).map(a => div().w(4).h_full().bg(/** @type {any} */ (t.chrome + a))));
     // With the Inbox showing, agents' tabs hold their place at the front: only the rest drag, among themselves.
     const loose = (c) => !inbox || !every.some(a => a.tab === c.id);
     // A press holds a tab's id: an agent starting or a tab closing can change the bar under it.
@@ -539,7 +519,7 @@ export default class Tabs extends View {
       })
       // The wheel only scrolls the strip, either way; a click is what goes to a tab.
       .on_scroll_wheel((e, cx) => {
-        this.strip -= (Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y) / settings().zoom;
+        stripWheel(this.tabStrip, e);
         cx.notify();
       })
       .when(Boolean(sidebar?.hidden), el => el.child(this.sidebarToggle(t, stopPress, awake(st, under, inbox), st)))
@@ -559,8 +539,7 @@ export default class Tabs extends View {
               : item(e.c, strip.indexOf(e.c)))))
           // A cut end fades out, in both modes: one way for the strip to run out of room, and a tab cut short reads as cut, not as
           // a narrow tab. 16px of the bar's own color in steps, there being no gradient fill for an element.
-          .when(at > 0.5, el => el.child(fade("strip-fade-start", true)))
-          .when(at < over - 0.5, el => el.child(fade("strip-fade-end", false))))));
+          .children(stripFades(t.chrome, this.tabStrip)))));
   }
 
   // With the Inbox showing, who's in view, as T3's thread header: the space, a sub-agent's parent, then the tab's agents side by
@@ -575,32 +554,34 @@ export default class Tabs extends View {
     // closes it.
     const titled = ctx.sub ?? ctx.head;
     const menu = (b) => {
-      this.hot = null;
       const z = Number(settings()?.zoom) || 1;
       openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...(b ? { at: { x: b.x, y: b.y + b.height + 4 * z } } : {}), props: { tab: "agent", target: { address: titled } } });
     };
+    // Its menu up: the title stays lit, its ⌄ shown and its label down, as the layout's other buttons that open one (trigger.js).
+    const menuOn = (id) => popupOpen(this, id, "t3-menu.closed");
     // A right-click is the menu of what's under it, on the pointer, as everywhere: the space's (as in Spaces), an agent's (as
     // its card's).
     const context = (kind, target) => (_e, cx) => { detailsFor(this, null, cx); openMenu(this, kind, target, cx); };
-    const fromTitle = () => { const b = this.titleFrom; this.titleFrom = null; if (!justClosed(this, "t3-menu.closed")) menu(b); };
     const sep = (id) => div().id(id).flex_none().text_color(t.dim).child("/");
-    const press = (e, cx) => { stopPress(e, cx); detailsFor(this, null, cx); this.titleFrom = e.bounds; pressed(this); };
-    const act = (action) => (_e, cx) => { action(); this.pressAt = this.titleFrom = null; cx.notify(); };
+    const press = (e, cx) => { stopPress(e, cx); detailsFor(this, null, cx); };
+    const act = (action) => (_e, cx) => { action(); cx.notify(); };
     const link = (id, label, el, action, radius = 4) => tip(this, t, id, label, stop(this, t, id, el.id(id).role("button").accessibility_label(label)
       .on_mouse_down("left", press).on_click(act(action)).on_hover(glow(this, id)), radius), { below: true });
     // A name shown whole has no label, as a tab's (T3's title only repeats it). Cut short, or down to its icon or `…`, the tab's
     // hover label holds it whole, under it, its words where the name starts (`at`, from the item's left; the label's 1 + 8 in).
     const text = (id, label) => nameText(this, id, label, { size: 14, weight: "medium" });
+    // `action` null: the title, which opens its menu.
     const named = (id, label, el, action, { agent, titled: own = false, shown = true, at = 0, radius = 4 } = /** @type {{ agent: string, titled?: boolean, shown?: boolean, at?: number, radius?: number }} */ ({ agent: null })) => {
-      return stop(this, t, id, namedLabel(this, t, id, label, el.id(id).role("button").accessibility_label(label)
-        .on_mouse_down("left", press).on_click(act(action)).on_mouse_down("right", context("agent", { address: own ? titled : agent })), {
-        shown, at, onHover: (hovered, cut, cx) => { glow(this, id)(hovered, cx); detailsFor(this, hovered && cut ? id : null, cx); },
+      const wired = action ? el.on_mouse_down("left", press).on_click(act(action)) : opener(this, { id, closed: "t3-menu.closed", onOpen: menu, press })(el);
+      return stop(this, t, id, namedLabel(this, t, id, label, wired.id(id).role("button").accessibility_label(label)
+        .on_mouse_down("right", context("agent", { address: own ? titled : agent })), {
+        shown, at, onHover: (hovered, cut, cx) => { glow(this, id)(hovered, cx); detailsFor(this, hovered && cut && !menuOn(id) ? id : null, cx); },
         onMove: e => detailsAt(this, id, e),
       }), radius);
     };
     // As T3's title: its ⌄ is part of it, 4 after the name, 14px, there only while the title is hovered or has the keyboard.
     const chevron = (id) => {
-      const shown = this.hot === id || within(this, [id]);
+      const shown = this.hot === id || within(this, [id]) || menuOn(id);
       return div().id("crumb-menu").flex_none().opacity(shown ? 1 : 0).transition("opacity", { duration: 150, easing: "ease-out" })
         .child(svg("mods/t3-tabs/icons/chevron-down.svg").size(14).text_color(t.muted));
     };
@@ -612,11 +593,11 @@ export default class Tabs extends View {
         .text_color(lit || this.hot === id ? t.foreground : t.muted)
         .child(text(id, label))
         .when(lit, e => e.child(chevron(id)));
-      return named(id, label, el, lit ? fromTitle : () => focusAgent(address), { agent: address, titled: lit, radius: 6 });
+      return named(id, label, el, lit ? null : () => focusAgent(address), { agent: address, titled: lit, radius: 6 });
     };
     const sub = ctx.sub && named(`peer-${ctx.sub}`, nameOf(ctx.sub), h_flex().min_w(0).flex_shrink(1).gap(4).items_center().rounded(4)
       .text_color(dim ? t.muted : t.foreground).child(text(`peer-${ctx.sub}`, nameOf(ctx.sub)))
-      .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : fromTitle, { agent: ctx.sub, titled: !dim });
+      .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : null, { agent: ctx.sub, titled: !dim });
     // Its own width and no less (flex weighting alone let the strip win): capped at the row, where its names shorten.
     return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(14).font_medium()
       .child(link("crumb-space", `Open a tab in ${space.name}`, h_flex().min_w(0).flex_shrink(1).gap(6).items_center()

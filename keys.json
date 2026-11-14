@@ -159,12 +159,12 @@
     "ctrl-alt-x": "overlay.close"
   },
   "mod:t3-files": {
-    "cmd-t": "t3-tabs.surface-menu",
+    "cmd-t": "t3-chrome.surface-menu",
     "cmd-w": "t3-files.close",
     "ctrl-alt-shift-x": "t3-files.close"
   },
   "mod:review": {
-    "cmd-t": "t3-tabs.surface-menu",
+    "cmd-t": "t3-chrome.surface-menu",
     "cmd-w": "review.close",
     "ctrl-alt-shift-x": "review.close"
   }

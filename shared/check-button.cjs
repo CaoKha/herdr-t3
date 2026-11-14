@@ -7,7 +7,7 @@ const vm = require("node:vm");
 
 const src = fs.readFileSync(path.join(__dirname, "button.js"), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.b = { button, radiusOf, DISABLED, split };";
+  + "\nglobalThis.b = { button, radiusOf, DISABLED, split, ghostButton };";
 // An element that records its calls; `when` runs its branch, `hover` records the style it sets.
 const element = (calls = []) => new Proxy({ calls }, { get: (target, key) => key === "calls" ? target.calls : (...args) => {
   if (key === "when") return args[0] ? args[1](element(calls)) : element(calls);
@@ -15,9 +15,11 @@ const element = (calls = []) => new Proxy({ calls }, { get: (target, key) => key
   calls.push([key, ...args]);
   return element(calls);
 } });
-const context = vm.createContext({ h_flex: () => element(), div: () => element(), svg: (p) => element([["svg", p]]) });
+// tip.js's glow.
+const glow = (view, id) => (on) => { view.hot = on ? id : null; };
+const context = vm.createContext({ h_flex: () => element(), div: () => element(), svg: (p) => element([["svg", p]]), glow });
 vm.runInContext(src, context);
-const { button, split } = context.b;
+const { button, split, ghostButton } = context.b;
 const t = { solid: "SOLID", solid_foreground: "INK", raised: "RAISED", input: "INPUT", foreground: "#fff", dim: "DIM",
   hover: "HOVER", selected: "SELECTED", border: "BORDER", ansi1: "RED", accent: "ACCENT", accent_foreground: "ACCENT_FG" };
 const calls = (o) => button(t, "b", o).calls;
@@ -63,12 +65,28 @@ calls({ text: "Go", act: () => clicked++ }).find(([k]) => k === "on_click")[1](n
 assert.equal(clicked, 1);
 assert.deepEqual(arg(calls({ icon: "x.svg", label: "Wrap", on: true, disabled: true, surface: "card" }), "bg"), [], "a disabled toggle isn't pressed: no on fill");
 
-// split(): one group, so its fill is the group's; each half only lights.
+// split(): one group, so its fill is the group's, with the seam; its chevron always shows, as T3's.
 const flat = (c) => c.flatMap((call) => call[0] === "child" ? flat(call[1].calls) : [call]);
-const pair = (o) => { const g = flat(split(t, { id: "g", mainId: "m", moreId: "x", chevron: "c.svg", ...o }, (m) => m, (x) => x).calls); return { bg: arg(g, "bg"), svg: arg(g, "svg") }; };
-assert.deepEqual(pair({}).bg, [], "at rest: no fill, no seam");
-assert.deepEqual(pair({ hot: "main" }).bg, ["#fff12", "BORDER"], "hovered: 7% under both halves, the seam shown");
-assert.deepEqual(pair({ on: true }).bg, ["#fff1f", "BORDER"], "menu open: 12%");
-assert.deepEqual(pair({ hot: "main", locked: true }).bg, [], "a locked main half doesn't light the pair");
-assert.deepEqual([pair({ quiet: true }).svg, pair({ quiet: true, hot: "more" }).svg], [[], ["c.svg"]], "quiet: the chevron only while lit");
+const pair = (o) => { const g = flat(split(t, { id: "g", mainId: "m", moreId: "x", chevron: "c.svg", ...o }, (m) => m, (x) => x).calls); return { bg: new Set(arg(g, "bg")), svg: arg(g, "svg") }; };
+assert.equal(pair({}).bg.size, 0, "at rest: no fill, no seam");
+assert.deepEqual(pair({}).svg, ["c.svg"], "at rest the chevron still says there's a menu");
+assert.ok(pair({ hot: "main" }).bg.has("#fff12") && pair({ hot: "main" }).bg.has("BORDER"), "hovered: 7% under both halves, the seam shown");
+assert.ok(pair({ on: true }).bg.has("#fff1f"), "menu open: 12%");
+assert.equal(pair({ hot: "main", locked: true }).bg.size, 0, "a locked main half doesn't light the pair");
+
+// ghostButton(): the wired icon button. Hovering lights its icon, a click runs it; disabled, neither.
+{
+  const view = {}, cx = { stop_propagation() {} };
+  let ran = 0;
+  const draw = (disabled = false) => ghostButton(view, t, "g", { icon: "x.svg", label: "Tree", act: () => ran++, disabled });
+  const handler = (el, key) => el.calls.find(([k]) => k === key)?.at(-1);
+  assert.deepEqual(arg(draw().calls, "text_color"), ["DIM"]);
+  handler(draw(), "on_hover")(true);
+  assert.deepEqual(arg(draw().calls, "text_color"), ["#fff"], "hovered, its icon lights");
+  handler(draw(), "on_click")(null, cx);
+  assert.equal(ran, 1);
+  view.hot = null;
+  const off = draw(true).calls;
+  assert.ok(!off.some(([k]) => k === "on_click" || k === "on_hover"), "disabled: no click, no hover");
+}
 console.log("button ok");

@@ -13,12 +13,13 @@ share() { f=$1; shift; for d; do cp "$src/shared/$f.js" "$src/$d/"; done; }
 share name mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker
 share program mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker
 share tree mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu
+share status-mark mods/t3-pane mods/t3-agents
 share project mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu
-share tip mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
+share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share details mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-tabs extras/mods/pulls-review
 share measured-text mods/t3-actions mods/t3-chrome mods/t3-tabs
 share motion mods/t3-inbox mods/t3-agents mods/t3-spaces
-share focus mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
+share focus extras/mods/review mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
 share list mods/t3-chrome mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review
 share zoom mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-picker
 share sidebar mods/t3-chrome mods/t3-home mods/t3-tabs mods/t3-spaces mods/t3-agents mods/t3-inbox mods/t3-pane mods/t3-menu
@@ -29,26 +30,27 @@ share labels mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-menu
 share pins mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-menu
 share menu mods/t3-inbox mods/t3-agents mods/t3-spaces mods/t3-tabs mods/t3-pane
 share panel mods/t3-chrome mods/t3-tabs mods/t3-actions mods/t3-files extras/mods/pulls-review extras/mods/review
-share terminal-context mods/t3-tabs mods/t3-actions mods/t3-files
+share terminal-context mods/t3-tabs mods/t3-actions mods/t3-files mods/t3-chrome extras/mods/pulls-review extras/mods/review
+share surfaces mods/t3-chrome mods/t3-tabs mods/t3-actions mods/t3-files extras/mods/pulls-review extras/mods/review
+share scroll-strip mods/t3-tabs mods/t3-chrome
 share submenu mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review
 share review-git mods/t3-actions extras/mods/pulls-review extras/mods/review
 share review-menu mods/t3-actions extras/mods/review
 share review-scope mods/t3-actions extras/mods/review
-share file-icons mods/t3-files extras/mods/review
-share file-icons-data mods/t3-files extras/mods/review
-share pierre-icons mods/t3-files mods/t3-chrome
-share pierre-icons-data mods/t3-files mods/t3-chrome
+share pierre-icons mods/t3-files mods/t3-chrome extras/mods/review
+share pierre-icons-data mods/t3-files mods/t3-chrome extras/mods/review
 share file-tree mods/t3-files extras/mods/review
 share nav-column mods/t3-files extras/mods/review
-share file-menu mods/t3-files
+share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox extras/mods/review
 share open-in mods/t3-files mods/t3-actions
 share panel-states mods/t3-files extras/mods/review
-share button mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
-# file-icons.js's SVGs (scripts/vendor.sh makes them): each mod draws only its own.
-for d in mods/t3-files extras/mods/review; do rsync -a --delete "$src/shared/icons/cat/" "$src/$d/icons/cat/"; done
-for d in mods/t3-files mods/t3-chrome; do rsync -a --delete "$src/shared/icons/pierre/" "$src/$d/icons/pierre/"; done
-# Open in's app artwork and the breadcrumb menu's folder icon, the ones Details uses, copied into Files' own folder.
-for icon in finder vscode vscodium cursor zed app-window folder; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
+share button mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
+share trigger mods/t3-actions mods/t3-chrome mods/t3-pane mods/t3-tabs mods/t3-inbox mods/t3-spaces mods/t3-agents mods/t3-files extras/mods/review extras/mods/asciicn-wallpaper
+# The file tree's icons (pierre-icons.js's, scripts/vendor-files-icons.ts makes them; a folder's two): each mod draws only its own.
+for d in mods/t3-files mods/t3-chrome extras/mods/review; do rsync -a --delete "$src/shared/icons/pierre/" "$src/$d/icons/pierre/"; done
+for d in mods/t3-files extras/mods/review; do rsync -a --delete "$src/shared/icons/tree/" "$src/$d/icons/tree/"; done
+# Open in's app artwork, the ones Details uses, copied into Files' own folder.
+for icon in finder vscode vscodium cursor zed app-window; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
 
 # mod.json stays per repo: here the layout places it ("none"), alone it docks left.
 rsync -a --delete $gen --exclude mod.json "$src/mods/t3-inbox/" "$inbox/mods/t3-inbox/"

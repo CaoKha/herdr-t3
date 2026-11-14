@@ -5,10 +5,9 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const store = new Map();
-const src = "const drawButton = (() => {\n" + fs.readFileSync(path.join(__dirname, "button.js"), "utf8")
-  .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "") + "\nreturn button;\n})();\n" + fs.readFileSync(path.join(__dirname, "nav-column.js"), "utf8")
+const src = fs.readFileSync(path.join(__dirname, "nav-column.js"), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.nav = { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth, ghostButton };";
+  + "\nglobalThis.nav = { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth };";
 // Elements that keep their handlers and widths: a fake page to drag the column's edge in.
 const made = [];
 const element = () => {
@@ -31,29 +30,11 @@ const make = () => { const p = element(); proxies.set(made.at(-1), p); return p;
 const sets = [];
 const context = vm.createContext({ KEY: { navWidth: "t3.navWidth" }, shared: (k) => store.get(k) ?? null,
   setShared: (k, v) => { sets.push([k, v]); store.set(k, v); }, settings: () => ({ zoom: 2 }),
-  div: make, h_flex: make, v_flex: make, svg: make,
-  // tip.js's.
-  glow: (view, id) => (on, cx) => { if (on) view.hot = id; else if (view.hot === id) view.hot = null; cx.notify(); },
+  div: make, h_flex: make, v_flex: make, svg: make, ghostButton: make,
   localStorage: { getItem: (k) => store.get(`local:${k}`) ?? null, setItem: (k, v) => { sets.push([k, String(v)]); store.set(`local:${k}`, String(v)); } } });
 vm.runInContext(src, context);
-const { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth, ghostButton } = context.nav;
+const { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth } = context.nav;
 
-{
-  const t = { foreground: "#ffffff", dim: "#888888" }, view = {};
-  let clicks = 0;
-  const cx = { notify() {}, stop_propagation() {} };
-  const draw = (disabled = false) => ghostButton(t, "mods/review", "toggle", "folder-tree", "Tree", () => clicks++, { view, disabled });
-  const live = draw();
-  assert.equal(live.style.text_color, t.dim);
-  live.on.on_hover(true, cx);
-  assert.equal(draw().style.text_color, t.foreground, "the real helper brightens the hovered icon");
-  live.on.on_click({}, cx);
-  const disabled = draw(true);
-  assert.equal(disabled.style.opacity, 0.64);
-  assert.equal(disabled.on.on_click, undefined, "disabled has no click handler");
-  assert.equal(disabled.on.on_hover, undefined, "disabled has no hover tracking");
-  assert.equal(clicks, 1);
-}
 
 assert.deepEqual([...navRange(1200)], [160, 560], "wide: 560 at most");
 assert.deepEqual([...navRange(681)], [160, 425], "the content keeps 256");

@@ -48,11 +48,10 @@ let agentList = [];
 let sidebar = { id: "root", children: [{ id: "sidebar-lists", active: "lists" }] };
 let props = { pane: "p2" };
 let pointer = { x: 50, y: 10 };
-let reads = 0;
 const env = {
   View: class {}, div: element, svg: (src) => { const el = element(); el.svg = src; return el; }, image: (src) => { images.push(src); return element(); }, h_flex: element, v_flex: element, Popup: { new: (id, trigger) => element().id(id).child(trigger) }, keys: () => [],
   theme: () => ({ selected: "#123456" }), props: () => props, panes: () => [pane, shell, review], shared: (k) => sharedValues[k] ?? null, home: () => "/home/me",
-  terminals: () => { reads++; return terms; }, agents: () => agentList, spaces: () => [{ id: "s1", name: "project", tabs: [tab] }], layout: () => sidebar,
+  terminals: () => terms, agents: () => agentList, spaces: () => [{ id: "s1", name: "project", tabs: [tab] }], layout: () => sidebar,
   run: (name, args) => calls.push([name, args]), openOverlay: (o) => calls.push(["overlay", o]), closeOverlay: (id) => calls.push(["close", id]), settings: () => ({ zoom: 1 }), setShared: (k, v) => { sharedValues[k] = v; },
   window: Object.assign(() => ({ platform: "macos", active: true }), { mouse_position: () => pointer, viewport_size: () => ({ width: 1000, height: 800 }) }),
 };
@@ -69,37 +68,12 @@ function load(...files) {
     .replace(/^import .*;\r?\n/gm, "").replace(/export (function|const) /g, "$1 ").replace("export default class", "globalThis.Mod = class");
   const context = vm.createContext({ ...env });
   // Load the real synced helper, including the alias main.js imports.
-  vm.runInContext("(() => {\n" + fs.readFileSync(path.join(__dirname, "button.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf;\n})();", context);
+  vm.runInContext("(() => {\n" + ["button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger;\n})();", context);
   vm.runInContext(src, context, { filename: files.at(-1) });
   const mod = new context.Mod(); mod.init({}, cx); return mod;
 }
 const take = () => JSON.parse(JSON.stringify(calls.splice(0)));
-const parts = ["store.js", "name.js", "tree.js", "tip.js", "focus.js", "list.js", "program.js", "menu.js", "sidebar.js", "main.js"].map((f) => path.join(__dirname, f));
-// Same fixture and VM/element adapter on both revisions; no native paint or IPC is included.
-if (process.env.PANE_BENCH) {
-  terms = [{ address: "t2", state: "live", labels: {} },
-    ...Array.from({ length: 5000 }, (_, i) => ({ address: `other-${i}`, state: "live", parent: null, labels: {} })),
-    ...Array.from({ length: 30 }, (_, i) => ({ address: `kid-${i}`, parent: i % 3 === 1 ? `kid-${i - 1}` : "t2", state: "live", status: ["working", "blocked", "idle", "done", "error"][i % 5], status_ms: Date.now() - 720000, name: `Task ${i}`, program, labels: {} }))];
-  props = { kids: "t2", overlay: "bench" };
-  const samples = (n, fn) => {
-    const times = [];
-    for (let i = 0; i < n + 10; i++) { const start = performance.now(); fn(); if (i >= 10) times.push(performance.now() - start); }
-    times.sort((a, b) => a - b);
-    return { median: times[Math.floor(n / 2)], p95: times[Math.floor(n * .95)] };
-  };
-  const template = load(...parts); template.close();
-  console.log("open-ms", samples(100, () => { const m = new template.constructor(); m.init({}, cx); m.render(); m.close(); }));
-  const m = load(...parts);
-  let key = find(m.render(), "pane-kids").handlers.on_key_down;
-  console.log("move-ms", samples(500, () => { key({ key: "down" }, cx); key = find(m.render(), "pane-kids").handlers.on_key_down; }));
-  key({ key: "home" }, cx); m.render();
-  let pointed = 0;
-  console.log("hover-ms", samples(500, () => {
-    find(m.render(), `kid-kid-${pointed}`).handlers.on_hover(true, cx);
-    pointed = 1 - pointed; m.render();
-  }));
-  m.close(); process.exit(0);
-}
+const parts = ["store.js", "name.js", "tree.js", "status-mark.js", "tip.js", "focus.js", "list.js", "menu-row.js", "program.js", "menu.js", "sidebar.js", "main.js"].map((f) => path.join(__dirname, f));
 const header = load(...parts);
 header.hovered = true;
 find(header.render(), "pane-head-p2").handlers.click({}, cx);
@@ -265,48 +239,38 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
 {
   const kids = find(header.render(), "ph-kids-p2");
   assert.equal(kids.accessibility_label, "2 sub-agents");
-  assert.ok(texts(kids).includes("2"));
-  assert.equal(find(header.render(), "ph-mark-p2"), null, "the entry replaces the redundant aggregate working mark");
+  assert.deepEqual(texts(kids), ["2"]);
+  const own = () => { const m = find(header.render(), "ph-mark-p2"); return m && [...svgs(m).map((s) => path.basename(s)), ...texts(m)].join(" "); };
+  assert.equal(own(), "spinner.svg", "its own agent at work still says so beside the button");
+  pane.status = "blocked";
+  assert.equal(own(), "!", "and needing the person, with its sub-agents all fine");
+  pane.status = "idle";
   terms.find((k) => k.address === "grandchild").status = "blocked";
-  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents, 1 needs you");
-  assert.deepEqual(texts(find(header.render(), "ph-kids-p2")), ["2"], "attention changes the tint and tooltip, not the count wording");
+  assert.equal(own(), null, "a sub-agent's word isn't its own");
+  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents, 1 needs you", "the button says it");
+  assert.deepEqual(texts(find(header.render(), "ph-kids-p2")), ["2"]);
+  pane.status = "working";
   // Hung from the button, right edges together, as the agents list's sort menu.
   const k = find(header.render(), "ph-kids-p2");
   k.handlers.left({ bounds: { x: 300, y: 2, width: 40, height: 24 } }, cx);
   k.handlers.click({}, cx);
   assert.deepEqual(take(), [["overlay", { mod: "t3-pane", kind: "popup", width: 280, at: { x: 60, y: 30 }, props: { kids: "t2" } }]], "it opens the list, not the pane's focus; no height, so it grows and shrinks with its rows");
-  // The list, as the layout's menus: no repeated counts, every one a step in for each level with its own status;
-  // a click or Enter peeks it and closes the list.
+  // The list: every one a step in for each level with its own status; a click or Enter peeks it and closes the list.
   props = { kids: "t2", overlay: "o1" };
   const menu = load(...parts);
   const list = () => menu.render();
-  assert.equal(list().items.length, 1, "the popup contains only its list, with no details or footer actions");
-  for (const id of ["kid-details", "kid-peek", "kid-send", "kid-copy"]) assert.equal(find(list(), id), null);
-  assert.equal(find(list(), "kid-grandchild").style.bg, undefined, "opening doesn't preselect the attention-needed row");
-  assert.equal(find(list(), "kid-child").style.bg, undefined, "opening doesn't preselect the first row either");
-  assert.equal(list().items[0].key, "pane-kids-list", "only rows: the button already counts the sub-agents");
+  assert.equal(find(list(), "kid-grandchild").style.bg, undefined, "opening lights no row");
   assert.equal(find(list(), "kid-gone"), null, "an ended one isn't listed");
-  assert.deepEqual(["kid-child", "kid-grandchild"].map((id) => find(list(), id).pl), [8, 24]);
-  assert.equal(find(list(), "kid-child").accessibility_label, "child task, Working", "its own status: the row under it says what's stuck");
+  assert.deepEqual(["kid-child", "kid-grandchild"].map((id) => find(list(), id).items[0]?.style.w ?? 0), [0, 8], "a level in: 8 more and the gap's 8");
   assert.ok(texts(find(list(), "kid-child")).includes("4m"), "working, how long");
   const child = terms.find((k) => k.address === "child");
   child.created_ms = child.status_ms - 60 * 60000; child.status_ms = null;
-  tick();
   assert.ok(texts(find(list(), "kid-child")).includes("1h"), "no status change yet: working since it was made");
-  assert.equal(find(list(), "kid-grandchild").accessibility_label, "grandchild task, Needs you");
-  assert.ok(texts(find(list(), "kid-grandchild")).includes("Needs you"));
   const mark = (address) => find(list(), `kid-status-${address}`);
   assert.equal(mark("child").accessibility_label, "Working");
   assert.equal(mark("child").items[0].svg, "mods/workspace-chrome/spinner.svg");
-  assert.equal(mark("child").items[0].style.spin, 900, "the working mark spins as it does in Agents");
   assert.equal(mark("grandchild").accessibility_label, "Needs you");
-  assert.deepEqual(texts(mark("grandchild")), ["!", "Needs you"], "a single status group, not another label beside it");
-  for (const address of ["child", "grandchild"]) {
-    const row = find(list(), `kid-${address}`);
-    assert.equal(row.style.h, 28);
-    assert.equal(row.items.at(-1).key, `kid-status-${address}`, "status has the last column");
-    assert.equal(row.items.at(-1).style.w, 96, "every state keeps the same column width");
-  }
+  assert.deepEqual(texts(mark("grandchild")), ["!", "Needs you"]);
   find(list(), "kid-grandchild").handlers.click({}, cx);
   assert.deepEqual(take(), [["close", "o1"], ["terminal.peek", { terminal: "grandchild" }]]);
   find(list(), "kid-grandchild").handlers.right({}, cx);
@@ -314,56 +278,32 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
     props: { tab: "agent", target: { address: "grandchild" } } }]], "right-click replaces the list with the shared agent menu, without peeking");
   const keys = find(list(), "pane-kids").handlers.on_key_down;
   keys({ key: "enter" }, cx);
-  assert.deepEqual(take(), [], "Enter before selecting a row doesn't peek an automatic default");
+  assert.deepEqual(take(), [], "Enter before a row is lit peeks nothing");
   keys({ key: "down" }, cx); keys({ key: "enter" }, cx);
   assert.deepEqual(take(), [["close", "o1"], ["terminal.peek", { terminal: "child" }]]);
   keys({ key: "escape" }, cx);
   assert.deepEqual(take(), [["close", "o1"]]);
-  // Hover and keyboard selection only highlight rows; neither restores an external card or reads all terminals.
-  const row = () => find(list(), "kid-child");
-  const beforeReads = reads;
-  row().handlers.on_hover(true, cx);
-  assert.equal(find(list(), "details-child"), null, "no external hover card");
-  keys({ key: "down" }, cx);
-  assert.equal(find(list(), "kid-grandchild").style.bg, env.theme().selected, "keyboard selection highlights its row");
   find(list(), "kid-grandchild").handlers.on_hover(true, cx);
-  row().handlers.on_hover(false, cx);
+  assert.equal(find(list(), "kid-grandchild").style.bg, env.theme().selected, "the pointer lights its row");
   find(list(), "kid-grandchild").handlers.on_hover(false, cx);
-  assert.equal(find(list(), "kid-details"), null, "hover and keys never add a details footer");
-  assert.equal(reads, beforeReads, "hover, keyboard movement and rendering never enumerate terminals");
-  keys({ key: "enter" }, cx);
-  assert.deepEqual(take(), [["close", "o1"], ["terminal.peek", { terminal: "grandchild" }]], "Enter still peeks the highlighted row");
-  const fold = find(list(), "kid-fold-child");
-  assert.equal(find(find(list(), "kid-child").items[0], "kid-fold-child")?.key, fold.key, "the tree disclosure sits beside the program icon, not after the name");
-  fold.handlers.click({}, cx);
-  assert.equal(find(list(), "kid-grandchild"), null, "fold hides descendants, leaving the program icon in place");
-  keys({ key: "home" }, cx); keys({ key: "right" }, cx);
-  assert.ok(find(list(), "kid-grandchild"), "Right expands the keyboard-selected parent");
-  keys({ key: "left" }, cx);
-  assert.equal(find(list(), "kid-grandchild"), null);
-  keys({ key: "right" }, cx);
+  assert.notEqual(find(list(), "kid-grandchild").style.bg, env.theme().selected, "off the rows, nothing is lit");
   // A command an agent ran in a shell of its own isn't an agent; an agent that shell started still is, a level in from it.
   terms.push({ address: "job", parent: "t2", state: "live", status: null, name: "e2e-run", program: { key: "shell", shell: true, agent: false }, labels: {} },
     { address: "job-kid", parent: "job", state: "live", status: "idle", name: "docs", program: { key: "pi", agent: true }, labels: {} });
-  tick();
   assert.equal(find(list(), "kid-job"), null, "a shell isn't listed");
-  assert.equal(find(list(), "kid-job-kid").pl, 8);
-  assert.equal(mark("job-kid").accessibility_label, "Idle");
+  assert.equal(find(list(), "kid-job-kid").items[0]?.style.w, undefined, "what it started stands where the shell would have");
   const jobKid = terms.find((k) => k.address === "job-kid");
-  jobKid.status_ms = Date.now() - 12 * 60000; tick();
-  assert.deepEqual(texts(mark("job-kid")), ["12m"], "idle shows age, never Idle or a ring");
-  jobKid.status = "done"; tick();
-  assert.equal(mark("job-kid").accessibility_label, "Done");
-  assert.equal(mark("job-kid").items[0].style.size, 6);
-  jobKid.status = "error"; tick();
-  assert.equal(mark("job-kid").accessibility_label, "Failed");
-  assert.deepEqual(texts(mark("job-kid")), ["!", "Failed"]);
-  assert.deepEqual(list().items[0].items.map((row) => row.key), ["kid-child", "kid-grandchild", "kid-job-kid"], "a failure never jumps ahead of its tree position");
+  jobKid.status_ms = Date.now() - 12 * 60000;
+  assert.deepEqual(texts(mark("job-kid")), ["12m"], "idle shows how long, no mark");
+  jobKid.status = "done"; jobKid.turn = 2;
+  assert.equal(mark("job-kid").accessibility_label, "Done", "an unread done is a dot");
+  jobKid.labels["herdr.seen"] = "2";
+  assert.deepEqual(texts(mark("job-kid")), ["12m"], "read, it's idle again");
+  jobKid.status = "error";
+  assert.deepEqual(texts(mark("job-kid")), ["!", "Failed"], "failed: the same `!`, its own word");
+  assert.deepEqual(list().items[0].items.map((row) => row.key), ["kid-child", "kid-grandchild", "kid-job-kid"], "a failure keeps its place in the tree");
   jobKid.status = null;
-  tick();
-  assert.equal(mark("job-kid").accessibility_label, "Unknown");
-  assert.equal(mark("job-kid").items.length, 0, "no idle mark before its first status report");
-  assert.deepEqual(texts(find(list(), "kid-job-kid")).filter(Boolean), ["docs"], "no status text before its first report");
+  assert.equal(mark("job-kid"), null, "nothing before its first report");
   jobKid.status = "idle";
   props = { pane: "p2" };
   assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "3 sub-agents, 1 needs you");
@@ -372,7 +312,6 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   const left = terms.splice(-5);
   tick();
   assert.deepEqual(take(), [["close", "o1"]]);
-  assert.equal(find(list(), "kid-details"), null, "even an empty snapshot has no details or placeholders");
   terms.push(...left); tick();
   assert.deepEqual(take(), [], "while there are some, it stays");
   terms.splice(-5);
@@ -395,4 +334,4 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
 
 props = { pane: "missing" };
 assert.equal(find(header.render(), "pane-head-p2"), null);
-console.log("ok: a lone pane keeps zoom and close; focus, both splits and close target their own pane; names follow the shared rule, a mod pane's its own title and icon; quiet done dots hide in both modes; sub-agents open as a nested list that peeks; a missing pane renders nothing.");
+console.log("ok: a lone pane keeps zoom and close; focus, both splits and close target their own pane; names follow the shared rule, a mod pane's its own title and icon; quiet done dots hide in both modes; its own status beside its sub-agents' button, whose nested list peeks; a missing pane renders nothing.");

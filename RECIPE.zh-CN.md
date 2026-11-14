@@ -24,15 +24,15 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 无标题栏，terminal opacity 0、padding `[8, 0]`。窗格聚焦边框也是 2px `background`，默认不可见且聚焦不改变终端尺寸；把布局的 `focus.color` 改成 `accent` 即可显示。分屏时非聚焦窗格的图标、名字、目录降为 50%，悬停恢复，状态和按钮不变。布局保留但隐藏自带 `workspace-status`。
 
-后续改尺寸、圆角、间距或颜色前读 [T3 token 基准](docs/internals/t3-tokens.md)：组件 token、按钮变体和有意不同于 T3 的地方以它为维护出处。
+后续改尺寸、圆角、间距或颜色前读 [T3 token 基准](docs/internals/t3-tokens.md)：设计规则（成组、对齐、弹层触发按钮）、组件 token、按钮变体和有意不同于 T3 的地方以它为维护出处。
 
 ### 侧栏框架
 
-品牌栏先给 macOS 窗口按钮留位置，再放官方标记（`frame/welcome/herdr.png`，20px、圆角 5、70%）和 `Herdr`（14px medium `muted`，间隔 8）。两者在悬停和 Home 时提亮；28px 按钮回 Home，无提示、不加悬停底色。放不下完整名字时整个隐藏，只留标记，不截成 `Her…`。右侧内缩 8 的 28px 按钮用 16px Lucide 图标切模式、隐藏侧栏。模式图标表示点击后去哪里：`inbox` 或 `layout-list`，隐藏按钮再隔 12。
+品牌栏先给 macOS 窗口按钮留位置，再放官方标记（`frame/welcome/herdr.png`，20px、圆角 5、70%）和 `Herdr`（14px medium `muted`，间隔 8）。两者在悬停和 Home 时提亮；28px 按钮回 Home，无提示、不加悬停底色。放不下完整名字时整个隐藏，只留标记，不截成 `Her…`。右侧内缩 8 的 28px 按钮用 16px Lucide 图标切模式、隐藏侧栏。模式图标表示点击后去哪里：`inbox` 或 `layout-list`，两个按钮相接。
 
 macOS 窗口按钮初值 `[16, 12]`，与品牌栏中线对齐，距标记 16 屏幕点。无标题栏、非全屏时未缩放的 Y 为 `12 + 20 × (zoom − 1)`；只调整安装后名为 `herdr-t3` 的布局，改名副本不动。侧栏隐藏或窄时标签栏给窗口按钮留位置；Windows 的 28px 窗口按钮在标签栏末尾。
 
-底栏内缩 8、上 4，放间隔 4 的 32px 图标按钮（圆角 8、16px 图标）：Herdr Settings 和布局 sliders 设置。空位放撤销提示。更新下载好后，右侧 32px `Update` 胶囊（12px `accent` 字、同色 15% 底）运行 `app.update`。
+底栏内缩 8、上 4，放相接的 32px 图标按钮（圆角 8、16px 图标）：Herdr Settings 和布局 sliders 设置。空位放撤销提示。更新下载好后，右侧 32px `Update` 胶囊（12px `accent` 字、同色 15% 底）运行 `app.update`。
 
 ### Inbox
 
@@ -40,7 +40,7 @@ macOS 窗口按钮初值 `[16, 12]`，与品牌栏中线对齐，距标记 16 �
 
 Pinned、Active 卡片在上，Working、Snoozed、Settled 有内容时是贴底的折叠收纳区；空间不够时跟在卡片后，共用滚动列表。标题高 32，比行内缩 2、内边距 8，12px 淡色名称、常规字重数量、12px 箭头。折叠仍露出当前查看的行，隐藏数量不计它。Settled 分页 Show more，有可关闭终端时有 Clear；Clear 先确认，保留当前标签。
 
-卡片圆角 6、横竖内边距 10/8，三行高 20、20、16，间隔 4、2，齐全时高 78，卡片间隔 5。首行 space 标记／名字与状态／时间（Working 加时长、Needs you、Done，否则经过多久），第二行 agent 标题，可选第三行分支、中间截断。60% 程序图标和远程机器标记在分支行末尾，没有则在标题末尾。正在看、需要人、done 的标题为 medium `foreground`，其余 normal `muted`；悬停只提亮、不移动。工作中卡片平时 70%，悬停或正在看时恢复。置顶卡片在 space 头像后带 pin。
+卡片圆角 6、内边距 8，三行高 20、20、16，间隔 4、2，齐全时高 78，卡片间隔 5。首行 space 标记／名字与状态／时间（Working 加时长、Needs you、Done，否则经过多久），第二行 agent 标题，可选第三行分支、中间截断。60% 程序图标和远程机器标记在分支行末尾，没有则在标题末尾。正在看、需要人、done 的标题为 medium `foreground`，其余 normal `muted`；悬停只提亮、不移动。工作中卡片平时 70%，悬停或正在看时恢复。置顶卡片在 space 头像后带 pin。
 
 Settled、Snoozed 是 36px 窄行，圆角 6、行间隔 1：16px space 标记（未亮时 40%）、标题和已经过／剩余时间。悬停把时间换成 Un-settle 或 Wake。Snoozed 带 `accent` 闹钟；Woke 是 `blocked` 文字，悬停后仍留在控件旁。控件和状态在角落交叉淡变，不重新排版。
 
@@ -68,47 +68,45 @@ Inbox 左边改成面包屑：space／适用时的父级／当前查看的 agent
 
 多 pane 标签进入 Herdr 原生 zoom 后，标签变为高 24、圆角 6、虚线框的分段组：每 pane 一段图标名字，被 zoom 的为 `selected`、最宽 240，其余最宽 144。Lists 在组末尾保留状态，组没有关闭、标签菜单或拖动。Inbox 的 agent 仍在面包屑，工具段只含非 agent pane。用 pane 缩放按钮或 `cmd-shift-enter` 恢复分屏，标签栏不重复放按钮。
 
-标签后是Details（square-menu）和末尾，Lists另有24px新终端+。详情／panel-right用既有sm/card（28／图标16／圆角8／gap4）、下方快捷键提示；详情属工作列，面板／平台按钮转到展开面板头。点击／cmd-shift-b打开下挂右对齐原生popup：宽280／圆角16，自然高、最高420；分区p8，行32／字13 medium／图标16／gap10／横距10／圆角8（t3-tokens）。Workspace：locked电脑名（本机ComputerName／远程机器），folder只提示路径，整行右键Copy full path；无hover／chevron／假终端迁移。Open in列Finder和已装T3编辑器（Cursor／Trae／Kiro、VSCode／Insiders／VSCodium、Zed／Antigravity、JetBrains）；菜单始终有入口，只选择全局偏好，主按钮才执行，卸载回退Finder；远程禁用并说明。全局Actions仍全局：空时Add action，有时主动作图标／名字＋菜单，hover／键盘选中才显示Edit。split是共享split()的一体ghost组：静止无底，hover 7%／菜单开12%铺满两半并显示中线与箭头；箭头和folder同在行尾32槽；菜单跟整行同宽、下偏移4，箭头仅aria-label。卡片无阴影：原生popup会把它裁成方角。Add action仅图标态提示；动作／电脑／surface名仅实测截断时提示。编辑器打开保留详情，运行只收菜单，来源失效收详情；Tab／Enter／Space走按钮，方向键只走菜单，不默认高亮首行。卡片右键可切四个可用项显隐／Reset，全隐藏保留Choose what to show。打开前捕获space／tab／终端／cwd，动作显式cwd优先。开面板收详情，外点保留面板，放大时快捷键先恢复工作列；不改终端几何，Home无Actions。
+标签后Details（square-menu）、Lists的新终端+、panel-right相接成一组（t3-tokens P3／R1）。详情／panel-right用chrome面小按钮、下方快捷键提示；详情属工作列，面板／平台按钮转到展开面板头。点击／cmd-shift-b打开下挂右对齐原生popup，随内容自然高、有上限；尺寸见t3-tokens「详情 popup」。Workspace：locked电脑名（本机ComputerName／远程机器），folder只提示路径，整行右键Copy full path；无hover／chevron／假终端迁移。Open in列Finder和已装T3编辑器（Cursor／Trae／Kiro、VSCode／Insiders／VSCodium、Zed／Antigravity、JetBrains）；菜单始终有入口，只选择全局偏好，主按钮才执行，卸载回退Finder；远程禁用并说明。全局Actions仍全局：空时Add action，有时主动作图标／名字＋菜单，hover／键盘选中才显示Edit。split用共享split()（见t3-tokens）；箭头和folder同在行尾槽；菜单跟整行同宽，箭头仅aria-label。卡片无阴影：原生popup会把它裁成方角。Add action仅图标态提示；动作／电脑／surface名仅实测截断时提示。编辑器打开保留详情，运行只收菜单，来源失效收详情；Tab／Enter／Space走按钮，方向键只走菜单。卡片右键可切四个可用项显隐／Reset，全隐藏保留Choose what to show。打开前捕获space／tab／终端／cwd，动作显式cwd优先。开面板收详情，外点保留面板，放大时快捷键先恢复工作列；不改终端几何，Home无Actions。
 
-Quick Review取代Git控件，行尾弱色显示当前范围（与Review范围按钮同字，提交显示标题）：整行同宽／下偏移4的行锚定子菜单，无第二个范围按钮；base入口留在菜单内。复用Review页scope／Commits／base及键盘，选中范围就打开／切换Review标签。计数和提交异步读取、有界缓存，迟到结果作废；无Git写操作／PR行。未安装Review、远程或非Git来源说明不可用原因。
+Quick Review是split行，行尾弱色写现存Review标签正显示的范围（与Review范围按钮同字，提交显示标题）。主半边显示Review（该范围，没有则其默认）；箭头在行下打开范围菜单（与整行同宽、下偏移4），列Review的范围，不含base和`‹ ›`；Commits在旁边另开一个popup。只给Review正显示的范围打勾。选中就显示Review并请求该范围。每次打开重读计数，迟到结果作废；无Git写操作／PR行。未安装Review或远程时禁用并说明原因；不在Git仓库时由菜单说明。
 
 ### 窗格与子 agent
 
 标题依次是程序图标、有意义的名字（14px medium）、隔 12 的目录、子 agent 按钮、状态、右／下分屏、zoom／还原、关闭。控件 24、图标 14，悬停或键盘聚焦时显示。名字只是程序名时省略。Inbox 里单独显示或 zoom 的 agent 名已在面包屑，标题不重复；分屏保留。Inbox 标题用 14px `dim` 勾标已 Settle，用 12px `accent` 闹钟加剩余时间标 Snooze；working/blocked 优先。Lists 不画这两种收起标记。首图标文字对齐首标签，最后控件／状态距窗口边 12。
 
-子 agent 入口只数活后代：`3 ⌄`，需要你时用 `blocked` 色，tooltip／aria 写总数与需要你的数量；标题不重复聚合 working／需要你的标记。按钮24／字12 medium／p8／箭头14／r8。菜单280宽，下方4／右对齐，p4／行28／无标题，十行后滚动，全结束关闭。只留列表：无底部详情或动作按钮，不恢复外部悬停卡，打开不默认高亮行。严格深度优先树序，每级缩进16，不按紧急程度重排。程序图标16不动，右侧固定多留16：gap4后放12折叠箭头、在名字前；Left／Right 收展。固定96右列：转圈加时长、`! Needs you`、`! Failed`、完成点、空闲时长（`12m`，无 Idle／环），首次报告前留空；表示自身状态，done不读成idle。悬停／方向键高亮，点击／Enter peek并关闭；右键关闭此弹层，打开侧栏共用的 `t3-menu` agent 菜单，含 Send back／Copy address。树每秒在render外更新，render不读文件、跑命令或遍历全量终端。命令shell不算agent。
+子 agent 入口只数活后代：`3 ⌄`，需要你时用 `blocked` 色，tooltip／aria 写总数与需要你的数量；标题的状态标记仍是 agent 自己的。按钮24／字12 medium／p8／箭头14／r8。菜单280宽，下方4／右对齐，p4／行28／无标题，十行后滚动，全结束关闭。严格深度优先树序，每级缩进16，不按紧急程度重排。行：程序图标16、名字、Agents 行同款标记：转圈加时长、`!`加`Needs you`、`ansi1` 色`!`加`Failed`、未读完成点、空闲时长（`12m`），首次报告前留空。指针／方向键点亮行，点击／Enter peek并关闭；右键关闭此弹层，打开共用的 `t3-menu` agent 菜单。命令shell不算agent。
 
 ### space 面板与 Files
 
-右侧唯一面板跨终端标签跟随space；每space记开关／放大、标签列表／当前项，未用过关闭且空，宽度全窗口共用。删除固定Files／Review两页；每文件一标签，通用Files／Review各最多一个。40px头含横滚标签（高24／圆角6／字12／槽内图标12／最宽144／相对路径提示）、+、28px放大／恢复／panel-right；溢出有箭头／滚轮，当前自动可见。隐藏保留并退出放大，切space恢复放大。 标签左6/右8/间距2，左16px槽显示12px surface图标，悬停/聚焦换×（tab面/圆角4），右边无×；+用24px xs ghost/图标14，间距4紧跟末标签并同条横滚，菜单左对齐下偏移6，布局控件固定最右。
+右侧唯一面板跨终端标签跟随space；每space记标签列表、当前项、开关和放大，未用过的关闭且空；宽度全窗口共用。没有固定页：每文件一标签，通用Files／Review各至多一个。头部（[token](docs/internals/t3-tokens.md)「面板标签」、P3／R1）：标签照T3，+紧跟末标签同条横滚，再是放大／恢复和panel-right。溢出用滚轮；照T3‹ ›并排在条后、到头置灰；当前标签（末标签连同+）自动滚入。同名照T3不区分。隐藏保留标签并退出放大，回到space恢复放大。
 
-空面板居中Open a surface，列表最宽320，Files F／装了才有Review R，行32／图标16／键提示。远程／非Git Review 50%置灰说明，+相同。面板cmd-t打开+，F/R选择、方向键循环可用、Enter执行，修饰键／输入焦点不抢字母；终端cmd-t仍新建终端。+ Files添加／激活整宽树；文件原位替换通用，或激活已有文件，不重复。共用一树；外部选标签清搜索、展开祖先并定位文件。
+空面板居中Open a surface：Files F，装了才有Review R。Review读标签工作处的仓库：最后活动终端的cwd，没有时space文件夹（照T3 diff跟随线程目录）；远程或非仓库置灰说明，+相同。Files／Review里cmd-t在+下打开+菜单，cmd-w关当前标签不关终端（keys.json `mod:`分区）。字母选、方向键只走可用行、Enter执行，修饰键／输入焦点不抢字母。+ Files添加或选中整宽树；文件原位替换通用Files或选中已有标签。共用一树；选标签清搜索并定位文件。
 
-×／中键／面板cmd-w关标签不关终端。关当前选右邻无则左邻，关其他不换，最后收起重开空。标签菜单：仅文件Copy path，另有Close／Close others／Close to the right／Close all，不可用置灰、批量原子更新。隐藏／切换保留，关闭释放文件／Review状态；Review重加默认范围，切换保留范围／组／文件／位置。每space只留最近显示三个文件标签的预览／Editor／阅读位置，更早回顶重读；页面仍仅缓存三个space。删除／改名保留标签并显示路径／根、定位树和Retry。终端路径点击首版未完成：宿主无链接／点击回调。
+×／中键关标签。关当前选右邻无则左邻，关其他不换，最后收起重开空。标签菜单：Copy path（文件／目录）、Close、Close others、Close to the right、Close all，不可用置灰，批量一步完成。隐藏／切换保留，关闭释放：各mod按标签实例释放自己的状态；Review重加从默认范围开始，不接旧标签的请求。每space只留最近显示三个文件标签的预览／Editor／位置，更早回顶重读。删除／改名保留标签并显示路径／根、定位和Retry。终端路径点击未完成：宿主无回调。
 
-两页共用圆角8、`background`卡片，内容左、导航右。Review保留40px透明工具栏和共用的加载／空／Retry状态。Files使用T3 inline结构；通用Files直接显示树头。Files错误留在对应区域，读不了的文件保留路径／根上下文。
+两类surface共用`background`卡片，内容左、树右。Review保留工具栏和共用状态；通用Files就是树；错误留在各自区域并保留路径／根。
 
-每页独立记导航开关／宽度、Wrap／Scroll。导航初始256、最小160／最大560，内容至少256、左6px拖动区；Files另支持←／→每次16及Home／End。无宽度断点，停稳300ms重排。切页恢复各自状态，不跨页定位。
+Files读space的`folder`／机器，不跟终端cwd。文件头、树头尺寸见t3-tokens「Files」。面包屑横滚／截断，无独立底条；目录hover仅文字提亮、不填底色。目录从原文件旁打开，继续导航原位替换目录标签、保留trail；›以原生popup弹出该目录内容菜单（目录：folder图标＋›，文件：类型图标），目录在旁边再开子菜单、层数不限，右侧放不下放左侧，两侧都放不下时压住上一级一部分，悬停（子菜单时序）／点击／→／Enter打开，←／Esc只关一层，选文件打开并全关；不同于T3的原地Back to，是我们的选择。Open in与详情共用目标和菜单，菜单只记偏好、主按钮执行。split静止无底，hover／菜单开时整组一块底并显示中线；菜单右对齐、不画勾；菜单行显式pointer。Preview／Code、Wrap、Tree固定槽，不适用置灰不消失。Markdown预览、语法Editor、图片仍只读；保留原生选择／复制，内容按下不夺焦点。宿主无gutter底色／高度API，已知不能完全匹配T3，用户选择保留原生Editor。
 
-Files读space的`folder`／机器，不跟终端cwd。文件头28加下距12，树头36加下距4。面包屑横滚／截断，无独立底条；目录hover仅文字提亮、不填底色。目录从原文件旁打开，继续导航原位替换目录标签、保留trail；chevron弹出该目录内容菜单（目录：folder图标＋›，文件：类型图标），目录在旁边再开子菜单、层数不限，悬停（子菜单时序）／点击／→／Enter打开，←／Esc只关一层，选文件打开并全关；不同于T3的原地Back to，是我们的选择。Open in与详情共用目标，菜单只记偏好、主按钮执行。split 49×28（图标半28＋箭头半20），静止无底，hover／菜单开时整组一块底并显示中线；菜单右对齐、不画勾；菜单行显式pointer。Preview／Code、Wrap、Tree固定28px槽／间隔4，不适用置灰不消失。Markdown预览、语法Editor、图片仍只读；保留原生选择／复制，内容按下不夺焦点。宿主无gutter底色／高度API，已知不能完全匹配T3，用户选择保留原生Editor。
+Files树（Review树同一种行）：无折叠箭头，目录图标开合两态表示展开，文件用原Pierre图形，颜色取主题；尺寸见[token](docs/internals/t3-tokens.md)。已读单目录链折叠后仍紧凑；目录优先自然序，点文件仅省略`.git`，忽略项变暗。无改动徽章／删除幽灵；树行／面包屑无tooltip。单选；方向键、Home／End、Enter／Space、Shift+F10可用。只有从树或面包屑发起才聚焦树，其他定位只滚动、选中。只画可见行；焦点索引和目录统计每次树重建只做一次。
 
-Files树：行24／字12／圆角6；目录chevron或原Pierre文件图形16，只占一个槽、颜色取主题。内距／缩进见[token](docs/internals/t3-tokens.md)，不沿用Review勾选框槽。已读单目录链折叠后仍紧凑；目录优先自然序，点文件仅省略`.git`，忽略项变暗。无改动徽章／删除幽灵；树行／面包屑无tooltip。hover7%／选中12%／焦点accent1px分开；方向键、Home／End、Enter／Space、Shift范围、Cmd／Ctrl切换／全选、Shift+F10可用。只画可见行；焦点索引和目录统计每次树重建只做一次。
+Search是28px ghost输入，按token保留光标内距／focus ring，无清除图标；Esc清空并退出输入。防抖200ms、查询≤256字符、每个词都在路径中、不分大小写；不显示别的搜索词的结果（未搜到时显示加载）。结果与祖先保留为树，打开结果不清搜索。最多200文件（文件名命中优先，其次路径短）加收窄提示；Git非忽略路径或文件系统≤20万，远程≤1000。加载／无匹配／错误分开。
 
-Search是28px ghost输入，按token保留光标内距／focus ring，无清除图标；Esc清空并退出输入。防抖200ms、查询≤256字符、每个词都在路径中、不分大小写。结果与祖先保留为树，打开结果不清搜索。最多200文件加收窄提示；Git非忽略路径或文件系统≤20万，远程≤1000。加载／无匹配／错误分开。
+可见才刷新：回来立即读，通常本机5s／远程10s，慢读取延长。文本变化更新，图片重选刷新。文本≤1MB、远程图片≤512KB；二进制／缺失／非UTF8说明原因。最近三个space／文件保留完整预览。全部展开跳过ignored、最多200目录／四路读取；折叠、手动toggle和搜索作废旧展开，await之后也检查。刷新不抢读、无同步磁盘IO；数千行仍流畅。
 
-可见才刷新：回来立即读，通常本机5s／远程10s，慢读取延长。文本变化更新，图片重选刷新。文本≤1MB、远程图片≤512KB；二进制／缺失／非UTF8说明原因。最近三个space／文件保留完整预览。全部展开跳过ignored、最多200目录／四路读取；折叠、手动toggle和搜索作废旧展开，await之后也检查。刷新不抢读、无同步磁盘IO；数千节点测展开／折叠／搜索／滚动／文件切换并比较耗时。
+树菜单是指针处的原生popup：本机Open／Reveal／Open with、相对Copy path、Insert到当前标签最后活动终端（无则置灰）；远程不列本机应用。方向键／Escape／typeahead。Insert借用并恢复文本剪贴板，不回车，不覆盖图片／后来新复制内容。Review树无菜单。
 
-树菜单：本机Open／Reveal／Open with、相对Copy path、Insert到当前标签最后活动终端（无则置灰）；远程不列本机应用。方向键／Escape／typeahead、指针／键盘锚点。Insert借用并恢复文本剪贴板，不回车，不覆盖图片／后来新复制内容。Review树无菜单。
+### 可选 Review
 
-### 可选 Review 页
+Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)，CLI `jin.review`，只支持本机仓库，读标签工作处（见上）。40px 工具栏：范围、分支比较或 commit SHA／前后、Analyze、折叠菜单、设置、导航开关；尺寸见 t3-tokens。非仓库／远程只写 `Review`，导航禁用；范围无变化写 `No changes`。
 
-Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)，CLI `jin.review`，只支持本机仓库，跟随 space 的 folder。40px 工具栏：范围、分支比较或 commit SHA／前后、Analyze、折叠菜单、设置、导航开关；24px ghost、12px 字、14px 图标。非仓库／远程只写 `Review`，导航禁用；范围无变化写 `No changes`。
+范围菜单是带数量的 Changes、Uncommitted、Outgoing、Incoming，写作 `3 commits`／`1 file`（0 禁用，正显示的除外），打开时不点亮任何行，分隔线后是可搜索 Commits 子菜单（列表最高 320）。分支范围显示 `head → base`，窄于 640 时 `vs base`；单 commit 显示短 SHA、`‹ ›`。Changes 另有宽 36–192 的比较目标按钮，打开 288 宽可搜索 popover，BRANCH／REMOTE 分区、28px 行、列表最高 256。搜索时不列 Automatic。本地分支不含 head，配同名远程（origin 优先）和 22×14 远程开关，再列最多 200 个最新远程独有分支、不含 HEAD；默认分支先、其余按新到旧。选择 base 打开 `base...head`，不分析；拨远程开关不关菜单。base 按 space 保存，Changes 数量和 Commits 随它。
 
-范围菜单是带数量的 Changes、Uncommitted、Outgoing、Incoming（0 保留并禁用），分隔线后是可搜索 Commits 子菜单（列表最高 320）。分支范围显示 `head → base`，窄于 640 时 `vs base`；单 commit 显示短 SHA、`‹ ›`。Changes 另有宽 36–192 的比较目标按钮，打开 288 宽可搜索 popover，BRANCH／REMOTE 分区、28px 行、列表最高 256。搜索时不列 Automatic。本地分支不含 head，配同名远程（origin 优先）和 22×14 远程开关，再列最多 200 个最新远程独有分支、不含 HEAD；默认分支先、其余按新到旧。选择 base 打开 `base...head`，不分析；拨远程开关不关菜单。base 按 space 保存，Changes 数量和 Commits 随它。
+有两个及以上组时，工具栏下是一行横贯 diff 和树的组页签，与工具栏同边、下有线，横滚不换行。规则组和 AI 组都显示。描边页签（尺寸见 t3-tokens）两行：上面类别图标、medium 名字和 critical，下方增删／文件数，已看后有进度环。当前组用树的选中底，其余悬停；全二进制不画无意义的行数分隔点。点组让 diff 和树从顶部显示它。AI 组说明在 diff 顶部（标题下 muted 正文，限高），规则组模板文字省略。
 
-有两个及以上组时，工具栏下是一行横贯 diff 和树的组页签，四周 8、下有线，横滚不换行。规则组和 AI 组都显示。圆角 8 描边页签两行，横竖内边距 8/2、间隔 6：上面 14px 类别图标、12px medium 名字和 critical，下方 11px 增删／文件数，已看后有 14px 进度环。当前组 12% 选中，其余悬停 7%；全二进制不画无意义的行数分隔点。点组让 diff 和树从顶部显示它。AI 组说明在 diff 顶部（13px medium 标题、12px muted、最高 160），规则组模板文字省略。
-
-树只列当前组的目录／文件，再列子组，每子组一行 24px、类别／名字／critical／数量／已看。子组默认开、目录默认折叠；不把子组合并进唯一目录。点子组展开并滚到它的组头。文件顺序同 Files，diff、行请求、`j`／`k` 也沿用。唯一当前文件由点击、j/k、或 diff 视口顶部的文件决定；跳转展开上级。已看框在 chevron 槽后、图标前，目录／子组三态，删除文件留空槽；已看文件划线变暗。Review树无右键，保留已看框。
+树只列当前组的目录／文件，再列子组，每子组一行：类别／名字／critical／数量／已看。子组默认开、目录默认折叠；不把子组合并进唯一目录。点子组展开并滚到它的组头。文件顺序同 Files，diff、行请求、`j`／`k` 也沿用。唯一当前文件由点击、j/k、或 diff 视口顶部的文件决定；跳转展开上级。行与 Files 树同一种，已看框在图标前，目录／子组三态，删除文件留空槽；已看文件划线变暗。Review树无右键，保留已看框。
 
 只有代码和 hunk 头用窗口代码字体。换行后每行高 20，Unicode 宽字、组合符号、连接序列保持字形和安全断行；设置 Lines: Wrap／Scroll 与 Files 独立。二进制只显示 `binary` 文件头，不请求行。吸顶文件头保持不透明，主题勾选框缩透明度时保留原 alpha。Review 可见时每 15s 刷新，回来立即补读；完整数据／行／布局缓存只留最近三个 space，分析状态仍是轻量、按 space。本布局无Review栏，添加标签不自动分析；在页内选范围、Analyze。Language／Agent／Model 是设置子菜单，选中只关子菜单。
 
@@ -128,7 +126,7 @@ Home 是一张带框无标题的 pane，不是 agent 看板。默认正中三个
 
 卡片、Agents、标签、标题统一命名：Pi 在跑先用 `pi.session`；再用人为命名的标签，但只给顶层 agent，且不能与另一个顶层 agent 共用此标签；然后是有意义的终端标题，只去掉该程序自己的装饰（Pi `π - … - <目录>`，OpenCode `OC | `）；最后程序名。拒绝纯路径／user@host／程序／目录标题，以及不再跑 agent 时残留的 agent 装饰标题。子 agent 不继承标签名。未命名标签按里面的 agent，否则聚焦 pane 命名。
 
-父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent 自身行区分 done 与 idle，但不再变成另一份父级未读结果。会报告状态或程序标成 agent 的活终端才算，命令 shell 不算，但经过 shell 启动的 agent 算。Working 用自带转圈／`working`；blocked 是圆角 `!`、15% `blocked` 底（通常 14px，Inbox 16、Agents／子 agent 行 12）；done 是 6px `done` 点（Inbox 绿色 `Done`）；idle 在 Agents 里是环、子 agent 菜单里是时长，其他不画。
+父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent 自身行把 error 写成 Failed（同一个 `!`、`ansi1` 色），done 未读前是圆点，不变成父级的未读结果。会报告状态或程序标成 agent 的活终端才算，命令 shell 不算，但经过 shell 启动的 agent 算。Working 用自带转圈／`working`；blocked 是圆角 `!`、15% `blocked` 底（通常 14px，Inbox 16、Agents／子 agent 行 12）；done 是 6px `done` 点（Inbox 绿色 `Done`）；idle 在 Agents 里是环、子 agent 菜单里是时长，其他不画。
 
 Space 标记优先当前所在位置（第一个终端目录，否则创建目录）的仓库根 favicon：先常见文件再页面／路由 icon 声明，不含 `.icns`，16px、圆角 25%。没有则取名字第一个字母／数字、大写，粗体等宽、字号为标记的 8.25/16，从 T3 的 18 色按名字哈希取（暗色 Tailwind 400、亮色 600），同色 14% 底；没有可用字符就文件夹。找到十分钟重查，没找到一分钟。程序标志按组件槽直接画 Herdr/mod 素材，不改原画布配色。
 
@@ -262,7 +260,7 @@ macOS 用 `osascript`、Linux `zenity` 选择，等待显示 Opening…；图片
 | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details`，切详情；侧栏用原按钮 |
 | `cmd-alt-b` | `t3-tabs.panel`，隐藏／恢复space面板 |
-| `cmd-shift-g` | `t3-tabs.review`，Review 页开关；无键 `t3-tabs.files` 同理 |
+| `cmd-shift-g` | `t3-tabs.review`，Review 开关；无键 `t3-tabs.files` 同理 |
 | `cmd-shift-s` | `t3-tabs.settle`，当前 Inbox agent/mod 卡 |
 | `cmd-p` | `mod.open:t3-picker` |
 | `cmd-]`／`cmd-[` | `t3-tabs.next/prev`，agent，不循环 |
@@ -314,7 +312,7 @@ floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 
 sidebar/work/panel 列 `resizable:false` 固定内部边界，外分隔线仍可拖。Spaces 传 `{newMenu:"t3-new-menu"}`；Inbox 传 `{newMenu:"t3-new-menu",picker:"t3-picker",home:"t3-tabs.home",menu:"t3-menu"}`。main/home-main 共用前述 background/border/focus/radius/gap/lone。浮动 keys 副本负责命令、Home、space 面板同步；其他 tab 副本共用导航，不各开一份确认。
 
-必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应的从官方 mod 改，Inbox/Home/Files 新建。保留官方 workspace-status/转圈/程序素材；UI 自带目录 Lucide 24网格/1.75px，Files用T3/Pierre原图形，Review用Catppuccin。mod 不能越目录 import，改 `shared/` 源后由 `scripts/sync.sh` 分发，复用命名/状态/pin/labels、焦点/菜单/动画/按钮、侧栏/面板/存储、文件树/菜单/状态模块。
+必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应的从官方 mod 改，Inbox/Home/Files 新建。保留官方 workspace-status/转圈/程序素材；UI 自带目录 Lucide 24网格/1.75px，Files／Review树用T3/Pierre原图形。mod 不能越目录 import，改 `shared/` 源后由 `scripts/sync.sh` 分发，复用命名/状态/pin/labels、焦点/菜单/动画/按钮、侧栏/面板/存储、文件树/菜单/状态模块。
 
 必需 mod 要真实文件（SVG 软链不加载），布局/SVG、按 context 合并 keys 放 `HERDR_APP_HOME` 或 `~/.config/herdr-app`，`layout.switch {"name":"herdr-t3"}` 选中。`scripts/update.sh` 要 `jq/rsync`，先验证旧 layout/keys，再 `rsync --delete` 自己 mod；保留主题/focus/stack 选择、支持的 extra 块、Review `config.json`，只更新已装 extras/主题，repo 键优先、报告替换。设置/pins/用户画不在替换目录。`scripts/sync.sh` 还写安装目录和同级独立仓库，不是只读检查。
 

@@ -9,10 +9,11 @@
 // groups, the list's moves (shared/list.js, the one way every popup's list moves), Copy address and path, close()'s stamp, and
 // the agent's, a checkout's and a machine's menus with the Snooze times.
 
-import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { View } from "gpui-kit";
+import { v_flex } from "gpui-base";
 import { run, props, closeOverlay, openOverlay, theme, keys, terminals, agents, spaces, panes, exec, setShared, shared, layout, settings } from "herdr";
 import { menuJump } from "./list.js";
+import { menuRow, menuRule, menuHint } from "./menu-row.js";
 import { subPlace, hoverRow, subOpened, subLeft } from "./submenu.js";
 import { placeOf } from "./project.js";
 import { presets } from "./snooze-presets.js";
@@ -309,31 +310,18 @@ export default class Menu extends View {
       .children(
         list.map((it, i) =>
           v_flex()
-            .when(i > 0 && list[i - 1][4] !== it[4], el => el.child(div().mx(8).my(4).h(1).bg(t.border)))
-            .child(h_flex()
-            .id(`mi-${i}`)
-            .h(28)
-            .px(8)
-            .gap(8)
-            .rounded(4)
-            .items_center()
-            .justify_between()
-            // Only what deletes something is red, in words, as T3's destructive item: a Close asks first while a program runs.
-            .text_color(it[1] === "worktree" && it[2].action === "remove" ? t.ansi1 : t.foreground)
-            // As T3's MenuSubTrigger, lit while its submenu is open.
-            .when(i === this.at || i === this.sub?.row, (el) => el.bg(t.selected))
-            .on_hover((on, cx) => { const to = on ? i : this.at === i ? -1 : this.at; if (to !== this.at) { this.at = to; cx.notify(); } })
-            .on_mouse_move((e, cx) => {
-              this.rows[i] = e.bounds;
-              hoverRow(this.s, it[1] === "snooze" ? it[1] : null, e, cx, (key, _row, cx) => { if (key) this.openSub(i, false); else this.closeSub(); cx.notify(); });
-            })
-            .on_click((_e, cx) => this.choose(i, cx))
-            // As T3's MenuItem: the icon hangs 2px into each side's padding and gap.
-            .when(Boolean(menuIcon(it[1], it[0], it[2])), (el) => el.child(svg(menuIcon(it[1], it[0], it[2])).size(16).mx(-2).flex_none().text_color(t.muted)))
-            .child(div().flex_1().min_w(0).truncate().child(it[0]))
-            // T3's MenuSubTrigger ends in its chevron, 80% opaque, 2px into the padding.
-            .child(it[1] === "snooze" ? svg("mods/workspace-chrome/chevron-right.svg").size(16).mr(-2).flex_none().text_color(t.muted).opacity(0.8)
-              : div().flex_none().text_size(12).font_medium().text_color(t.dim).child(it[3] ?? (it[1] === "copy" ? it[2].text : shortcut(it[1], it[2]))))),
+            .when(i > 0 && list[i - 1][4] !== it[4], el => el.child(menuRule(t)))
+            .child(menuRow(this, t, `mi-${i}`, {
+              at: [this, "at", i], label: it[0], open: i === this.sub?.row, icon: menuIcon(it[1], it[0], it[2]) || null, sub: it[1] === "snooze",
+              // Only what deletes something is red, in words, as T3's destructive item: a Close asks first while a program runs.
+              color: it[1] === "worktree" && it[2].action === "remove" ? t.ansi1 : null,
+              trail: it[1] === "snooze" ? null : menuHint(t, it[3] ?? (it[1] === "copy" ? it[2].text : shortcut(it[1], it[2]))),
+              pick: (cx) => this.choose(i, cx),
+              also: (el) => el.on_mouse_move((e, cx) => {
+                this.rows[i] = e.bounds;
+                hoverRow(this.s, it[1] === "snooze" ? it[1] : null, e, cx, (key, _row, cx) => { if (key) this.openSub(i, false); else this.closeSub(); cx.notify(); });
+              }),
+            })),
         ),
       );
   }

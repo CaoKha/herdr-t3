@@ -11,7 +11,7 @@
 - **共享控件**（`shared-controls.md`）：4 点全按建议。Details split 静止时照 T3 显示箭头，删掉 `quiet`；窄页面包屑多级菜单接受部分遮挡，并如实写进文档；子 agent 列表也改成指针离开就熄灭；Details/Files 的像素值移出 RECIPE，只留在 `t3-tokens.md`。
 - **面板**（`panel-surfaces.md`）：
   - 同名文件标签**和 T3 一样不区分**（不按建议），文档和测试里的「相对路径提示」改成与此一致。
-  - 横滚箭头按 T3 并排放右侧、到头禁用；`cmd-t`/`cmd-w` 只走 mod 的 `on_key_down`；关闭后释放由各 mod 通过 born 自己负责；切标签用每个标签一个 reveal 计数；「Review 是否可用」合成一个共享函数。
+  - 横滚箭头按 T3 并排放右侧、到头禁用；`cmd-t`/`cmd-w` 只走 `keys.json` 的 `mod:` 分区（实施时改定：宿主先把按键交给绑定还是先交给视图没有文档、也无法不抢焦点地验证；若先给绑定，只留 `on_key_down` 会让 `cmd-w` 关掉终端标签。`mod:` 分区在两种顺序下都只触发一次，同样满足「只留一条路、不重复触发」）；关闭后释放由各 mod 通过 born 自己负责；切标签用每个标签一个 reveal 计数；「Review 是否可用」合成一个共享函数；Review 读哪个仓库统一为当前标签最后活动终端的 cwd，没有时回退 space 文件夹（用户点验发现 space 文件夹不是仓库时 + 菜单误报不可用）。
   - 旧的固定 Files/Review 页自动迁移**删除**。
 - **Details**（`details-popup.md`）：5 点全按建议。Quick Review 子层改为独立原生 popup 级联；删掉范围快照缓存；文案改用 GLOSSARY 用词；来源规则与 Details 统一；Review 还没显示过范围时，范围菜单不打勾。
 - **Files**（`files-panel.md`）：

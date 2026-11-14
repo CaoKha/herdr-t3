@@ -26,6 +26,8 @@ const theme = { selected: "#selected", hover: "#hover", foreground: "#fg", ansi1
 let target = {}, calls = [], closed = [], state = {}, list = "inbox", opened = 0, zoom = 1, view = { width: 1200, height: 800 }, mouse = { x: 0, y: 0 };
 let terms = [{ address: "t1", labels: {} }], agentList = [];
 const context = vm.createContext({
+  // menu-row.js's: button.js's and tip.js's (no row here is disabled).
+  DISABLED: 0.64, glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
   View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
   run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
   window: { viewport_size: () => view, mouse_position: () => mouse },
@@ -33,7 +35,7 @@ const context = vm.createContext({
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, hc: async () => ({ code: 0 }), notify() {},
   layout: () => ({ id: "root", children: [{ id: "sidebar-lists", active: list, children: [] }] }),
 });
-const src = ["store.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "project.js", "list.js", "snooze-presets.js", "submenu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["store.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "project.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Menu = class").replace(/^export /gm, "");
 vm.runInContext(src, context);
 // Timers run when the test says time has passed.

@@ -9,41 +9,22 @@ import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { panes, terminals, agents, spaces, props, run, theme, home, openOverlay, closeOverlay, settings, shared, setShared, layout } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
-import { isAgent, kidStatus, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
+import { kidStatus, kidTree, notNews, ownStatus, subAgents } from "./tree.js";
+import { statusMark, STATUS_WORD } from "./status-mark.js";
 import { programIcon } from "./program.js";
 import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
-import { stopsInit, stopsEnd, stop, focusRoot, within, pressed, justClosed } from "./focus.js";
-import { menuJump, scrollList } from "./list.js";
+import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
+import { trigger } from "./trigger.js";
+import { menuKeys, scrollList } from "./list.js";
+import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY } from "./store.js";
 import { openMenu } from "./menu.js";
 import { button as drawButton, radiusOf } from "./button.js";
 
 // The list as the layout's other menus (the sort menu, the right-click menu): 4 around 28px rows.
-const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_ROW = 28, KIDS_CLOSED = "t3-pane.kidsClosed";
-const WORD = { working: "Working", blocked: "Needs you", idle: "Idle", done: "Done", error: "Failed" };
+const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = "t3-pane.kidsClosed";
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-// Everything an agent started, a step in for each level, as the agents list nests them, each with its own status:
-// as T3's rows, one waiting on a stuck one under it is still at work, and that one says it's stuck.
-function kidRows(addr) {
-  const all = terminals(), listed = new Map(agents().map((a) => [a.address, a.status]));
-  const children = new Map();
-  for (const k of all) {
-    if (k.state !== "live") continue;
-    if (!children.has(k.parent)) children.set(k.parent, []);
-    children.get(k.parent).push(k);
-  }
-  const walk = (at, depth, seen) => {
-    if (seen.has(at)) return [];
-    seen.add(at);
-    // A shell between them isn't listed (tree.js): what it started stands where it would have.
-    return (children.get(at) ?? []).filter((k) => !seen.has(k.address)).flatMap((k) => isAgent(k)
-      ? [{ k, depth, st: k.status === "error" ? "error" : kidStatus(k, listed) }, ...walk(k.address, depth + 1, seen)]
-      : walk(k.address, depth, seen));
-  };
-  return walk(addr, 0, new Set());
-}
 const kidName = (k) => k.name || k.template || k.program?.name || k.address;
 
 // How long it's been working, as the Inbox's Working pill: 9s, 4m, 1h 5m.
@@ -72,13 +53,9 @@ export default class Pane extends View {
       this.at = -1;
       this.keys = cx.focus_handle();
       this.keys.focus();
-      // Only this run: folds and the tree snapshot belong to this popup, not a saved preference.
-      this.folded = new Set();
-      this.refreshKids();
       // A working one's time runs on, as the Inbox's pill. With all of them ended, the list goes.
       this.clock = cx.timer.every(1000, (cx) => {
-        this.refreshKids();
-        if (this.rows.length === 0) closeOverlay(props().overlay);
+        if (!kidTree(terminals(), props().kids).length) closeOverlay(props().overlay);
         else cx.notify();
       });
       return;
@@ -97,113 +74,48 @@ export default class Pane extends View {
     else { stopsEnd(this); this.napWatch?.cancel(); }
   }
 
-  refreshKids() {
-    const selected = this.rows?.[this.at]?.k.address;
-    this.allRows = kidRows(props().kids);
-    const live = new Set(this.allRows.map(({ k }) => k.address));
-    for (const key of this.folded) if (!live.has(key)) this.folded.delete(key);
-    this.allRows.forEach((r, i) => {
-      r.children = this.allRows[i + 1]?.depth > r.depth;
-    });
-    this.visibleKids(selected);
-  }
-
-  visibleKids(selected = this.rows?.[this.at]?.k.address) {
-    let hidden = Infinity;
-    this.rows = this.allRows.filter((r) => {
-      if (r.depth > hidden) return false;
-      hidden = this.folded.has(r.k.address) ? r.depth : Infinity;
-      return true;
-    });
-    this.labels = this.rows.map(({ k }) => kidName(k));
-    this.at = this.rows.findIndex(({ k }) => k.address === selected);
-  }
-
-  foldKid(row, folded) {
-    if (!row?.children) return;
-    if (folded) this.folded.add(row.k.address); else this.folded.delete(row.k.address);
-    this.visibleKids(row.k.address);
-  }
-
-  // Rendering and moving selection use the timer's tree snapshot, never terminal enumeration.
+  // Everything the agent started, a step in for each level, as the agents list nests them, each with its own status:
+  // one waiting on a stuck one under it is still at work, and that one says it's stuck.
   kidsMenu(t) {
-    const rows = this.rows, done = () => closeOverlay(props().overlay), now = Date.now();
-    const peek = (k) => { done(); run("terminal.peek", { terminal: k.address }); };
+    const listed = new Map(agents().map((a) => [a.address, a.status]));
+    const rows = kidTree(terminals(), props().kids), now = Date.now();
+    const peek = (i) => { closeOverlay(props().overlay); run("terminal.peek", { terminal: rows[i].k.address }); };
     // T3's text-2xs with tabular figures: the time in monospace children, one per part, as the Inbox's pill.
     const mono = settings()?.font_family ?? "JetBrains Mono";
     // No status_ms means unchanged since creation, for working and idle alike.
     const since = (k) => k.status_ms || k.created_ms || 0;
+    // Its status at the row's end, the Agents rows' mark; needing the person or failed, the word too; working or idle, for how long.
+    const trail = (k, st) => STATUS_WORD[st] && h_flex().id(`kid-status-${k.address}`).flex_none().gap(4).items_center()
+      .role("status").accessibility_label(STATUS_WORD[st])
+      .when(st !== "idle", (el) => el.child(statusMark(t, st)))
+      .when(st === "blocked" || st === "error", (el) => el.child(menuHint(t, STATUS_WORD[st]).text_color(st === "error" ? t.ansi1 : t.blocked)))
+      .when((st === "working" || st === "idle") && since(k) > 0, (el) => el.children(took(since(k), now).split(" ").map((part) => menuHint(t, part).font_family(mono))));
     // As tall as it is: the popup opens with no height, so it grows and shrinks as sub-agents come and go.
-    return v_flex().id("pane-kids").w_full().min_h(0).p(4).bg(t.popover).text_size(14)
-      .track_focus(this.keys).on_key_down((e, cx) => {
-        if (e.key === "enter") { if (rows[this.at]) peek(rows[this.at].k); }
-        else if (e.key === "escape") done();
-        else if (e.key === "left" || e.key === "right") this.foldKid(rows[this.at], e.key === "left");
-        else {
-          const to = menuJump(this, e, this.labels, this.at);
-          if (to < 0) return;
-          this.at = to;
-        }
-        cx.stop_propagation();
-        cx.notify();
-      })
-      .child(scrollList(this, "pane-kids-list", { count: rows.length, row: KIDS_ROW, height: Math.min(rows.length, KIDS_SHOWN) * KIDS_ROW, at: this.at,
+    return v_flex().id("pane-kids").w_full().min_h(0).p(4).bg(t.popover)
+      .track_focus(this.keys).on_key_down(menuKeys(this, rows.map(({ k }) => kidName(k)), peek))
+      .child(scrollList(this, "pane-kids-list", { count: rows.length, row: MENU_ROW, height: Math.min(rows.length, KIDS_SHOWN) * MENU_ROW, at: this.at,
         wheeled: (keep) => { if (keep >= 0) this.at = keep; },
         draw: (i) => {
-          const r = rows[i], { k, depth, st } = r;
-          // The menus' row: 8 in, 8 between, radius 4, lit with the selection; a level steps in by the icon's 16.
-          return h_flex().id(`kid-${k.address}`).relative().h(KIDS_ROW).pl(8 + depth * 16).pr(8).gap(8).rounded(4).items_center().flex_none()
-            .text_color(t.foreground).when(i === this.at, (el) => el.bg(t.selected))
-            .role("button").cursor_pointer().accessibility_label(WORD[st] ? `${kidName(k)}, ${WORD[st]}` : kidName(k))
-            .on_hover((on, cx) => {
-              if (on && this.at !== i) { this.at = i; cx.notify(); }
-            })
-            .on_mouse_down("right", (_e, cx) => { done(); openMenu(this, "agent", { address: k.address }, cx); })
-            .on_click(() => peek(k))
-            // Grow the icon group to the right only: icon16 + gap4 + fold12, the program stays at its original x.
-            .child(div().w(32).h(16).mx(-2).flex_none().relative().flex().items_center()
-              .child(programIcon(k.program, 16, t.muted) ?? svg("mods/workspace-chrome/terminal.svg").size(16).flex_none().text_color(t.muted))
-              // Its words in a tooltip as the agents list's fold has (tip.js), the icon where it was.
-              .when(r.children, (el) => el.child(div().absolute().left(20).top(2).child(tip(this, t, `kid-fold-${k.address}`, this.folded.has(k.address) ? "Expand sub-agents" : "Collapse sub-agents",
-                div().id(`kid-fold-${k.address}`).size(12).role("button")
-                .accessibility_label(this.folded.has(k.address) ? "Expand sub-agents" : "Collapse sub-agents")
-                .on_click((_e, cx) => { cx.stop_propagation(); this.foldKid(r, !this.folded.has(k.address)); cx.notify(); })
-                .child(svg(`mods/t3-pane/icons/${this.folded.has(k.address) ? "chevron-right" : "chevron-down"}.svg`).size(12).text_color(t.dim)))))))
-            .child(div().flex_1().min_w(0).truncate().child(kidName(k)))
-            // T3's shortcut column, one fixed status group. Its width fits Needs you at 12px without squeezing the icon.
-            .child(h_flex().id(`kid-status-${k.address}`).w(96).flex_none().gap(4).items_center().justify_end().text_size(12).font_medium().text_color(t.dim)
-              .role("status").accessibility_label(WORD[st] ?? "Unknown")
-              .when(st === "working", (el) => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
-              .when(st === "blocked" || st === "error", (el) => el.text_color(st === "error" ? t.ansi1 : t.blocked).child(div().size(12).flex_none().rounded(4).when(st === "blocked", (badge) => badge.bg(t.blocked + "26")).text_size(10).font_bold().flex().items_center().justify_center().child("!")).child(WORD[st]))
-              .when(st === "done", (el) => el.child(div().size(6).flex_none().rounded_full().bg(t.done)))
-              .when((st === "working" || st === "idle") && since(k) > 0, (el) => el.children(took(since(k), now).split(" ").map((part) => div().font_family(mono).child(part)))));
+          const { k, depth } = rows[i];
+          // A level steps in by the icon's 16: the spacer and the row's gap.
+          return menuRow(this, t, `kid-${k.address}`, { at: [this, "at", i], label: kidName(k), pick: () => peek(i),
+            lead: depth > 0 ? div().w(depth * 16 - 8).flex_none() : undefined,
+            icon: programIcon(k.program, 16, t.muted) ?? "mods/workspace-chrome/terminal.svg",
+            trail: trail(k, kidStatus(k, listed)),
+            also: (row) => row.on_mouse_down("right", (_e, cx) => { closeOverlay(props().overlay); openMenu(this, "agent", { address: k.address }, cx); }) });
         } }));
   }
 
-  // How many sub-agents, all the way down, or how many need the person, as T3's details meta button; a click opens their list under it.
-  kidsButton(t, pane, terminal) {
-    const rows = kidRows(terminal);
-    const id = `ph-kids-${pane}`, n = rows.length, stuck = rows.filter((r) => r.st === "blocked" || r.st === "error").length;
-    const total = plural(n, "sub-agent", "sub-agents"), text = String(n);
+  // How many sub-agents, all the way down, as T3's details meta button, in the colour of needing the person if one does;
+  // a click opens their list under it. `kids`: their words (subAgents).
+  kidsButton(t, pane, terminal, kids) {
+    const stuck = kids.filter((s) => s === "blocked").length, total = plural(kids.length, "sub-agent", "sub-agents");
     const label = stuck ? `${total}, ${stuck} need${stuck === 1 ? "s" : ""} you` : total;
-    return tip(this, t, id, label, stop(this, t, id, drawButton(t, id, {
-      // Pressed while its list is open, as the panel toggle and the Inbox's scope chip: opened here since the last list closed.
-      text, label, surface: "card", color: stuck ? t.blocked : undefined, hot: this.hot === id, on: this.kidsOpen?.id === id && this.kidsOpen.at > (shared(KIDS_CLOSED) ?? 0) })
-      .on_hover(glow(this, id))
-      .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); pressed(this); this.kidsFrom = e.bounds; })
-      .on_click((_e, cx) => {
-        cx.stop_propagation();
-        const b = this.kidsFrom, z = Number(settings()?.zoom) || 1;
-        this.kidsFrom = null;
-        if (justClosed(this, KIDS_CLOSED)) return;
-        this.hot = null; // The list covers it, before the pointer can report leaving it.
-        // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
-        this.kidsOpen = { id, at: Date.now() };
-        openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH,
-          ...(b ? { at: { x: b.x + b.width - KIDS_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { kids: terminal } });
-        cx.notify();
-      })
-      .child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()), radiusOf("xs")));
+    // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
+    return trigger(this, t, `ph-kids-${pane}`, { text: String(kids.length), label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
+      onOpen: (b) => { const z = Number(settings()?.zoom) || 1; openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH,
+        ...(b ? { at: { x: b.x + b.width - KIDS_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { kids: terminal } }); } },
+    (el) => el.child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 
   // What shows on hover also watches where the pointer is: its leave can be dropped (tip.js).
@@ -256,10 +168,10 @@ export default class Pane extends View {
     // Split, the panes beside the focused one recede, as T3's split terminals do, with no ring: their icon, name and folder a
     // step down, back up while hovered. Its status mark (what needs the person) and its buttons stay as they are.
     const quiet = !alone && !p.focused && !this.hovered;
-    // Its agent with the sub-agents it started (tree.js).
+    // Its agent's own status; what it started speaks through the sub-agent button (tree.js).
     const all = terminals();
     const kids = subAgents(agents(), all)(p.terminal);
-    const st = p.mod ? modStatus(p) : treeStatus(ownStatus(p.status, p.terminal, all), kids);
+    const st = p.mod ? modStatus(p) : ownStatus(p.status, p.terminal, all);
     // Put away, it's no news (no done dot, in either mode). With the Inbox chosen the header says so, as its Inbox row does
     // (docs/adr/0002): a snooze with its clock and time left, else Settle's check. At work or needing the person, that shows first.
     const k = p.terminal && all.find((x) => x.address === p.terminal);
@@ -296,14 +208,13 @@ export default class Pane extends View {
           .child(this.button(t, `ph-d-${pane}`, "mods/t3-pane/icons/square-split-vertical.svg", "Split down", () => run("pane.split", { direction: "down", pane }), "pane.split:down"))
           .child(this.button(t, `ph-z-${pane}`, `mods/t3-pane/icons/${p.zoomed ? "minimize-2" : "maximize-2"}.svg`, p.zoomed ? "Unzoom pane" : "Zoom pane", () => run("pane.zoom", { pane }), "pane.zoom"))
           .child(this.button(t, `ph-x-${pane}`, "mods/t3-pane/icons/x.svg", "Close pane", () => { this.hot = null; run(`t3-tabs.close-pane:${pane}`); }, "pane.close")))))
-      .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal)))
-      .when(st === "working" && !kids.length, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Working", svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))))
+      .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal, kids)))
       // The same marks as the agents list and tabs.
-      .when(st === "blocked" && !kids.length, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Needs you", div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(11).font_bold().text_color(t.blocked).flex().items_center().justify_center().accessibility_label("Needs you").child("!")))))
+      .when(st === "working" || st === "blocked", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, STATUS_WORD[st], statusMark(t, st, 14)))))
       .when(inbox && away, el => el.child(slot(nap
         ? tipMark(this, t, `ph-mark-${pane}`, "Snoozed", h_flex().gap(4).items_center().text_size(12).text_color(t.accent)
           .child(svg("mods/t3-pane/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(nap, now)))
         : tipMark(this, t, `ph-mark-${pane}`, "Settled", svg("mods/t3-pane/icons/check.svg").size(14).flex_none().text_color(t.dim)))))
-      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", div().size(6).flex_none().rounded_full().bg(t.done))))), 8));
+      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", statusMark(t, "done"))))), 8));
   }
 }

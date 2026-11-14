@@ -94,7 +94,7 @@ _Avoid_: diff、changes、评审窗格
 _Avoid_: 侧边面板、panel 栏
 
 **导航列**：
-space 面板一页里内容右边的那一列：列头加文件树。每页各记自己的宽度和开关。
+space 面板一个标签里内容右边的那一列：列头加文件树。Files 和 Review 各记自己的宽度和开关。
 _Avoid_: aside、侧栏、文件栏
 
 **Files**：

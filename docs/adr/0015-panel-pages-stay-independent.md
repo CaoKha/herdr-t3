@@ -1,6 +1,6 @@
 # Files 和 Review 各自独立
 
-标签模型及关闭释放规则由 [0017](0017-space-panel-surfaces.md) 修订：隐藏／切换保留，关闭 Review 删除范围和阅读位置，再次添加从默认开始。
+标签模型及关闭释放规则由 [0017](0017-space-panel-surfaces.md) 修订：隐藏／切换保留，关闭 Review 即按标签实例放下它的范围和阅读位置，再次添加从默认开始。
 
 修订 [0013](0013-space-panel-pages-share-one-frame.md) 里的双向跨页操作、共用导航列宽度，以及之后两页共用换行偏好的做法。
 

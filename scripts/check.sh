@@ -42,6 +42,12 @@ for p in $(grep -rhoE --include='*.js' --exclude=gpui-kit.d.ts 'mods/(t3-[a-z-]+
   [ -f "$p" ] || [ -f "extras/$p" ] || { echo "FAIL no such icon: $p"; fail=1; }
 done
 
+# UI icons are Lucide's 24 grid at one 1.75 stroke (docs/internals/t3-tokens.md「规则」P4): a currentColor stroke at any other
+# width, or at Lucide's default 2 by leaving it out, fails. Pierre's vendored set and the Windows caption glyphs (1px) are drawn so.
+for f in $(grep -rl --include='*.svg' 'stroke="currentColor"' shared/icons mods extras/mods | grep -vE '/icons/(pierre|cat)/|/win-[a-z]+\.svg$'); do
+  [ "$(grep -o 'stroke-width="[^"]*"' "$f" | sort -u)" = 'stroke-width="1.75"' ] || { echo "FAIL $f: a UI icon's stroke is 1.75"; fail=1; }
+done
+
 # accent is the focus ring's and emphasis's color, never a button's fill (docs/internals/t3-tokens.md「按钮」): its foreground
 # only goes on the few non-buttons filled with it, listed here.
 for f in $(grep -rlE --include='*.js' --exclude=gpui-kit.d.ts 'accent_foreground' shared mods extras/mods); do
@@ -49,12 +55,13 @@ for f in $(grep -rlE --include='*.js' --exclude=gpui-kit.d.ts 'accent_foreground
 done
 
 # Herdr closes an open dialog or popup on a key bound to tab.close or pane.close; ours are bound to t3-tabs, so each mod that
-# opens as one needs its own `mod:` section, or cmd-w closes the tab behind it. `mod: MOD` is the file's own folder.
+# opens as one needs its own `mod:` section, or cmd-w closes the tab behind it. `mod: MOD` is the file's own folder. A mod
+# whose own close (`<mod>.close`) closes its popups first, as Files', may bind that instead.
 for f in $(grep -rlE --include='*.js' --exclude=gpui-kit.d.ts 'openOverlay|mod\.open' mods extras/mods); do
   own=$(basename "$(dirname "$f")")
   for m in $(grep -hoE 'openOverlay\(\{ *mod: *("[a-z0-9-]+"|MOD)|mod\.open", *\{ *name: *"[a-z0-9-]+"|"mod\.open:[a-z0-9-]+"' "$f" \
       | sed -E "s/.*MOD$/$own/; s/.*[\":]([a-z0-9-]+)\"?$/\1/" | sort -u); do
-    jq -e --arg s "mod:$m" '.[$s]["cmd-w"] == "overlay.close"' keys.json >/dev/null || { echo "FAIL keys.json has no mod:$m section closing it with cmd-w ($f opens it)"; fail=1; }
+    jq -e --arg s "mod:$m" --arg own "$m.close" '.[$s]["cmd-w"] == "overlay.close" or .[$s]["cmd-w"] == $own' keys.json >/dev/null || { echo "FAIL keys.json has no mod:$m section closing it with cmd-w ($f opens it)"; fail=1; }
   done
 done
 

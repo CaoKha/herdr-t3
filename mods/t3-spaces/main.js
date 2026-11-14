@@ -11,7 +11,8 @@ import { projectMark, tint } from "./project.js";
 import { repoFacts } from "./repos.js";
 import { dragGone, glow, hoverKept, tip, tipMark, POINTER_WATCH, pointerMoved } from "./tip.js";
 import { openMenu } from "./menu.js";
-import { stopsInit, stopsEnd, stop, focusRoot, enter, pressed, justClosed } from "./focus.js";
+import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
+import { trigger } from "./trigger.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY } from "./store.js";
 import { button, radiusOf } from "./button.js";
@@ -549,8 +550,7 @@ export default class Spaces extends View {
     if (d?.moved) d.drawn = true;
     this.landed = null;
     const asks = props()?.newMenu && machines().length > 1;
-    const tool = (id, label, icon, fn, more) => tip(this, t, id, label, stop(this, t, id, button(t, id, { icon: `mods/t3-spaces/icons/${icon}.svg`, label, size: "sm", hot: this.hot === id })
-      .on_hover(glow(this, id)).on_mouse_down("left", () => pressed(this)).on_click(fn), radiusOf("sm")), more);
+    const tool = (id, label, icon, closed, onOpen, action = undefined) => trigger(this, t, id, { icon: `mods/t3-spaces/icons/${icon}.svg`, label, closed, onOpen, action });
     return focusRoot(this, v_flex().size_full().min_h(0).bg(t.chrome).text_size(14)
       .when(this.dragFocus, el => el.track_focus(this.dragKeys).on_key_down((e, cx) => {
         if (e.keystroke !== "escape" || !this.dragFocus) return;
@@ -562,15 +562,12 @@ export default class Spaces extends View {
         .child(div().text_color(t.muted).child("Spaces"))
         // The same two as Inbox's top row, so switching modes moves nothing.
         .child(h_flex().flex_none().items_center()
-          .child(tool("space-new", "New space", "folder-plus", (_e, cx) => {
-            this.hot = null;
-            // The layout's menu asks which machine, as its mod.json places it; the shipped one can't, so docked alone it's the active space's.
-            const closing = justClosed(this, `${props()?.newMenu}.pickClosed`);
-            if (!asks) run("space.new");
-            else if (!closing) openOverlay({ mod: props().newMenu, kind: "popup", frame: "none", at: /** @type {any} */ ("top"), offset: 96, width: 576, height: 420, props: { pick: true } });
-            cx.notify();
-          }, { action: asks ? null : "space.new" }))
-          .child(tool("space-new-tab", "New tab", "square-pen", (_e, cx) => { this.hot = null; const menu = props()?.newMenu ?? "new-menu"; if (!justClosed(this, `${menu}.closed`)) run("mod.open", { name: menu }); cx.notify(); }))))
+          // The layout's menu asks which machine, as its mod.json places it; the shipped one can't, so docked alone it's the active space's.
+          .child(tool("space-new", "New space", "folder-plus", `${props()?.newMenu}.pickClosed`, () => {
+            if (!asks) { run("space.new"); return false; }
+            openOverlay({ mod: props().newMenu, kind: "popup", frame: "none", at: /** @type {any} */ ("top"), offset: 96, width: 576, height: 420, props: { pick: true } });
+          }, asks ? null : "space.new"))
+          .child(tool("space-new-tab", "New tab", "square-pen", `${props()?.newMenu ?? "new-menu"}.closed`, () => run("mod.open", { name: props()?.newMenu ?? "new-menu" })))))
       .child(v_flex().id("space-list").flex_1().min_h(0).overflow_y_scroll()
         .on_mouse_move((e, cx) => this.dragTo(e, cx))
         // Released anywhere in the list, it lands where the gap is.

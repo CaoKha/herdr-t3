@@ -10,8 +10,8 @@ const { execFileSync } = require("node:child_process");
 const load = (file) => fs.readFileSync(path.join(__dirname, file), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (async function|function|const) /gm, "$1 ").replace(/^export \{[\s\S]*?\};?\s*$/m, "");
 const context = vm.createContext({});
-vm.runInContext([load("file-icons-data.js"), load("file-icons.js"), load("file-tree.js"), load("model.js"),
-  "globalThis.m = { join, fileIcon, folderIcon, FILE_NAMES, FILE_EXTENSIONS, FOLDER_NAMES, LIST, IGNORED, PROBE, REMOTE_SEARCH, RANKED, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, kindOf, languageOf, readProblem, failedRead, ticket };"].join("\n"), context);
+vm.runInContext([load("file-tree.js"), load("model.js"),
+  "globalThis.m = { join, LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket };"].join("\n"), context);
 const m = context.m;
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
@@ -35,12 +35,13 @@ function element(...made) {
 const walk = (node, out = []) => { if (node && typeof node === "object" && node.items) { out.push(node); node.items.forEach((c) => walk(c, out)); } return out; };
 const find = (root, id) => walk(root).find((n) => n.key === id) ?? null;
 const labels = (root) => walk(root).map((n) => n.calls.accessibility_label?.[0]).filter(Boolean);
-const space = (id, folder, active = false, machine = null) => ({ id, folder, machine, active, tabs: [] });
+const space = (id, folder, active = false, machine = null) => ({ id, folder, machine, active, tabs: [{ id: `${id}-tab`, active: true }] });
 
 // The page, started in a fake `herdr`: the panel on `page` with Review installed too, every folder holding a.js (changed) and
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
 function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null } = {}) {
-  const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0 };
+  const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
+    props: null, overlays: [], closed: [], commands: [] };
   const shared = { "t3.wrap": false, "t3.navWidth": 300 }, wrote = [], store = new Map(), timers = [], everies = [], failed = [];
   const commands = [];
   let wake = null, running = null;
@@ -83,7 +84,8 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
     theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
-    run() {}, notify() {}, exec, keys: () => [],
+    run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
+    props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
     readTextFile: async (p) => { w.read.push(p); return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : "const a = 1;\n"; },
     watchFolder: (p) => new Promise((resolve, reject) => w.watchers.push({ path: p, task: running, resolve, reject })),
     nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise((r) => { wake = r; }),
@@ -91,19 +93,22 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     Date, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
-  const files = ["store.js", "focus.js", "tip.js", "list.js", "panel.js", "terminal-context.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-icons-data.js", "file-icons.js", "file-tree.js", "nav-column.js", "submenu.js", "file-menu.js", "panel-states.js", "model.js", "main.js"];
-  const buttons = "const { drawButton, split } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split };\n})();\n";
+  const files = ["store.js", "focus.js", "trigger.js", "tip.js", "list.js", "menu-row.js", "terminal-context.js", "surfaces.js", "panel.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-tree.js", "nav-column.js", "submenu.js", "panel-states.js", "model.js", "menus.js", "main.js"];
+  const buttons = "const { drawButton, split, ghostButton, DISABLED } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split, ghostButton, DISABLED };\n})();\n";
   vm.runInContext((buttons + files.map(load).join("\n")).replace("export default class", "globalThis.Mod = class"), ctx);
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
   const view = new ctx.Mod();
   view.init({}, cx);
+  // One of its menus: another copy, opened with these props.
+  // One of its menus: another copy, opened with these props; they stay the app's props until `w.props = null`.
+  const menu = (p) => { w.props = { overlay: "m1", ...p }; const v = new ctx.Mod(); v.init({}, cx); return v; };
   const show = (p) => { body.active = p; };
   const activate = (id) => { w.spaces = w.spaces.map((s) => ({ ...s, active: s.id === id })); };
-  return { view, cx, w, settle, fire, tick, send, shared, wrote, store, show, activate };
+  return { view, cx, w, settle, fire, tick, send, shared, wrote, store, show, activate, ctx, menu };
 }
 
 async function page() {
-  const { view, cx, w, settle, fire, send, shared, wrote, store } = makePage();
+  const { view, cx, w, settle, fire, send, shared, wrote, store, ctx } = makePage();
   assert.equal(w.inputEvents.submit, undefined, "hierarchical search is not a flat picker that opens on input submit");
   // Its own choices start from the ones both pages used to share; after that, they're this page's.
   assert.equal(store.get("lines.wrap"), "false", "the old shared wrap is this page's first");
@@ -114,48 +119,29 @@ async function page() {
   assert.ok(find(root, "row-a.js") && find(root, "row-b.js"), "the folder's files in the tree");
   assert.equal(find(root, "t3-files-toolbar"), null, "generic Files starts directly at the tree search, with no root-name toolbar");
   assert.ok(!w.ran.some(r => r.line.includes(" status ")), "Files reads ignored paths, not Review's change statuses");
-  assert.ok(find(root, "t3-files-search-field"), "the ghost search has its own padded, focusable input boundary");
   assert.equal(find(root, "row-a.js").calls.tooltip, undefined, "tree rows have no path tooltip, including truncated names");
-  view.search.focus();
-  root = view.render(cx);
-  assert.equal(find(root, "t3-files-search-field").calls.px[0], 9, "caret is inset, not glued to the Search files boundary");
-  assert.equal(find(root, "t3-files-search-field").calls.border_color[0], "#0000ff");
-  assert.ok(find(root, "t3-files-search-ring"), "focus has a visible ring without moving refresh/collapse buttons");
   find(root, "row-a.js").handlers.on_click({ modifiers: {} }, cx); await settle();
-  root = view.render(cx);
-  find(root, "row-b.js").handlers.on_click({ modifiers: { platform: true } }, cx); await settle();
-  root = view.render(cx);
-  assert.equal(find(root, "row-a.js").calls.bg?.[0], "#ffffff1f", "Cmd-click preserves the previous tree selection");
-  assert.equal(find(root, "row-b.js").calls.bg?.[0], "#ffffff1f", "Cmd-click adds the file to selection");
-  find(root, "row-a.js").handlers.on_click({ modifiers: { platform: true } }, cx); await settle();
-  root = view.render(cx);
-  assert.equal(find(root, "row-a.js").calls.bg, undefined, "Cmd-click deselects without hover taking selection");
+  find(view.render(cx), "row-b.js").handlers.on_click({ modifiers: { platform: true } }, cx); await settle();
+  assert.equal(view.current().selected, "b.js", "one row selected: Cmd-click is a click, as there's nothing to do with many");
 
-  // A file Review also has opens here alone: no Open in Review in the toolbar or the menu, nothing asked of Review.
+  // A file opened from elsewhere (a command, a tab) shows in the tree without taking the keyboard from where it is.
+  w.focused = "terminal";
   send("open:a.js");
-  await settle();
+  await settle(); view.render(cx); await fire(0); await settle();
   root = view.render(cx);
   assert.ok(find(root, "t3-files-code"), "the file shows");
+  assert.equal(w.focused, "terminal", "an external reveal doesn't focus the tree");
   w.focused = "native-editor"; cx.stopped = false;
   find(root, "t3-files-content").handlers["on_mouse_down:left"]({}, cx);
   if (!cx.stopped) root.handlers["on_mouse_down:left"]({}, cx);
   assert.equal(w.focused, "native-editor", "a native Editor drag-start does not bubble up and lose focus to the Files root");
-  assert.equal(find(root, "t3-files-toolbar").calls.h[0], 28, "file subheader follows T3 inline geometry");
-  const crumbHover = element();
-  find(root, "crumb-").calls.hover[0](crumbHover);
-  assert.equal(crumbHover.calls.bg, undefined, "directory breadcrumb hover has no background fill");
-  assert.equal(crumbHover.calls.text_color[0], "#ffffff", "directory breadcrumb hover only brightens its text");
-  assert.equal(find(root, "t3-files-toolbar").calls.bg, undefined, "there is no separate header strip background");
-  assert.equal(find(root, "t3-files-breadcrumbs").calls.bg?.[0], "#00000000", "the scroll frame stays transparent");
   assert.equal(find(root, "t3-files-review"), null, "no Open in Review button");
   assert.ok(!labels(root).includes("Open in Review"));
-  find(root, "row-a.js").handlers["on_mouse_down:right"]();
-  root.handlers["on_mouse_down:right"]({ local_position: { x: 10, y: 10 } }, cx);
-  root = view.render(cx);
-  const items = walk(find(root, "file-menu-backdrop")).map((n) => n.key).filter((k) => k?.startsWith("file-menu-0-"));
-  assert.ok(items.includes("file-menu-0-copy-path"), "the row's menu opens");
-  assert.ok(!items.some((k) => /open-review|open-files/.test(k)), `no cross-page items: ${items}`);
-  find(root, "file-menu-backdrop").handlers["on_mouse_down:left"]({}, cx);
+  // A row's menu: a popup of this mod's at the pointer, for that row.
+  find(root, "row-a.js").handlers["on_mouse_down:right"]({}, cx);
+  const rowMenu = w.overlays.at(-1);
+  assert.equal(rowMenu.props.source.tab, "s1-tab", "for the space's tab in view, which it closes without");
+  assert.deepEqual([rowMenu.mod, rowMenu.kind, rowMenu.props.files, rowMenu.props.path, rowMenu.at], ["t3-files", "popup", "row", "a.js", undefined], "at the pointer");
 
   // Review's old ask to show a file here is left alone.
   shared["t3-files.reveal"] = { space: "s1", file: "b.js", n: Date.now() + 60000 };
@@ -175,7 +161,6 @@ async function page() {
   // The code keeps the width it was laid out at while its room moves, cut off; the new one once it holds 300 ms.
   const code = () => find(view.render(cx), "t3-files-code");
   const editorWidth = () => code().items[0].calls.w?.[0];
-  assert.ok(code().calls.overflow_hidden, "cut off, not scrolled");
   code().handlers.on_size_change({ width: 600, height: 400 }, cx);
   assert.equal(editorWidth(), 600, "the first width at once");
   code().handlers.on_size_change({ width: 640, height: 400 }, cx);
@@ -195,20 +180,18 @@ async function page() {
   await settle();
   view.render(cx); await fire(0);
   assert.equal(view.current().query, "b", "opening a search-tree file keeps the search, unlike external tab reveal");
-  assert.ok(find(view.render(cx), "t3-files-refresh"), "tree header has refresh");
+  // Its tab picked, the one already shown too: the search clears and the tree shows the file (T3's reveal).
+  vm.runInContext('activateSurface("file:b.js")', ctx);
+  view.render(cx); await fire(0);
+  assert.equal(view.current().query, "", "picking a tab clears the search");
   send("open:README.md"); await settle();
   root = view.render(cx);
-  assert.ok(find(root, "t3-files-render-mode"), "Markdown has one compact icon toggle, not two text pills");
   assert.equal(find(root, "tip-over-crumb-"), null, "the user explicitly removed breadcrumb tooltips even where T3 has them");
   assert.equal(find(root, "tip-over-t3-files-open-more"), null, "the split arrow keeps only its accessibility label");
-  const slots = root => walk(find(root, "t3-files-toolbar")).filter(n => ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"].includes(n.key)).map(n => [n.key,n.calls.w?.[0],n.calls.h?.[0]]);
-  const previewSlots = slots(root);
   assert.ok(find(root, "t3-files-wrap"), "Preview keeps the word-wrap slot so the other controls do not move");
-  assert.equal(find(root, "t3-files-wrap").calls.opacity?.[0], 0.64, "word wrap is disabled, not removed, in Preview");
-  assert.equal(find(root, "t3-files-wrap").handlers.on_click, undefined);
+  assert.equal(find(root, "t3-files-wrap").handlers.on_click, undefined, "word wrap is off in Preview");
   find(root, "t3-files-render-mode").handlers.on_click({}, cx);
-  assert.ok(find(view.render(cx), "t3-files-wrap"), "raw Markdown has word wrap");
-  assert.deepEqual(slots(view.render(cx)), previewSlots, "the same controls keep their order and dimensions in Code");
+  assert.ok(find(view.render(cx), "t3-files-wrap").handlers.on_click, "raw Markdown has word wrap");
   find(view.render(cx), "t3-files-render-mode").handlers.on_click({}, cx);
   assert.equal(find(view.render(cx), "t3-files-wrap").handlers.on_click, undefined, "cached Editor does not enable word wrap in Preview");
   send("open:cached.md"); await settle();
@@ -219,47 +202,65 @@ async function page() {
   assert.ok(find(view.render(cx), "t3-files-code"), "a cached Preview-only Markdown gains its Editor when reopened in global Code mode");
   find(view.render(cx), "t3-files-render-mode").handlers.on_click({}, cx);
   send("open:README.md"); await settle();
-  find(view.render(cx), "crumb-").handlers.on_click({}, cx); await fire(0);
+  // A breadcrumb is the person's own move: the tree takes the keyboard once it's there.
+  w.focused = "terminal";
+  find(view.render(cx), "crumb-").handlers.on_click({}, cx); await fire(0); await settle();
   root = view.render(cx);
   assert.equal(find(root, "t3-files-code"), null, "a directory surface has no file preview");
   assert.ok(find(root, "crumb-README.md"), "directory navigation retains the source trail");
   assert.ok(!w.read.includes("/r"), "a directory is never read as text");
+  assert.equal(w.focused, view.treeHandle, "a breadcrumb's folder takes the keyboard to the tree");
   find(root, "crumb-README.md").handlers.on_click({}, cx); await settle(); await fire(0);
   assert.ok(find(view.render(cx), "t3-files-md"), "the retained trail returns to its original file");
+  // ›: the folder's menu, a popup of its own under it; on while it's up, a press that closed it doesn't open it again.
+  root = view.render(cx);
+  find(root, "browse-").handlers["on_mouse_down:left"]({ bounds: { x: 100, y: 50, width: 16, height: 20 } }, cx);
+  find(root, "browse-").handlers.on_click({}, cx);
+  const crumbMenu = w.overlays.at(-1);
+  assert.deepEqual(plain([crumbMenu.props.files, crumbMenu.props.dir, crumbMenu.at]), ["folder", "", { x: 100, y: 74 }], "under the ›, its left edge with it");
+  assert.ok(find(view.render(cx), "browse-").calls.bg, "on while its menu is up");
+  const made = w.overlays.length;
+  find(view.render(cx), "browse-").handlers["on_mouse_down:left"]({ bounds: { x: 100, y: 50, width: 16, height: 20 } }, cx);
+  shared["t3-files.menuClosed"] = Date.now();
   find(view.render(cx), "browse-").handlers.on_click({}, cx);
-  root = view.render(cx);
-  assert.ok(find(root, "file-menu-0-a.js") && find(root, "file-menu-0-b.js"), "breadcrumb chevron lists sibling files");
-  // A folder in it opens its contents beside it, read as it opens, and a folder there opens a third level.
-  const here = view.states.get("s1");
-  here.entries.set("", [{ name: "src", dir: true }, ...here.entries.get("")]);
-  find(view.render(cx), "file-menu-0-src").handlers.on_click({}, cx); await settle();
-  assert.ok(w.ran.some((r) => r.line.includes(m.LIST) && r.line.includes("/r/src")), "a folder is read as its submenu opens");
-  root = view.render(cx);
-  assert.ok(find(root, "file-menu-1-src/d"), "the folder's contents open beside it");
-  here.entries.set("src/d", [{ name: "x.js", dir: false }]);
-  find(root, "file-menu-1-src/d").handlers.on_click({}, cx);
-  find(view.render(cx), "file-menu-2-src/d/x.js").handlers.on_click({}, cx); await settle();
-  assert.equal(view.menu, null, "a file picks and closes every level");
-  assert.ok(find(view.render(cx), "crumb-src/d/x.js"), "the picked file opens");
-  view.targets = ["Finder", "Zed"];
-  view.menu = { path: "README.md", context: view.context(), x: 4, y: 4, lv: [{ at: 2, open: null, intent: {} }] };
-  const menuKey = key => find(view.render(cx), "file-menu-backdrop").handlers.on_key_down({ key }, cx);
-  menuKey("right");
-  assert.ok(find(view.render(cx), "file-menu-1-editor:Zed"), "Right opens the target row's editor submenu");
-  menuKey("escape");
-  assert.ok(view.menu && !view.menu.lv[0].open, "Escape closes only the child menu first");
-  menuKey("right");
-  const launches = [], launch = view.launch;
-  view.launch = (_st, path, name) => launches.push([path, name]);
-  menuKey("enter");
-  view.launch = launch;
-  assert.deepEqual(launches, [["README.md", "Zed"]], "Enter dispatches the selected editor for the exact menu path");
-  assert.equal(view.menu, null);
-  assert.equal(w.focused, view.treeHandle, "closing a tree menu restores tree focus");
-  view.browse(view.current(), "targets", "README.md", null, cx);
-  find(view.render(cx), "file-menu-backdrop").handlers.on_key_down({ key: "escape" }, cx);
-  assert.equal(w.focused, view.handle, "closing a toolbar menu by mouse gives the page the keyboard, not the tree, whose ring would light");
+  assert.equal(w.overlays.length, made, "the press that closed it doesn't open it again");
+  // A breadcrumb menu's file is the person's pick: it opens and the tree takes the keyboard.
+  w.focused = "terminal";
+  send("pick:b.js"); await settle(); await fire(0);
+  assert.ok(find(view.render(cx), "crumb-b.js"), "the picked file opens");
+  assert.equal(w.focused, view.treeHandle);
   assert.deepEqual(wrote.filter((k) => /reveal/.test(k)), [], "no cross-page request");
+}
+
+// The menus are popups of their own (menus.js): a folder's read as it opens; a folder in it opens its own beside it, as deep
+// as they go; a file picked asks the page to show it and closes every level; a row's menu offers what its row can do.
+async function menus() {
+  const { cx, w, settle, menu, ctx } = makePage();
+  const source = { space: "s1", tab: "t1", root: "/r", on: null };
+  w.spaces = [{ ...space("s1", "/r", true), tabs: [{ id: "t1", active: true }] }];
+  const rowsOf = (v) => walk(v.render(cx)).map(n => n.key).filter(k => k?.startsWith("files-menu-") && k !== "files-menu-list");
+  // Herdr's window (the fake's `window` is herdr's window() too).
+  Object.assign(ctx.window, { mouse_position: () => ({ x: 10, y: 10 }), viewport_size: () => ({ width: 1200, height: 800 }) });
+  const top = menu({ files: "folder", source, dir: "", file: "a.js" }); await settle();
+  assert.deepEqual(rowsOf(top), ["files-menu-a.js", "files-menu-b.js"], "the folder's entries, read as it opens");
+  // A folder: Right on it opens its submenu beside it, hanging off this one.
+  top.entries = [{ name: "src", dir: true }, ...top.entries];
+  const keys = (v, key) => v.render(cx).handlers.on_key_down({ key }, cx);
+  keys(top, "down"); keys(top, "right");
+  const sub = w.overlays.at(-1);
+  assert.deepEqual(plain([sub.props.files, sub.props.dir, sub.props.parents, sub.props.lit]), ["folder", "src", ["m1"], 0], "src's submenu, its first row lit");
+  // A file in a submenu: the page asked to show it, every level closed.
+  const deep = menu({ files: "folder", source, dir: "src", parents: ["m0"] }); await settle();
+  deep.entries = [{ name: "x.js", dir: false }];
+  keys(deep, "down"); keys(deep, "enter");
+  assert.deepEqual(w.commands.at(-1), "t3-files.pick:src/x.js");
+  assert.deepEqual(plain(w.closed.slice(-2)), ["m1", "m0"], "it and the menus it hangs off close");
+  // A row's: Open with lists the editors beside it; Insert is off with no terminal in the tab.
+  const row = menu({ files: "row", source, path: "a.js", agent: null, editors: ["Zed"] });
+  assert.deepEqual(rowsOf(row), ["files-menu-open", "files-menu-reveal", "files-menu-open-with", "files-menu-copy-path", "files-menu-mention"]);
+  keys(row, "down"); keys(row, "down"); keys(row, "down"); keys(row, "right");
+  assert.deepEqual(plain([w.overlays.at(-1).props.files, w.overlays.at(-1).props.editors]), ["editors", ["Zed"]]);
+  w.props = null;
 }
 
 async function collapseDuringExpansion() {
@@ -332,19 +333,12 @@ async function resources() {
   assert.ok(ran().some((l) => l.includes(m.LIST)), "a minute at most");
   st("s1").took = 0;
 
-  // A search showing is found again with each refresh: a file gone leaves it, a new one joins, the lit one stays lit.
+  // A search showing is found again with each refresh: a file gone leaves it, a new one joins.
   send("search:js"); await settle();
-  const paths = () => plain(st("s1").results.map((r) => r.path).sort());
-  const lit = () => st("s1").results[st("s1").at].path;
+  const paths = () => plain(st("s1").found.results.map((r) => r.path).sort());
   assert.deepEqual(paths(), ["a.js", "b.js"]);
-  st("s1").at = st("s1").results.findIndex((r) => r.path === "b.js");
   w.files = ["0.js", "b.js", "c.js"]; st("s1").refreshed -= 5000; await tick();
   assert.deepEqual(paths(), ["0.js", "b.js", "c.js"], "refreshed: a.js gone, 0.js and c.js in");
-  assert.equal(lit(), "b.js", "the lit result stays lit");
-  assert.ok(st("s1").at > 0, "lit where it now is, not the first");
-  w.files = ["c.js", "d.js", "e.js"]; st("s1").refreshed -= 5000; await tick();
-  assert.deepEqual(paths(), ["c.js", "d.js", "e.js"]);
-  assert.equal(st("s1").at, 0, "the lit one gone: the first");
   send("search:"); await settle(); w.files = ["a.js", "b.js"];
 
   // An image shown is copied once: a refresh leaves it be (picking it again reads it again).
@@ -428,7 +422,7 @@ async function resources() {
   }
   const old = st("s1");
   assert.equal(st("s1").file, "a.js");
-  assert.deepEqual([st("s1").query, st("s1").results], ["b", null], "its search's words kept, not its results");
+  assert.deepEqual([st("s1").query, st("s1").found], ["b", null], "its search's words kept, not its results");
   assert.deepEqual(full(), ["s2", "s3", "s4"], "three spaces keep all they read");
   assert.equal(old.view, null, "s1's view let go");
   assert.ok(w.made.filter((e) => e.text).length >= 4 && w.made.every((e) => e === st("s2").view?.code || e === st("s3").view?.code || e === st("s4").view?.code || e.released), "every other editor released");
@@ -438,7 +432,7 @@ async function resources() {
   assert.ok(ran().some((l) => l.includes(m.LIST)) && w.read.includes("/r1/a.js"), "back: read again");
   assert.ok(st("s1").view?.code && !st("s1").view.code.released, "its file in an editor again");
   assert.ok(st("s1").expanded.has("src"), "its folders as they were");
-  assert.deepEqual(plain(st("s1").results.map((r) => r.path)), ["b.js"], "its search found again");
+  assert.deepEqual(plain(st("s1").found.results.map((r) => r.path)), ["b.js"], "its search found again");
   assert.deepEqual(full(), ["s3", "s4", "s1"]);
 
   // A read still under way when its space lets go comes back to nothing: no editor made, nothing kept.
@@ -456,6 +450,29 @@ async function resources() {
   const gone = st("s3").view.code;
   w.spaces = w.spaces.filter((s) => s.id !== "s3"); await tick();
   assert.ok(!view.states.has("s3") && gone.released, "a closed space's editor released");
+}
+
+// The words in the field and the tree under them always agree: words it can't search yet (the window behind) show as being
+// searched, never as another search's results or the whole tree, and are searched once it's in front.
+async function searchMatchesWords() {
+  const { view, cx, w, settle, tick, send } = makePage();
+  view.render(cx); await settle(); await tick();
+  send("search:a"); await settle();
+  let root = view.render(cx);
+  assert.ok(find(root, "row-a.js") && !find(root, "row-b.js"), "a: a.js only");
+  w.windowActive = false;
+  send("search:b"); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "row-a.js"), null, "b, not searched yet: a's result isn't shown under it");
+  assert.ok(find(root, "t3-files-tree-loading"), "b, not searched yet: shown as being searched");
+  w.windowActive = true; await tick();
+  root = view.render(cx);
+  assert.ok(find(root, "row-b.js") && !find(root, "row-a.js"), "in front: b's result");
+  send("search:"); await settle();
+  w.windowActive = false;
+  send("search:b"); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "row-a.js"), null, "from no search: not the whole tree under the words");
 }
 
 async function surfaceCache() {
@@ -528,19 +545,10 @@ async function surfaceCache() {
   assert.equal(second(), true);
   assert.equal(list(), true);
 
-  // Icons, in VS Code's order: the name with its folder, the name, the longest extension, the plain file; case aside.
-  assert.equal(m.fileIcon("index.D.ts"), "icons/cat/typescript-def.svg");
-  assert.equal(m.fileIcon("src/app.ts"), "icons/cat/typescript.svg", "a path: its name");
-  assert.equal(m.fileIcon("PACKAGE.json"), `icons/cat/${m.FILE_NAMES["package.json"]}.svg`);
-  assert.equal(m.fileIcon("ci.yml", ".github/workflows/ci.yml"), `icons/cat/${m.FILE_EXTENSIONS["workflows/yml"]}.svg`);
-  assert.notEqual(m.FILE_EXTENSIONS["workflows/yml"], m.FILE_EXTENSIONS.yml);
-  assert.equal(m.fileIcon("no-such.thing"), "icons/cat/_file.svg");
-  assert.equal(m.fileIcon("constructor"), "icons/cat/_file.svg", "not Object's");
-  assert.equal(m.folderIcon("packages/cli/SRC", true), "icons/cat/folder_src_open.svg");
-  assert.equal(m.folderIcon("whatever"), "icons/cat/_folder.svg");
-  // Every icon the data names is in this mod's icons/cat: a missing one draws nothing.
-  const names = new Set(["_file", "_folder", "_folder_open", ...Object.values(m.FILE_NAMES), ...Object.values(m.FILE_EXTENSIONS), ...Object.values(m.FOLDER_NAMES).flatMap((f) => [f, `${f}_open`])]);
-  for (const n of names) assert.ok(fs.existsSync(path.join(__dirname, "icons/cat", `${n}.svg`)), `icons/cat/${n}.svg`);
+  // Results in order: a file name holding every term first, then the shorter path, then as text.
+  assert.deepEqual(plain(m.rankPaths(["docs/indexing/x.md", "src/a/index.ts", "a/index.js", "index.md", "b/index.js"], m.terms("index"))),
+    ["index.md", "a/index.js", "b/index.js", "src/a/index.ts", "docs/indexing/x.md"]);
+  assert.deepEqual(plain(m.rankPaths(["shared/file-menu.js", "docs/file/menu.md"], m.terms("file menu"))), ["shared/file-menu.js", "docs/file/menu.md"], "every term in the name");
 
   // The shell scripts, run: listing, ignored, the remote probe and search, in a repo with awkward names.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3-files-check-"));
@@ -579,5 +587,7 @@ async function surfaceCache() {
   await page();
   await resources();
   await surfaceCache();
+  await searchMatchesWords();
+  await menus();
   console.log("t3-files checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

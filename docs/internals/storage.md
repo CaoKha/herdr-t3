@@ -48,30 +48,30 @@ Apply 和 Studio 导入保存时，在独占的 `.preview/save-<unique-id>/` 写
 
 两类按约定取名，不进 `KEY`：
 
-- **弹窗关闭时间戳**：mod 整个就是一个弹窗时用 `<mod>.closed`（`t3-picker.closed`）；mod 平时是别的东西、另外还会以某种弹窗打开时用 `<mod>.<那种弹窗>Closed`（`t3-agents.sortClosed`）。由弹窗的 `close()` 写，打开它的控件用 `focus.js` 的 `justClosed` 读。
+- **弹窗关闭时间戳**：mod 整个就是一个弹窗时用 `<mod>.closed`（`t3-picker.closed`）；mod 平时是别的东西、另外还会以某种弹窗打开时用 `<mod>.<那种弹窗>Closed`（`t3-agents.sortClosed`）。由弹窗的 `close()` 写，打开它的控件用 `shared/trigger.js` 读（内部是 `focus.js` 的 `justClosed`），按钮的 on 态也由它与打开时间比出来。Review 页内弹层不是 mod 弹窗，外部按下关闭时由页面写 `review.<名字>Closed`（`settingsClosed`、`scopeClosed` 等）。
 - **名字由别人定的键**，照用：和 Herdr 自带 mod 共用的 `layout`、`space.colors`、`agents.sort`；Inbox 的 mod 卡片约定 `<mod>.program`、`<mod>.status`、`<mod>.titles`。
 
 ## 读写
 
-`t3.panels[space]` 保存 `{ open, wide, tabs, active }`，标签为 `{ id, path?, born }`：`files`、`file:<相对路径>` 或 `review`。`born` 是同名标签关闭再开后的新实例号，使隐藏 mod 也能识别状态已释放。旧 `{ page }` 在首次读取时转成一个对应标签；无记录从空列表开始。布局 stack 子块只是渲染位，空列表选择 `panel-empty`（独立 Review 安装无此块时回退 Files 渲染位）。
+`t3.panels[space]` 只存 `{ tabs, active, open, wide }`，由 `shared/panel.js` 写；增删改规则在纯函数 `shared/surfaces.js`。标签为 `{ id, born, reveal, path?, folder?, trail? }`：`files`、`file:<相对路径>` 或 `review`。`born` 是标签实例号（比本副本给过的都大的毫秒数），关闭再加就是新实例；各 mod 自己比对 `born` 释放旧实例的状态，面板不写别的 mod 的键。`reveal` 是该标签被选中的次数，Files 见它变化就清搜索并定位（T3 的 revealRequestId）。没有 `tabs` 的旧记录（固定页时代的 `page`）从空列表开始，不迁移；首次写入只保留上述字段。布局 stack 子块只是渲染位，空列表选 `panel-empty`；Herdr 自带布局的 stack 没有此块，面板不存标签（`panelState().owns` 为假）。
 
-`selected` 是最后一次选择标签的事件号，用于 Files 在重复选择当前标签时也清空搜索并定位；旧 `page` 字段只作 stack 布局回传的同步记号，不是可见的页签模式。`t3.openTarget` 在Files／详情之间全局只保存一个目标名，不保留本轮旧键迁移；本机每次运行共用 `globalThis.t3OpenInTargets` 的 `{version:3,promise,names}` 并行应用检测，名单版本变化即替换旧缓存，目标卸载时失效并回退Finder。已完成名单可经knownTargets只读访问，避免热加载时旧init任务丢失使Files永久只留Finder；绘制不等待promise或扫描应用。候选仅取T3完整编辑器表，以macOS LaunchServices查安装（GUI进程PATH可能没有CLI）；绘制和打开菜单不扫描。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
+`t3.openTarget` 在Files／详情之间全局只保存一个目标名，不保留本轮旧键迁移；本机每次运行共用 `globalThis.t3OpenInTargets` 的 `{version:3,promise,names}` 并行应用检测，名单版本变化即替换旧缓存，目标卸载时失效并回退Finder。已完成名单可经knownTargets只读访问，避免热加载时旧init任务丢失使Files永久只留Finder；绘制不等待promise或扫描应用。候选仅取T3完整编辑器表，以macOS LaunchServices查安装（GUI进程PATH可能没有CLI）；绘制和打开菜单不扫描。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
 
-Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。`review.shown[space]` 存 `{ root, page, base, label }`，`label` 是 Review 范围按钮的字（提交读到后为标题），供详情的 Quick Review 照写。Review 标签关闭同步删除 `review.shown[space]`，其内存副本按实例号驱逐，迟到读取失效。详情来源和弹层 id 只通过 popup props 传递，不写持久状态；本机机器名在弹层启动时读取。
+Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。`review.shown[space]` 存 `{ root, page, base, label, born? }`，`label` 是 Review 范围按钮的字（提交读到后为标题），供详情的 Quick Review 照写；`born` 是写它的 Review 标签实例（`panel.js` 的 `surfaceBorn`，Herdr 自带 stack 里没有）。读的一方只认 `born` 与当前 Review 标签相同的记录，所以关闭再加的 Review 从默认范围开始。`review` 请求 `{ space, root, page, base?, n, analyze, born? }` 只由 `panel.js` 的 `reviewRequest` 写（Review 页自己的范围菜单、Review 栏和详情共用），同样带 `born`：先 `showPage("review")` 再写请求，Review 不接手发给已关闭标签的请求。Review 的内存副本按实例号驱逐，迟到读取失效。详情来源和弹层 id 只通过 popup props 传递，不写持久状态；本机机器名在弹层启动时读取。
 
 `globalThis.t3Titlebar` 只记本次运行测到的标题栏末端和面板宽度，供键盘打开详情时锚定到同一入口；不写共享状态或磁盘。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
 
-详情子菜单关系只记本次运行的 `globalThis.t3DetailsLayers`（子overlay id → 父详情id／kind），用于菜单开启时的split状态和父关闭时清理。子关闭即删对应记录；不写共享偏好。Open in菜单选择只更新既有全局目标名，真正执行只在主按钮点击发生。全局Actions的数据归属不改成项目脚本，已有动作不迁移或删除。
+详情只记本次运行的 `globalThis.t3Details`：`id` 是打开着的详情 popup，`layers` 是它打开的每个菜单（overlay id → 打开它的 popup id／kind），用于行和split的开启态以及关闭时连带关掉下级菜单；关闭即删。Commits 子菜单打开时从本次运行的 `globalThis.t3DetailsRange`（打开着的范围菜单）取已读到的提交，不再读 Git。都不写共享偏好。Open in菜单选择只更新既有全局目标名，真正执行只在主按钮点击发生。全局Actions的数据归属不改成项目脚本，已有动作不迁移或删除。
 
 `t3-actions.detailsItems` 保存详情中可用项目的显隐偏好：`environment`、`openIn`、`scripts`、`review`。默认全开，只存与默认不同的 `false`；Reset 清空。卡片右键与所有详情副本共用这一份，不存未知项目或缺少后端的T3功能。全隐藏仍显示 Choose what to show 入口，不改变Actions数据、面板标签或Git仓库。
 
-Quick Review与Review页共用`shared/review-scope.js`及本次运行的`globalThis.t3ReviewScopeRun`：按root＋所选base仅留最近三份完成快照、TTL5秒，同源合并在途读取；活跃owner／follower不能因容量驱逐而丢结果，完成或关闭才释放。关闭／驱逐／来源、page、space或base变化使结果失效；关闭原生owner同步释放pending并唤醒仍存活的follower，避免永远停在Reading。范围选择继续写既有`review`请求和`review.bases`；不新增持久范围。base的remote开关保留原菜单stays语义：切换Review标签而不关闭选择器，普通选范围收起详情。
+Quick Review与Review页共用`shared/review-scope.js`：范围菜单每次打开都重读计数、提交和refs，不缓存；迟到结果只在读取凭据、root、space和所选base都没变时生效，菜单关闭或驱逐即作废。范围选择继续写既有`review`请求和`review.bases`；不新增持久范围。详情的范围菜单没有base选择；选范围收起详情。
 
 
 - 几个 mod 都要读写的数据，经 `shared/` 里的一个模块读写，默认值也写在那里：置顶经 `shared/pins.js`（`pinList`、`pin`、`unpin`、`putBack`），布局设置经 `shared/layout-settings.js`。所以 Pin 不管从哪里点，都会结束 Snooze；Undo 不管从哪里点，都会把置顶放回原位。
 - 只有一个 mod 读写的键，在那个 mod 里写 `shared(KEY.x) ?? 默认值`。
 
-Files 的树选择集合、范围锚点、搜索中的折叠集合、目录 loading/error、面包屑目录菜单及 hover 几何仅存本次运行，不写 shared 或磁盘。内部树选择打开文件时保留搜索；外部选标签／open 命令清搜索并 reveal。所有内部选择都记录同次 surface selected 事件号，避免下一帧把它误判为外部选择。树仍按 space 共用，不复制每标签树。`t3.panels` 的目录标签复用 `file:<path>`，加 `folder:true` 与可选的 `trail`；根目录仍是 `files`，`trail` 保留原文件面包屑。此为新增标签元数据，已有文件标签不迁移、不写文件内容。
+Files 的树选中行、搜索中的折叠集合、目录 loading/error 仅存本次运行，不写 shared 或磁盘。Files 的菜单是本 mod 的原生 popup：打开中的菜单及其上级 id 只记在本次运行的 `globalThis.t3FilesMenus`；顶层菜单关闭写 `t3-files.menuClosed`，子菜单关闭写 `t3-files.submenuClosed`（按「弹窗关闭时间戳」约定）。内部树选择打开文件时保留搜索；选标签（`reveal` 变化）／open 命令清搜索并 reveal。Files 自己打开文件后记下当前标签的 `id:born:reveal`，下一帧不把它当作外部选择。树仍按 space 共用，不复制每标签树。`t3.panels` 的目录标签复用 `file:<path>`，加 `folder:true` 与可选的 `trail`；根目录仍是 `files`，`trail` 保留原文件面包屑。此为新增标签元数据，已有文件标签不迁移、不写文件内容。
 
 `shared/measured-text.js`的`nameW`／`textW`仅记本次运行各文字的自然宽／容器宽，供同一份nameText／named／measuredTooltip判断截断。原生布局回调按zoom归一化，宽度未变不notify；不以字符数估算，不在每次重绘重新测量。
 

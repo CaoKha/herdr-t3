@@ -12,7 +12,7 @@ const find = (n, id) => !n || typeof n !== 'object' ? undefined : n.id === id ? 
 let zoom = 1, notices = 0;
 const cx = { notify() { notices++; } }, view = {}, tips = [];
 const c = vm.createContext({ div: element, settings: () => ({ zoom }), Popup: { new: (id, trigger) => element().id(id).child(trigger) },
-  tip: (_v, _t, id, label, trigger, options) => { tips.push({ id, label, options }); return trigger; } });
+  tip: (_v, _t, id, label, trigger, options) => { tips.push({ id, label, options }); return trigger; }, tipCard: (_t, id) => element().id(id), FADE: {} });
 vm.runInContext(fs.readFileSync(__dirname + '/measured-text.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
 let node = c.nameText(view, 'title', 'iiii', { size: 14, weight: 'medium' });
 assert.equal(c.isTextCut(view, 'title'), false, 'unmeasured names read as whole');

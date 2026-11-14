@@ -20,11 +20,11 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
 - **Go to** (`cmd-p`): jump to any pane, agent or program, by its name.
-- **Details** (`cmd-shift-b`): locked computer/directory, Open in and global Actions, then a Quick Review child menu anchored directly to its row, with base selection inside it. Installed T3 editors, including VSCodium and JetBrains, share one preference with Files; choosing only remembers it, and the main button opens it. Right-click the card to choose what to show.
+- **Details** (`cmd-shift-b`): locked computer/directory, Open in and global Actions, then Quick Review: one click shows Review, its arrow picks the range. Installed T3 editors, including VSCodium and JetBrains, share one preference with Files; choosing only remembers it, and the main button opens it. Right-click the card to choose what to show.
 - **Slim tabs and framed panes**, in T3 Code's look.
-- **Sub-agent menu**: a descendant count opens only the tree, in its original order. Click a row or use arrows and Enter to peek; right-click for the same agent menu as the sidebar, including Send back and Copy address. Idle shows elapsed time; completed and failed agents remain distinct.
+- **Sub-agent menu**: a descendant count opens only the tree, in its original order. Click a row or use arrows and Enter to peek; right-click for the same agent menu as the sidebar, including Send back and Copy address. Each row has the mark an Agents row uses: idle shows elapsed time, Failed is red, and a done dot goes once you've seen it.
 - **Other machines**: their spaces grouped by machine, their Inbox cards marked. In Lists, hover an Agents row to see its machine's name.
-- **Files**: a read-only T3-style tree and one tab per file. Search keeps the tree, directory breadcrumbs keep a return trail, and the header's controls keep fixed slots across Preview/Code. Hide retains tabs; close releases them. Large trees cancel obsolete expansion work and draw only visible rows.
+- **Files**: a read-only T3-style tree, the same as Review's, and one tab per file. Search keeps the tree, directory breadcrumbs keep a return trail, and the header's controls keep fixed slots across Preview/Code. Hide retains tabs; close releases them. Large trees cancel obsolete expansion work and draw only visible rows.
 - **Review** (optional): one closable tab per space, with its own range and reading position. Switching retains it; closing and re-adding starts from the default range.
 
 Each in detail: [the guide](docs/user/guide.md).
@@ -84,7 +84,7 @@ The layout sends no telemetry. The optional Review extra uses its configured ana
 
 ## Extras (optional)
 
-- **pulls.review**: a Review bar and the panel's Review page.
+- **pulls.review**: a Review bar and the panel's Review surface.
 - **Theme export for Pi**: Pi's colors follow Herdr's.
 - **asciicn wallpaper**: Home in your theme's colours: four built-in pictures, images processed as Dots, Braille, Blocks or Quadrants, or Studio `.ans` with its original characters. Choose a mode and frame it with Fill/Fit, drag or arrow keys, zoom and Reset before Apply; moving reuses a cached preview. Saved framing survives restarts and resizing. Existing drawings stay unchanged; reimport an original image for the new processing. Buttons stay in place, including during mode changes. See [the extras](docs/user/extras.md#asciicn-wallpaper).
 - **Themes**: Catppuccin and T3 Code, light and dark.
@@ -93,7 +93,7 @@ How to add them: [the extras](docs/user/extras.md).
 
 ## Credits and license
 
-`t3-chrome`, `t3-spaces`, `t3-agents`, `t3-tabs`, `t3-pane`, `t3-new-menu`, `t3-picker` and the layout start from Herdr App's shipped `workspace-chrome`, `spaces`, `agents`, `tabs`, `pane`, `new-menu`, `picker` and `main`. Settle follows T3 Code's design. The Catppuccin themes use the [Catppuccin](https://github.com/catppuccin/catppuccin) palette (MIT License, Copyright (c) 2021 Catppuccin); the T3 Code themes take [T3 Code](https://github.com/pingdotgg/t3code)'s default colors (MIT License, Copyright (c) 2026 T3 Tools Inc.). Icons are [Lucide](https://lucide.dev)'s (ISC License, Copyright (c) Lucide Contributors); file and folder icons in Review are [Catppuccin's VS Code icons](https://github.com/catppuccin/vscode-icons) (MIT License, Copyright (c) 2023 Catppuccin, Copyright (c) 2023 thang-nm). Files and panel labels use original [T3 Code](https://github.com/pingdotgg/t3code) (MIT) and [Pierre](https://github.com/pierrecomputer/trees) (Apache-2.0) icon shapes, colored by the active theme. Review counts characters' widths with [get-east-asian-width](https://github.com/sindresorhus/get-east-asian-width)'s table (MIT License, Copyright (c) Sindre Sorhus). Apache-2.0, as Herdr App.
+`t3-chrome`, `t3-spaces`, `t3-agents`, `t3-tabs`, `t3-pane`, `t3-new-menu`, `t3-picker` and the layout start from Herdr App's shipped `workspace-chrome`, `spaces`, `agents`, `tabs`, `pane`, `new-menu`, `picker` and `main`. Settle follows T3 Code's design. The Catppuccin themes use the [Catppuccin](https://github.com/catppuccin/catppuccin) palette (MIT License, Copyright (c) 2021 Catppuccin); the T3 Code themes take [T3 Code](https://github.com/pingdotgg/t3code)'s default colors (MIT License, Copyright (c) 2026 T3 Tools Inc.). Icons are [Lucide](https://lucide.dev)'s (ISC License, Copyright (c) Lucide Contributors). The file trees in Files and Review and the panel labels use original [T3 Code](https://github.com/pingdotgg/t3code) (MIT) and [Pierre](https://github.com/pierrecomputer/trees) (Apache-2.0) icon shapes, colored by the active theme. Review counts characters' widths with [get-east-asian-width](https://github.com/sindresorhus/get-east-asian-width)'s table (MIT License, Copyright (c) Sindre Sorhus). Apache-2.0, as Herdr App.
 
 ## More
 

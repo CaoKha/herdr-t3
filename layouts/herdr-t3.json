@@ -93,8 +93,9 @@
           "background": "chrome",
           "children": [
             { "id": "tabs", "type": "block", "size": { "weight": 1 }, "window_drag": true, "content": { "mod": "t3-tabs" } },
-            { "id": "actions", "type": "block", "size": { "px": 32 }, "window_drag": true, "content": { "mod": "t3-actions", "props": { "block": "actions", "details": true } } },
-            { "id": "tabs-end", "type": "block", "size": { "px": 36 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "end", "block": "tabs-end" } } }
+            { "id": "actions", "type": "block", "size": { "px": 28 }, "window_drag": true, "content": { "mod": "t3-actions", "props": { "block": "actions", "details": true } } },
+            { "id": "tabs-end", "type": "block", "size": { "px": 28 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "end", "block": "tabs-end" } } },
+            { "id": "tabs-end-inset", "type": "row", "size": { "px": 12 }, "window_drag": true, "children": [] }
           ]
         },
         {

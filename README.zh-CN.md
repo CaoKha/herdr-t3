@@ -20,11 +20,11 @@
 - **Home**：收起正在看的 agent 后，回到一个安静的页面，不会自动跳到下一张卡片。下一步看什么由你决定。也可以在设置（`cmd-shift-,`）里改成跳到下一张卡片，或者把 Home 换成终端或你自己的 mod。
 - **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名、标状态。
 - **跳转**（`cmd-p`）：按名字跳到任何窗格，agent 和普通程序都行。
-- **详情**（`cmd-shift-b`）：locked 电脑／目录、Open in、全局 Actions，下面的快速 Review 行直接弹出子菜单，base 选择留在菜单内。已装T3编辑器（含VSCodium／JetBrains）与Files共用偏好，菜单只选择，主按钮才打开；右键卡片可选择显示项目。
+- **详情**（`cmd-shift-b`）：locked 电脑／目录、Open in、全局 Actions，下面的 Quick Review 一点就显示 Review，箭头选范围。已装T3编辑器（含VSCodium／JetBrains）与Files共用偏好，菜单只选择，主按钮才打开；右键卡片可选择显示项目。
 - **窄标签、带框窗格**，照 T3 Code 的外观。
-- **子 agent 菜单**：数量入口只打开原顺序的树；点行或方向键加 Enter 来 peek，右键打开侧栏同一份 agent 菜单，含 Send back、Copy address。空闲显示闲了多久，完成与出错各自区分。
+- **子 agent 菜单**：数量入口只打开原顺序的树；点行或方向键加 Enter 来 peek，右键打开侧栏同一份 agent 菜单，含 Send back、Copy address。每行用 Agents 行同样的标记：空闲显示闲了多久，Failed 是红色，完成圆点看过就消失。
 - **其他机器**：它们的 space 按机器分组，Inbox 卡片带机器标记；Lists 中悬停 Agents 行查看机器名。
-- **Files**：照 T3 的只读文件树，每文件一个标签。搜索仍是树，目录面包屑保留返回路径，Preview／Code 切换时头部控件固定占位。隐藏保留，关闭释放；大树取消过时展开，只画可见行。
+- **Files**：照 T3 的只读文件树，与 Review 的同一种，每文件一个标签。搜索仍是树，目录面包屑保留返回路径，Preview／Code 切换时头部控件固定占位。隐藏保留，关闭释放；大树取消过时展开，只画可见行。
 - **Review**（可选）：每 space 最多一个可关闭标签，独立保留范围和阅读位置；切换保留，关闭重加回默认范围。
 
 每项的详细说明见[使用指南](docs/user/guide.zh-CN.md)。
@@ -84,7 +84,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 
 ## 可选扩展
 
-- **pulls.review**：Review 栏和面板里的 Review 页。
+- **pulls.review**：Review 栏和面板里的 Review 标签。
 - **给 Pi 用的主题导出**：让 Pi 的配色跟着 Herdr 走。
 - **asciicn 壁纸**：Home 配色跟随主题：自带4张画，图片可选 Dots、Braille、Blocks 或 Quadrants，Studio `.ans` 保留原字形。Apply 前选模式，再用 Fill／Fit、拖动或方向键、缩放和 Reset 构图，移动时复用缓存预览；保存后重启和尺寸变化仍保留构图。已有画保持原样，重新导入原图才用新处理。按钮在切换／转换等状态下都保持原位。见[可选扩展](docs/user/extras.zh-CN.md#asciicn-壁纸)。
 - **主题**：Catppuccin 和 T3 Code，各有明暗两套。
@@ -93,7 +93,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 
 ## 致谢与许可证
 
-`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-tabs`、`t3-pane`、`t3-new-menu`、`t3-picker` 和布局本身，分别基于 Herdr App 自带的 `workspace-chrome`、`spaces`、`agents`、`tabs`、`pane`、`new-menu`、`picker` 和 `main` 修改。Settle 参照 T3 Code 的设计。Catppuccin 主题使用 [Catppuccin](https://github.com/catppuccin/catppuccin) 色板（MIT 许可证，Copyright (c) 2021 Catppuccin）；T3 Code 主题取自 [T3 Code](https://github.com/pingdotgg/t3code) 的默认配色（MIT 许可证，Copyright (c) 2026 T3 Tools Inc.）。图标来自 [Lucide](https://lucide.dev)（ISC 许可证，Copyright (c) Lucide Contributors）；Review 里的文件、文件夹图标来自 [Catppuccin 的 VS Code 图标](https://github.com/catppuccin/vscode-icons)（MIT 许可证，Copyright (c) 2023 Catppuccin、Copyright (c) 2023 thang-nm）。Files 和面板标签使用 [T3 Code](https://github.com/pingdotgg/t3code)（MIT）和 [Pierre](https://github.com/pierrecomputer/trees)（Apache-2.0）的原图形，由当前主题着色。Review 用 [get-east-asian-width](https://github.com/sindresorhus/get-east-asian-width) 的表计算字符宽度（MIT 许可证，Copyright (c) Sindre Sorhus）。许可证与 Herdr App 相同，为 Apache-2.0。
+`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-tabs`、`t3-pane`、`t3-new-menu`、`t3-picker` 和布局本身，分别基于 Herdr App 自带的 `workspace-chrome`、`spaces`、`agents`、`tabs`、`pane`、`new-menu`、`picker` 和 `main` 修改。Settle 参照 T3 Code 的设计。Catppuccin 主题使用 [Catppuccin](https://github.com/catppuccin/catppuccin) 色板（MIT 许可证，Copyright (c) 2021 Catppuccin）；T3 Code 主题取自 [T3 Code](https://github.com/pingdotgg/t3code) 的默认配色（MIT 许可证，Copyright (c) 2026 T3 Tools Inc.）。图标来自 [Lucide](https://lucide.dev)（ISC 许可证，Copyright (c) Lucide Contributors）。Files 和 Review 的文件树以及面板标签使用 [T3 Code](https://github.com/pingdotgg/t3code)（MIT）和 [Pierre](https://github.com/pierrecomputer/trees)（Apache-2.0）的原图形，由当前主题着色。Review 用 [get-east-asian-width](https://github.com/sindresorhus/get-east-asian-width) 的表计算字符宽度（MIT 许可证，Copyright (c) Sindre Sorhus）。许可证与 Herdr App 相同，为 Apache-2.0。
 
 ## 更多
 

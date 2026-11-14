@@ -1,6 +1,6 @@
 import { spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window } from "herdr";
 import { namer, programOf } from "./name.js";
-import { descendants, kidStatus, ownStatus, treeStatus } from "./tree.js";
+import { descendants, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { sidebarParts } from "./sidebar.js";
 import { newTab } from "./project.js";
@@ -338,8 +338,8 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   // as the Inbox copy may not have started (docs/adr/0003). Seeing it once it has woken stays the Inbox's: Woke is its mark.
   function endSnoozes(terms, every) {
     const was = states, active = window()?.active, now = Date.now();
-    const listed = new Map(every.map(a => [a.address, a.status]));
-    const state = (a) => treeStatus(ownStatus(a.status, a.address, terms), descendants(terms, a.address).map(k => kidStatus(k, listed)));
+    const under = subAgents(every, terms);
+    const state = (a) => treeStatus(ownStatus(a.status, a.address, terms), under(a.address));
     states = new Map(every.map(a => [a.address, state(a)]));
     const viewed = inViewAgent(terms, every);
     for (const a of every) {

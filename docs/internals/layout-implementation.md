@@ -14,6 +14,8 @@ Herdr 在绘制中拒绝会再请求绘制的操作：`cx.notify()`、`cx.new()`
 
 隐藏 stack 子节点/列里的 mod 不绘制、不收 `<mod>.<command>`；启动后的 timer 继续，首次显示前则尚未启动。Inbox/Agents 的行计算独立于 `render()`，由每秒 timer 也调用，只有当前模式写 agent order。必须随时工作的命令/Snooze 维护在根浮动、视觉为空的 `t3-tabs {part:"keys"}`；不能依赖可被面板放大藏住的标签条。
 
+子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照：5,000 个终端时打开一次约 0.8ms，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。
+
 `t3-tabs/main.js` 的 `nav()` 给 strip/keys 共用同一导航；strip 绘制前也 track，避免晚一帧。同一帧 track 两次必须幂等，`check-navigation.cjs` 按此回放。`shared/sidebar.js` 查 `sidebar`、`sidebar-lists`；缺 stack 不当作 Lists，独立发布 mod 未必有整个布局。
 
 Home 的 layout select/row 高度和目标 panel restore 与 tab select 同次发出；在 `spaces()` 回传前暂认已到达，不能把 Home 面板写回来源 space。命令后的模型晚一帧左右，不从调用成功推断所有结构已回传。新 space 自带 shell、不能失最后 tab，替换 Home 内容先加入再关闭。Home 的识别/名称契约见 ADR 0005/0006，键和保存归属见 storage。
@@ -26,11 +28,11 @@ Tooltip 用自己管理时序的 `Popup`：`HoverCard` 会因指针停在卡片�
 
 ## 键盘、关闭键与菜单链
 
-键盘模式由 `shared/focus.js` 管；每副本 close 调 `stopsEnd`。运行首副本通过 `globalThis.t3FocusRun` 清崩溃残值：Herdr 当前所有 mod 共用 JS context，但未承诺此能力，`sessionStorage` 又是每副本一份。没有在走键盘的副本遇到普通 stop 按下，要在 press 夺焦点前结束旧模式。Inbox 内菜单只在真正持键盘时保模式。
+键盘模式由 `shared/focus.js` 管；每副本 close 调 `stopsEnd`。运行首副本通过 `globalThis.t3FocusRun` 清崩溃残值：Herdr 当前所有 mod 共用 JS context，但未承诺此能力，`sessionStorage` 又是每副本一份。没有在走键盘的副本遇到普通 stop 按下，要在 press 夺焦点前结束旧模式。Inbox 内菜单只在真正持键盘时保模式。Files 树只在用户从树、面包屑或 Locate 发起时 focus；标签切换、命令等外部 reveal 只滚动和选中，不把键盘从终端拿走。树行焦点环只在树里按过方向键等之后出现，点击不显示。
 
-Herdr 自 0.1.14 起自动处理绑定 `tab.close`/`pane.close` 的关闭键，但布局绑到 `t3-tabs`，每个 popup/dialog 必须另有 `mod:<name>` 四键 `overlay.close` 覆盖。两页面板有自己的 close 覆盖；同时可停靠和弹层的 mod，键盘 Tab 到停靠副本时也会拦这四键、那时不关东西。仓库 gate 查自己打开的 overlay；Herdr 内置弹层名单升级时另核。
+Herdr 自 0.1.14 起自动处理绑定 `tab.close`/`pane.close` 的关闭键，但布局绑到 `t3-tabs`，每个 popup/dialog 必须另有 `mod:<name>` 四键 `overlay.close` 覆盖。两页面板有自己的 close 覆盖（Files 的弹层菜单也由 `t3-files.close` 先关菜单、没有菜单才关标签，gate 接受 `<mod>.close`）；同时可停靠和弹层的 mod，键盘 Tab 到停靠副本时也会拦这四键、那时不关东西。仓库 gate 查自己打开的 overlay；Herdr 内置弹层名单升级时另核。
 
-点已开的 popup 按钮，outside press 先关弹层、click 才到按钮；`close()` 写时间，按钮用 `justClosed` 避免立刻重开。`t3-menu` 用父子 id 链关闭后代，Review 页内子菜单复用 `shared/submenu.js` 的悬停意图/方向键规则。Snooze `Popover` 的 Enter/Space 要绑定在持 focus handle 的面板 context，否则宿主绑定只关菜单、不选项。滚动列表用 `shared/list.js` 同步 pointer/highlight/scroll，另包滚动容器会跟不上按键。
+点已开的 popup 按钮，outside press 先关弹层、click 才到按钮；`close()` 写时间，按钮经 `shared/trigger.js`（`trigger()`／`opener()`，内部是 `pressed`＋`justClosed`）避免立刻重开，各弹层用自己的键，所以开着一个时点另一个的按钮仍会打开它。Review 页内弹层也一样：外部按下关闭时写 `review.<名字>Closed`，不再用 300ms 时间窗。`t3-menu` 和 Files 的菜单（`mods/t3-files/menus.js`，子菜单关闭写 `t3-files.submenuClosed` 让上级重绘并收回键盘）用父子 id 链关闭后代，Review 页内子菜单复用 `shared/submenu.js` 的悬停意图/方向键规则。Snooze `Popover` 的 Enter/Space 要绑定在持 focus handle 的面板 context，否则宿主绑定只关菜单、不选项。滚动列表用 `shared/list.js` 同步 pointer/highlight/scroll，另包滚动容器会跟不上按键。
 
 ## 尺寸、滚动与重排
 

@@ -31,7 +31,7 @@ const env = {
   spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => ({}), shared: () => null,
   sidebarParts: () => ({ stack: { active: "lists" } }), panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
-  glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
+  glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false, tipCard: (_t, id) => element().id(id), FADE: {},
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {},
   navigation: () => ({ atHome: false, frame: () => ({ tabs: [tab], context: null }) }),
@@ -44,10 +44,11 @@ function load(dir) {
   const strip = src => src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/measured-text.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/details.js"), "utf8")), scope);
+  vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/scroll-strip.js"), "utf8")), scope);
   vm.runInContext('globalThis.namedLabel = named;', scope);
-  vm.runInContext("(() => {\n" + strip(fs.readFileSync(path.join(dir, "button.js"), "utf8")) + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf;\n})();", scope);
+  vm.runInContext("(() => {\n" + strip(["button.js", "trigger.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; Object.assign(globalThis, { trigger, opener, popupOpen });\n})();", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
-  return Object.assign(new scope.Mod(), { nameW: {}, strip: 0, pressed: null, over: null, area: 600 });
+  return Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, surfaceWidths: {}, surfaceStrip: {}, pressed: null, over: null, area: 600 });
 }
 const click = (root, id) => { const el = find(root, id); assert.ok(el, id); el.handlers.on_click({}, cx); return el; };
 const tabs = load(__dirname);

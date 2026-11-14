@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(__dirname, "file-tree.js"), "utf8")
 // The row as drawn: each element a tag and what it holds, in order.
 const el = (tag) => { const node = { tag, kids: [], calls: {} }; const p = new Proxy(node, { get: (t, k) => k in t ? t[k] : k === "child" ? (c) => (t.kids.push(c), p)
   : k === "when" ? (c, f) => (c ? f(p) : p) : (...args) => (t.calls[k] = args, p) }); return p; };
-const context = vm.createContext({ div: () => el("div"), svg: () => el("svg"), image: () => el("icon"), h_flex: () => el("row"), fileIcon: () => "", folderIcon: () => "" });
+const context = vm.createContext({ div: () => el("div"), svg: (src) => Object.assign(el("svg"), { src }), h_flex: () => el("row"), pierreFileIcon: () => el("svg") });
 vm.runInContext(src.replace("globalThis.tree = { treeRows,", "globalThis.tree = { treeRow, treeRows,"), context);
 const { treeRows, pathEntries, rowAt, treeKey, treeRow, naturalCompare, sortEntries } = context.tree;
 const plain = (v) => JSON.parse(JSON.stringify(v));
@@ -74,20 +74,16 @@ const grouped = new Map([["", [{ name: "G", dir: true, path: "group:g", flat: fa
   ["group:g/src", [{ name: "a.ts", dir: false, path: "src/a.ts" }]]]);
 assert.deepEqual(shape(treeRows((rel) => grouped.get(rel) ?? [], () => true)), ["v G", "  v src", "    a.ts"]);
 
-// Review's reviewed box leads the row: after the chevron's slot, before the icon; the letter and the page's own after the name.
-const drawn = treeRow({ dim: "#888888", ring: "#0000ff", foreground: "#ffffff" }, "mods/x", { path: "a.ts", name: "a.ts", depth: 0 }, "r",
-  { leading: el("box"), trailing: el("tail"), status: "M" });
-assert.deepEqual(drawn.kids.map((k) => typeof k === "string" ? "text" : k.tag), ["div", "box", "icon", "div", "div", "tail"]);
-
-// Files uses Pierre's single leading slot: the chevron OR a file icon, never both or an empty slot before a file.
+// One row for both pages: the page's box only fills a lane before the icon, the indent and margins don't move with it; no
+// chevron, a folder's icon shows whether it's open.
 const t = { dim: "#888888", accent: "#0000ff", foreground: "#ffffff" };
-const file = treeRow(t, "mods/t3-files", { path: "a.ts", name: "a.ts", depth: 0 }, "f");
-assert.deepEqual(file.kids.map(k => k.tag), ["icon", "div"], "a file icon leads its label directly");
-const folder = treeRow(t, "mods/t3-files", { path: "src", name: "src", dir: true, depth: 1 }, "d");
-assert.deepEqual(folder.kids.map(k => k.tag), ["div", "div"], "directory uses only a chevron slot");
-assert.equal(folder.calls.pl[0], 25.6, "first indent is 19.2 after the 6.4 row padding");
-const deep = treeRow(t, "mods/t3-files", { path: "a/b/c", name: "c", dir: true, depth: 3 }, "deep");
-assert.ok(Math.abs(deep.calls.pl[0] - 63) < 0.01, "following indents advance by 18.7, not the old doubled icon width");
+const drawn = treeRow(t, "mods/x", { path: "a.ts", name: "a.ts", depth: 2 }, "r", { leading: el("box"), trailing: el("tail"), status: "M" });
+const bare = treeRow(t, "mods/x", { path: "a.ts", name: "a.ts", depth: 2 }, "f");
+assert.deepEqual(drawn.kids.map((k) => k.tag), ["box", "svg", "div", "div", "tail"], "box, icon, name, letter, the page's own");
+assert.deepEqual(bare.kids.map((k) => k.tag), ["svg", "div"], "no box, no lane");
+assert.deepEqual([drawn.calls.pl, drawn.calls.mx, drawn.calls.h], [bare.calls.pl, bare.calls.mx, bare.calls.h], "the same geometry with or without a box");
+const icon = (open) => treeRow(t, "mods/x", { path: "src", name: "src", dir: true, open, depth: 0 }, "d").kids[0].src;
+assert.notDeepEqual(icon(true), icon(false), "an open folder's icon differs from a closed one's");
 assert.equal(treeKey("space", all, 4)?.pick.path, "README.md", "Space activates like Enter");
 
-console.log("ok: file tree: lone folders flatten (groups never), paths keep their order, a path finds its row, the keys move as Pierre's, and a page's box leads the row.");
+console.log("ok: file tree: lone folders flatten (groups never), paths keep their order, a path finds its row, the keys move as Pierre's, and both pages draw one row.");

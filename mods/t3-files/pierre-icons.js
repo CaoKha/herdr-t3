@@ -23,7 +23,3 @@ export function pierreFileIcon(t, mod, path, size = 16) {
   const file = pierreIconFile(path), token = file.replace(/^(file-tree-builtin-|t3-file-icon-)/, "");
   return svg(`${mod}/icons/pierre/${file}.svg`).size(size).flex_none().text_color(t[COLOR[token]] ?? t.dim);
 }
-
-export function pierreChevron(t, mod, open) {
-  return svg(`${mod}/icons/pierre/${open ? "file-tree-icon-chevron" : "chevron-right"}.svg`).size(16).text_color(t.dim);
-}

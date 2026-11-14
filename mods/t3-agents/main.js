@@ -6,14 +6,14 @@ import { v_flex, h_flex } from "gpui-base";
 import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, settings, openOverlay, closeOverlay, props, nextCommand } from "herdr";
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { glow, tip } from "./tip.js";
-import { stopsInit, stopsEnd, stop, focusRoot, enter, pressed, justClosed } from "./focus.js";
+import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
+import { trigger } from "./trigger.js";
 import { menuJump } from "./list.js";
 import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
 import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY, migrateLocal } from "./store.js";
 import { pinList, setPinned } from "./pins.js";
-import { button, radiusOf } from "./button.js";
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
@@ -269,18 +269,9 @@ export default class Agents extends View {
             .justify_between()
             .child(div().text_size(12).font_medium().text_color(t.muted).child("Agents"))
             .child(
-              tip(this, t, "ag-sort", `Sort agents: ${sort.label}`, stop(this, t, "ag-sort", button(t, "ag-sort", { icon: `mods/t3-agents/icons/${sort.icon}.svg`, label: "Sort agents", size: "sm", hot: this.hot === "ag-sort" })
-                .on_hover(glow(this, "ag-sort"))
-                .on_mouse_down("left", (e) => { pressed(this); this.sortFrom = e.bounds; })
-                .on_click((_e, cx) => {
-                  if (justClosed(this, "t3-agents.sortClosed")) { this.sortFrom = null; return; }
-                  this.hot = null; // The menu covers it, before the pointer can report leaving it.
-                  // Hung from the button, right edges together, as T3's menus. No press (the keyboard), the app's default.
-                  const b = this.sortFrom, z = Number(settings()?.zoom) || 1;
-                  this.sortFrom = null;
-                  openOverlay({ mod: "t3-agents", kind: "popup", width: SORT_WIDTH, height: 140, ...(b ? { at: { x: b.x + b.width - SORT_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { sortMenu: true } });
-                  cx.notify();
-                }), radiusOf("sm"))),
+              // Hung from the button, right edges together, as T3's menus. No press (the keyboard), the app's default.
+              trigger(this, t, "ag-sort", { icon: `mods/t3-agents/icons/${sort.icon}.svg`, label: `Sort agents: ${sort.label}`, closed: "t3-agents.sortClosed",
+                onOpen: (b) => { const z = Number(settings()?.zoom) || 1; openOverlay({ mod: "t3-agents", kind: "popup", width: SORT_WIDTH, height: 140, ...(b ? { at: { x: b.x + b.width - SORT_WIDTH * z, y: b.y + b.height + 4 * z } } : {}), props: { sortMenu: true } }); } }),
             ),
       )
       .when(list.length === 0, (el) =>

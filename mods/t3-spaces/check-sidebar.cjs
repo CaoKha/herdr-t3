@@ -147,6 +147,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   assert.ok(find(at, "fold-t0") && !find(at, "sub-grandchild"), "sub-agents start folded");
   // The child is in error: folded, it still shows, one step in, hung from the parent.
   assert.equal(find(at, "sub-child").style.pl, 30, "a stuck sub-agent shows under its folded parent");
+  if (width === 208) assert.equal(find(at, "sub-status-child").style.accessibility_label, "Failed", "a failed one says so, with the menu's `!`");
   f.terminals().find(k => k.address === "grandchild").status = "blocked";
   const stuck = ag.render(cx);
   assert.deepEqual([find(stuck, "sub-child").style.pl, find(stuck, "sub-grandchild").style.pl], [30, 30], "every stuck one hangs straight from the parent");
@@ -727,7 +728,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   const spins = tree => walk(tree).some(n => n.source === "mods/workspace-chrome/spinner.svg");
   assert.ok(spins(find(f.load("t3-tabs").render(cx), "tab-b0")), "its tab still shows it working");
   const header = f.load("t3-pane", { pane: "p0" }).render(cx);
-  assert.ok(!spins(header) && find(header, "ph-kids-p0"), "its pane header uses the descendant entry, not another aggregate spinner");
+  assert.ok(!spins(header) && find(header, "ph-kids-p0"), "its pane header says its own agent is idle; the sub-agent button speaks for the rest");
 }
 
 {
@@ -1541,27 +1542,25 @@ for (const width of [208, 240, 256, 320, 480]) {
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 34 }, cx);
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 34 }, cx);
   assert.deepEqual(f.calls.splice(0), [["layout.resize", { id: "tabs-end", px: 34 }]], "once per change");
+  // Zoomed 1.1, a 28 button is 30.8 px, which the window snaps to 31: its block is still 28, not 29, so it touches Details (「规则」P3).
+  const wasSettings = f.scopes.get("t3-tabs").settings;
+  f.scopes.get("t3-tabs").settings = () => ({ ...wasSettings(), zoom: 1.1 });
+  fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 31 }, cx);
+  assert.deepEqual(f.calls.splice(0), [["layout.resize", { id: "tabs-end", px: 28 }]], "a zoomed width rounds to its own px");
+  f.scopes.get("t3-tabs").settings = wasSettings;
   f.scopes.get("t3-tabs").window = () => ({ platform: "windows", buttons: true });
-  assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-minimize", "tip-maximize", "tip-close-window"], "the window's buttons stay last");
+  // What the end draws, in order: the tips over its buttons.
+  const endKeys = () => { const keys = []; const walk = (n) => { if (!n || typeof n !== "object") return; if (n.key?.startsWith?.("tip-") && !n.key.startsWith("tip-over-")) keys.push(n.key); (n.items ?? []).forEach(walk); }; walk(find(end.render(cx), "tabs-end")); return keys; };
+  assert.deepEqual(endKeys(), ["tip-tab-new", "tip-minimize", "tip-maximize", "tip-close-window"], "the window's buttons stay last");
   // The layout owns the only toggle, even with the Review extension installed (ADR 0017).
   f.slots.panel = { id: "panel", hidden: true, children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] };
-  assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
+  assert.deepEqual(endKeys(), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
   f.slots.review = { id: "review-bar", content: { mod: "pulls-review", props: { block: "review-bar", toggle: true } } };
-  assert.deepEqual(find(end.render(cx), "tabs-end").items.map(n => n.key), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
-  // The window's buttons (Windows) end 2 in; Review's toggle before them ends 2 in itself, so 6 first, the boxes 8 apart.
-  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
-  delete f.slots.review;
-  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
-  f.slots.review = { id: "review-bar", content: { mod: "pulls-review", props: { block: "review-bar", toggle: true } } };
+  assert.deepEqual(endKeys(), ["tip-tab-new", "tip-panel-toggle", "tip-minimize", "tip-maximize", "tip-close-window"]);
   f.scopes.get("t3-tabs").window = () => ({ platform: "macos", buttons: false });
-  // Without them the last control's box ends 12 from the window's edge, over the pane headers' last button, its icon about
-  // as far in as the sidebar's from its edge. With nothing to draw (the Inbox's crumb has the + and the Review bar the
-  // toggle), 10, so the toggle's box, 2 in itself, ends at 12 too.
-  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
   f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
-  assert.deepEqual([find(end.render(cx), "tabs-end").items.length, find(end.render(cx), "tabs-end").style.pr], [1, 8], "closed panel keeps one toggle with Inbox");
+  assert.deepEqual(endKeys(), ["tip-panel-toggle"], "closed panel keeps one toggle with Inbox");
   delete f.slots.review;
-  assert.equal(find(end.render(cx), "tabs-end").style.pr, 8);
   delete f.slots["sidebar-lists"]; f.scopes.get("t3-tabs").window = () => ({ platform: "windows", buttons: true });
   delete f.slots.panel; delete f.slots.review;
   fire(find(end.render(cx), "close-window"), "on_hover", true, cx);
@@ -1584,7 +1583,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   const spinner = tree => walk(tree).find(n => n.source === "mods/workspace-chrome/spinner.svg");
   const open = f.load("t3-agents");
   for (const tree of [tabs.render(cx), open.render(cx)]) assert.equal(spinner(tree).style.text_color, f.theme().working);
-  assert.equal(spinner(head), undefined, "a header with descendants doesn't repeat the tree's spinner");
+  assert.equal(spinner(head).style.text_color, f.theme().working, "a header with sub-agents still shows its own agent at work");
   for (const id of ["ph-r-p0", "ph-d-p0", "ph-z-p0", "ph-x-p0"]) assert.deepEqual([find(head, id).style.h, find(head, id).style.w], [24, 24]);
   const actions = walk(head).find(n => n.items.some(child => child?.key === "tip-ph-r-p0"));
   assert.equal(actions.style.gap, 4);
@@ -2178,7 +2177,7 @@ for (const width of [208, 240, 256, 320, 480]) {
     scope.spaces = () => [reviewSpace];
     f.slots.panel = { id: "panel", hidden: true, children: [{ id: "panel-body", active: "panel-empty", children: ["files", "panel-empty", "review"].map(id => ({ id })) }] };
     let gitReads = 0, gitCode = 128;
-    scope.exec = async () => { gitReads++; return { code: gitCode }; };
+    scope.exec = async () => { gitReads++; return { code: gitCode, stdout: gitCode ? "" : "/repo\n" }; };
     assert.deepEqual(await press("review"), []); assert.equal(gitReads, 0, "remote never asks local Git");
     reviewSpace.machine = null;
     assert.deepEqual(await press("review"), [], "not a repository: no surface added");
@@ -2823,7 +2822,6 @@ for (const width of [208, 240, 256, 320, 480]) {
     const f = fixture(256), ag = f.load("t3-agents"), scope = f.scopes.get("t3-agents");
     f.terminals()[0].parent = "grandchild";
     assert.deepEqual(plain(vm.runInContext('descendants(terminals(), "t0").map(k => k.address)', scope)), ["child", "grandchild"], "a live parent cycle stops before returning the root");
-    assert.deepEqual(plain(vm.runInContext('agentTree(terminals(), "t0").map(s => s.t.address)', scope)), ["child", "grandchild"], "Agents tree lines visit each descendant once even with a cycle");
     ag.folded.t0 = false;
     assert.equal(walk(ag.render(cx)).filter(n => n.key === "sub-t0").length, 0, "a cycle cannot render the parent again as its own descendant");
   }

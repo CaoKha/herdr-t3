@@ -1,8 +1,8 @@
-// What the Files page knows, apart from drawing it: git's answers parsed, the search filter, sort order and file kinds.
+// What the Files page knows, apart from drawing it: git's answers parsed, the search filter and ranking, sort order and file kinds.
 // check-files.cjs loads this alone.
 import { sortEntries } from "./file-tree.js";
 
-export const RANKED = 1000; // a search ranks at most this many matches; past it, the first ones as found
+export const REMOTE_MAX = 1000; // another machine sends at most this many matches, the first it finds; they're ranked here
 
 /** `a/b`: either may be "" (the space's folder, or a path from it). */
 export const join = (a, b) => !a ? b : !b ? a : `${a.replace(/\/$/, "")}/${b}`;
@@ -19,8 +19,8 @@ export const IGNORED = 'for p in "$1"/* "$1"/.[!.]* "$1"/..?*; do [ -e "$p" ] ||
 // text with U+FFFD and takes up to half a minute to refuse one past 1 MiB.
 export const PROBE = 's=$(wc -c < "$1") || exit 1; h=$(head -c 8192 "$1" | wc -c); z=$(head -c 8192 "$1" | tr -d "\\000" | wc -c); echo $s $((h - z))';
 // Search on another machine runs there: the whole list would take seconds to come over. Every term in the path, case
-// aside, 1000 at most. The query goes as an argument, never into the script.
-export const REMOTE_SEARCH = `if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-files -co --exclude-standard -z | tr '\\0' '\\n'; else find . -name .git -prune -o -type f -print | sed 's|^\\./||'; fi | awk 'BEGIN { n = split(tolower(ARGV[1]), t, " "); ARGV[1] = "" } { p = tolower($0); for (i = 1; i <= n; i++) if (!index(p, t[i])) next; print; if (++c >= ${RANKED}) exit }' "$1"`;
+// aside, REMOTE_MAX at most. The query goes as an argument, never into the script.
+export const REMOTE_SEARCH = `if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-files -co --exclude-standard -z | tr '\\0' '\\n'; else find . -name .git -prune -o -type f -print | sed 's|^\\./||'; fi | awk 'BEGIN { n = split(tolower(ARGV[1]), t, " "); ARGV[1] = "" } { p = tolower($0); for (i = 1; i <= n; i++) if (!index(p, t[i])) next; print; if (++c >= ${REMOTE_MAX}) exit }' "$1"`;
 
 // The listing script's output: a kind (d or f) and a name, each ended by NUL; in file-tree.js's order.
 export function parseListing(stdout) {
@@ -70,6 +70,13 @@ export async function filterPaths(lower, words, from, pause, alive = () => true)
     if (start + CHUNK < n) { await pause(); if (!alive()) return null; }
   }
   return out;
+}
+
+/** Matches in the order shown: a path whose file name holds every term first, then the shorter path, then as text. `words`
+ *  are terms(); one key per path, so a search matching most of a big repo still sorts in one go. */
+export function rankPaths(paths, words) {
+  return paths.map((p) => { const name = p.slice(p.lastIndexOf("/") + 1).toLowerCase(); return { p, k: (words.every((w) => name.includes(w)) ? 0 : 1e7) + p.length }; })
+    .sort((a, b) => a.k - b.k || (a.p < b.p ? -1 : a.p > b.p ? 1 : 0)).map((x) => x.p);
 }
 
 // What a file is shown as.
