@@ -82,7 +82,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v, set_value(x) { v = x; }, focus() { events.focus?.({}, cx); } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
     spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
-    theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
+    theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
     props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
@@ -94,7 +94,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     Date, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
   const files = ["store.js", "focus.js", "trigger.js", "tip.js", "list.js", "menu-row.js", "terminal-context.js", "surfaces.js", "panel.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-tree.js", "nav-column.js", "submenu.js", "popup-menu.js", "panel-states.js", "model.js", "menus.js", "main.js"];
-  const buttons = "const { drawButton, split, ghostButton, DISABLED } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split, ghostButton, DISABLED };\n})();\n";
+  const buttons = "const { drawButton, split, ghostButton, tint, DISABLED, GROUP_GAP } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split, ghostButton, tint, DISABLED, GROUP_GAP };\n})();\n";
   vm.runInContext((buttons + files.map(load).join("\n")).replace("export default class", "globalThis.Mod = class"), ctx);
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
   const view = new ctx.Mod();
@@ -132,6 +132,15 @@ async function page() {
   assert.ok(find(root, "t3-files-code"), "the file shows");
   // Its header is Review's 40 bar, controls centred: the Tree switch stays put between the pages (R1).
   assert.ok(find(root, "t3-files-toolbar").calls.h[0] === 40 && !find(root, "t3-files-toolbar").calls.mb, "Review's 40 bar, nothing under it");
+  // Its icons 14 in their 28 buttons, as T3's file toolbar (the panel head's stay 16).
+  assert.equal(find(root, "t3-files-switches").calls.gap[0], 4, "Preview, Wrap and Tree 4 apart (P3), each its own fill");
+  for (const id of ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"]) assert.deepEqual(find(root, id).items.map((n) => n.calls.size?.[0]), [14], `${id}: a 14 icon`);
+  // As T3's: the tree column's left rule at 60% of the border, no rule under its head, the search with no hover fill.
+  assert.ok(!find(root, "t3-files-nav").calls.border_l && find(root, "t3-files-nav-rule").calls.opacity[0] === 0.6, "a faint rule");
+  assert.ok(!find(root, "t3-files-nav-head").calls.border_b, "no rule under the column's head");
+  assert.equal(find(root, "t3-files-search-field").calls.hover, undefined, "the search field: no hover fill");
+  // The crumbs' › lights as the bar's buttons: the text color at 4% hovered, 7% with its menu up.
+  { const st = element(); find(root, "browse-").calls.hover[0](st); assert.equal(st.calls.bg[0], "#ffffff0a"); }
   assert.equal(w.focused, "terminal", "an external reveal doesn't focus the tree");
   w.focused = "native-editor"; cx.stopped = false;
   find(root, "t3-files-content").handlers["on_mouse_down:left"]({}, cx);
@@ -190,6 +199,8 @@ async function page() {
   root = view.render(cx);
   assert.equal(find(root, "tip-over-crumb-"), null, "the user explicitly removed breadcrumb tooltips even where T3 has them");
   assert.equal(find(root, "tip-over-t3-files-open-more"), null, "the split arrow keeps only its accessibility label");
+  assert.equal(find(root, "t3-files-open-group").calls.border_color?.[0], "#555555", "Open in is T3's header split: outlined in input, as button.js draws it");
+  assert.equal(find(root, "t3-files-main").calls.bg?.[0], "#111111", "the content on background, apart from the tree on chrome");
   assert.ok(find(root, "t3-files-wrap"), "Preview keeps the word-wrap slot so the other controls do not move");
   assert.equal(find(root, "t3-files-wrap").handlers.on_click, undefined, "word wrap is off in Preview");
   find(root, "t3-files-render-mode").handlers.on_click({}, cx);
@@ -220,7 +231,7 @@ async function page() {
   find(root, "browse-").handlers.on_click({}, cx);
   const crumbMenu = w.overlays.at(-1);
   assert.deepEqual(plain([crumbMenu.props.files, crumbMenu.props.dir, crumbMenu.at]), ["folder", "", { x: 100, y: 74 }], "under the ›, its left edge with it");
-  assert.ok(find(view.render(cx), "browse-").calls.bg, "on while its menu is up");
+  assert.equal(find(view.render(cx), "browse-").calls.bg[0], "#ffffff12", "on while its menu is up");
   const made = w.overlays.length;
   find(view.render(cx), "browse-").handlers["on_mouse_down:left"]({ bounds: { x: 100, y: 50, width: 16, height: 20 } }, cx);
   shared["t3-files.menuClosed"] = Date.now();

@@ -12,7 +12,7 @@
   - Inbox：T3 式 Settle。需要你的 agent 以卡片留在上方，等你处理的排最前；结束的由你手动 Settle 进底部的安静列表，有新工作时自动回来。工作中的 agent 折叠进 Working 收纳区。Snooze 把任何不需要你的 agent 藏到你选的时间。
 - **各处同一个名字**：Inbox 卡片、agents 列表、标签和窗格标题用同一条规则给终端取名：Pi 在跑时用 Pi 会话名，其次是你命名过的标签，再其次是有意义的终端标题，最后是程序名。同一个标签里的两个 Pi 各自显示自己的会话名；Pi 退出后在原处启动的 lazygit 显示为 lazygit，不沿用旧会话名。
 - **各处同一套状态标记**：工作中转圈，blocked 或这一轮失败时显示 `!`，done 显示圆点。已 Settle 或 Snooze 的 agent 在各处都不再显示 done 圆点，Lists 也一样；只有 Inbox 会藏起工作中的 Snooze agent，其他地方照样转圈。显示 Inbox 时，标签上不显示任何标记：什么需要你由侧栏来说。
-- **窄标签、带框窗格**：24px 标签，照 T3 的面板标签；圆角窗格带 28px 标题栏（名字、目录、状态；悬停时出现分屏、缩放、关闭）；分屏时，你不在的窗格标题栏变暗，同 T3。选了 Inbox 时，收起的 agent 也在这里标出：已 Settle 显示勾，Snooze 中显示闹钟和剩余时间。标题栏的状态只表示它自己的 agent；旁边的子 agent 按钮写它启动的全部后代数量，需要你时变色，tooltip 写需要你的个数。点开按树序列出，每行是程序图标、名字和 Agents 行同样的标记：工作时长、Needs you、红色 Failed、没看过的完成圆点或空闲时长。指针或 Up／Down 点亮行，点行或 Enter peek；右键打开侧栏同一份 agent 菜单，含 Send back、Copy address，Escape 关闭。Inbox 里就靠它打开子 agent。zoom 一个分屏的标签，标签栏会展开它的各个窗格，每个一段：点一段就改 zoom 它；用窗格标题栏的缩放按钮或 `cmd-shift-enter` 还原分屏。
+- **窄标签、带框窗格**：24px 标签，照 T3 的面板标签；圆角窗格带 28px 标题栏（名字、目录、状态；悬停时出现分屏、缩放、关闭）；分屏时，你不在的窗格标题栏变暗，同 T3。选了 Inbox 时，收起的 agent 也在这里标出：已 Settle 显示勾，Snooze 中显示闹钟和剩余时间。标题栏的状态只表示它自己的 agent；旁边的子 agent 按钮写它启动的全部后代数量，需要你时变色，有在跑的时数字前转圈，tooltip 写需要你和在跑的个数。点开按树序列出，每行是程序图标、名字和 Agents 行同样的标记：工作时长、Needs you、红色 Failed、没看过的完成圆点或空闲时长。指针或 Up／Down 点亮行，点行或 Enter peek；右键打开侧栏同一份 agent 菜单，含 Send back、Copy address，Escape 关闭。Inbox 里就靠它打开子 agent。zoom 一个分屏的标签，标签栏会展开它的各个窗格，每个一段：点一段就改 zoom 它；用窗格标题栏的缩放按钮或 `cmd-shift-enter` 还原分屏。
 - **Inbox 下的标签栏**：以你正在看的 agent 为主角，也就是 Inbox 亮着的卡片。左边是它的 space、是子 agent 时的父级和它的名字；点 space 去这里的空标签，已有就切过去、没有才新建，这时标签栏右边不再有 `+`；点名字或 `⌄` 打开这个 agent 的菜单：Pin、Snooze、Settle，和卡片上一样，标签里只有它时还有 Rename。右键名字或父级打开那个 agent 的菜单，和 T3 一样；右键 space 打开 space 的菜单。这里只写你正在看的 agent：同一标签里的其他 agent 用它的卡片或窗格去。右边分开放：它的子 agent 的标签，再是不含 agent 的标签。焦点在程序上时 agent 留在那里但不亮；从标签栏进入工具标签时它变暗，点它回去。点左边的 space 或按 `cmd-t` 开始新的事之后只有 space，直到你再看某个 agent。这个 agent 的窗格单独显示时，标题里不再写标签栏已经写了的名字。
 - **新建**：标签栏的 `+` 直接在当前 space 开终端标签（显示 Inbox 时由标签栏左边的 space 承担，先去已有的空标签）；侧栏的 New tab（Lists 和 Inbox 都有）先选 space。侧栏的 New space 在机器多于一台时先问建在哪台；`cmd-n` 不问，直接用当前 space 的机器。不选 agent：在终端里启动。
 - **Home**：Settle 或 Snooze 当前查看的 agent 后，回到一个安静的固定位置，不再跳到下一张卡片，下一步看什么由你决定。想继续跳到下一张，或者把 Home 换成终端或别的 mod，见下面的设置。用这里的按钮或 `cmd-]`、`cmd-p`、`cmd-t` 决定下一步，Undo 能带回刚才的 agent。`cmd-shift-h` 或侧栏左上角的 Herdr logo 可随时进入。它不占 space 序号。它只放一样东西（页面、终端或 mod），没有窗格标题栏：不能 split 也不能关，agent 也不会留在里面。侧栏显示时，空的标签栏会收起，Home 占满高度。
@@ -21,7 +21,8 @@
   - 第一行是所在的机器：悬停 folder 图标看目录，整行右键复制路径。
   - **Open in**：主半边用 Finder 或上次选的已装 T3 编辑器（Cursor、Trae、Kiro、VS Code／Insiders／VSCodium、Zed、Antigravity 和 JetBrains）打开目录；箭头只选用哪个，和 Files 共用。选的编辑器卸载了就回到 Finder；远程 space 上说明为什么不可用。
   - **Actions**（全局）：没有时显示 Add action，有时显示上次运行的那个和其余的菜单，悬停才出 Edit。编辑时详情留在对话框后面。名字被截断时悬停显示全名。
-  - **Quick Review**：主半边显示 Review，行尾写 Review 正显示的范围。箭头列出各范围和数量（`3 commits`、`1 file`），给正显示的打勾；Commits 在旁边展开，可搜索。选中就让 Review 显示它。需要装 Review 扩展，且 space 在本机。
+  - **Review**：主半边显示 Review，行尾写 Review 正显示的范围。箭头列出各范围和数量（`3 commits`、`1 file`），给正显示的打勾；Commits 在旁边展开，可搜索。选中就让 Review 显示它。需要装 Review 扩展，且 space 在本机。
+  - 键盘操作：用 `cmd-shift-b`（或在按钮上按 Enter）打开时，第一个控件带焦点环。↑／↓ 在行间移动，←／→ 在一行的两半间移动，Enter 按下；这样打开的菜单首行点亮，关掉后键盘回到它的箭头。Escape 关闭详情，回到终端。
   - 卡片右键可显示或隐藏这几项，或 Reset；全部隐藏时用 Choose what to show 找回。
   - 打开面板会收起详情；面板放大时，快捷键先恢复终端。Home 没有 Actions。
 - **其他机器**：机器多于一台时 Spaces 按机器分组，来自其他机器的 Inbox 卡片带服务器标记，标记不单独弹提示。Lists 的 Agents 行只在悬停详情里显示机器名；Inbox 卡片的悬停详情也能查看机器名。在 Herdr 的 Settings 里添加机器；重建过的机器会提供 Connect，New space 会先问建在哪台机器上。

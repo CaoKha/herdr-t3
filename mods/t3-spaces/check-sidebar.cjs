@@ -52,7 +52,7 @@ function bundle(dir, file = "main.js", seen = new Set()) {
   seen.add(file);
   const src = fs.readFileSync(path.join(dir, file), "utf8");
   // Keep the helper's private tint separate from project.js's exported tint.
-  if (file === "button.js") return "const { button, radiusOf } = (() => {\n" + src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nreturn { button, radiusOf }; })();\nconst drawButton = button;";
+  if (file === "button.js") return "const { button, radiusOf, ghostTint, GROUP_GAP } = (() => {\n" + src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nreturn { button, radiusOf, ghostTint: tint, GROUP_GAP }; })();\nconst drawButton = button;";
   const needs = [...src.matchAll(/^import [^;]*? from "\.\/(.+?)";/gm)].map((m) => bundle(dir, m[1], seen)).join("\n");
   const alias = src.includes("named as namedLabel") ? "\nconst namedLabel = named;\n" : "";
   return needs + alias + "\n" + src.replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ").replace("export default class", "globalThis.Mod = class");
@@ -729,7 +729,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   const spins = tree => walk(tree).some(n => n.source === "mods/workspace-chrome/spinner.svg");
   assert.ok(spins(find(f.load("t3-tabs").render(cx), "tab-b0")), "its tab still shows it working");
   const header = f.load("t3-pane", { pane: "p0" }).render(cx);
-  assert.ok(!spins(header) && find(header, "ph-kids-p0"), "its pane header says its own agent is idle; the sub-agent button speaks for the rest");
+  assert.ok(!find(header, "ph-mark-p0") && spins(find(header, "ph-kids-p0")), "its pane header says its own agent is idle; the sub-agent button spins for the rest");
 }
 
 {
@@ -1376,7 +1376,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   f.spaces()[0].tabs.push({ id: "other", name: "other task", active: false });
   const tabs = f.load("t3-tabs"), root = tabs.render(cx);
   assert.equal(find(root, "tab-b0").hoverStyle.bg, undefined);
-  assert.equal(find(root, "tab-other").hoverStyle.bg, f.theme().hover);
+  assert.equal(find(root, "tab-other").hoverStyle.bg, f.theme().foreground + "0a", "hovered: the text color at 4%, as the bar's buttons");
   assert.equal(find(root, "tab-strip").style.gap, 4);
   // Tabs take their whole names while the room allows, the longest give way first; past that the strip keeps the active tab in view.
   {

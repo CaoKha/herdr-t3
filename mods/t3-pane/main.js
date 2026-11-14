@@ -20,7 +20,7 @@ import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
 import { openMenu } from "./menu.js";
-import { button as drawButton, radiusOf } from "./button.js";
+import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
 
 // The list as the layout's other menus (the sort menu, the right-click menu): 4 around 28px rows.
 const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = closedKey("t3-pane", "kids");
@@ -109,12 +109,14 @@ export default class Pane extends View {
   // How many sub-agents, all the way down, as T3's details meta button, in the colour of needing the person if one does;
   // a click opens their list under it. `kids`: their words (subAgents).
   kidsButton(t, pane, terminal, kids) {
-    const stuck = kids.filter((s) => s === "blocked").length, total = plural(kids.length, "sub-agent", "sub-agents");
-    const label = stuck ? `${total}, ${stuck} need${stuck === 1 ? "s" : ""} you` : total;
+    const stuck = kids.filter((s) => s === "blocked").length, busy = kids.filter((s) => s === "working").length;
+    const label = [plural(kids.length, "sub-agent", "sub-agents"), stuck && `${stuck} need${stuck === 1 ? "s" : ""} you`, busy && `${busy} working`].filter(Boolean).join(", ");
     // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
-    return trigger(this, t, `ph-kids-${pane}`, { text: String(kids.length), label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
+    // One at work spins before the count, inside the button: the mark in the slot after it stays the agent's own.
+    return trigger(this, t, `ph-kids-${pane}`, { wide: true, label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
       onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal, ...litProp(!b) } }); } },
-    (el) => el.child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
+    (el) => el.when(busy > 0, (b) => b.child(statusMark(t, "working"))).child(String(kids.length))
+      .child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 
   // What shows on hover also watches where the pointer is: its leave can be dropped (tip.js).
@@ -202,7 +204,7 @@ export default class Pane extends View {
       .child(div().relative().flex_1().min_w(0).h_full().ml(6).flex().items_center()
         .child(div().id(`ph-folder-${pane}`).flex_1().min_w(0).truncate().pr(12).text_color(t.dim).when(quiet, (el) => el.opacity(0.5)).child(folder(p.cwd)))
         // Over the folder's end, so hovering moves nothing else, as in the agents list and the inbox.
-        .when(this.hovered || within(this, [head, ...tools]), el => el.child(h_flex().absolute().top(0).bottom(0).right(0).pl(12).flex_none().gap(4).items_center().bg(t.background)
+        .when(this.hovered || within(this, [head, ...tools]), el => el.child(h_flex().absolute().top(0).bottom(0).right(0).pl(12).flex_none().gap(GROUP_GAP).items_center().bg(t.background)
           .child(this.button(t, `ph-r-${pane}`, "mods/t3-pane/icons/square-split-horizontal.svg", "Split right", () => run("pane.split", { direction: "right", pane }), "pane.split:right"))
           .child(this.button(t, `ph-d-${pane}`, "mods/t3-pane/icons/square-split-vertical.svg", "Split down", () => run("pane.split", { direction: "down", pane }), "pane.split:down"))
           .child(this.button(t, `ph-z-${pane}`, `mods/t3-pane/icons/${p.zoomed ? "minimize-2" : "maximize-2"}.svg`, p.zoomed ? "Unzoom pane" : "Zoom pane", () => run("pane.zoom", { pane }), "pane.zoom"))

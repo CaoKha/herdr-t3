@@ -7,29 +7,30 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 ## Layout
 
 - Generic Files is the full-width tree. With a file open: content on the left, the tree in the navigation column on the right.
+- Grounds, as T3's code surface beside its FileExplorerPane: the content (code, Markdown, image, its states) on `background`, by `nav-column.js` `withNav`, the column shut too; the header and the column on the panel's `chrome`. The column's left rule stays (T3 keeps `border-l border-border/60` between the two grounds).
 - Files reads the space's `folder` on the space's machine, not the terminal's cwd.
 - Navigation column: open state and width are this copy's own (`nav.open`, `nav.width`), as is Wrap/Scroll (`lines.wrap`). Width starts at 256, between 160 and 560, the content at least 256; a 6px drag handle on its left; keyboard steps of 16, Home and End. No breakpoint: the layout reflows once the width has been stable for 300ms. No cross-page reveal.
 
 ## File header
 
 - Inline: 40 high, controls centred, as Review's toolbar, so Tree and its neighbours keep their place between the pages; 12 horizontal (R1, the panel head's edge), no bottom rule.
-- Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; on (12%) while its menu is open. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
-- On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, touching `sm` (28) buttons. All take the `chrome` hover and on (P7).
+- Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; hovered 4%, on 7% while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
+- On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, `sm` (28) buttons 4 apart with 14px icons (T3's file toolbar; the Open in icon too, its chevron 16). All take the `chrome` hover and on (`foreground` 4% / 7%, P7). Open in is 24 high, as T3's xs beside its 28 toolbar toggles.
 - Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Wrap; deliberate).
 - Clickable buttons and menu rows show the pointer cursor.
 
 ## Open in
 
-- `split()` (`sm`, `surface: "chrome"`): a 28 square icon half, a 20 wide chevron half, 16px icon, radius 8, 49 wide in all.
-- Transparent at rest with no rule; on hover or with its menu open, one background for the group and a 1×16 `border` rule. The chevron slot is always kept, so disabling doesn't shift anything. The chevron has only an aria-label.
+- `split()` `xs` (`surface: "chrome"`), T3's OpenInPicker in a header (`outline`): 24 high, radius 8, an `input` outline and a full-height `input` rule at rest, no fill; a 25 wide icon half (14px icon) and a 24 wide chevron half (16), 50 in all ([t3-tokens「按钮」](../t3-tokens.md)).
+- The half under the pointer takes the `chrome` hover (4%) alone; with its menu open the chevron's half is on (7%). Disabled (remote), the whole control, outline too, fades to 0.64, nothing shifting. The chevron has only an aria-label.
 - Its menu is Details' (`shared/open-in.js` `targetsMenu`): 220 wide, 28px rows, right edge on the group's (`align="end"`), 4 below. No check mark: the main icon already says the target. App icons from `targetIcon`: coloured brand art, single-colour brand marks in `foreground`, others a `dim` generic window.
 - Choosing saves the target; the main half opens it.
 
 ## Tree header
 
 - 36 high, 4 below, 12 horizontal; buttons and the field 8 apart.
-- The search field is T3's compact input: 28 high, 9 horizontal padding, 12px text, radius 6. Transparent at rest, `foreground` 7% on hover. Focused: `background`, a 1px `accent` border and an inner 3px `accent` 24% ring (`ui/input-group.tsx`), with no layout change. No clear slot: Escape clears and leaves the field. It is a Tab stop.
-- Navigation column heads (Review's 40 head too) are 12 horizontal.
+- The search field is T3's compact input: 28 high, 9 horizontal padding, 12px text, radius 6. Transparent at rest and hovered (T3's ghost input is 1.2%, unseen). Focused: `background`, a 1px `accent` border and an inner 3px `accent` 24% ring (`ui/input-group.tsx`), with no layout change. No clear slot: Escape clears and leaves the field. It is a Tab stop.
+- Navigation column heads, Review's too, are this one: 36 high, 4 below, 12 horizontal, no rule under them (T3's subheaders in the panel). The column's left rule is `border` at 60% (T3's `border-border/60`), drawn as its own element so a theme's translucent border keeps its alpha; it sits where the content's `background` meets the column's `chrome`.
 
 ## Tree rows
 

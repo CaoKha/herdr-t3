@@ -12,7 +12,7 @@ import { withNav, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
 import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
 import { KEY, migratePagePrefs, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
-import { split, ghostButton } from "./button.js";
+import { split, ghostButton, tint, GROUP_GAP } from "./button.js";
 import { loadingState } from "./panel-states.js";
 import { stopsInit, stopsEnd, enter, focusRoot, stop, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
@@ -491,7 +491,7 @@ export default class Files extends View {
 
   /** @param {any} state */
   control(t, id, icon, label, press, state = {}) {
-    const el = ghostButton(this, t, id, { icon: `${MOD}/icons/${icon}.svg`, label, act: press, ...state });
+    const el = ghostButton(this, t, id, { icon: `${MOD}/icons/${icon}.svg`, label, act: press, surface: "chrome", ...state });
     const trigger = state.disabled ? div().flex_none().child(el).on_hover(glow(this, id)) : stop(this, t, id, el, 8);
     return tip(this, t, id, label, trigger);
   }
@@ -525,13 +525,13 @@ export default class Files extends View {
       .track_focus(this.handle).on_mouse_down("left", () => this.handle.focus())
       .on_size_change((size, cx) => { this.size = { width: size.width / zoom(), height: size.height / zoom() }; cx.notify(); })
       .when(Boolean(st.file) || st.folder !== null, el => el.child(this.toolbar(st, t)))
-      .child(div().flex_1().min_h(0).child(st.file ? withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: this.tree(st, t), open: this.navOpen, inline: true, handle: this.navHandle })
+      .child(div().flex_1().min_h(0).child(st.file ? withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: this.tree(st, t), open: this.navOpen, handle: this.navHandle })
         : v_flex().size_full().min_h(0).child(div().h(36).mb(4).px(12).flex_none().child(this.searchHead(st, t))).child(div().flex_1().min_h(0).child(this.tree(st, t))))));
   }
 
   // Only a file has a subheader; Markdown uses one icon toggle, not a segmented text control. 12 in, as the panel head above
   // (t3-tokens「规则」R1); 40 high, its controls centred, as Review's bar, so Tree stays put between the pages. Open in, then
-  // the three switches touching, 8 between (P3); its buttons on chrome, as the head's (P7).
+  // the three switches a group's gap apart, 8 between the two (P3); its buttons on chrome, as the head's (P7), their icons 14, as T3's file toolbar.
   toolbar(st, t) {
     const md = kindOf(st.file ?? "") === "markdown", code = shared(MARKDOWN) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
@@ -546,25 +546,25 @@ export default class Files extends View {
       return stop(this, t, id, opener(this, { id, closed: MENU_CLOSED, onOpen: (b) => {
         openMenu("folder", { height: FOLDER_H, ...hang(b, MENU_W, { align: "start" }) }, { source: this.source(st), dir: path, file: st.file }, !b);
       } })(div().id(id).w(16).h(20).mx(2).rounded(4).flex_none().flex().items_center().justify_center().cursor_pointer()
-        .when(on, s => s.bg(t.foreground + "1f")).when(!on, el => el.hover(s => s.bg(t.foreground + "12"))))
+        .when(on, s => s.bg(tint(t, "chrome", true))).when(!on, el => el.hover(s => s.bg(tint(t, "chrome", false)))))
       .child(svg(`${MOD}/icons/chevron-right.svg`).size(14).text_color(on ? t.foreground : t.dim)).role("button").accessibility_label(`Browse ${path || nameOf(st.root)}`), 4); };
     return h_flex().id("t3-files-toolbar").h(40).flex_none().px(12).gap(8).items_center()
         .child(h_flex().id("t3-files-breadcrumbs").flex_1().min_w(0).overflow_x_scroll().bg("#00000000").items_center().text_size(12)
           .when(Boolean(st.root), (el) => el.child(crumb(nameOf(st.root.replace(/\/$/, "")) || st.root, "", current === "")))
           .children(parts.flatMap((part, i) => [separator(parts.slice(0, i).join("/")), crumb(part, parts.slice(0, i + 1).join("/"), parts.slice(0, i + 1).join("/") === current)])))
         .child(this.openControl(st, t))
-        .child(h_flex().flex_none().items_center()
+        .child(h_flex().id("t3-files-switches").flex_none().gap(GROUP_GAP).items_center()
           .child(this.control(t, "t3-files-render-mode", md && !code ? "code-xml" : "eye", md ? code ? "Show preview" : "Show code" : "Preview is not available for this file", cx => {
             if (!code && st.view?.text !== undefined && !st.view.code) this.editor(st.view, st.file);
             setShared(MARKDOWN, code ? "preview" : "code"); cx.notify();
-          }, { on: md && !code, disabled: !md, size: "sm", surface: "chrome" }))
+          }, { on: md && !code, disabled: !md, size: "sm", iconSize: 14 }))
           // Wrap or scroll long lines, this page's own choice.
-          .child(this.control(t, "t3-files-wrap", "text-wrap", st.view?.code && (!md || code) ? wrapLines() ? "Disable word wrap" : "Enable word wrap" : "Word wrap is only available in code", (cx) => { setWrapLines(!wrapLines()); cx.notify(); }, { on: wrapLines(), disabled: !st.view?.code || md && !code, size: "sm", surface: "chrome" }))
-          .child(this.control(t, "t3-files-nav-toggle", "folder-tree", !st.file ? "File explorer is always visible for folders" : this.navOpen ? "Hide file explorer" : "Show file explorer", cx => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, { on: !st.file || this.navOpen, disabled: !st.file, size: "sm", surface: "chrome" })));
+          .child(this.control(t, "t3-files-wrap", "text-wrap", st.view?.code && (!md || code) ? wrapLines() ? "Disable word wrap" : "Enable word wrap" : "Word wrap is only available in code", (cx) => { setWrapLines(!wrapLines()); cx.notify(); }, { on: wrapLines(), disabled: !st.view?.code || md && !code, size: "sm", iconSize: 14 }))
+          .child(this.control(t, "t3-files-nav-toggle", "folder-tree", !st.file ? "File explorer is always visible for folders" : this.navOpen ? "Hide file explorer" : "Show file explorer", cx => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, { on: !st.file || this.navOpen, disabled: !st.file, size: "sm", iconSize: 14 })));
   }
 
-  // T3's OpenInPicker: the app's icon opens the file or folder there; ⌄ picks the app (menus.js, open-in.js's list, Details'
-  // too), its menu's right edge with the pair's.
+  // T3's OpenInPicker in its header, outlined: the app's icon opens the file or folder there; ⌄ picks the app (menus.js,
+  // open-in.js's list, Details' too), its menu's right edge with the pair's.
   openControl(st, t) {
     const names = knownTargets() ?? this.targets, target = names.includes(shared(KEY.openTarget)) ? shared(KEY.openTarget) : "Finder", available = !st.on && window()?.platform === "macos";
     const id = "t3-files-open-in", moreId = "t3-files-open-more";
@@ -572,8 +572,8 @@ export default class Files extends View {
     const hot = this.hot === id || within(this, [id]) ? "main" : this.hot === moreId || within(this, [moreId]) ? "more" : null;
     // The keyboard walks only an enabled half.
     const kept = (key, el) => available ? stop(this, t, key, el, 8) : el;
-    return split(t, { id: "t3-files-open-group", mainId: id, moreId, chevron: `${MOD}/icons/chevron-down.svg`, surface: "chrome", hot, on: popupOpen(this, moreId, MENU_CLOSED), disabled: !available, label: `Open in ${target}`, moreLabel: "Choose editor" },
-      main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 16)).on_hover(hover(id))
+    return split(t, { id: "t3-files-open-group", mainId: id, moreId, chevron: `${MOD}/icons/chevron-down.svg`, size: "xs", surface: "chrome", hot, on: popupOpen(this, moreId, MENU_CLOSED), disabled: !available, label: `Open in ${target}`, moreLabel: "Choose editor" },
+      main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 14)).on_hover(hover(id))
         .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target); })))),
       more => kept(moreId, more.on_hover(hover(moreId)).when(available, opener(this, { id: moreId, closed: MENU_CLOSED, onOpen: (b, cx) => {
         openMenu("open-in", { height: openInHeight(names), ...hang(b, MENU_W) }, { source: this.source(st), targets: names }, !b);
@@ -632,7 +632,6 @@ export default class Files extends View {
       // A tab stop as every control is; Enter or Space on it goes into the field.
       .child(stop(this, t, "t3-files-search-field", div().id("t3-files-search-field").relative().flex_1().min_w(0).h(28).px(9).rounded(6).border_1().border_color(this.searchFocused ? t.accent : "#00000000")
         .when(Boolean(this.searchFocused), el => el.bg(t.background))
-        .when(!this.searchFocused, el => el.hover(s => s.bg(t.foreground + "12")))
         .on_mouse_down("left", (_e, cx) => { this.search.focus(); cx.stop_propagation(); })
         .child(Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files"))
         .when(Boolean(this.searchFocused), el => el.child(div().id("t3-files-search-ring").absolute().inset_0().rounded(6).border(3).border_color(t.accent + "3d"))), 6, { enter: () => this.search.focus() }))

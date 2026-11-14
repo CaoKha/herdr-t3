@@ -4,7 +4,7 @@ Geometry, constants and edge rules of the 40px tab row (`t3-tabs`, plus the `act
 
 ## Lists tabs
 
-- 24px, radius 6, 12px text; the active tab `selected`.
+- 24px, radius 6, 12px text; the active tab `foreground` 7%, another hovered 4%, in light and dark themes alike (t3-tokens「按钮」).
 - All the space's tabs: a 12px program or terminal icon, the name, a trailing 16px state slot. Hover replaces the state with the 16px close button (12px `×`, radius 4, `tab` surface).
 - At least 96px for short names (t3-tokens「有意不同」).
 - Full names until crowded. Then the longest shrink first, the active tab to 240px and the others to 144px; then the strip scrolls.
@@ -47,19 +47,20 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 
 ## Zoom group
 
-- When Herdr's native zoom is on in a multi-pane tab, the tab becomes a 24px dashed-outline group, radius 6, one icon-and-name segment per pane. The zoomed segment is `selected`, at most 240px; others at most 144px.
+- When Herdr's native zoom is on in a multi-pane tab, the tab becomes a 24px dashed-outline group, radius 6, one icon-and-name segment per pane. The zoomed segment is lit as the active tab (`foreground` 7%), at most 240px; others at most 144px.
 - Lists keeps the tab's state at the group's end. The group has no close, tab menu or drag (shortcut in code).
 - In Inbox the agent stays in the breadcrumb and only non-agent panes form tool segments.
 - Clicking a segment focuses that pane and moves the zoom, without restructuring splits. Splits come back with the pane's zoom button or `cmd-shift-enter`; the bar has no button for it.
 
 ## Top-right group
 
-Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `square-menu` and `panel-right`, touching (t3-tokens P3).
+Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `square-menu` and `panel-right`, 4 apart (t3-tokens P3, T3's `gap-1`).
 
-- Order: Lists' new-terminal `+` (`tabs-end`), Details (the `actions` block), then the closed panel's `panel-right` (`window-end`, the `window` part of `t3-tabs`). `+` sits before Details and never moves it; the panel toggle always holds the corner. Windows/Linux window buttons come last, 8 apart from the group.
-- The group's right edge comes from the layout's `tabs-end-inset` (12, owned by no mod), aligned with the pane header's last control (t3-tokens R1). On a Mac with the panel closed, the toggle is 12 from the window edge and Details 40; with the panel open, Details is 12 from the work column's edge, and the panel and window buttons move to the panel head.
+- Order: Lists' new-terminal `+` (`tabs-end`), Details (the `actions` block), then the closed panel's `panel-right` (`window-end`, the `window` part of `t3-tabs`). `+` sits before Details and never moves it; the panel toggle always holds the corner. Each side carries its 4: `tabs-end` ends with it while `+` shows, `window-end` starts with it while the toggle shows (`panel.js` `windowEndPx` counts it), so the toggle ends 12 from the window edge open or closed and `titlebar.js` `detailsAnchor`, from the measured `window-end`, still finds Details' right edge. Windows/Linux window buttons come last, 8 apart from the group.
+- The group's right edge comes from the layout's `tabs-end-inset` (12, owned by no mod), aligned with the pane header's last control (t3-tokens R1). On a Mac with the panel closed, the toggle is 12 from the window edge and Details 44; with the panel open, Details is 12 from the work column's edge, and the panel and window buttons move to the panel head, onto the same screen points: the panel head's padding puts its last button 12 from the window edge too (`check-buttons.cjs` and t3-chrome's `check-surfaces.cjs` hold both at 12).
 - The three blocks size themselves with `layout.resize`; leftovers under half a pixel after zoom aren't rounded up, or adjacent blocks gain a 1px gap.
-- On the 40px bar they take the `chrome` surface (hover `hover`, on `selected`), as the brand bar and panel head do. Details is a `trigger()`; tooltips sit below.
+- That resize follows a frame's measure, so it lands a frame late. Whatever shows or hides the panel (`panel.js` `showPanel`) resizes `window-end` in the same go to what it will draw (`windowEndPx`), so the frame that shows the change already has Details where it ends up. `check-buttons.cjs` holds `windowEndPx` to the drawn width; `check-panel.cjs` checks every open and close sizes it.
+- On the 40px bar they take the `chrome` surface (hover `foreground` 4%, on 7%), as the brand bar and panel head do. Details is a `trigger()`; tooltips sit below.
 
 ## Tab interactions
 

@@ -50,7 +50,7 @@ function load(dir) {
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/titlebar.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/list.js"), "utf8")), scope);
   vm.runInContext('globalThis.namedLabel = named;', scope);
-  vm.runInContext("(() => {\n" + strip(["button.js", "trigger.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; Object.assign(globalThis, { trigger, opener, popupOpen, hang });\n})();", scope);
+  vm.runInContext("(() => {\n" + strip(["button.js", "trigger.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; Object.assign(globalThis, { trigger, opener, popupOpen, hang });\n})();", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, surfaceWidths: {}, surfaceStrip: {}, pressed: null, over: null, area: 600 });
 }
@@ -83,10 +83,37 @@ panelOpen = false;
     const view = load(__dirname), ids = list => list.flatMap(b => b.content ? (part = b.content.props, drawn.filter(id => find(view.render(), id))) : []);
     const before = ids(blocks.slice(0, at)), after = ids(blocks.slice(at + 1)), state = `${mode}, panel ${open ? "open" : "closed"}`;
     assert.deepEqual(after, open ? [] : ["panel-toggle"], `only the closed panel's toggle follows Details (${state})`);
-    assert.equal(after.length * 28 + blocks.slice(at + 1).reduce((sum, b) => sum + (b.content ? 0 : b.size.px), 0), open ? 12 : 40, state);
+    // 4 from Details to the closed panel's toggle, and from Lists' + to Details (P3): the toggle still ends 12 from the edge.
+    const lead = (part = { part: "window" }, find(view.render(), "window-end").style.pl ?? 0), trail = (part = { part: "end" }, find(view.render(), "tabs-end").style.pr ?? 0);
+    assert.deepEqual([lead, trail], [open ? 0 : 4, mode === "lists" ? 4 : 0], `4 beside Details (${state})`);
+    assert.equal(lead + after.length * 28 + blocks.slice(at + 1).reduce((sum, b) => sum + (b.content ? 0 : b.size.px), 0), open ? 12 : 44, state);
     assert.deepEqual(before, mode === "lists" ? ["tab-new"] : [], `Lists' + comes before Details (${state})`);
   }
   env.window = wasWindow; env.sidebarParts = wasParts; panelOpen = false; part = { part: "window" };
+}
+// The closed panel's toggle ends 12 from the window edge, where the open panel's head puts it (t3-chrome check-surfaces), on
+// rows as high, so the 28 buttons share a centre too.
+{
+  const root = JSON.parse(fs.readFileSync(path.join(__dirname, "../../layouts/herdr-t3.json"), "utf8"));
+  const node = (n, id) => n?.id === id ? n : (n?.children ?? []).map(c => node(c, id)).find(Boolean);
+  const row = node(root, "tabs-row").children, closed = row.slice(row.findIndex(b => b.id === "window-end") + 1).reduce((sum, b) => sum + b.size.px, 0);
+  assert.equal(closed, 12, "the closed panel's toggle, 12 from the window edge");
+  assert.equal(node(root, "panel-head").size.px, node(root, "tabs-row").size.px, "the panel head and the tab bar share a centre line");
+}
+// panel.js sizes the window part as it shows or hides the panel (so that frame has Details where it ends up): the width it
+// gives is the width this part draws, each platform, panel open or closed.
+{
+  const scope = vm.createContext({ layout: () => ({ id: "root", children: [{ id: "panel-body", children: [{ id: "files" }] }] }), window: () => env.window(), GROUP_GAP: 4 });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../../shared/panel.js"), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.windowEndPx = windowEndPx;", scope);
+  part = { part: "window" };
+  const was = env.window;
+  for (const p of ["windows", "macos"]) for (const open of [false, true]) {
+    env.window = () => ({ platform: p, buttons: p !== "macos" }); panelOpen = open;
+    const el = load(__dirname).render(), drawn = (find(el, "panel-toggle") ? 4 + 28 : 0) + (find(el, "minimize") ? 8 + 3 * 28 : 0);
+    assert.equal(scope.windowEndPx(open), drawn, `${p}, panel ${open ? "open" : "closed"}`);
+  }
+  env.window = was;
+  panelOpen = false;
 }
 platform = "linux";
 root = tabs.render();
@@ -103,6 +130,7 @@ root = tabs.render();
 const close = click(root, "close-b");
 assert.equal(close.style.h, 16); assert.equal(close.items.length, 1); assert.equal(close.items[0].style.size, 12);
 assert.equal(close.hoverStyle.bg, t.raised, "as T3's tab close, bg-muted"); assert.equal(calls.pop()[0], "t3-tabs.close-tab:b");
+assert.equal(find(root, "tab-b").style.bg, "#ffffff12", "the tab shown: the text color at 7%, as the panel's tabs");
 tabs.overTab = null;
 assert.equal(find(tabs.render(), "close-b").items.length, 0, "the close icon still hides until the tab is hovered");
 

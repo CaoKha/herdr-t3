@@ -18,7 +18,7 @@ What the [RECIPE](../../../RECIPE.md) leaves out of the sidebar's frame: exact g
 
 ## Footer
 
-- 44px high. Touching 32px icon buttons (radius 8, 16px icons), 8 in from the side and 4 from the top: Herdr Settings, then the layout's sliders button (Layout Settings).
+- 44px high. 32px icon buttons 4 apart (t3-tokens P3; radius 8, 16px icons), 8 in from the side and 4 from the top: Herdr Settings, then the layout's sliders button (Layout Settings).
 - The free space between them and the edge holds the Undo notice ([inbox](inbox.md#undo-notice)).
 - When an update has downloaded: a right-aligned 32px `Update` pill, 12px `accent` text on a 15% `accent` wash, running `app.update`.
 

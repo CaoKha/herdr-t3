@@ -1,6 +1,6 @@
 # Details popup
 
-The Details popup (`t3-actions`, `cmd-shift-b`) and its Quick Review row: geometry, rows, menus and edge rules. The [RECIPE](../../../RECIPE.md) says what it holds; the decision is [ADR 0019](../../adr/0019-details-popup.md); its button sits in the tab bar's [top-right group](tab-bar.md#top-right-group). Shared sizes are in [t3-tokens](../t3-tokens.md).
+The Details popup (`t3-actions`, `cmd-shift-b`) and its Review row: geometry, rows, menus and edge rules. The [RECIPE](../../../RECIPE.md) says what it holds; the decision is [ADR 0019](../../adr/0019-details-popup.md); its button sits in the tab bar's [top-right group](tab-bar.md#top-right-group). Shared sizes are in [t3-tokens](../t3-tokens.md).
 
 Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection.tsx`, `threadDetailsCardLayout.ts`.
 
@@ -26,7 +26,7 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 
 ## Splits
 
-- Splits use `shared/button.js` `split()` with the `row` surface: a 32px chevron slot, a 1×16 middle rule.
+- Splits use `shared/button.js` `split()` `row`: T3's `isPanel` split, `ghost`, not the outlined `xs` of a header (Files' Open in, Actions' bar): rows in a card read as a list, and an outline round each would box every row. A 32px chevron slot, a 1×16 middle rule.
 - The chevron always shows, `dim`, as T3. At rest: no background, no rule. On hover (7%) or with its menu open (12%), the whole group takes one background and shows the rule. The half under the pointer adds its own 7% on top of the group's.
 - Chevrons and the folder tooltip share the trailing slot. Chevrons have only an aria-label, no tooltip.
 - Submenus are as wide as the whole row and hang 4px below it.
@@ -36,7 +36,7 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 - Add action's tooltip only in its icon-only state. Action, computer and surface names get one only when actually clipped (measured, `measuredTooltip`).
 - All tooltips are the layout's own (`tip`), never the host's `.tooltip()`.
 
-## Quick Review
+## Review row
 
 - A `split()` row. The main half is the icon, the name, then in 12px `dim` the range the live Review tab shows: only `review.shown` written by a Review tab that still exists (matching `born`), otherwise nothing. Same words as Review's range button; a commit shows its title.
 - The main half shows Review on that range, else its default.
@@ -48,7 +48,10 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 
 ## Keyboard and lifecycle
 
-- Tab, Enter and Space work the buttons; arrows work only the menus. Escape closes one layer at a time.
+- Opened by keys (`cmd-shift-b`, Enter or Space on its button: `toggleDetails` with no press puts `litProp(true)` in its props), its first control has the keyboard with the focus ring; by the pointer, the card has it and nothing is ringed until the first arrow.
+- ↑/↓, Home, End and typing move between rows as a menu's (`list.js` `menuKeys` over `detailsGrid`), wrapping and keeping the half; ←/→ move between a split's halves and stop at its ends. The machine row isn't in the walk. Tab, Enter and Space work as on every stop: Enter and Space are the control's click.
+- A row's menu opened by keys hangs under that row (from `props.at` and the row's top: no press to measure) with its first row lit (t3-tokens「菜单行」). When it closes, the keyboard returns to the chevron that opened it (`popup-menu.js` `backTo`, run in its close, never in render), unless the focused terminal changed meanwhile, as when an action ran beside it.
+- Escape closes one layer at a time; on the card, it closes Details and gives the keyboard back to the source terminal.
 - Opening an editor keeps the popup; running an action closes only its menu.
 - Opening captures the space, tab, terminal and cwd. An action's explicit cwd wins. When the source changes, the popup closes.
 - Opening the panel closes Details. Clicking outside keeps the panel. With the panel maximized, the shortcut first restores the work column.

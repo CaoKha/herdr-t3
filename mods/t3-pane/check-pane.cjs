@@ -69,7 +69,7 @@ function load(...files) {
     .replace(/^import .*;\r?\n/gm, "").replace(/export (function|const) /g, "$1 ").replace("export default class", "globalThis.Mod = class");
   const context = vm.createContext({ ...env });
   // Load the real synced helper, including the alias main.js imports.
-  vm.runInContext("(() => {\n" + ["button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang;\n})();", context);
+  vm.runInContext("(() => {\n" + ["button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.GROUP_GAP = GROUP_GAP; globalThis.trigger = trigger; globalThis.hang = hang;\n})();", context);
   vm.runInContext(src, context, { filename: files.at(-1) });
   const mod = new context.Mod(); mod.init({}, cx); return mod;
 }
@@ -239,8 +239,17 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   { address: "gone", parent: "t2", state: "exited", status: "idle", name: "ended", labels: {} });
 {
   const kids = find(header.render(), "ph-kids-p2");
-  assert.equal(kids.accessibility_label, "2 sub-agents");
-  assert.deepEqual(texts(kids), ["2"]);
+  // What it draws, in order: an svg by its file, words as they are.
+  const shown = () => { const out = [], walk = (n) => typeof n === "string" ? out.push(n) : n && typeof n === "object" && (typeof n.svg === "string" ? out.push(path.basename(n.svg)) : n.items.forEach(walk)); walk(find(header.render(), "ph-kids-p2")); return out; };
+  assert.equal(kids.accessibility_label, "2 sub-agents, 1 working", "the button says how many are at work");
+  assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "one at work, anywhere down: the shared spinner before the count");
+  terms.find((k) => k.address === "child").status = "idle";
+  assert.deepEqual(shown(), ["2", "chevron-down.svg"], "none at work: the count alone");
+  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents");
+  terms.find((k) => k.address === "grandchild").status = "working";
+  assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "a grandchild at work spins it too");
+  terms.find((k) => k.address === "grandchild").status = "idle";
+  terms.find((k) => k.address === "child").status = "working";
   const own = () => { const m = find(header.render(), "ph-mark-p2"); return m && [...svgs(m).map((s) => path.basename(s)), ...texts(m)].join(" "); };
   assert.equal(own(), "spinner.svg", "its own agent at work still says so beside the button");
   pane.status = "blocked";
@@ -248,8 +257,8 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   pane.status = "idle";
   terms.find((k) => k.address === "grandchild").status = "blocked";
   assert.equal(own(), null, "a sub-agent's word isn't its own");
-  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents, 1 needs you", "the button says it");
-  assert.deepEqual(texts(find(header.render(), "ph-kids-p2")), ["2"]);
+  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents, 1 needs you, 1 working", "the button says it");
+  assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "needing the person adds no `!` of its own: the count's colour says it, the `!` beside it stays the agent's");
   pane.status = "working";
   // Hung from the button, right edges together, as the agents list's sort menu.
   const k = find(header.render(), "ph-kids-p2");
@@ -307,7 +316,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   assert.equal(mark("job-kid"), null, "nothing before its first report");
   jobKid.status = "idle";
   props = { pane: "p2" };
-  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "3 sub-agents, 1 needs you");
+  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "3 sub-agents, 1 needs you, 1 working");
   // All of them ended with the list open: it closes on the next tick.
   props = { kids: "t2", overlay: "o1" };
   const left = terms.splice(-5);

@@ -110,7 +110,7 @@ assert.equal(navWidth(681), 310, "the pages retain different widths");
   const handle = { is_focused: () => true }, cx = { stop_propagation() {}, notify() {} };
   const key = value => {
     made.length = 0;
-    withNav({}, "files", 900, { content: null, head: null, list: null, open: true, inline: true, handle });
+    withNav({}, "files", 900, { content: null, head: null, list: null, open: true, handle });
     made.find(el => el.ids.includes("files-nav-edge")).on.on_key_down({ key: value }, cx);
   };
   store.set("local:nav.width", "300");
@@ -118,5 +118,18 @@ assert.equal(navWidth(681), 310, "the pages retain different widths");
   key("right"); assert.equal(navWidth(900), 300);
   key("home"); assert.equal(navWidth(900), 160);
   key("end"); assert.equal(navWidth(900), 560);
+}
+// As T3's code surface (`--code-background`) beside its FileExplorerPane (`bg-background`): the content on the theme's
+// `background`, the column on the page's chrome, and the column's own border/60 rule between them, as T3 keeps it.
+{
+  const t = { background: "BG", border: "#333" };
+  const page = (open) => { made.length = 0; proxies.clear(); withNav(t, "p", 1000, { content: make(), head: make(), list: make(), open }); return made; };
+  const byId = (els, id) => els.find(e => e.ids.includes(id));
+  let els = page(true);
+  assert.equal(byId(els, "p-main")?.style.bg, "BG", "the content on background");
+  assert.equal(byId(els, "p-nav").style.bg, undefined, "the column stays on the page's chrome");
+  assert.deepEqual([byId(els, "p-nav-rule").style.bg, byId(els, "p-nav-rule").style.opacity], ["#333", 0.6], "T3's border-l border/60 stays");
+  els = page(false);
+  assert.equal(byId(els, "p-solo").style.bg, "BG", "the column closed, the content keeps its ground");
 }
 console.log("ok: independent nav widths/open state, keyboard resize and width settling without stale cross-page timers.");

@@ -13,7 +13,7 @@ import { KEY, closedKey } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { stripAt, stripEnds, stripWheel, stripPage, stripFades } from "./scroll-strip.js";
-import { button as drawButton, radiusOf } from "./button.js";
+import { button as drawButton, radiusOf, tint, GROUP_GAP } from "./button.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { statusMark } from "./status-mark.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
@@ -24,8 +24,11 @@ const PAGES = { files: ["Files", "folder-tree"], review: ["Review", "pulls-revie
 // The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md「菜单行」).
 const MENU_W = 220, menuHeight = (rows) => rows * MENU_ROW + 8;
 const zoomOf = () => Number(settings()?.zoom) || 1;
-// The panel head's ends, 12 inside the panel card as the surfaces' own headers below it (t3-tokens「规则」R1).
-const HEAD_IN = 12;
+const nodeOf = (n, id) => n?.id === id ? n : (n?.children ?? []).reduce((hit, c) => hit ?? nodeOf(c, id), null);
+const side = (n) => [].concat(n?.padding ?? 0).at(-1);
+// The layout's room each side of the panel head's mod: the panel's and the head's padding put its ends 12 in, as the
+// surfaces' own rows below it (t3-tokens「规则」R1).
+const headPad = (root) => side(nodeOf(root, "panel")) + side(nodeOf(root, "panel-head"));
 // Stamped as `+`'s menu closes: a press on `+` that closed it mustn't reopen it (trigger.js).
 const SURFACE_CLOSED = closedKey("t3-chrome", "surface");
 
@@ -111,10 +114,10 @@ export default class WorkspaceChrome extends View {
         .on_hover(glow(this, id))
         // Each opens over its button, before the pointer can report leaving it.
         .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); }), radiusOf("default")), { action: key });
-      // T3's footer: 8 in and 4 above its row, whatever height the layout gives the block. Its two buttons touch, 8 to what
-      // follows (docs/internals/t3-tokens.md「规则」P3).
+      // T3's footer: 8 in and 4 above its row, whatever height the layout gives the block. Its two buttons a group's gap apart,
+      // 8 to what follows (docs/internals/t3-tokens.md「规则」P3).
       return focusRoot(this, div().size_full().bg(t.chrome).px(8).pt(4).child(h_flex().h(32).gap(8).items_center()
-        .child(h_flex().flex_none().items_center()
+        .child(h_flex().id("footer-buttons").flex_none().gap(GROUP_GAP).items_center()
           .child(button("settings", "mods/t3-chrome/icons/settings.svg", "Settings", () => run("app.settings"), "app.settings"))
           .child(button("t3-settings", "mods/t3-chrome/icons/sliders-horizontal.svg", "Herdr T3 settings", () => run("t3-tabs.settings"), "t3-tabs.settings")))
         .child(notice || div().flex_1())
@@ -175,23 +178,23 @@ export default class WorkspaceChrome extends View {
     });
   }
 
-  // + 's menu: under its press, else (the panel's cmd-t) under where + stands: the head ends the panel's padding in from the
+  // + 's menu: under its press, else (the panel's cmd-t) under where + stands: the head's mod ends its padding in from the
   // window's right, + after the tabs as the strip has them scrolled. A popup's `at` is in zoomed px.
   openSurfaceMenu(press) {
     const z = zoomOf(), rows = panelState().pages.includes("review") ? 2 : 1;
     let at = hang(press, 0, { align: "start", gap: 6 }).at;
     if (!at && this.headW) {
-      const find = (n, id) => n?.id === id ? n : (n?.children ?? []).reduce((hit, c) => hit ?? find(c, id), null), root = layout();
-      const pad = find(root, "panel")?.padding?.[1] ?? 8, high = find(root, "panel-head")?.size?.px ?? 40;
-      const left = globalThis.window.viewport_size().width - (pad + this.headW) * z;
-      at = { x: left + (HEAD_IN + (this.addX ?? 0) - (this.surfaceStrip.at ?? 0)) * z, y: (high / 2 + 12 + 6) * z };
+      const root = layout(), high = nodeOf(root, "panel-head")?.size?.px ?? 40;
+      const left = globalThis.window.viewport_size().width - (headPad(root) + this.headW) * z;
+      at = { x: left + ((this.addX ?? 0) - (this.surfaceStrip.at ?? 0)) * z, y: (high / 2 + 12 + 6) * z };
     }
     openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(rows), ...(at ? { at } : {}), props: { part: "surface-menu", ...litProp(!press) } });
   }
 
   // The space panel's head (docs/internals/specs/space-panel.md): its tabs as T3's, + after them in the same scrolled strip,
   // T3's arrows together after it while it overflows, then widen and put away; each group's buttons touch, groups 8 apart,
-  // and the ends 12 inside the card, over its header's (「规则」P3, R1). The rest of the row drags the window.
+  // and the ends 12 inside the column, over its pages' rows (「规则」P3, R1), by the layout's padding. The rest of the row drags
+  // the window.
   panelHead(t) {
     const s = panelState(), space = spaces().find(p => p.active), z = zoomOf();
     // Review's run for this space, marked as a tab's agent is.
@@ -211,8 +214,8 @@ export default class WorkspaceChrome extends View {
         : svg(`mods/t3-chrome/icons/${icon}.svg`).size(12).text_color(t.dim);
       // As T3's: same names aren't told apart; a name cut short says itself whole.
       return measuredTooltip(this, t, key, label, stop(this, t, key, own(h_flex().id(key).h(24).max_w(144).pl(6).pr(8).gap(2).flex_none().items_center().rounded(6).text_size(12)
-        .bg(on ? t.selected : t.chrome).text_color(on || this.hot === key ? t.foreground : t.muted)
-        .when(!on, el => el.hover(st => st.bg(t.hover))).on_hover(glow(this, key))
+        .bg(on ? tint(t, "chrome", true) : t.chrome).text_color(on || this.hot === key ? t.foreground : t.muted)
+        .when(!on, el => el.hover(st => st.bg(tint(t, "chrome", false)))).on_hover(glow(this, key))
         .role("tab").accessibility_label(label)
         .on_click(() => activateSurface(id))
         .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (widths[id] !== w) { widths[id] = w; cx.notify(); } })
@@ -236,18 +239,19 @@ export default class WorkspaceChrome extends View {
     const at = stripAt(strip, { widths: sizes, gap: 4, room, focus: i, focusKey: `${space?.id}:${s.active}`, ready: s.tabs.every(tab => widths[tab.id]) });
     this.addX = sizes.slice(0, -1).reduce((sum, w) => sum + w + 4, 0);
     const ends = stripEnds(strip), over = (strip.over ?? 0) > 0;
-    return focusRoot(this, h_flex().id("panel-head").size_full().bg(t.chrome).px(HEAD_IN).gap(8).items_center()
-      .on_size_change((size, cx) => { noteTitlebar("panel", size.width); if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
+    return focusRoot(this, h_flex().id("panel-head").size_full().bg(t.chrome).gap(8).items_center()
+      // What the panel takes from the work column: the head, its padding and the root's divider.
+      .on_size_change((size, cx) => { const root = layout(); noteTitlebar("panel", size.width + (2 * headPad(root) + (root?.divider?.width ?? 0)) * z); if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
       .child(div().id("surface-scroll").relative().flex_1().min_w(0).h_full().overflow_hidden()
         .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (this.surfaceRoom !== w) { this.surfaceRoom = w; cx.notify(); } })
         .on_scroll_wheel((e, cx) => { stripWheel(strip, e); cx.notify(); })
         .child(h_flex().id("surface-strip").h_full().ml(-at).gap(4).items_center().children(s.tabs.map(page)).child(add))
         .children(stripFades(t.chrome, strip)))
       // T3's: together, only while the tabs overflow, each greyed at its end.
-      .when(over, el => el.child(h_flex().flex_none().items_center()
+      .when(over, el => el.child(h_flex().id("surface-arrows").flex_none().gap(GROUP_GAP).items_center()
         .child(button("surface-back", "chevron-left", "Scroll tabs left", () => stripPage(strip, -1, room), { size: "xs", disabled: !ends.back }))
         .child(button("surface-next", "chevron-right", "Scroll tabs right", () => stripPage(strip, 1, room), { size: "xs", disabled: !ends.next }))))
-      .child(h_flex().id("panel-controls").flex_none().items_center()
+      .child(h_flex().id("panel-controls").flex_none().gap(GROUP_GAP).items_center()
         .child(button("panel-wide", s.wide ? "minimize-2" : "maximize-2", s.wide ? "Restore panel" : "Expand panel", toggleWide))
         .child(button("panel-close", "panel-right", "Hide panel", hidePanel, { key: "t3-tabs.panel" })))
       .when(Boolean(window()?.buttons), el => el.child(h_flex().flex_none().items_center().children([["minimize", "−", "win-min"], ["maximize", window().maximized ? "❐" : "□", window().maximized ? "win-restore" : "win-max"], ["close", "×", "win-close"]].map(([cmd, text, icon]) => own(drawButton(t, `panel-window-${cmd}`, { size: "sm", label: `${cmd} window`, ...(window().platform === "windows" ? { icon: `mods/t3-chrome/icons/${icon}.svg` } : { text }) }).w(28).px(0).on_click(() => run(`window.${cmd}`))))))));

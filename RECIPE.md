@@ -21,14 +21,14 @@ Built with Herdr's layout JSON and mod API, in T3 Code's proportions. The person
 | Work area | `chrome`, including the gaps behind panes; 8px horizontal inset, 8px pane gaps and bottom inset |
 | Pane | `background`, radius 8, 2px border also in `background`; framed even alone |
 | Pane header | Always present outside Home, 28px, inside the pane |
-| Space panel | Rightmost full-height column; initially hidden, initially equal weight to work, min 480px; draggable outside divider, 8px horizontal/bottom inset |
+| Space panel | Rightmost full-height column; initially hidden, initially equal weight to work, min 480px; draggable outside divider; no card: head and pages one `chrome` surface from the top to the window's bottom, set apart from work by the divider; their content 12 in from the column's edges |
 | Dividers | 1px `border` |
 
 There is no title bar; terminal opacity is 0 and terminal padding `[8, 0]`. A pane's 2px focus border defaults to `background`, invisible without changing the terminal's size; setting the layout's `focus.color` to `accent` shows it. In a split, unfocused headers fade to 50% until hovered. The shipped `workspace-status` bar exists but is hidden.
 
 ### Sidebar frame
 
-The brand bar leaves room for macOS's window buttons, then shows Herdr's own mark and `Herdr`; together they are a button that goes Home. At its right, two touching 28px buttons switch mode (the icon names the destination, `inbox` or `layout-list`) and hide the sidebar. The traffic lights are moved to sit centred on this bar. The footer holds Herdr Settings and the layout's settings (sliders) as touching 32px buttons; its free space shows the Undo notice, and a downloaded update adds an `Update` pill. Spec: [sidebar](docs/internals/specs/sidebar.md).
+The brand bar leaves room for macOS's window buttons, then shows Herdr's own mark and `Herdr`; together they are a button that goes Home. At its right, two touching 28px buttons switch mode (the icon names the destination, `inbox` or `layout-list`) and hide the sidebar. The traffic lights are moved to sit centred on this bar. The footer holds Herdr Settings and the layout's settings (sliders) as two 32px buttons 4 apart; its free space shows the Undo notice, and a downloaded update adds an `Update` pill. Spec: [sidebar](docs/internals/specs/sidebar.md).
 
 ### Inbox
 
@@ -44,31 +44,31 @@ Agents are 36px rows with a program icon, time in state (`<1m`, `5m`, `3h`, `2d`
 
 ### Tab bar
 
-In Lists, the bar shows every tab of the space: 24px tabs, radius 6, 12px text, the active one `selected`, each with an icon, name and a state slot that becomes `×` on hover; crowded tabs shrink, then scroll.
+In Lists, the bar shows every tab of the space: 24px tabs, radius 6, 12px text, the active one on `foreground` 7% (hovered 4%), each with an icon, name and a state slot that becomes `×` on hover; crowded tabs shrink, then scroll.
 
 In Inbox, the left side is a breadcrumb, space / parent / viewed agent (14px medium), the agent the sidebar lights. The right side holds compact tool tabs without state: panes hidden by zoom, the agent family's other tabs, tabs with no agent. Focus on a program keeps the agent in the breadcrumb, dimmed; clicking it returns.
 
-A tab under Herdr's native zoom becomes a dashed group, one segment per pane. After the tabs sits one touching group of 28px buttons: Lists' new-terminal `+`, Details (`square-menu`), and the closed panel's `panel-right` in the corner; on Windows and Linux, window buttons follow 8 apart. With the panel open, the panel and window buttons move to its head. Spec: [tab bar](docs/internals/specs/tab-bar.md).
+A tab under Herdr's native zoom becomes a dashed group, one segment per pane. After the tabs sits one group of 28px buttons 4 apart: Lists' new-terminal `+`, Details (`square-menu`), and the closed panel's `panel-right` in the corner; on Windows and Linux, window buttons follow 8 apart. With the panel open, the panel and window buttons move to its head; the toggle stays on the same screen point, and the frame that opens or closes the panel already has Details where it ends up. Spec: [tab bar](docs/internals/specs/tab-bar.md).
 
 ### Details
 
-Details (`cmd-shift-b`) is a native popup under its button, 280 wide, up to 420 high, radius 16. It lists the locked computer name (folder path as tooltip); Open in, a split row for Finder or an installed T3 editor; the global Actions; and Quick Review, a split row ending in the range a live Review tab shows, whose chevron offers Review's ranges. Right-clicking the card picks which rows show. Spec: [details](docs/internals/specs/details.md).
+Details (`cmd-shift-b`) is a native popup under its button, 280 wide, up to 420 high, radius 16. It lists the locked computer name (folder path as tooltip); Open in, a split row for Finder or an installed T3 editor; the global Actions; and Review, a split row ending in the range a live Review tab shows, whose chevron offers Review's ranges. Right-clicking the card picks which rows show. It works from the keyboard: opened by keys, its first control is ringed; ↑/↓ move between rows (not the computer's), ←/→ between a split's halves, and Escape closes it, back to its terminal. Spec: [details](docs/internals/specs/details.md).
 
 ### Panes and sub-agents
 
-A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you; it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
+A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working spinner before the count while one is at work; it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
 
 ### Space panel
 
-One right panel follows the space across its tabs; each space keeps its own surface tabs and open and maximized state. The head is T3's panel tab strip (a tab per file, at most one generic Files and one Review, then `+`, maximize, `panel-right`); an empty panel offers "Open a surface". Pages sit on one `background` card, every row's ends 12px inside its column. Spec: [space panel](docs/internals/specs/space-panel.md).
+One right panel follows the space across its tabs; each space keeps its own surface tabs and open and maximized state. The head is T3's panel tab strip (a tab per file, at most one generic Files and one Review, then `+`, maximize, `panel-right`); an empty panel offers "Open a surface". Head and pages are one `chrome` surface, every row's ends 12px inside its column. As everywhere, a ghost button or tab lights at `foreground` 4% hovered and 7% on, in every theme. No rules run across the pages: only the tree column's left rule, at 60% of `border`. Spec: [space panel](docs/internals/specs/space-panel.md).
 
 ### Files
 
-Files shows the space's folder on its machine, read-only: a full-width tree, or with a file open the content on the left and the tree in a resizable column on the right. The file header has breadcrumbs (`›` opens one folder menu that moves through folders in place, Back on top, as T3's), the Open in split, and Preview/Code, Wrap and Tree toggles. The tree has no chevrons: open and closed folder icons, Pierre file icons in theme colours, ignored entries dim. Search filters the same tree. Content is a Markdown preview, the native read-only `Editor`, or an image. Spec: [files](docs/internals/specs/files.md).
+Files shows the space's folder on its machine, read-only: a full-width tree, or with a file open the content on the left and the tree in a resizable column on the right. The file header has breadcrumbs (`›` opens one folder menu that moves through folders in place, Back on top, as T3's), the Open in split, and Preview/Code, Wrap and Tree toggles, their icons 14px as T3's file toolbar. Open in is T3's header split: 24 high, one `input` outline round the icon and the chevron with a full-height rule between them, no fill at rest, each half filling on its own when hovered; Actions' `▶ | ⌄` in a bar is the same control (`shared/button.js` `split()` `xs`), while Details' split rows stay borderless, as T3's panel. The content is on the theme's `background`, the header and the tree's column on the panel's `chrome`, a faint rule where they meet, as T3's code beside its file explorer. The tree has no chevrons: open and closed folder icons, Pierre file icons in theme colours, ignored entries dim. Search filters the same tree. Content is a Markdown preview, the native read-only `Editor`, or an image. Spec: [files](docs/internals/specs/files.md).
 
 ### Optional Review
 
-Review is for the [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo) (CLI `jin.review`), on local repositories only, reading the repository where the tab works. Its 40px toolbar has the range menu (Changes, Uncommitted, Outgoing, Incoming with counts, then Commits), the branch comparison target or a commit's SHA with `‹ ›`, Analyze, a fold menu, settings and the navigation toggle. With two or more groups, a row of outlined group tabs runs under the toolbar; the navigation column lists the current group's files as Files' tree rows, with reviewed boxes. Without a repository, or remote, it says `Review`; an empty range says `No changes`. Spec: [review](docs/internals/specs/review.md).
+Review is for the [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo) (CLI `jin.review`), on local repositories only, reading the repository where the tab works. Its 40px toolbar has the range menu (Changes, Uncommitted, Outgoing, Incoming with counts, then Commits), the branch comparison target or a commit's SHA with `‹ ›`, Analyze, a fold menu, settings and the navigation toggle. Its buttons' icons are 14px; the diff is on `background`, the toolbar and the navigation column on `chrome`, as in Files; nothing on the page is ruled or outlined: no rule under the toolbar, file headers or summary, hunk rows on `foreground` 5%, note cards on 4%. With two or more groups, a row of group tabs runs under the toolbar, the current one lit as the panel's tabs; the navigation column lists the current group's files as Files' tree rows, with reviewed boxes. Without a repository, or remote, it says `Review`; an empty range says `No changes`. Spec: [review](docs/internals/specs/review.md).
 
 ### Popups, dialogs and Home
 
@@ -219,12 +219,11 @@ root: row, terminal_menu=t3-menu
 │  │     └─ home-main: same active-tab pane frame, no header
 │  ├─ work-bottom-inset: row [8] → bar-measure:t3-tabs {part:"measure"}
 │  └─ status: workspace-status [28, hidden]
-└─ panel: column [weight1,min480,hidden], padding[0,8], chrome
-   ├─ panel-head: t3-chrome {part:"panel"} [40]
-   ├─ panel-body: stack, active=files, background, radius8
+└─ panel: column [weight1,min480,hidden], chrome
+   ├─ panel-head: t3-chrome {part:"panel"} [40], padding[0,12]
+   ├─ panel-body: stack, active=files
    │  ├─ files: t3-files
    │  └─ review: review [optional]
-   └─ panel-bottom-inset: row [8]
 floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, visually empty
 ```
 
@@ -264,7 +263,7 @@ Terminal facts are labels (`settled`, `snoozed`), cross-mod facts and preference
 5. The breadcrumb's current, held, away and fresh states, sub-agents and zoom agree with the lit card and focus. Closing active and background tabs, last and split panes lands where described, keeps unread neighbours and asks before stopping a program; close keys over an overlay never close the tab beneath.
 6. Starting an agent in Home's shell leaves an ordinary space with the agent and a clean next Home, project numbers stable. Go to and New: previous pane and name matches first, remote metadata, shell reuse, keyboard access without taking the terminal's Tab. Worktree folds keep grouping and numbering.
 7. Actions add, edit, delete and run in each place and folder: required fields, confirmation, last-run choice, shell kept.
-8. Space panel and Files: every open, replace, duplicate, close, bulk, hide, maximize and eviction rule; local and remote; menus and clipboard; disabled, missing, long and many files; panel versus terminal keys. Details: empty and full Actions, locked machine row, choosing versus running, layered Escape, source change, cold and warm opening times.
+8. Space panel and Files: every open, replace, duplicate, close, bulk, hide, maximize and eviction rule; local and remote; menus and clipboard; disabled, missing, long and many files; panel versus terminal keys. Details: empty and full Actions, locked machine row, choosing versus running, the keyboard walk, layered Escape, source change, cold and warm opening times.
 9. Review ranges, bases, remotes, commits, groups, reviewed state, `j`/`k`, Analyze, Unicode, binary, empty and error: tree and diff in one order, no unasked analysis, safe wrapping, opaque sticky headers, correct checkbox alpha.
 10. Wallpaper: pictures load from disk at start; `+` menu and drops; the framing card grows upward with a fixed footer; four modes, paper on light themes, EXIF; any picture framed without conversion; zoom about the pointer with the slider in step; Apply, Cancel, retry, two Homes, late work and Delete, with no source edits or resurrection; framing survives restart, cache, theme and resize; odd file names work.
 

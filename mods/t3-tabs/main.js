@@ -22,7 +22,7 @@ import { openMenu } from "./menu.js";
 import { panelState, togglePanel, toggleWide, syncPanel, restorePanel, reviewRepo } from "./panel.js";
 import { rememberTerminal } from "./terminal-context.js";
 import { stripAt, stripWheel, stripFades } from "./scroll-strip.js";
-import { button as drawButton, radiusOf } from "./button.js";
+import { button as drawButton, radiusOf, tint as ghostTint, GROUP_GAP } from "./button.js";
 import { nameText, named as namedLabel } from "./measured-text.js";
 
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
@@ -294,8 +294,9 @@ export default class Tabs extends View {
   // on_size_change reports zoomed pixels; a layout's are logical.
   fit(size) {
     // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
-    const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1) - 0.5);
-    if (id === "window-end") noteTitlebar("end", size.width);
+    const z = Number(settings()?.zoom) || 1, id = props()?.block, px = Math.ceil(size.width / z - 0.5);
+    // What stands right of Details: this part and the layout's tabs-end-inset.
+    if (id === "window-end") noteTitlebar("end", size.width + (findNode(layout(), "tabs-end-inset")?.size?.px ?? 0) * z);
     if (!id || px === this.fitted) return;
     this.fitted = px;
     run("layout.resize", { id, px });
@@ -351,16 +352,17 @@ export default class Tabs extends View {
         .on_hover(glow(this, id)).on_mouse_down("left", stopPress).on_click(action)
         .when(Boolean(glyph), el => el.child(glyph)), radiusOf("sm")), { action: key, below: true });
     // The work header's end: Lists' terminal + before Details (t3-actions' block), so it never moves Details; after Details the
-    // `window` part: the panel's toggle while no panel head owns it, in the window's corner, then the window's buttons 8 on. All
-    // touch Details; the layout's tabs-end-inset puts the end 12 from the column's (docs/internals/t3-tokens.md「规则」P3, R1).
+    // `window` part: the panel's toggle while no panel head owns it, in the window's corner, then the window's buttons 8 on. Each
+    // stands a group's gap from Details, its own side carrying it; the layout's tabs-end-inset puts the end 12 from the column's,
+    // so the toggle stays where the open panel's head puts it (docs/internals/t3-tokens.md「规则」P3, R1).
     const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = panelState().pages.length > 0 && !panelState().open;
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
-      .child(h_flex().id("tabs-end").flex_none().items_center().on_size_change((size) => this.fit(size))
+      .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
         // With the Inbox, the breadcrumb's space is the way to a new tab.
         // 28 as the panel toggle beside it: one size in a group (「规则」R2).
         .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => newTab(spaces().find(s => s.active)), "t3-tabs.new")))));
     if (props()?.part === "window") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
-      .child(h_flex().id("window-end").flex_none().items_center().on_size_change((size) => this.fit(size))
+      .child(h_flex().id("window-end").flex_none().items_center().when(toggleShown, el => el.pl(GROUP_GAP)).on_size_change((size) => this.fit(size))
         // The space panel's toggle, over where it opens: the sidebar's panel-left, mirrored. Lit while open.
         .when(toggleShown, el => el.child(button("panel-toggle", "mods/t3-tabs/icons/panel-right.svg",
           "Show panel", () => togglePanel(), "t3-tabs.panel")))
@@ -447,14 +449,14 @@ export default class Tabs extends View {
         .when(!over && status != null, el => el.child(statusMark(t, status, 14)))
         .when(over, el => stop(this, t, closeId, el, radiusOf("tiny"))), { action: c.active ? "t3-tabs.close-tab" : undefined, below: true, delay: 500 });
       const tab = h_flex().id(tabId).relative().h(24).w(widths.get(c.id)).pl(6).pr(8).gap(2).rounded(6).items_center().flex_none().text_size(12)
-        .bg(c.active ? t.selected : t.chrome).text_color(c.active || over ? t.foreground : t.muted)
+        .bg(c.active ? ghostTint(t, "chrome", true) : t.chrome).text_color(c.active || over ? t.foreground : t.muted)
         .role("button").accessibility_label(name)
         .on_hover((on, cx) => {
           if (on) { this.overTab = c.id; detailsWatch(this, c.id, cx); }
           else if (this.overTab === c.id) { this.overTab = null; detailsFor(this, null, cx); }
           cx.notify();
         })
-        .when(!c.active, el => el.hover(s => s.bg(t.hover)))
+        .when(!c.active, el => el.hover(s => s.bg(ghostTint(t, "chrome", false))))
         // Dragged as a space is: the source fades, a line shows where it lands. `over` is null until the drag starts.
         .when(pressedAt === i && this.over !== null && this.over !== c.id, el => el.opacity(0.5))
         .when(pressedAt >= 0 && this.over === c.id && pressedAt !== i, el => el.child(
@@ -617,7 +619,7 @@ export default class Tabs extends View {
       const glyph = programIcon(programOf(p), 12, t.muted) ?? svg("mods/t3-tabs/icons/terminal.svg").size(12).text_color(t.muted);
       return stop(this, t, id, h_flex().id(id).relative().h_full().pl(6).pr(8).gap(2).rounded(6).items_center().min_w(0).flex_shrink(1)
         .max_w(on ? TAB_ACTIVE : TAB_FLOOR).text_size(12).text_color(on || this.hot === id ? t.foreground : t.muted)
-        .when(on, el => el.bg(t.selected)).when(!on, el => el.hover(s => s.bg(t.hover))).on_hover(glow(this, id))
+        .when(on, el => el.bg(ghostTint(t, "chrome", true))).when(!on, el => el.hover(s => s.bg(ghostTint(t, "chrome", false)))).on_hover(glow(this, id))
         .role("button").accessibility_label(label)
         .on_mouse_down("left", stopPress).on_click(() => focusPane(p.pane))
         .on_mouse_down("right", (_e, cx) => openMenu(this, "pane", { pane: p.pane, terminal: p.terminal }, cx))

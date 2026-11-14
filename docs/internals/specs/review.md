@@ -4,8 +4,8 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Toolbar
 
-- T3 `DiffPanel`'s head: 40 high, 12 horizontal (R1), a `border` below. The scope button leading it has 2 left padding, as a Files crumb: its box at 12, its words at 14, where Files' first crumb's are.
-- Buttons are all `sm` (28) with the `chrome` hover and on: range, commit `‹ ›`, Analyze, fold menu, settings, navigation toggle. Icon buttons touch; text buttons and icon groups are 8 apart. The comparison target (a combobox trigger) stays `xs`, as T3.
+- T3 `DiffPanel`'s head: 40 high, 12 horizontal (R1), no rule below (T3's subheaders in the panel). The scope button leading it has 2 left padding, as a Files crumb: its box at 12, its words at 14, where Files' first crumb's are.
+- Buttons are all `sm` (28) with 14px icons (T3's diff toolbar) and the `chrome` hover and on (`foreground` 4% / 7%): range, commit `‹ ›`, Analyze, fold menu, settings, navigation toggle. Icon buttons are 4 apart (P3), the commit `‹ ›` too; text buttons and icon groups are 8 apart. The comparison target (a combobox trigger) stays `xs`, as T3.
 - Popovers open 4 below their button (top 38), right-aligned to it. Page popovers write `review.<name>Closed` when an outside press closes them (see [storage](../storage.md)).
 - No repository, or another machine: the toolbar says `Review` and navigation is disabled. A range with no changes says `No changes`.
 
@@ -25,11 +25,11 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Group tabs
 
-- With two or more groups: one horizontal, scrolling, non-wrapping row under the toolbar, across diff and tree, on the toolbar's edge, ruled below. Rule-based groups count as well as AI groups.
-- Row: 12 horizontal (the toolbar's edge), 8 vertical, 6 apart. Tabs radius 8, 1px outline, padding 8/2. Line 1: 14px category icon, 12px medium name, critical mark. Line 2 (11px): additions/deletions, file count, and a 14px progress ring once reviewed. Binary-only groups get no meaningless line-count separator.
-- Current group `foreground` 12% (the tree's selection), others 7% on hover.
+- With two or more groups: one horizontal, scrolling, non-wrapping row under the toolbar, across diff and tree, on the toolbar's edge, with no rule below. Rule-based groups count as well as AI groups.
+- Row: 12 horizontal (the toolbar's edge), 8 vertical, 6 apart. Tabs radius 8, no outline, padding 8/2. Line 1: 14px category icon, 12px medium name, critical mark. Line 2 (11px): additions/deletions, file count, and a 14px progress ring once reviewed. Binary-only groups get no meaningless line-count separator.
+- Current group `foreground` 7%, others 4% on hover, as the panel's tabs.
 - Clicking a group starts it at the top in diff and tree.
-- An AI group's summary heads the diff: 13px medium title over 12px `muted` text, at most 160 high. Rule-based boilerplate is left out.
+- An AI group's summary heads the diff: 13px medium title over 12px `muted` text, at most 160 high, with no rule under it. Rule-based boilerplate is left out.
 
 ## Tree
 
@@ -48,6 +48,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 - Wrapped rows are 20 high. Unicode wide characters, combining marks and joined sequences keep their shapes and break safely.
 - Settings' Lines: Wrap/Scroll is this page's own, independent of Files.
 - A binary file shows only its `binary` header and requests no rows.
+- The diff and the group summary over it are on `background`, as T3's diff on `--code-background` (nav-column.js puts the content there); the toolbar, group tabs and the navigation column stay on the panel's `chrome`. As Pierre's diff, nothing in it is ruled or outlined: file headers sit on the diff's ground, the stuck one too (the file in front isn't lit; the tree says which), hunk rows on `foreground` 5% (Pierre's separator), a line's note card on 4% with radius 8 (a critical one on `blocked` 10%), and split's sides are 1px apart on the panel's `chrome`.
 - Sticky file headers stay opaque over scrolling code. Translucent theme checkbox colours keep their own alpha when scaled.
 
 ## Refresh and memory

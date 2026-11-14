@@ -6,16 +6,16 @@ Sources: T3 `09a54f01` `RightPanelTabs.tsx`, `ui/panel-tab-close-button.tsx`, `R
 
 ## Column
 
-The rightmost full-height column: initially hidden, initially equal in weight to the work column, at least 480px, its outside divider draggable, 8px horizontal and bottom inset. Below the 40px head, `panel-body` is a `background` card, radius 8. The width is one for the whole window.
+The rightmost full-height column: initially hidden, initially equal in weight to the work column, at least 480px, its outside divider draggable. No card: the 40px head and `panel-body` below it are one `chrome` surface from the top to the window's bottom, set apart from the work column by the root's 1px divider. The head's layout padding (12 each side) and the pages' own rows put content 12 in from the column's edges, so the head's panel-right stands where the tab bar's does with the panel closed (12 from the window edge, same 40px row). The width is one for the whole window.
 
 ## Head
 
-- The head's ends sit 12 inside the card (t3-tokens R1): the first tab's box and the last button's box on the same edges as the page header below.
+- The head's ends sit 12 inside the column, by `panel-head`'s layout padding (t3-tokens R1): the first tab's box and the last button's box on the same edges as the page header below. The head's mod draws no inset of its own.
 - Tabs: 24 high, at most 144 wide, radius 6, padding 6 left and 8 right, children 2 apart, 12px text. A 16px slot on the left holds the 12px surface icon; on tab hover or keyboard focus it becomes a 12px `×` (radius 4, `tab` surface).
-- Active tab `selected`, hover `hover`; text `foreground` / `muted`, as the tab strip's unselected tabs.
+- Active tab `foreground` 7%, hover 4%, as the tab bar's; text `foreground` / `muted`, as the tab strip's unselected tabs.
 - `+` follows the last tab, 4 apart, inside the same scrolled strip: `trigger()`, xs ghost (24 square, 14px icon).
-- Overflow: wheel scrolls; T3's `‹ ›` (xs, touching) sit after the strip, greyed at the ends (`DISABLED`). Both ends of the strip fade over 16px (`shared/scroll-strip.js`, shared with the tab bar). The active tab, and a last tab's `+`, scroll into view.
-- Then maximize/restore and panel-right (sm, touching), 8 after the arrows. Layout controls are rightmost. With the panel open, the window buttons move here too.
+- Overflow: wheel scrolls; T3's `‹ ›` (xs, 4 apart, P3) sit after the strip, greyed at the ends (`DISABLED`). Both ends of the strip fade over 16px (`shared/scroll-strip.js`, shared with the tab bar). The active tab, and a last tab's `+`, scroll into view.
+- Then maximize/restore and panel-right (sm, 4 apart, 16px icons), 8 after the arrows; their `chrome` hover and on are the bar's (`foreground` 4% / 7%). Layout controls are rightmost. With the panel open, the window buttons move here too.
 - Same names aren't told apart (T3); a clipped name's tooltip gives it whole.
 
 ## Surface menu
