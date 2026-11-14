@@ -1,6 +1,6 @@
-// Context menus, one per thing (docs/research/context-menu-plan.md). Opened as a popup with
+// Context menus, one per thing (docs/internals/specs/menus.md). Opened as a popup with
 // props { tab: "pane" | "tab" | "space" | "agent" | "snooze" | "checkout" | "machine", target }: which thing, not what it offers.
-// The agent's Snooze opens its times beside it, as T3's MenuSub (docs/research/submenu-plan.md): a second popup with
+// The agent's Snooze opens its times beside it, as T3's MenuSub (docs/internals/specs/menus.md#submenus): a second popup with
 // props { tab: "snooze", target, parents, lit }, `parents` the menus it hangs off, `lit` the row lit when keys opened it.
 // ↑/↓, Home, End and typeahead move, Enter runs, Esc closes. An item is [label, command, args, hint, group];
 // a command "worktree" opens the worktree dialog instead.

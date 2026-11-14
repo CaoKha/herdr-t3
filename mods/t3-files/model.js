@@ -94,7 +94,7 @@ const IMAGES = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 export const extOf = (name) => name.includes(".") ? name.split(".").pop().toLowerCase() : "";
 export const kindOf = (name) => IMAGES.has(extOf(name)) ? "image" : /^(md|markdown|mdx)$/.test(extOf(name)) ? "markdown" : "text";
 
-// The Editor's languages that color something (docs/research/files-panel-verify-local.md); the rest stay plain.
+// The Editor's languages that color something (docs/internals/specs/files.md, Editor languages); the rest stay plain.
 const LANGUAGES = {
   js: "js", mjs: "js", cjs: "js", jsx: "js", ts: "js", mts: "js", cts: "js", tsx: "js", json: "json", jsonc: "json", yaml: "yaml", yml: "yaml",
   rs: "rust", go: "go", py: "python", sh: "sh", bash: "bash", zsh: "zsh", css: "css", c: "c", h: "c", cpp: "cpp", cc: "cpp", cxx: "cpp",

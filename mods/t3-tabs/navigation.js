@@ -418,7 +418,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     return [...(lead ? [lead] : []), ...kin, ...space.tabs.filter(c => !every.some(a => a.tab === c.id))];
   }
 
-  // The Inbox's bar as it draws: who's in view (docs/research/inbox-tab-bar-plan.md), then its family's other tabs and the
+  // The Inbox's bar as it draws: who's in view (docs/internals/specs/tab-bar.md), then its family's other tabs and the
   // space's programs. The tab in view and the parent's are in the breadcrumb, so not again among them.
   function context(w, tabs) {
     if (!w || !inboxShown()) return null;

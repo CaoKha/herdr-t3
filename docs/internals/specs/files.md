@@ -1,0 +1,121 @@
+# Files
+
+The Files surface (`t3-files`): header, tree, search, menus, reading limits and the host facts it relies on. The tree row is shared with Review. The [RECIPE](../../../RECIPE.md) says what Files does; the decision is [ADR 0018](../../adr/0018-files-follow-t3-surfaces.md); tabs and their lifecycle are in [space-panel](space-panel.md). Shared sizes are in [t3-tokens](../t3-tokens.md).
+
+Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `FileBreadcrumbs.tsx`, Pierre `style.js`.
+
+## Layout
+
+- Generic Files is the full-width tree. With a file open: content on the left, the tree in the navigation column on the right.
+- Files reads the space's `folder` on the space's machine, not the terminal's cwd.
+- Navigation column: open state and width are this copy's own (`nav.open`, `nav.width`), as is Wrap/Scroll (`lines.wrap`). Width starts at 256, between 160 and 560, the content at least 256; a 6px drag handle on its left; keyboard steps of 16, Home and End. No breakpoint: the layout reflows once the width has been stable for 300ms. No cross-page reveal.
+
+## File header
+
+- Inline: 28 high, 12 below, 12 horizontal (R1, the panel head's edge), no bottom rule.
+- Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; on (12%) while its menu is open. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
+- On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, touching `sm` (28) buttons. All take the `chrome` hover and on (P7).
+- Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Wrap; deliberate).
+- Clickable buttons and menu rows show the pointer cursor.
+
+## Open in
+
+- `split()` (`sm`, `surface: "chrome"`): a 28 square icon half, a 20 wide chevron half, 16px icon, radius 8, 49 wide in all.
+- Transparent at rest with no rule; on hover or with its menu open, one background for the group and a 1×16 `border` rule. The chevron slot is always kept, so disabling doesn't shift anything. The chevron has only an aria-label.
+- Its menu is Details' (`shared/open-in.js` `targetsMenu`): 220 wide, 28px rows, right edge on the group's (`align="end"`), 4 below. No check mark: the main icon already says the target. App icons from `targetIcon`: coloured brand art, single-colour brand marks in `foreground`, others a `dim` generic window.
+- Choosing saves the target; the main half opens it.
+
+## Tree header
+
+- 36 high, 4 below, 12 horizontal; buttons and the field 8 apart.
+- The search field is T3's compact input: 28 high, 9 horizontal padding, 12px text, radius 6. Transparent at rest, `foreground` 7% on hover. Focused: `background`, a 1px `accent` border and an inner 3px `accent` 24% ring (`ui/input-group.tsx`), with no layout change. No clear slot: Escape clears and leaves the field. It is a Tab stop.
+- Navigation column heads (Review's 40 head too) are 12 horizontal.
+
+## Tree rows
+
+`shared/file-tree.js` `treeRow`, shared by Files and Review; slots never change its geometry.
+
+- Row 24, 12px text, radius 6, padding 6.4, margin 1.6, 16px icons, gap 4.8. Each level indents 16 + 4.8 = 20.8, so a child's icon sits under its parent's name.
+- No fold chevron: folders are Lucide `folder` / `folder-open` (`dim`), files Pierre's shapes coloured by theme ANSI or `dim` (t3-tokens「有意不同」).
+- Review's reviewed box is a fixed 16 slot (plus the gap) before the icon; tri-state boxes and status letters as before.
+- With the pointer over the tree, each level draws a 1px `foreground` 14% indent guide on its folder icon's centre line.
+- Hover 7%, selected 12%, a row whose context menu is open 7%. The `accent` 1px keyboard ring appears only after a key moves the selection.
+- Ignored and reviewed rows: text `dim`, icon 50%; reviewed is also struck through.
+- The viewport pads 10.4 each side: with the row margin, row boxes sit 12 inside the column, the head's edge (R1); Pierre uses 16.
+- The tree-width handle steps 16 by keyboard.
+
+## Tree behaviour
+
+- Loaded single-folder chains stay compact when closed.
+- Order: folders first, natural order (a small ASCII digit-run comparer: QuickJS has no `Intl`, and `localeCompare` puts `file2` after `file10`). Dotfiles shown except `.git`. Ignored entries dim.
+- No Git badges, no deleted ghosts, no row or crumb tooltips (the user removed them, clipped names included).
+- One selection. Arrows, Home, End, Enter, Space and Shift+F10 work.
+- Only moves started from the tree or the breadcrumbs focus the tree. Tab switches, commands and other reveals only scroll and select, never taking the terminal's keyboard.
+- Rows are virtual: only visible rows are drawn. The focus index and folder counts are built once per tree rebuild.
+
+## Folders from the breadcrumbs
+
+- A folder crumb opens a folder tab beside the source file, keeping its trail; moving between folders then replaces that tab in place. Folders are never read as text.
+- `›` opens that folder's menu, a native popup: folders show a folder icon and `›`, files their type icon. A folder cascades its own menu beside it, any depth. Hover (submenu timing), click, → or Enter opens; ← or Esc closes one level; picking a file opens it and closes all.
+- Placement by `shared/submenu.js` `subPlace`: right if it fits, else left; a page too narrow for either lets the third level overlap the first. The breadcrumb menu's left edge lines up with `›`, 4 below. A folder menu scrolls after 12 rows.
+- No T3 "Back to" in place: our choice.
+
+## Search
+
+- Debounced 200ms, at most 256 characters; every word must appear in the path, case-insensitive substring.
+- A query's results never show under another query; a query not yet searched shows loading.
+- Results and their ancestors stay a tree; opening a result keeps the query.
+- At most 200 files, file-name matches first, then shorter paths, then text order, plus a note to refine. `rankPaths` keeps only the top 200 by binary insertion and yields every 5000 paths, so 200,000 matches don't interrupt QuickJS; after it returns, the search checks it still counts.
+- Sources: Git's non-ignored paths (`git ls-files -co --exclude-standard -z`), or a filesystem walk (`find`) up to 200,000 entries; remote at most 1000 (`awk`).
+- Loading, no matches and errors are separate states.
+
+## Reading and refresh
+
+- Read only while the panel shows Files and the window is in front. Returning reads at once; then every 5s locally, 10s remote, backing off when reads are slow. No recursive watcher; refreshes never race and do no synchronous disk IO.
+- Text changes update in place; images reselect.
+- Text up to 1MB; remote images up to 512KB. Binary, missing and non-UTF-8 files say why. A read error offers Try again beside Locate.
+- Expand all skips ignored folders, at most 200 folders with four reads at a time. Collapsing, a manual toggle or a search cancels a pending expansion, checked again after each await.
+- Full data for the last three shown spaces; eviction releases it and late answers can't refill it.
+- Thousands of rows stay smooth.
+
+## Content
+
+- Read-only: Markdown preview (`TextView.markdown`, 12 inside, not T3's `px-6`), the native read-only `Editor` with syntax colours, images. No editing or saving.
+- The content area stops left presses from bubbling, so the root doesn't steal native selection focus; selecting and copying work.
+- The host has no gutter colour or height API, so the gutter can't match T3; the user kept the native Editor rather than an HTML renderer (a 40,000-line HTML prototype stalled painting).
+
+### Editor languages
+
+`EditorState.language` accepts any string, but only some names have a grammar. Mapped by extension (`model.js` `LANGUAGES`); the rest stay plain:
+
+| Extensions | Language |
+| --- | --- |
+| `js mjs cjs jsx ts mts cts tsx` | `js` (the TS names showed no colour) |
+| `json jsonc` | `json` |
+| `yaml yml` | `yaml` |
+| `rs` / `go` / `py` | `rust` / `go` / `python` |
+| `sh` / `bash` / `zsh` | `sh` / `bash` / `zsh` |
+| `css` | `css` |
+| `c h` / `cpp cc cxx hpp` | `c` / `cpp` |
+| `java` / `kt kts` | `java` / `kotlin` |
+| `rb` / `php` / `sql` / `lua` | `ruby` / `php` / `sql` / `lua` |
+| `graphql gql` | `graphql` |
+| `Makefile`, `GNUmakefile` | `makefile` |
+
+Seen without colour, so left plain: `toml`, `scss`, `html`, `vue`, `svelte`, `swift`, `dockerfile`, `diff`, `xml`, `nix`, `zig`, `elixir`. Markdown goes to `TextView.markdown`, not the Editor. Re-probe before adding a name: constructing an Editor without an error doesn't prove a grammar exists.
+
+### readTextFile
+
+Only a missing file returns `null`; an empty file returns `""`. Binary and invalid UTF-8 throw `stream did not contain valid UTF-8`, over 1 MiB throws `Text file exceeds 1 MiB`, a folder throws `Is a directory`. So `null` never means binary or too large; images go by extension. `model.js` `readProblem` turns the errors into sentences. Images are written under the app's `cache/t3-files/` (remote ones from base64) and cleared on close and at the next start.
+
+## Tree menu
+
+- A native popup at the pointer, 220 wide, 4 top and bottom, rows from t3-tokens「菜单行」.
+- Local: Open, Reveal (`open -R`), Open with (default app where supported); relative Copy path; Insert into the tab's last active terminal (disabled when there is none). Remote spaces get no local-app rows.
+- Arrows, Escape and typeahead work. `cmd-w` closes the menu before the tab.
+- Insert: save the text clipboard, write the path, `pane.focus` the terminal, `terminal.paste`, then restore the clipboard 150ms later (paste reads the clipboard late; restoring at once pastes the old text). Never presses Enter, never overwrites an image clipboard or something copied meanwhile. Paths with control characters are refused; Copy path still works.
+- Review's tree has no menu.
+
+## Commands
+
+`t3-files.open:<path>`, `t3-files.search:<words>`, `t3-files.close`.

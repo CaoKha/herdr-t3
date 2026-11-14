@@ -60,6 +60,8 @@ Apply 和 Studio 导入保存时，在独占的 `.preview/save-<unique-id>` 写�
 
 ## 读写
 
+`t3.settings` 默认 `{ afterAway: "home", homeMod: "t3-home" }`，Terminal 存为 `homeMod: null`。`t3-actions.actions` 是 `{ list: [{ id, name, command, icon, place, cwd? }], last }`，全局一份。`t3-inbox.rows`、`t3-agents.rows` 发布各自画出的 `{ order, view }`，供上／下 agent 键走同一顺序。重启保留 pins、settings、每 space 面板、Home id、最近 pane（`t3-tabs.recent`，至多 30 个）和终端标签；最后看的 agent 和关闭历史只在内存里。
+
 `t3.panels[space]` 只存 `{ tabs, active, open, wide }`，由 `shared/panel.js` 写；增删改规则在纯函数 `shared/surfaces.js`。标签为 `{ id, born, reveal, path?, folder?, trail? }`：`files`、`file:<相对路径>` 或 `review`。`born` 是标签实例号（比本副本给过的都大的毫秒数），关闭再加就是新实例；各 mod 自己比对 `born` 释放旧实例的状态，面板不写别的 mod 的键。`reveal` 是该标签被选中的次数，Files 见它变化就清搜索并定位（T3 的 revealRequestId）。没有 `tabs` 的旧记录（固定页时代的 `page`）从空列表开始，不迁移；首次写入只保留上述字段。布局 stack 子块只是渲染位，空列表选 `panel-empty`；Herdr 自带布局的 stack 没有此块，面板不存标签（`panelState().owns` 为假）。
 
 `t3.openTarget` 在Files／详情之间全局只保存一个目标名，不保留本轮旧键迁移；本机每次运行共用 `globalThis.t3OpenInTargets` 的 `{version:3,promise,names}` 并行应用检测，名单版本变化即替换旧缓存，目标卸载时失效并回退Finder。已完成名单可经knownTargets只读访问，避免热加载时旧init任务丢失使Files永久只留Finder；绘制不等待promise或扫描应用。候选仅取T3完整编辑器表，以macOS LaunchServices查安装（GUI进程PATH可能没有CLI）；绘制和打开菜单不扫描。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
@@ -78,7 +80,7 @@ Quick Review与Review页共用`shared/review-scope.js`（读取、行、Commits 
 - 几个 mod 都要读写的数据，经 `shared/` 里的一个模块读写，默认值也写在那里：置顶经 `shared/pins.js`（`pinList`、`pin`、`unpin`、`putBack`），布局设置经 `shared/layout-settings.js`。所以 Pin 不管从哪里点，都会结束 Snooze；Undo 不管从哪里点，都会把置顶放回原位。
 - 只有一个 mod 读写的键，在那个 mod 里写 `shared(KEY.x) ?? 默认值`。
 
-Files 的树选中行、搜索中的折叠集合、目录 loading/error 仅存本次运行，不写 shared 或磁盘。Files 的菜单是本 mod 的原生 popup，登记在 `globalThis.t3Popups`（见上）；顶层菜单关闭写 `t3-files.menuClosed`，子菜单关闭写 `t3-files.submenuClosed`（按「弹窗关闭时间戳」约定）。Insert into agent terminal 借剪贴板粘贴的 150ms 内，本次运行的 `globalThis.t3PastePending` 为真，再按不重入。内部树选择打开文件时保留搜索；选标签（`reveal` 变化）／open 命令清搜索并 reveal。Files 自己打开文件后记下当前标签的 `id:born:reveal`，下一帧不把它当作外部选择。树仍按 space 共用，不复制每标签树。`t3.panels` 的目录标签复用 `file:<path>`，加 `folder:true` 与可选的 `trail`；根目录仍是 `files`，`trail` 保留原文件面包屑。此为新增标签元数据，已有文件标签不迁移、不写文件内容。
+Markdown 文件显示预览还是源码是 `t3-files.markdown`（`"code"` 或 `"preview"`，未设为预览），全局一份。Files 的树选中行、搜索中的折叠集合、目录 loading/error 仅存本次运行，不写 shared 或磁盘。Files 的菜单是本 mod 的原生 popup，登记在 `globalThis.t3Popups`（见上）；顶层菜单关闭写 `t3-files.menuClosed`，子菜单关闭写 `t3-files.submenuClosed`（按「弹窗关闭时间戳」约定）。Insert into agent terminal 借剪贴板粘贴的 150ms 内，本次运行的 `globalThis.t3PastePending` 为真，再按不重入。内部树选择打开文件时保留搜索；选标签（`reveal` 变化）／open 命令清搜索并 reveal。Files 自己打开文件后记下当前标签的 `id:born:reveal`，下一帧不把它当作外部选择。树仍按 space 共用，不复制每标签树。`t3.panels` 的目录标签复用 `file:<path>`，加 `folder:true` 与可选的 `trail`；根目录仍是 `files`，`trail` 保留原文件面包屑。此为新增标签元数据，已有文件标签不迁移、不写文件内容。
 
 `shared/measured-text.js`的`nameW`／`textW`仅记本次运行各文字的自然宽／容器宽，供同一份nameText／named／measuredTooltip判断截断。原生布局回调按zoom归一化，宽度未变不notify；不以字符数估算，不在每次重绘重新测量。
 

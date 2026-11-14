@@ -1,6 +1,6 @@
 # Files 的结构与交互跟随 T3 Code
 
-Files 的结构和交互照 T3 Code 的 Files 面板，尺寸、边距、颜色和圆角取本布局 token（[t3-tokens](../internals/t3-tokens.md)「Files 文件头与树」）。修订 [0013](0013-space-panel-pages-share-one-frame.md) 的 Files 常驻工具栏、两页强制同头/同状态，以及 [0017](0017-space-panel-surfaces.md) 的“目录面包屑仅定位树”。
+Files 的结构和交互照 T3 Code 的 Files 面板，尺寸、边距、颜色和圆角取本布局 token，Files 的规格见 [specs/files](../internals/specs/files.md)。修订 [0013](0013-space-panel-pages-share-one-frame.md) 的 Files 常驻工具栏、两页强制同头/同状态，以及 [0017](0017-space-panel-surfaces.md) 的“目录面包屑仅定位树”。
 
 - 通用 Files 直接显示整宽树；打开文件后左边是内容，右边是导航列里的树。文件头是 inline：面包屑、Open in、Preview/Code、Wrap、Tree，后三个固定槽，不适用时禁用（T3 条件隐藏 Wrap，这里有意不同）。
 - **一棵树，两个页面**：Files 与 Review 用同一种行（`shared/file-tree.js` 的 `treeRow`），几何不随插槽变化；没有折叠箭头，目录图标开合两态表示展开，图标都用 T3/Pierre 图形。Review 只多已看框和状态字母。Catppuccin 图标包删除。
@@ -10,4 +10,4 @@ Files 的结构和交互照 T3 Code 的 Files 面板，尺寸、边距、颜色�
 - 目录面包屑从文件旁边打开目录 surface，保留原文件和 trail；目录之间继续导航原位替换。目录不当文本读取。
 - 只在面板显示 Files、窗口在前时读取；全部展开最多200目录、4路读取，折叠、单目录操作和搜索使旧展开失效。
 
-保留只读、每 space 共用树和有界预览缓存，不加入编辑/保存。T3 的 Web 文档/媒体预览与拖进 composer 无对应 GPUI/终端接口；Insert 是安全的终端映射。源码和 Markdown 内容区阻断冒泡的左键按下，避免根元素夺走原生选择焦点；宿主未暴露 gutter 颜色/高度，保留原生 readonly Editor（见[报告](../research/files-panel-t3-parity/source-selection-and-gutter.md)）。完整对照见[审计](../research/files-panel-t3-parity/README.md)和 [2026-11-14 审查](../research/rewrite-review-2026-11-14/files-panel.md)。
+保留只读、每 space 共用树和有界预览缓存，不加入编辑/保存。T3 的 Web 文档/媒体预览与拖进 composer 无对应 GPUI/终端接口；Insert 是安全的终端映射。源码和 Markdown 内容区阻断冒泡的左键按下，避免根元素夺走原生选择焦点；`EditorState` 只暴露语言、文本、字体、字号、行号／折叠开关、readonly、soft_wrap 和语法色，没有 gutter 底色或高度，整窗 `set_theme` 会波及其他控件，所以 gutter 无法完全照 T3；自绘 HTML 原型在 4 万行文件上卡在绘制，不进产品。用户选择保留原生 readonly Editor，gutter 列为已知缺口。2026-11-14 审查后用户拍板：搜索用子串过滤加排序（文件名命中、路径短的优先），删除多选，只在用户从树或面包屑发起时聚焦树，Review 树也改用 Pierre 图标。逐项规格见 [specs/files](../internals/specs/files.md)。

@@ -14,7 +14,7 @@ Herdr 在绘制中拒绝会再请求绘制的操作：`cx.notify()`、`cx.new()`
 
 隐藏 stack 子节点/列里的 mod 不绘制、不收 `<mod>.<command>`；启动后的 timer 继续，首次显示前则尚未启动。Inbox/Agents 的行计算独立于 `render()`，由每秒 timer 也调用，只有当前模式写 agent order。必须随时工作的命令/Snooze 维护在根浮动、视觉为空的 `t3-tabs {part:"keys"}`；不能依赖可被面板放大藏住的标签条。
 
-子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。`tree.js` 对每份 `terminals()` 列表只建一次索引（`WeakMap`，按父地址分组的存活终端、按地址的终端）：Herdr 每次调用都返回新列表，所以按列表对象做键不会过期；同一次绘制内把同一份列表传下去才能复用索引。逐层 `filter` 整份列表是 O(agent × 终端)，5,000 个终端时 Tabs/Agents/Inbox 的一次绘制在 QuickJS 里会 `interrupted`（[性能审查](../research/rewrite-review-2026-11-14/performance-audit.md)）。检查里的假 `terminals()` 也要每次返回新数组，原地改同一数组会读到旧索引。
+子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。`tree.js` 对每份 `terminals()` 列表只建一次索引（`WeakMap`，按父地址分组的存活终端、按地址的终端）：Herdr 每次调用都返回新列表，所以按列表对象做键不会过期；同一次绘制内把同一份列表传下去才能复用索引。逐层 `filter` 整份列表是 O(agent × 终端)，5,000 个终端时 Tabs/Agents/Inbox 的一次绘制在 QuickJS 里会 `interrupted`（2026-11-14 实测：建索引后 1,000 个终端每次绘制 28ms→4ms，5,000 个从中断降到 19ms）。检查里的假 `terminals()` 也要每次返回新数组，原地改同一数组会读到旧索引。
 
 面板的 `surface-*` 副本在 render 里判断 Review 能否读取（`probeReview`，key 不变即返回），不开周期定时器：隐藏副本的 timer 不停，250ms 轮询会在窗口空闲时一直读宿主列表。
 
@@ -58,7 +58,7 @@ Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切�
 
 ## 壁纸转换而非用户生命周期
 
-`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 和运行时导入使用。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形，草稿就是Braille的采样网格（列×2、行×4，各模式最细的一档）：由系统缩放器直接出（sips、ImageMagick `-resize`），BMP base64一次回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`对草稿做整块面积平均得到其他模式的网格（Braille原样用）；RGBA在草稿中复用，不重读原图。2026-11-14 起不再照网站在JS里做4倍超采样再块平均：字形与旧流程逐格一致率87–99%（Braille最低），整图看不出差别，选图到预览快5–10倍（[性能报告](../research/rewrite-review-2026-11-14/wallpaper-performance.md)）。同一份采样RGBA的字形及每格RGB仍须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
+`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 和运行时导入使用。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形，草稿就是Braille的采样网格（列×2、行×4，各模式最细的一档）：由系统缩放器直接出（sips、ImageMagick `-resize`），BMP base64一次回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`对草稿做整块面积平均得到其他模式的网格（Braille原样用）；RGBA在草稿中复用，不重读原图。2026-11-14 起不再照网站在JS里做4倍超采样再块平均：字形与旧流程逐格一致率87–99%（Braille最低），整图看不出差别，选图到预览快5–10倍（2026-11-14 实测，用户拍板接受）。同一份采样RGBA的字形及每格RGB仍须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
 
 宿主`exec`静默丢弃stdout超过8MiB的尾部；网格草稿最大960×384，BMP约1.1MB、base64约1.5MB，一次 exec 读完。`decodeBmp` 仍接受分块文本。分配RGBA前检查头部、尺寸与实际解码字节完整度；RGBA转码每4096像素yield，不能按固定64行分块（大宽图会单步卡近200ms）。
 

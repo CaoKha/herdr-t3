@@ -1,5 +1,5 @@
 // Oracle: asciicn d5592fc980cad39578f13b16f6e015404160669b, MIT (../LICENSE-asciicn).
-// Vendor pure modules with docs/research/wallpaper-asciicn-fidelity/scripts/vendor-asciicn.sh,
+// Vendor pure modules with vendor-asciicn.sh beside this file,
 // copy its sibling auto-levels.ts into that folder, then: bun generate-image-v3.ts <vendor-folder>
 // Prints the fixture; never imports this project's image implementation.
 import { createHash } from "node:crypto";

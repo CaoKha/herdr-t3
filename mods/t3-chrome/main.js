@@ -189,7 +189,7 @@ export default class WorkspaceChrome extends View {
     openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(rows), ...(at ? { at } : {}), props: { part: "surface-menu" } });
   }
 
-  // The space panel's head (docs/internals/t3-tokens.md「面板标签」): its tabs as T3's, + after them in the same scrolled strip,
+  // The space panel's head (docs/internals/specs/space-panel.md): its tabs as T3's, + after them in the same scrolled strip,
   // T3's arrows together after it while it overflows, then widen and put away; each group's buttons touch, groups 8 apart,
   // and the ends 12 inside the card, over its header's (「规则」P3, R1). The rest of the row drags the window.
   panelHead(t) {

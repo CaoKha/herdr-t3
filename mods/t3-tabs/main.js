@@ -540,7 +540,7 @@ export default class Tabs extends View {
   }
 
   // With the Inbox showing, who's in view, as T3's thread header: the space, a sub-agent's parent, then the tab's agents side by
-  // side with the one in view lit, the card the Inbox lights (docs/research/inbox-tab-bar-plan.md). Held, a program there has the
+  // side with the one in view lit, the card the Inbox lights (docs/internals/specs/tab-bar.md). Held, a program there has the
   // focus: the one last looked at is outlined. Away, in a tab of programs: it all dims, and leads back. The title's ⌄ is the
   // tab's menu. A zoomed tab's panes come back by the pane header's zoom: the bar has no button for it.
   crumb(t, ctx, { every, all, under, st, ps, name, narrow, stopPress }) {

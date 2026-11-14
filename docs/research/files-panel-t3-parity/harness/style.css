@@ -1,6 +1,0 @@
-@import "/Users/jinjiebewater/my/tools/t3code/apps/web/src/index.css";
-@source "/Users/jinjiebewater/my/tools/t3code/apps/web/src/components/files";
-@source "/Users/jinjiebewater/my/tools/t3code/apps/web/src/components/ui";
-body { margin:0; padding:16px; background:#111; font-family:var(--font-sans); }
-.surface { display:flex; flex-direction:column; width:681px; height:850px; border-radius:8px; overflow:hidden; }
-.source-label { color:#bbb; font:12px/20px Arial,sans-serif; margin-bottom:8px; }

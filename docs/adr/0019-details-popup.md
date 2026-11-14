@@ -10,4 +10,4 @@
 
 Quick Review 选范围时先添加或选中 Review 标签，再写带该标签 `born` 的请求（见 0017），所以关闭后再加的 Review 不接手旧请求；它显示的当前范围只取 `born` 与当前 Review 标签相同的 `review.shown` 记录。
 
-2026-11-14 重写（[审查](../research/rewrite-review-2026-11-14/details-popup.md)、[决定](../research/rewrite-review-2026-11-14/decisions.md)）：每层菜单都是独立的原生 popup，挂在它的行下或旁边，和 t3-menu、Files 的级联同一套做法；不再用一块透明大画布装下范围、Commits 和 base 三层，因为透明部分也挡输入。范围菜单只选范围，base 和 commit 的 ‹ › 留给 Review 页。主半边不恢复已关闭 Review 标签的范围（同 0017 的「关闭即释放」）。只有详情本身盯来源，下级菜单随它关闭；共享的 `review-scope.js` 不认识详情，宿主视图提供 `pick` 和 `openCommits`，请求一律由 `panel.js` 的 `reviewRequest` 写。
+2026-11-14 重写（审查后用户拍板）：菜单打开时不预先高亮任何行；Review 还没显示过范围时范围菜单不打勾；动作名被截断时才给提示；文案用 GLOSSARY 的词，不照抄 T3；删掉范围快照缓存，每次打开重读；Quick Review 的来源规则与详情相同，只看 space／标签／终端是否还在。每层菜单都是独立的原生 popup，挂在它的行下或旁边，和 t3-menu、Files 的级联同一套做法；不再用一块透明大画布装下范围、Commits 和 base 三层，因为透明部分也挡输入。范围菜单只选范围，base 和 commit 的 ‹ › 留给 Review 页。主半边不恢复已关闭 Review 标签的范围（同 0017 的「关闭即释放」）。只有详情本身盯来源，下级菜单随它关闭；共享的 `review-scope.js` 不认识详情，宿主视图提供 `pick` 和 `openCommits`，请求一律由 `panel.js` 的 `reviewRequest` 写。

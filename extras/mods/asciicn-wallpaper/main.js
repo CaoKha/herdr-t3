@@ -54,7 +54,7 @@ const menuItems = (windows) => [
   { id: "folder", label: "Open wallpaper folder", icon: "folder" },
 ];
 const menuHeight = (items) => 8 + items.length * MENU_ROW + NOTE;
-// Waits (t3-tokens: 壁纸): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so nothing flashes. A new
+// Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so nothing flashes. A new
 // picture loads unseen under the last one for WARM ms, about the longest image() takes to rasterise one (it says nothing when
 // done), so Home never goes blank between pictures.
 const SHOW = 150, KEEP = 300, WARM = 400;
@@ -549,7 +549,7 @@ export default class Wallpaper extends View {
       .on_hover((on, cx) => { this.hot = on ? id : this.hot === id ? null : this.hot; cx.notify(); }), radiusOf("xs"));
   }
 
-  // The framing card, T3's popover in the switcher's place (t3-tokens: 壁纸). Name, then until the picture shows only how far
+  // The framing card, T3's popover in the switcher's place (docs/internals/specs/wallpaper.md). Name, then until the picture shows only how far
   // it has got; once shown it opens out upward: mode (an image's), Fill/Fit and Reset, Zoom. Its footer never moves: a status
   // slot, then Cancel and Apply, which become Close and Choose another… when the file can't be read. `waits`: which of the
   // card's waits show now (track()); before one does, nothing says so.
