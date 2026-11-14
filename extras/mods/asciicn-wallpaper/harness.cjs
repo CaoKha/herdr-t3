@@ -94,7 +94,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   // Keyboard stops and tooltips have their own checks in shared/.
   stubs = { "focus.js": () => ({ stop: (_v, _t, _id, el) => el, focusRoot: (_v, el) => el, stopsInit: v => { v.fs = {}; }, stopsEnd() {}, enter() {},
     pressed: v => { v.pressAt = Date.now(); }, justClosed: () => false }),
-    "tip.js": () => ({ tip: (_v, _t, _id, _label, el) => el, glow: () => () => {} }), ...stubs };
+    "tip.js": () => ({ tip: (_v, _t, _id, _label, el) => el, glow: () => () => {}, FADE: { duration: 150, easing: "ease-out" } }), ...stubs };
   for (const file of MODULES) {
     if (stubs[file]) context.__m[file] = stubs[file](context.__m);
     else link(context, file, readFileSync(path.join(__dirname, file), "utf8"));

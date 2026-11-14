@@ -4,6 +4,8 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-15
 
+- asciicn wallpaper: switching pictures no longer blacks Home out for a moment. The picture you had stays until the next one has loaded, then the new one replaces it at once, instead of fading in over an empty Home. Its controls now behave like the rest of the layout: the pointer stays an arrow over the switcher, the card's icon buttons, modes and Fill/Fit, and turns into a hand only on the card's filled buttons, as on the layout's dialogs. ‹, › and the crop button show their names on hover. **Delete…** is now **Delete**, drawn like the Actions editor's. While framing, dragging the picture moves it the whole way again: it used to stop after the first few pixels.
+
 - Files' breadcrumb `›` menu works as T3's again: one menu that changes folder in place instead of opening another beside it. A folder in it shows its contents there; **Back to …** on top, or ←, goes up a folder (no higher than the crumb you opened it from); Escape closes it; picking a file opens it. Opened from the keyboard, its first row is lit.
 - Switching between Files and Review, the header's buttons (Tree, and those beside it) no longer jump up and down: a file's header in Files is now the same 40px bar as Review's, its controls centred. Review's Changes button starts its words where Files' first breadcrumb does.
 

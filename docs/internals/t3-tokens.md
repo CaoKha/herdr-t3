@@ -83,6 +83,7 @@
 - ghost 和 plain 的底随它所在的面（`surface`）：`chrome` 上悬停 `hover`、on `selected`；`card`（`background` 卡片、`popover`、对话框）上悬停 foreground 7%、on 12%，因为部分主题的 `hover` 等于 `popover` 和 `background`；`row`（侧栏的行和卡片里的控件，T3 行控件）没有底，只变亮；`tab`（标签的 ×）悬停 `raised`，照 T3 tab close 的 `bg-muted`。
 - 禁用：整体透明度 0.64（T3 `disabled:opacity-64`），不换底色和字色，没有悬停，不响应点击；禁用的 toggle 不算按下，不画 on 底。
 - 焦点：`stop()` 的 2px `accent` 内环，半径取 `radiusOf(size)`。
+- 指针（全布局，2026-11-15 用户决定）：ghost 按钮、`trigger()` 和分段切换悬停时是箭头，`button()` 不传 `act`、`ghostButton()` 即如此；实底按钮（primary、outline、danger）、菜单行、split 两半和列表行是手形，`button()` 传 `act` 或调用方加 `cursor_pointer()`；能拖动的画面（壁纸取景）是 `cursor_grab()`。
 - 打开弹层或菜单的按钮一律用 `shared/trigger.js` 的 `trigger(view, t, id, { label, hint?, action?, below?, open?, closed?, onOpen, icon?, text?, size?, surface?, color?, disabled? }, extra?)`（P6）：画 `button()`（默认 `sm`／`chrome`）、`tip()` 卡片和 `stop()`；按下记 `pressed()` 和按钮位置，点击时若这次按下刚关掉弹层（`justClosed(view, closed)`）就不再打开，否则 `onOpen(bounds, cx)`；`open` 为真时按钮 on、提示 `off`。`closed` 是弹层 `close()` 写的时间戳键（见 [storage.md](storage.md)）；不传 `open` 时由 `popupOpen(view, id, closed)` 判断：本按钮打开之后键还没再写过。`onOpen` 返回 `false` 表示没开出弹层（如直接新建 space）。不是按钮的触发处（split 的箭头半、详情行、标题、面包屑 ›）用同文件的 `opener(view, { id?, closed?, onOpen, press? })` 接同样的按下和点击，on 态自己画。Review 页内弹层由 `closePopup` 在外部按下时写 `review.<名字>Closed`。
 - svg 不吃悬停样式，ghost 的字色变化靠调用方传 `hot`（`view.hot === id`）。卡片上的 ghost 图标按钮一律用同文件的 `ghostButton(view, t, id, { icon, label, act, press?, on?, disabled?, color?, size?, surface? })`（`surface` 默认 `card`，40px 顶栏上传 `chrome`）：它接好悬停（tip.js `glow`）、按下不下传、点击执行，调用方只加 `stop()` 和 `tip()`。
 - 不是按钮却按 ghost 方式点亮的元素（详情行），底色取同文件导出的 `tint(t, surface, on)`。
@@ -119,6 +120,7 @@
 - 同组图标按钮相接（P3）：T3 只有侧栏头这样，`PanelLayoutControls`、`DiffPanel`、文件头树开关之间是 `gap-1`。面板头的 ‹ › 也相接，T3 是 `gap-0.5`。全窗口一个间距，品牌栏和工作列右上那两对按钮才左右镜像。
 - 侧栏顶行 Search 框和按钮组之间 4（T3 原样），不按 P3 的 8：用户定侧栏头保持现状。
 - 侧栏卡片和 slim 行横向内边距 8，T3 是 10（R3）。
+- ghost 按钮和分段切换悬停时指针不变，T3 的 `Button` 一律 `cursor-pointer`：规则见「按钮」的指针一条。
 - 面板页的边一律12（R1）：树行不取 Pierre 的16，Markdown 预览不取 T3 的 `px-6`，Review 文件头不取 T3 的左8。
 - 文件树没有折叠箭头，目录图标开合两态表示展开；T3 的 Pierre 树是 chevron。Files 与 Review 两棵树是同一种行（用户决定统一）。
 - Spaces 行之间 1，T3 的文件夹之间 8：space 多了太占高度。

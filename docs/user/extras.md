@@ -34,7 +34,7 @@ Home never goes blank between pictures: when you switch, change theme or apply, 
 
 In a light theme, a picture you added from an image is drawn like ink on paper: the marks go where the photo is dark. Pictures added from Studio, and the built-in ones, keep the same tones in both. A phone photo stored on its side is turned upright first.
 
-If Apply can't finish, the card stays open with the reason at its bottom: fix it and press **Apply** again, which reuses the drawing it already saved. Your selected wallpaper doesn't change until Apply succeeds. To delete a picture you added, press the crop button on it, then **Delete…** at the card's bottom left, and confirm its name; that also removes its framing.
+If Apply can't finish, the card stays open with the reason at its bottom: fix it and press **Apply** again, which reuses the drawing it already saved. Your selected wallpaper doesn't change until Apply succeeds. To delete a picture you added, press the crop button on it, then **Delete** at the card's bottom left, and confirm its name; that also removes its framing.
 
 Your pictures are `.ans` files in `~/.config/herdr-app/asciicn-wallpaper/`. A `.ans` you copy there appears in the switcher without a preview, covering Home; one you change there is drawn again, keeping its framing. Braille, blocks, quadrants and halftone dots keep their shapes; other characters become marks as big as they are dark. Names may be Unicode, start with `-` or be hidden (`.hidden.ans`); files named only `.ans`, `..ans` or `...ans` are refused, so rename them first.
 

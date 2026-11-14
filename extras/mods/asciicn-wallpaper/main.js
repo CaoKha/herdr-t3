@@ -26,8 +26,8 @@ import { KEY, Library, MOD, finish, isLight, madePicture, makePicture, pictureKe
 import { readImage } from "./source.js";
 import { fromSlider, nextPreset, pan, scroll, toSlider, zoomAt } from "./framing.js";
 import { enter, focusRoot, stop, stopsEnd, stopsInit } from "./focus.js";
-import { button as drawButton, radiusOf } from "./button.js";
-import { tip } from "./tip.js";
+import { DISABLED, button as drawButton, ghostButton, radiusOf } from "./button.js";
+import { FADE, tip } from "./tip.js";
 import { popupOpen, trigger } from "./trigger.js";
 import { MENU_ROW, menuRow } from "./menu-row.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
@@ -54,11 +54,9 @@ const menuItems = (windows) => [
   { id: "folder", label: "Open wallpaper folder", icon: "folder" },
 ];
 const menuHeight = (items) => 8 + items.length * MENU_ROW + NOTE;
-// Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so nothing flashes. A new
-// picture loads unseen under the last one for WARM ms, about the longest image() takes to rasterise one (it says nothing when
-// done), so Home never goes blank between pictures.
-const SHOW = 150, KEEP = 300, WARM = 400;
-const MOTION = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
+// Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so
+// nothing flashes. FILL: the progress bar's last stretch, while Home loads the first picture.
+const SHOW = 150, KEEP = 300, FILL = 400;
 
 export default class Wallpaper extends View {
   init(_props, cx) {
@@ -76,10 +74,10 @@ export default class Wallpaper extends View {
     this.over = false;
     this.hot = null;
     this.draft = null;
-    // Waits by key ({ since, end? }, track()), the picture paths shown long enough to be loaded, and the last of them, held up
-    // while the next loads: { scene, path, p }.
+    // Waits by key ({ since, end? }, track()), the picture paths loaded, and the last one shown, held up while the next loads:
+    // { scene, path, p } (layers()).
     this.waits = {};
-    this.warm = new Set();
+    this.loaded = new Set();
     this.held = null;
     // Momentum after a lift (framing.js scroll).
     this.gesture = {};
@@ -270,7 +268,7 @@ export default class Wallpaper extends View {
     cx.notify();
     let done = false;
     try {
-      // The first drawing carries on the reading's progress; Home shows it once loaded (WARM).
+      // The first drawing carries on the reading's progress; Home shows it once loaded.
       const step = (f) => { if (!d.drawn && d.progress != null) { d.progress = f; cx.notify(); } };
       await tick(cx);
       const sampled = await finish(sampleImage(d.pixels, style, d.plan), cx, current);
@@ -386,31 +384,29 @@ export default class Wallpaper extends View {
     return true;
   }
 
-  // Home's picture layers: the picture wanted once loaded; until then the last one shown stays up, the new one loading
-  // unseen above it. `dim` fades what shows while a mode is drawing.
-  layers(scene, p, path, dim, cx) {
-    const layer = (id, s, pp, src, imageId, opacity) => {
-      const [w, h] = this.size(s, pp);
-      return div().id(id).absolute().bottom((this.height - h) * (1 - pp.y)).left(`${pp.x * 100}%`).ml(-pp.x * w).w(w).h(h)
-        .opacity(opacity).transition("opacity", MOTION).when(Boolean(src), (el) => el.child(image(src).id(imageId).size_full()));
-    };
-    const warm = !!path && this.warm.has(path), held = this.held, fade = dim ? 0.7 : 1;
-    // Loaded, or nothing to hold up instead (Home's first picture): it shows, and is what the next one holds up.
-    if (warm || (path && !held)) {
-      this.held = { scene, path, p };
-      if (!warm && this.warming !== path) this.warm_(path, cx);
-      return [layer(`wallpaper-${scene.id}`, scene, p, path, "wallpaper-picture", fade)];
-    }
-    if (path && this.warming !== path) this.warm_(path, cx);
+  // Home's picture layer: the picture wanted, once loaded; until then the last one shown, so Home is never bare between them.
+  // image() says nothing when it has loaded, nor reports its own size, so a copy at its own size (GPUI sizes an unsized image
+  // only once it has it), clipped to nothing, makes the box around it grow then, which that box reports. The layer is keyed by
+  // its picture: a new one starts whole, with nothing to fade in from. `dim` fades it while a mode is drawing.
+  layers(scene, p, path, dim) {
+    const fade = dim ? 0.7 : 1, ready = !!path && this.loaded.has(path);
     // The same picture, or a draft's (one framing for all its modes), moves with the framing; another stays where it was.
-    const hp = held && (held.scene.id === scene.id || this.draft ? p : held.p);
-    return [held && layer("wallpaper-held", held.scene, hp, held.path, "wallpaper-picture", fade),
-      layer(`wallpaper-${scene.id}`, scene, p, path, "wallpaper-loading", 0)].filter(Boolean);
-  }
-
-  warm_(path, cx) {
-    this.warming = path;
-    cx.timer.after(WARM, (cx) => { this.warm.add(path); if (!this.closed) cx.notify(); });
+    const at = (shown) => ({ ...shown, p: shown.scene.id === scene.id || this.draft ? p : shown.p });
+    const layer = ({ scene: s, path: src, p: pp }) => {
+      const [w, h] = this.size(s, pp);
+      return div().id(`wallpaper-at:${src}`).absolute().bottom((this.height - h) * (1 - pp.y)).left(`${pp.x * 100}%`).ml(-pp.x * w).w(w).h(h)
+        .opacity(fade).transition("opacity", FADE).child(image(src).id("wallpaper-picture").size_full());
+    };
+    // Not drawn after this, the host may let the last one go: coming back, it is loaded again first.
+    if (ready && this.held && this.held.path !== path) this.loaded.delete(this.held.path);
+    if (ready) this.held = { scene, path, p };
+    return [this.held && layer(at(this.held)),
+      path && !ready && div().id("wallpaper-probe").absolute().size(0).overflow_hidden().child(div().id("wallpaper-probe-size").absolute()
+        .on_size_change((size, cx) => {
+          if (!size.width || this.loaded.has(path)) return;
+          this.loaded.add(path);
+          if (!this.closed) cx.notify();
+        }).child(image(path).id("wallpaper-probe-image")))].filter(Boolean);
   }
 
   render(cx) {
@@ -429,26 +425,26 @@ export default class Wallpaper extends View {
       .on_drop(({ paths }, cx) => { if (paths?.[0] && this.draft?.phase !== 'applying') cx.spawn((cx) => this.open(paths[0], cx)); });
     if (!this.height) return root;
     const p = placement(d?.scene ? d.placement : shared(KEY.placements)?.[scene.id], scene.focus);
-    const path = this.pictureOf(scene, t, cx), loaded = !!path && this.warm.has(path);
+    const path = this.pictureOf(scene, t, cx), loaded = !!path && this.loaded.has(path);
     if (d) {
       if (loaded && d.scene) d.shown = true;
       // The waits the card shows: the first picture (read, drawn, loaded), a mode or theme redrawing, Apply.
       const waits = { load: this.track(`load:${d.id}`, !d.shown && ['loading', 'converting', 'ready'].includes(d.phase), cx),
         draw: this.track(`draw:${d.id}`, !!d.shown && (d.phase === 'converting' || !loaded), cx),
         apply: this.track(`apply:${d.id}`, d.phase === 'applying', cx) };
-      return focusRoot(this, root.children(this.layers(scene, p, path, waits.draw, cx))
+      return focusRoot(this, root.children(this.layers(scene, p, path, waits.draw))
         .when(Boolean(d.scene), (el) => el.child(this.compositionCanvas(t))).child(this.card(t, waits)));
     }
-    const picture = this.layers(scene, p, path, false, cx), waiting = this.track("picture", !loaded, cx);
-    const button = (id, name, label, act, disabled = false) => stop(this, t, id, drawButton(t, id, { icon: icon(name), label, hot: this.hot === id, act, disabled })
-      .on_hover((on, cx) => { this.hot = on ? id : this.hot === id ? null : this.hot; cx.notify(); }), radiusOf("xs"));
+    const picture = this.layers(scene, p, path, false), waiting = this.track("picture", !loaded, cx);
+    const button = (id, name, label, act, disabled = false) => tip(this, t, id, label,
+      stop(this, t, id, ghostButton(this, t, id, { icon: icon(name), label, act, disabled, surface: "chrome" }), radiusOf("xs")));
     const go = (by) => () => setShared(KEY.wallpaper, all[(i + by + all.length) % all.length].id);
     const menuUp = popupOpen(this, "wallpaper-add", MENU_CLOSED);
     const shown = this.over || this.opening || menuUp || Date.now() < (this.shownUntil ?? 0) || /** @type {any} */ (this).fs.keyboard;
     const spinner = (size) => svg("mods/workspace-chrome/spinner.svg").size(size).flex_none().text_color(t.dim).spin(900);
     const switcher = h_flex().id("wallpaper-switcher").absolute().right(12).bottom(12).p(4).gap(4).items_center()
       .rounded(8).bg(t.chrome).text_size(12).text_color(t.dim)
-      .opacity(shown ? 1 : 0).transition("opacity", MOTION)
+      .opacity(shown ? 1 : 0).transition("opacity", FADE)
       .child(button("wallpaper-back", "chevron-left", "Previous wallpaper", go(-1), all.length < 2))
       // A picture still loading spins inside the name's fixed slot, so no button moves.
       .child(h_flex().w(Math.min(160, Math.max(0, (this.width ?? 304) - 144))).flex_none().gap(6).justify_center().items_center()
@@ -463,7 +459,7 @@ export default class Wallpaper extends View {
       .child(switcher);
     // With the switcher away, the spinner sits where its right end is.
     const chip = h_flex().id("wallpaper-wait").absolute().right(12).bottom(12).size(32).justify_center().items_center().rounded(8).bg(t.chrome)
-      .role("status").accessibility_label(`Loading ${scene.name}`).opacity(shown ? 0 : 1).transition("opacity", MOTION).child(spinner(14));
+      .role("status").accessibility_label(`Loading ${scene.name}`).opacity(shown ? 0 : 1).transition("opacity", FADE).child(spinner(14));
     return focusRoot(this, root.children(picture).when(waiting, (el) => el.child(chip)).child(corner));
   }
 
@@ -484,7 +480,6 @@ export default class Wallpaper extends View {
     d.placement = placement({ ...d.placement, ...change });
     const s = toSlider(d.placement.zoom);
     if (Math.abs(Number(this.scale.value()) - s) > 1e-6) this.scale.set_value(s);
-    this.drag = null;
     cx.notify();
   }
 
@@ -503,7 +498,11 @@ export default class Wallpaper extends View {
       .when(active(), el => el.cursor_grab()).role("group")
       .accessibility_label("Wallpaper framing. Drag, scroll or use arrow keys; Shift moves faster. Minus and equals zoom, 0 resets.")
       .on_mouse_move((e, cx) => {
-        if (this.drag) move(this.drag.placement, (e.position.x - this.drag.at.x) / zoom(), (e.position.y - this.drag.at.y) / zoom(), cx);
+        // Step by step from where the picture is, so a zoom or key mid-drag doesn't make it jump.
+        if (!this.drag) return;
+        const from = this.drag.at;
+        this.drag.at = e.position;
+        move(d.placement, (e.position.x - from.x) / zoom(), (e.position.y - from.y) / zoom(), cx);
       })
       .on_mouse_up("left", () => { this.drag = null; })
       .on_hover(on => { if (!on) this.drag = null; })
@@ -533,20 +532,24 @@ export default class Wallpaper extends View {
       .on_mouse_down("left", (e, cx) => {
         if (!active()) return;
         this.composeFocus.focus();
-        this.drag = { at: e.position, placement: { ...d.placement } };
+        this.drag = { at: e.position };
         cx.stop_propagation();
       });
   }
 
-  // A text button in the card's footer: T3's compact.
+  // A text button in the card's footer: T3's compact, filled, so the pointer takes the hand, as on the layout's dialogs.
   action(t, id, label, act, { disabled = false, variant = "outline" } = {}) {
-    return stop(this, t, id, drawButton(t, id, { variant: /** @type {"primary" | "outline" | "ghost"} */ (variant), size: "compact", text: label, act, disabled }), radiusOf("compact"));
+    return stop(this, t, id, drawButton(t, id, { variant: /** @type {"primary" | "outline" | "danger"} */ (variant), size: "compact", text: label, act, disabled }), radiusOf("compact"));
   }
 
   // An icon button on the card.
   tool(t, id, name, label, act, disabled = false) {
-    return stop(this, t, id, drawButton(t, id, { icon: icon(name), label, size: "xs", surface: "card", hot: this.hot === id, act, disabled })
-      .on_hover((on, cx) => { this.hot = on ? id : this.hot === id ? null : this.hot; cx.notify(); }), radiusOf("xs"));
+    return stop(this, t, id, ghostButton(this, t, id, { icon: icon(name), label, act, disabled }), radiusOf("xs"));
+  }
+
+  // A ToggleGroup's toggle: a ghost, so, as the layout's other segments, the pointer stays as it is.
+  toggle(t, id, o, act) {
+    return drawButton(t, id, { ...o, size: "xs", surface: "card" }).when(!o.disabled, (el) => el.on_click((_e, cx) => act(cx)));
   }
 
   // The framing card, T3's popover in the switcher's place (docs/internals/specs/wallpaper.md). Name, then until the picture shows only how far
@@ -569,9 +572,9 @@ export default class Wallpaper extends View {
       const reset = this.resetOf(d), atRest = p.zoom === reset.zoom && p.x === reset.x && p.y === reset.y;
       rows.push(h_flex().h(28).flex_none().gap(8).items_center()
         .child(h_flex().h(28).flex_1().min_w(0).p(2).gap(2).rounded(8).bg(t.raised).children([['cover', 'Fill'], ['contain', 'Fit']].map(([mode, text]) =>
-          stop(this, t, `wallpaper-${mode}`, drawButton(t, `wallpaper-${mode}`, { text, size: "xs", surface: "card", on: p.mode === mode, disabled: busy,
+          stop(this, t, `wallpaper-${mode}`, this.toggle(t, `wallpaper-${mode}`, { text, on: p.mode === mode, disabled: busy,
             label: `${mode === 'cover' ? 'Fill: crop to fill' : 'Fit: show the whole picture'}${p.mode === mode ? ', selected' : ''}`,
-            act: cx => this.setPlacement(d, { mode }, cx) }).rounded(6).flex_1().min_w(0), radiusOf("compact")))))
+          }, cx => this.setPlacement(d, { mode }, cx)).rounded(6).flex_1().min_w(0), radiusOf("compact")))))
         .child(tip(this, t, "wallpaper-reset", atRest ? "Already at 100%, centred" : "Reset framing (0)",
           this.tool(t, "wallpaper-reset", "rotate-ccw", "Reset framing", cx => this.setPlacement(d, reset, cx), busy || atRest))));
       rows.push(this.zoomRow(t, d, busy));
@@ -579,7 +582,7 @@ export default class Wallpaper extends View {
     // Broken, the reason is the card's body already.
     const status = broken ? null : d.message ? div().truncate().text_color(t.ansi1).child(d.message)
       : open && waits.draw ? h_flex().gap(6).items_center().child(spinner(12)).child(d.phase === 'converting' ? drawing : "Loading picture…")
-      : open && d.saved?.id.startsWith("file:") && !still ? this.action(t, "wallpaper-delete", "Delete…", () => this.askRemove(d.saved), { variant: "ghost" }).ml(-8)
+      : open && d.saved?.id.startsWith("file:") && !still ? this.action(t, "wallpaper-delete", "Delete", () => this.askRemove(d.saved), { variant: "danger" })
       : null;
     const footer = h_flex().id("wallpaper-card-footer").h(28).flex_none().gap(8).items_center()
       .child(h_flex().id("wallpaper-card-status").flex_1().min_w(0).items_center().text_size(12).text_color(t.dim).when(Boolean(status), (el) => el.child(status)))
@@ -599,7 +602,7 @@ export default class Wallpaper extends View {
   cardWidth() { return Math.min(300, Math.max(0, (this.width ?? 324) - 24)); }
 
   // What the compact card says while the first picture comes: the step and a bar. An image's steps are known, so the bar
-  // shows how far (eased to each, and over WARM to the end while Home loads the picture); a .ans file's isn't, so it sweeps.
+  // shows how far (eased to each, and over FILL to the end while Home loads the picture); a .ans file's isn't, so it sweeps.
   progress(t, d, label) {
     const w = this.cardWidth() - 32, f = d.progress == null ? null : d.phase === 'ready' ? 1 : d.progress;
     const bar = div().id("wallpaper-progress-bar").absolute().top(0).h_full().rounded(4).bg(t.foreground);
@@ -608,7 +611,7 @@ export default class Wallpaper extends View {
       .child(div().h(16).truncate().text_size(12).text_color(t.dim).child(label))
       .child(div().relative().h(4).w_full().rounded(4).bg(t.border).overflow_hidden()
         .child(f == null ? bar.w(w * 0.3).loop("left", { from: -w * 0.3, to: w, period: 1600 })
-          : bar.left(0).w(w * f).transition("width", { duration: d.phase === 'ready' ? WARM : 300, easing: d.phase === 'ready' ? "linear" : "ease-out" })));
+          : bar.left(0).w(w * f).transition("width", { duration: d.phase === 'ready' ? FILL : 300, easing: d.phase === 'ready' ? "linear" : "ease-out" })));
   }
 
   // T3's segmented ToggleGroup; the mode being drawn spins.
@@ -616,9 +619,9 @@ export default class Wallpaper extends View {
     const off = d.phase === 'applying';
     const styles = h_flex().id('wallpaper-styles').h(28).w_full().p(2).gap(2).rounded(8).bg(t.raised).role('group').accessibility_label('Image processing')
       .children(STYLES.map(([style, text], index) => stop(this, t, `wallpaper-style-${style}`,
-        drawButton(t, `wallpaper-style-${style}`, { text: style === 'quadrants' && (this.width ?? 324) < 324 ? 'Quads' : text,
-          label: `${text}${d.style === style ? ', selected' : ''}`, size: 'xs', surface: 'card', on: d.style === style, disabled: off,
-          act: cx => cx.spawn(cx => this.setStyle(style, cx)) }).px(3).rounded(6).flex_1().min_w(0).whitespace_nowrap()
+        this.toggle(t, `wallpaper-style-${style}`, { text: style === 'quadrants' && (this.width ?? 324) < 324 ? 'Quads' : text,
+          label: `${text}${d.style === style ? ', selected' : ''}`, on: d.style === style, disabled: off },
+          cx => cx.spawn(cx => this.setStyle(style, cx))).px(3).rounded(6).flex_1().min_w(0).whitespace_nowrap()
           .when(drawing && d.phase === 'converting' && d.style === style, (el) => el.child(spinner(12).id("wallpaper-style-spinner")))
           .on_key_down((e, cx) => {
             if (off || !plainKey(e) || !ARROWS.includes(e.key)) return;
@@ -634,7 +637,7 @@ export default class Wallpaper extends View {
   // track), logarithmic. Scrolling over the row zooms about Home's middle.
   zoomRow(t, d, off) {
     const z = d.placement.zoom, step = (dir) => (cx) => this.zoomBy(d, nextPreset(this.draft.placement.zoom, dir) / this.draft.placement.zoom, null, cx);
-    const slider = stop(this, t, "wallpaper-zoom", div().id("wallpaper-zoom").h(24).flex_1().min_w(0).opacity(off ? 0.64 : 1)
+    const slider = stop(this, t, "wallpaper-zoom", div().id("wallpaper-zoom").h(24).flex_1().min_w(0).opacity(off ? DISABLED : 1)
       .role("group").accessibility_label("Wallpaper zoom, 100 to 400 percent")
       .on_key_down((e, cx) => {
         if (off || !plainKey(e) || !ARROWS.includes(e.key)) return;

@@ -33,12 +33,14 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const { toSlider } = r.modules["framing.js"];
     Object.assign(look.colours, { ansi0: "#000001", ansi15: "#fffffe", ansi7: "#c0c0c1", ansi8: "#808081" });
     const h = await r.home();
-    const tree = () => h.render(cx);
+    // As Herdr, which loads a picture shortly after it is first drawn: its hidden copy then takes the picture's size.
+    const loads = (t, c = cx) => { find(t, "wallpaper-probe-size")?.handlers.on_size_change({ width: 640, height: 480 }, c); return t; };
+    const tree = () => loads(h.render(cx));
     const at = (id) => find(tree(), id);
     const click = (id) => at(id).handlers.on_click({}, cx);
     // The picture Home shows once the one for this theme is made and loaded.
     const shown = async (home = h, rt = r) => {
-      const draw = () => home.render(rt.cx);
+      const draw = () => loads(home.render(rt.cx), rt.cx);
       const now = () => { const { madePicture, pictureKey, isLight } = rt.modules["library.js"], s = home.draft?.scene ?? home.all().find(x => x.id === (rt.state[KEY] ?? "lighthouse"));
         return madePicture(pictureKey(s, { ...rt.look.colours }, isLight()))?.path; };
       // Made, then loaded (shown in place of the last one).
@@ -66,12 +68,33 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.equal(at("wallpaper-picture").props.path, recoloured, "the last picture stays up meanwhile");
     const ember = await shown();
     assert.ok(ember.includes("/ember/"), "then the new one shows");
+
+    // A made picture shows only once it has loaded, however long that takes: until its hidden copy has a size, the last one
+    // stays up. Then the new one takes its place in one frame: never neither, never both.
+    state[KEY] = "nebula";
+    await settle(() => find(h.render(cx), "wallpaper-probe-image"));
+    await settle();
+    let raw = h.render(cx);
+    const pictures = (n) => !n || typeof n !== "object" ? 0 : Number(n.key === "wallpaper-picture") + n.items.reduce((sum, x) => sum + pictures(x), 0);
+    assert.equal(find(raw, "wallpaper-picture").props.path, ember, "the last picture stays up while the new one loads");
+    find(raw, "wallpaper-probe-size").handlers.on_size_change({ width: 0, height: 0 }, cx);
+    assert.equal(find(h.render(cx), "wallpaper-picture").props.path, ember, "no size yet is not loaded");
+    find(raw, "wallpaper-probe-size").handlers.on_size_change({ width: 640, height: 480 }, cx);
+    raw = h.render(cx);
+    assert.ok(find(raw, "wallpaper-picture").props.path.includes("/nebula/"), "loaded, the new picture shows");
+    assert.equal(pictures(raw), 1, "in the last one's place");
+    assert.equal(find(raw, "wallpaper-probe-image"), undefined);
+    state[KEY] = "ember";
+    await shown();
     delete state[KEY];
     await shown();
 
     // The switcher: ‹ name › frame +, nothing greyed out to hold a place; framing works for a built-in picture too.
     assert.equal(at("wallpaper-remove"), undefined, "deleting isn't on the switcher");
     for (const id of ["wallpaper-back", "wallpaper-next", "wallpaper-frame", "wallpaper-add"]) assert.ok(at(id).handlers.on_click, `${id} works`);
+    // As the layout's other ghost buttons (pane header, Files, sidebar), hovering one leaves the pointer as it is.
+    const hand = (id) => "cursor_pointer" in at(id).props;
+    for (const id of ["wallpaper-back", "wallpaper-next", "wallpaper-frame", "wallpaper-add"]) assert.ok(!hand(id), `${id} keeps the pointer`);
 
     // + opens this mod's menu as a popup above it; its rows send the pick back to this Home.
     at("wallpaper-add").handlers.on_mouse_down({ bounds: { x: 900, y: 760, width: 24, height: 24 } }, cx);
@@ -190,11 +213,20 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     // Framing: Fill/Fit, drag, keys, the zoom buttons, slider, wheel and trackpad, and Reset, with no file read or written.
     await settle();
     io = 0;
+    for (const id of ["wallpaper-cover", "wallpaper-style-dots", "wallpaper-zoom-in", "wallpaper-zoom-out"]) assert.ok(!hand(id), `${id} keeps the pointer`);
+    assert.ok(hand("wallpaper-apply") && hand("wallpaper-cancel"), "the footer's filled buttons take the hand, as the layout's dialogs'");
     click("wallpaper-contain");
-    const geometry = () => at(`wallpaper-${h.draft.scene.id}`).props;
+    const geometry = () => at(`wallpaper-at:${at("wallpaper-picture").props.path}`).props;
     const sceneRatio = h.draft.scene.width / h.draft.scene.height;
     assert.ok(Math.abs(geometry().w - 1000) < 1e-6 && Math.abs(geometry().h - 1000 / sceneRatio) < 1e-6, "Fit shows the whole picture");
     const canvas = () => at("wallpaper-compose");
+    // A drag follows the pointer move after move, not only its first step.
+    canvas().handlers.on_mouse_down({ position: { x: 300, y: 300 } }, cx);
+    canvas().handlers.on_mouse_move({ position: { x: 300, y: 290 } }, cx);
+    const stepped = h.draft.placement.y;
+    canvas().handlers.on_mouse_move({ position: { x: 300, y: 250 } }, cx);
+    assert.ok(h.draft.placement.y < stepped, `a drag keeps moving the picture after its first step (${stepped} → ${h.draft.placement.y})`);
+    canvas().handlers.on_mouse_up({}, cx);
     canvas().handlers.on_mouse_down({ position: { x: 300, y: 300 } }, cx);
     canvas().handlers.on_mouse_move({ position: { x: 300, y: 2000 } }, cx);
     canvas().handlers.on_mouse_up({}, cx);
@@ -253,11 +285,11 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.ok(saved?.includes("/.tiles/Coast/"), "the saved picture is drawn from its own cache");
     assert.equal(await svgOf(saved), drawn, "the same picture the preview showed");
     h.width = 600;
-    const at600 = at("wallpaper-file:Coast").props;
+    const at600 = at(`wallpaper-at:${saved}`).props;
     assert.ok(Math.abs(at600.w - 1200) < 1e-6, "saved Fit at 2× recomputes for a narrower Home");
     h.width = 1000;
     state[PLACEMENTS]["file:Coast"] = { mode: "nonsense", zoom: Infinity, x: -2, y: 3 };
-    assert.equal(at("wallpaper-file:Coast").props.bottom, 0, "nonsense framing falls back to bounded values");
+    assert.equal(at(`wallpaper-at:${saved}`).props.bottom, 0, "nonsense framing falls back to bounded values");
     state[PLACEMENTS]["file:Coast"] = kept;
 
     // The next run of the app shows a saved picture from disk, converting and writing nothing.
@@ -281,6 +313,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.equal(await shown(), saved, "nothing is converted again");
     assert.equal(at("wallpaper-styles"), undefined, "a saved picture keeps its mode: no mode row");
     assert.ok(at("wallpaper-delete")?.handlers.on_click, "an added picture can be deleted from here");
+    assert.deepEqual(texts(at("wallpaper-delete")), ["Delete"], "named as the layout names what a confirm dialog asks about, without …");
     h.setPlacement(d, { zoom: 3 }, cx);
     at("wallpaper-compose").handlers.on_key_down({ key: "enter", modifiers: {} }, cx);
     await settle(() => h.draft === null);
