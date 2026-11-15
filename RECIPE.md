@@ -56,7 +56,7 @@ Details (`cmd-shift-b`) is a native popup under its button, 280 wide, up to 420 
 
 ### Panes and sub-agents
 
-A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working spinner before the count while one is at work; it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
+A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working spinner before the count while one is at work and the agent itself isn't (a header has one spinner at most); it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
 
 ### Space panel
 
@@ -74,7 +74,7 @@ Review is for the [pulls.review fork](https://github.com/JinJieBeWater/pulls.rev
 
 New and Go to are top-centred popups, 576 wide, radius 16, with 48px two-line rows and a footer of keycaps. Menus, tooltips and buttons follow [t3-tokens](docs/internals/t3-tokens.md). The Actions editor and confirmations are 512px, radius 16; a confirmation's action is red text on a raised button, after Cancel. Layout Settings follows Herdr's own Settings dialog (880×620). Spec: [dialogs](docs/internals/specs/dialogs.md).
 
-Home is one framed pane without a header: centred Next agent, Go to and New tab buttons with keycaps, no names or counts. On Home the tab row folds from 40 to 8px unless it must hold window buttons or the hidden sidebar's controls. Spec: [home](docs/internals/specs/home.md).
+Home is one framed pane without a header: centred Next agent, Go to and New tab buttons with keycaps, no names or counts. On Home the tab row has no panel toggle and folds from 40 to 8px unless it must hold window buttons or the hidden sidebar's controls. Spec: [home](docs/internals/specs/home.md).
 
 ## How it behaves
 

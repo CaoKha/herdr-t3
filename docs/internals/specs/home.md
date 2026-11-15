@@ -7,7 +7,7 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 - One framed pane without a header (`home-main`, the same active-tab frame as `main`).
 - Default content: centred Next agent (disabled when there is nowhere to go), Go to and New tab. At most 320 wide, 32 high, radius 8; 14px text on the left, keycaps on the right; no names or counts.
 - 40 is added below the group so it sits centred against the whole window, top bar included.
-- The tab row has no tabs, `+`, Actions or Review, and folds from 40 to 8, except when it must hold the hidden sidebar's controls, macOS window buttons or Windows window buttons. Leaving restores 40.
+- The tab row has no tabs, `+`, Actions, Review or panel toggle (`⌥⌘B` still opens the panel), and folds from 40 to 8, except when it must hold the hidden sidebar's controls, macOS window buttons or Windows window buttons. Leaving restores 40.
 - The first frame on arrival already has Home's frame and its own panel state.
 
 ## Identity

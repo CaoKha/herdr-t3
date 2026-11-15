@@ -8,7 +8,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find } = kit;
 const t = { chrome: "#111111", background: "#222222", dim: "#555555", muted: "#777777", foreground: "#ffffff", hover: "#333333", selected: "#444444" };
 const calls = [], space = { id: "s", active: true, tabs: [] }, tab = { id: "b", active: true, named: true, name: "Task" };
-let part = { part: "end" }, platform = "windows", panelOpen = false;
+let part = { part: "end" }, platform = "windows", panelOpen = false, home = false;
 const cx = { notify() {}, stop_propagation() {} };
 const env = {
   View: class {}, div: element, svg: src => { const e = element(); e.src = src; return e; }, image: element, h_flex: element,
@@ -21,7 +21,7 @@ const env = {
   keptHover: (view, key, id) => ({ hover: on => { view[key] = on ? id : null; }, move() {} }), tipCard: (_t, id) => element().id(id), FADE: {},
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {}, REVIEW_STATUS: "review.status",
-  navigation: () => ({ atHome: false, frame: () => ({ tabs: [tab], context: null }) }),
+  navigation: () => ({ get atHome() { return home; }, frame: () => ({ tabs: [tab], context: null }) }),
   subAgents: () => () => [], namer: () => p => p.title, programIcon: () => null,
   POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
   openMenu: (_view, kind, target) => calls.push([kind, target]), openOverlay: value => calls.push(["overlay", value]),
@@ -88,15 +88,26 @@ panelOpen = false;
 // panel.js sizes the window part as it shows or hides the panel (so that frame has Details where it ends up): the width it
 // gives is the width this part draws, each platform, panel open or closed.
 {
-  const scope = vm.createContext({ layout: () => ({ id: "root", children: [{ id: "panel-body", children: [{ id: "files" }] }] }), window: () => env.window(), GROUP_GAP: 4 });
+  const scope = vm.createContext({ layout: () => ({ id: "root", children: [{ id: "panel-body", children: [{ id: "files" }] }] }), window: () => env.window(), GROUP_GAP: 4,
+    KEY: { home: "t3-tabs.home" }, shared: k => k === "t3-tabs.home" ? "h" : null, spaces: () => [{ id: home ? "h" : "s", active: true }] });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../../shared/panel.js"), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.windowEndPx = windowEndPx;", scope);
   part = { part: "window" };
   const was = env.window;
-  for (const p of ["windows", "macos"]) for (const open of [false, true]) {
-    env.window = () => ({ platform: p, buttons: p !== "macos" }); panelOpen = open;
+  for (const atHome of [false, true]) for (const p of ["windows", "macos"]) for (const open of [false, true]) {
+    env.window = () => ({ platform: p, buttons: p !== "macos" }); panelOpen = open; home = atHome;
     const el = load(__dirname).render(), drawn = (find(el, "panel-toggle") ? 4 + 28 : 0) + (find(el, "minimize") ? 8 + 3 * 28 : 0);
-    assert.equal(scope.windowEndPx(open), drawn, `${p}, panel ${open ? "open" : "closed"}`);
+    assert.equal(scope.windowEndPx(open), drawn, `${p}, panel ${open ? "open" : "closed"}${atHome ? ", at Home" : ""}`);
   }
+  // At Home the panel's toggle isn't drawn, as +: the row folds to 8 there, and a 28 toggle squeezed into it still took the
+  // pointer. ⌥⌘B still opens the panel. Window buttons stay, the row not folding while they show.
+  panelOpen = false; home = true;
+  for (const p of ["macos", "windows"]) {
+    env.window = () => ({ platform: p, buttons: p !== "macos" });
+    const el = load(__dirname).render();
+    assert.equal(find(el, "panel-toggle"), null, `${p}: no panel toggle at Home`);
+    assert.equal(Boolean(find(el, "minimize")), p !== "macos", `${p}: window buttons as anywhere`);
+  }
+  home = false;
   env.window = was;
   panelOpen = false;
 }

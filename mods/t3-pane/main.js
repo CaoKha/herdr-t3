@@ -107,15 +107,15 @@ export default class Pane extends View {
   }
 
   // How many sub-agents, all the way down, as T3's details meta button, in the colour of needing the person if one does;
-  // a click opens their list under it. `kids`: their words (subAgents).
-  kidsButton(t, pane, terminal, kids) {
+  // a click opens their list under it. `kids`: their words (subAgents); `busyOwn`: its own agent is at work.
+  kidsButton(t, pane, terminal, kids, busyOwn) {
     const stuck = kids.filter((s) => s === "blocked").length, busy = kids.filter((s) => s === "working").length;
     const label = [plural(kids.length, "sub-agent", "sub-agents"), stuck && `${stuck} need${stuck === 1 ? "s" : ""} you`, busy && `${busy} working`].filter(Boolean).join(", ");
     // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
-    // One at work spins before the count, inside the button: the mark in the slot after it stays the agent's own.
+    // One at work spins before the count, inside the button, unless the agent spins in the slot after it: one spinner a header.
     return trigger(this, t, `ph-kids-${pane}`, { wide: true, label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
       onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal, ...litProp(!b) } }); } },
-    (el) => el.when(busy > 0, (b) => b.child(statusMark(t, "working"))).child(String(kids.length))
+    (el) => el.when(busy > 0 && !busyOwn, (b) => b.child(statusMark(t, "working"))).child(String(kids.length))
       .child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 
@@ -209,7 +209,7 @@ export default class Pane extends View {
           .child(this.button(t, `ph-d-${pane}`, "mods/t3-pane/icons/square-split-vertical.svg", "Split down", () => run("pane.split", { direction: "down", pane }), "pane.split:down"))
           .child(this.button(t, `ph-z-${pane}`, `mods/t3-pane/icons/${p.zoomed ? "minimize-2" : "maximize-2"}.svg`, p.zoomed ? "Unzoom pane" : "Zoom pane", () => run("pane.zoom", { pane }), "pane.zoom"))
           .child(this.button(t, `ph-x-${pane}`, "mods/t3-pane/icons/x.svg", "Close pane", () => { this.hot = null; run(`t3-tabs.close-pane:${pane}`); }, "pane.close")))))
-      .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal, kids)))
+      .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal, kids, st === "working")))
       // The same marks as the agents list and tabs.
       .when(st === "working" || st === "blocked", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, STATUS_WORD[st], statusMark(t, st, 14)))))
       .when(inbox && away, el => el.child(slot(nap

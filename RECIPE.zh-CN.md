@@ -56,7 +56,7 @@ Herdr 原生 zoom 中的标签变为虚线分段组，每 pane 一段。标签�
 
 ### 窗格与子 agent
 
-窗格标题依次是程序图标、有意义的名字（只是程序名、或 Inbox 面包屑已写过时省略）、目录、子 agent 按钮、状态，然后是悬停或键盘聚焦时出现的分屏、zoom、关闭控件。Inbox 标题用 `dim` 勾标已 Settle 的 agent，用闹钟加剩余时间标 Snooze 的。子 agent 按钮写 `3 ⌄`，只数活后代，有需要你的时用 `blocked` 色，有在跑的时数字前加工作 spinner；它打开 280 宽的后代列表，按树序并带状态标记。规格：[pane](docs/internals/specs/pane.md)。
+窗格标题依次是程序图标、有意义的名字（只是程序名、或 Inbox 面包屑已写过时省略）、目录、子 agent 按钮、状态，然后是悬停或键盘聚焦时出现的分屏、zoom、关闭控件。Inbox 标题用 `dim` 勾标已 Settle 的 agent，用闹钟加剩余时间标 Snooze 的。子 agent 按钮写 `3 ⌄`，只数活后代，有需要你的时用 `blocked` 色，有在跑、而 agent 自己没在跑时数字前加工作 spinner（一个窗格头最多一个 spinner）；它打开 280 宽的后代列表，按树序并带状态标记。规格：[pane](docs/internals/specs/pane.md)。
 
 ### space 面板
 
@@ -74,7 +74,7 @@ Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/
 
 New、Go to 是顶部居中 popup，宽 576、圆角 16，两行条目高 48，底部是键帽提示。菜单、提示和按钮照 [t3-tokens](docs/internals/t3-tokens.md)。Actions 编辑器和确认框宽 512、圆角 16；确认框的执行按钮在 Cancel 后，raised 底红字。布局设置照 Herdr 自己的 Settings 对话框（880×620）。规格：[dialogs](docs/internals/specs/dialogs.md)。
 
-Home 是一张带框、无标题的窗格：正中 Next agent、Go to、New tab 三个带键帽的按钮，无名字或计数。在 Home 时标签栏整行从 40 收成 8，除非要放窗口按钮或隐藏侧栏的控件。规格：[home](docs/internals/specs/home.md)。
+Home 是一张带框、无标题的窗格：正中 Next agent、Go to、New tab 三个带键帽的按钮，无名字或计数。在 Home 时标签栏没有面板开关，整行从 40 收成 8，除非要放窗口按钮或隐藏侧栏的控件。规格：[home](docs/internals/specs/home.md)。
 
 ## 它怎么表现
 

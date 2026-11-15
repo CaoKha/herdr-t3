@@ -349,7 +349,8 @@ export default class Tabs extends View {
     // `window` part: the panel's toggle while no panel head owns it, in the window's corner, then the window's buttons 8 on. Each
     // stands a group's gap from Details, its own side carrying it; the layout's tabs-end-inset puts the end 12 from the column's,
     // so the toggle stays where the open panel's head puts it (docs/internals/t3-tokens.md「规则」P3, R1).
-    const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = panelState().pages.length > 0 && !panelState().open;
+    // At Home neither: its row folds to 8 (fitRow); ⌥⌘B still opens the panel there.
+    const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = !this.navigation.atHome && panelState().pages.length > 0 && !panelState().open;
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
       .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
         // With the Inbox, the breadcrumb's space is the way to a new tab.

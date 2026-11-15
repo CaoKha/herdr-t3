@@ -218,6 +218,12 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   // What it draws, in order: an svg by its file, words as they are.
   const shown = () => { const out = [], walk = (n) => typeof n === "string" ? out.push(n) : n && typeof n === "object" && (typeof n.svg === "string" ? out.push(path.basename(n.svg)) : n.items.forEach(walk)); walk(find(header.render(), "ph-kids-p2")); return out; };
   assert.equal(kids.style.accessibility_label, "2 sub-agents, 1 working", "the button says how many are at work");
+  // At most one working mark in the header: the agent at work keeps its own, and the button says only how many.
+  const spinners = () => svgs(header.render()).filter((s) => path.basename(s) === "spinner.svg").length;
+  assert.equal(spinners(), 1, "its own agent and a sub-agent both at work: one spinner, the agent's");
+  assert.deepEqual(shown(), ["2", "chevron-down.svg"], "the agent at work: the button is the count alone");
+  assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "2 sub-agents, 1 working", "its tooltip still says one is at work");
+  pane.status = "idle";
   assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "one at work, anywhere down: the shared spinner before the count");
   terms.find((k) => k.address === "child").status = "idle";
   assert.deepEqual(shown(), ["2", "chevron-down.svg"], "none at work: the count alone");
@@ -227,6 +233,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   terms.find((k) => k.address === "grandchild").status = "idle";
   terms.find((k) => k.address === "child").status = "working";
   const own = () => { const m = find(header.render(), "ph-mark-p2"); return m && [...svgs(m).map((s) => path.basename(s)), ...texts(m)].join(" "); };
+  pane.status = "working";
   assert.equal(own(), "spinner.svg", "its own agent at work still says so beside the button");
   pane.status = "blocked";
   assert.equal(own(), "!", "and needing the person, with its sub-agents all fine");

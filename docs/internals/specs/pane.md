@@ -15,7 +15,7 @@ Geometry and edge rules of the pane header (`t3-pane`) and its sub-agent list. T
 
 ## Sub-agent button
 
-- `3 ⌄`: live descendants only, tinted `blocked` if any need the person (no `!` of its own). While any descendant, at any depth, is working, the 12px `statusMark` spinner stands before the count, 4 apart, so the button grows 16. Tooltip and aria give the total, the attention count and the working count (`3 sub-agents, 1 needs you, 2 working`). The header's state mark stays the agent's own.
+- `3 ⌄`: live descendants only, tinted `blocked` if any need the person (no `!` of its own). While any descendant, at any depth, is working and the agent itself isn't, the 12px `statusMark` spinner stands before the count, 4 apart, so the button grows 16: a header shows at most one spinner, and the agent's own comes first. Tooltip and aria give the total, the attention count and the working count (`3 sub-agents, 1 needs you, 2 working`). The header's state mark stays the agent's own.
 - 24px control, 12px medium text, padding 8, gap 4, 14px chevron, radius 8. A `trigger()`: on while its list is open.
 
 ## Sub-agent list
