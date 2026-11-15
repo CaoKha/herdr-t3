@@ -41,14 +41,16 @@ share review-scope mods/t3-actions extras/mods/review
 share pierre-icons mods/t3-files mods/t3-chrome extras/mods/review
 share pierre-icons-data mods/t3-files mods/t3-chrome extras/mods/review
 share file-tree mods/t3-files extras/mods/review
+share file-listing mods/t3-files extras/mods/review
+share menus mods/t3-files extras/mods/review
 share nav-column mods/t3-files extras/mods/review
 share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox extras/mods/review extras/mods/asciicn-wallpaper extras/mods/pulls-review
-share open-in mods/t3-files mods/t3-actions
+share open-in mods/t3-files mods/t3-actions extras/mods/review
 share panel-states mods/t3-files extras/mods/review
 share color mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files mods/t3-home mods/t3-new-menu mods/t3-picker extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share button mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share trigger mods/t3-actions mods/t3-chrome mods/t3-pane mods/t3-tabs mods/t3-inbox mods/t3-spaces mods/t3-agents mods/t3-files extras/mods/review extras/mods/asciicn-wallpaper extras/mods/pulls-review
-share popup-menu mods/t3-menu mods/t3-files mods/t3-actions
+share popup-menu mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review
 share titlebar mods/t3-chrome mods/t3-actions
 share palette mods/t3-home mods/t3-chrome mods/t3-new-menu mods/t3-picker
 # The checks' fake elements and loader, beside each mod's checks: a standalone repo has no shared/.
@@ -62,6 +64,8 @@ for d in mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review; do mkdir
 for d in mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/folder.svg" "$src/$d/icons/"; done
 # Open in's app artwork, the ones Details uses, copied into Files' own folder.
 for icon in finder vscode vscodium cursor zed app-window; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
+# Review's shared path menu draws the same artwork from its own folder, including the standalone extra.
+for icon in finder vscode vscodium cursor zed app-window external-link folder-open copy at-sign check arrow-left refresh-cw; do cp "$src/mods/t3-files/icons/$icon.svg" "$src/extras/mods/review/icons/$icon.svg"; done
 
 # mod.json stays per repo: here the layout places it ("none"), alone it docks left.
 rsync -a --delete $gen --exclude mod.json "$src/mods/t3-inbox/" "$inbox/mods/t3-inbox/"

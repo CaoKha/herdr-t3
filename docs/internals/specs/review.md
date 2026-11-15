@@ -39,7 +39,9 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 - Files keep Files' natural order; diff, line requests and `j`/`k` follow it.
 - One current file: from a click, `j`/`k`, or the file at the diff viewport's top. Jumps expand ancestors.
 - Reviewed boxes precede icons; folder and subgroup boxes are tri-state; removed files keep an empty slot. Reviewed files dim and strike through.
-- No context menu. Folder rows read a per-folder file index built with the tree, not a filter of the whole group per row.
+- Files and folders can drag into terminals using their absolute paths under the Review repository and the space's machine; compact folders use their outermost real path, never `group:<key>/` prefixes. Deleted files (`missing` or Git `removed`) and subgroup rows cannot drag.
+- Files' shared native tree menu ([files](files.md#tree-menu)): Open, Reveal, Open with, relative Copy path and Insert into the tab's last active terminal; remote paths omit local apps. Deleted files offer only Copy path; subgroup rows have no menu. Right-click preserves the current file, folder folds and reviewed state; its row stays highlighted while the menu is open. `cmd-w` closes menus before the Review tab. Real dragging and right-clicks require user verification.
+- Folder rows read a per-folder file index built with the tree, not a filter of the whole group per row.
 
 ## Diff
 

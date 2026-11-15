@@ -18,7 +18,8 @@ import { stopsInit, stopsEnd, enter, focusRoot, stop, within } from "./focus.js"
 import { opener, popupOpen, hang } from "./trigger.js";
 import { tip, hoverKept, glow } from "./tip.js";
 import { MENU_ROW } from "./menu-row.js";
-import { LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, join, parentOf, nameOf, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, terms, narrows,
+import { LIST, join, parseListing } from "./file-listing.js";
+import { IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, parentOf, nameOf, ancestors, parseIgnored, markIgnored, folderEntries, terms, narrows,
   filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket } from "./model.js";
 import { alpha } from "./color.js";
 

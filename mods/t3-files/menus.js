@@ -1,4 +1,4 @@
-// Files' menus (docs/adr/0018): native popups of this mod, as the layout's other menus. A tree row's (right-click, Shift+F10),
+// Files and Review's menus (docs/adr/0018): native popups of their own mod. A tree row's (right-click, Shift+F10),
 // a breadcrumb's folder (›) and Open in's apps (⌄, drawn by open-in.js as Details' is). A row's Open with opens its submenu
 // beside it in a popup of its own (submenu.js); they close together. A breadcrumb's folder menu, as T3's FileBreadcrumbs, moves
 // through folders in place, Back on top. Each acts only while the space and tab it was opened on still show (`source`).
@@ -13,24 +13,25 @@ import { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuCl
 import { targetsMenu, awaitTargets, openTarget, targetIcon } from "./open-in.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { KEY, closedKey } from "./store.js";
-import { LIST, join, parseListing } from "./model.js";
+import { LIST, join, parseListing } from "./file-listing.js";
 
-const ICONS = "mods/t3-files"; // whose icons/ it draws
+const menuMod = () => props()?.menuMod ?? "t3-files";
+const menuIcons = () => `mods/${menuMod()}`; // each mod draws only its own icons/
 // As t3-menu's: 220 wide, 4 in, rows of 28; a folder's at most 12 rows before it scrolls.
 export const MENU_W = 220, FOLDER_H = 8 + 12 * MENU_ROW;
 // Stamped as a top menu closes, for the control that opened it (trigger.js); a submenu's, for the menu it hangs off.
-export const MENU_CLOSED = closedKey("t3-files", "menu"), SUB_CLOSED = closedKey("t3-files", "submenu");
+export const MENU_CLOSED = closedKey("t3-files", "menu");
 
-/** Opens a top Files menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props;
+/** Opens a top menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props;
  *  `keys`: opened by keys, its first row lit. */
-export const openMenu = (kind, place, extra, keys = false) => openPopup({ mod: "t3-files", width: MENU_W, ...place, props: { ...extra, files: kind } }, null, null, keys);
+export const openMenu = (kind, place, extra, keys = false) => openPopup({ mod: extra.menuMod ?? "t3-files", width: MENU_W, ...place, props: { ...extra, files: kind } }, null, null, keys);
 
 /** The space and tab a menu was opened on are still the ones shown. */
 const sourceOkay = (s) => { const sp = spaces().find(x => x.active); return sp?.id === s.space && sp.tabs.some(t => t.active && t.id === s.tab); };
 
 /** A tree row's items: a remote one can't be opened or revealed here; `agent` is the tab's last active terminal. */
-/** @param {{ remote?: boolean, platform?: string, agent?: any, editors?: string[] }} o */
-export function rowItems({ remote = false, platform, agent = null, editors = [] }) {
+/** @param {{ remote?: boolean, platform?: string, agent?: any, editors?: string[], deleted?: boolean }} o */
+export function rowItems({ remote = false, platform, agent = null, editors = [], deleted = false }) {
   const mac = platform === "macos" && !remote;
   return [
     mac && { id: "open", label: "Open", icon: "external-link" },
@@ -38,7 +39,7 @@ export function rowItems({ remote = false, platform, agent = null, editors = [] 
     mac && editors.length > 0 && { id: "open-with", label: "Open with", icon: "external-link", sub: "editors" },
     { id: "copy-path", label: "Copy path", icon: "copy" },
     { id: "mention", label: "Insert into agent terminal", icon: "at-sign", disabled: !agent, hint: agent ? "" : "No active terminal in this tab" },
-  ].filter(Boolean);
+  ].filter(it => it && (!deleted || it.id === "copy-path"));
 }
 
 // Into the agent's input as a paste, never sent: the clipboard carries it and gets its text back. Paste reads the clipboard a
@@ -111,22 +112,22 @@ function goTo(view, dir, cx, lit) {
 // Where Back goes: the folder above, while that's still within the crumb's (T3's canGoBack); else null.
 const backDir = (view) => view.dir === props().dir ? null : view.dir.slice(0, Math.max(0, view.dir.lastIndexOf("/")));
 
-/** Closes every Files menu open, for cmd-w (keys.json's mod:t3-files runs t3-files.close): whether there was one. */
-export const closeMenus = () => closeTops("t3-files");
+/** Closes the mod's open menus before its tab, for cmd-w: whether there was one. */
+export const closeMenus = (mod = "t3-files") => closeTops(mod);
 
 /** Its submenu goes with it; the control that opened it, or the menu it hangs off, learns it's gone. */
 export function closeMenu(view) {
   const p = props();
   stopsEnd(view);
   menuClosed(p.overlay);
-  setShared(p.parents?.length ? SUB_CLOSED : MENU_CLOSED, Date.now());
+  setShared(closedKey(menuMod(), p.parents?.length ? "submenu" : "menu"), Date.now());
 }
 
 // What a menu lists: { id, label, icon?|glyph?, sub?, disabled?, hint?, checked?, keepOpen?, run?(cx) }.
 function items(view) {
-  const p = props(), t = theme(), s = p.source;
+  const p = props(), t = theme(), s = p.source, ICONS = menuIcons();
   if (p.files === "editors") return p.editors.map(name => ({ id: `editor:${name}`, label: name, glyph: targetIcon(ICONS, name, t), run: () => launch(s, p.path, name) }));
-  if (p.files === "row") return rowItems({ remote: Boolean(s.on), platform: window()?.platform, agent: p.agent, editors: p.editors }).map(it => ({ ...it, run: (cx) => {
+  if (p.files === "row") return rowItems({ remote: Boolean(s.on), platform: window()?.platform, agent: p.agent, editors: p.editors, deleted: p.deleted }).map(it => ({ ...it, run: (cx) => {
     if (it.id === "open") launch(s, p.path, shared(KEY.openTarget) ?? "Finder");
     else if (it.id === "reveal") exec("open", ["-R", "--", join(s.root, p.path)]).then(r => { if (r.code !== 0) throw new Error(r.stderr); }).catch(e => notify({ title: "Couldn't reveal in Finder", body: String(e), level: "error" }));
     else if (it.id === "copy-path") cx.write_to_clipboard(p.path);
@@ -148,8 +149,8 @@ function items(view) {
 // Row `i`'s submenu beside it, Open with's editors (the one row with one). `lit`: keys opened it, so its first row is lit, as Base UI's.
 function openSub(view, i, lit) {
   const p = props(), it = items(view)[i];
-  openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: "t3-files", width: MENU_W, height: 8 + p.editors.length * MENU_ROW,
-    props: { files: it.sub, source: p.source, path: p.path, editors: p.editors } }, null, lit);
+  openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: menuMod(), width: MENU_W, height: 8 + p.editors.length * MENU_ROW,
+    props: { menuMod: menuMod(), files: it.sub, source: p.source, path: p.path, editors: p.editors } }, null, lit);
 }
 
 function choose(view, i, cx, lit = false) {
@@ -163,10 +164,10 @@ function choose(view, i, cx, lit = false) {
 }
 
 export function menuView(view) {
-  const p = props(), t = theme();
+  const p = props(), t = theme(), ICONS = menuIcons();
   if (p.files === "open-in") return targetsMenu(view, ICONS, p.targets ?? [], p.reason, (name) => { if (sourceOkay(p.source)) setShared(KEY.openTarget, name); closeOverlay(p.overlay); });
   // Its submenu closed itself (← or Esc in it, a click beside it): the keyboard comes back here.
-  subGone(view, SUB_CLOSED);
+  subGone(view, closedKey(menuMod(), "submenu"));
   const list = items(view), o = list[0]?.id === ".." ? 1 : 0;
   const row = (i) => { const it = list[i]; return menuRow(view, t, `files-menu-${it.id}`, { at: [view, "at", i], label: it.label, open: i === view.sub?.row,
     icon: it.glyph ?? (it.icon ? `${ICONS}/icons/${it.icon}.svg` : null), sub: Boolean(it.sub || (it.into !== undefined && it.id !== "..")) && `${ICONS}/icons`, disabled: it.disabled, hint: it.hint || "Not available",

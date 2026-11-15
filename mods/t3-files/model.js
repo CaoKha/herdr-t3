@@ -1,18 +1,14 @@
 // What the Files page knows, apart from drawing it: git's answers parsed, the search filter and ranking, sort order and file kinds.
 // check-files.cjs loads this alone.
-import { sortEntries } from "./file-tree.js";
+import { join } from "./file-listing.js";
 
 export const REMOTE_MAX = 1000; // another machine sends at most this many matches, the first it finds; they're ranked here
 
-/** `a/b`: either may be "" (the space's folder, or a path from it). */
-export const join = (a, b) => !a ? b : !b ? a : `${a.replace(/\/$/, "")}/${b}`;
 export const parentOf = (p) => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
 export const nameOf = (p) => p.slice(p.lastIndexOf("/") + 1);
 /** The folders above a path, from the top: `a/b/c` → `a`, `a/b`. */
 export const ancestors = (p) => { const out = []; for (let at = p.indexOf("/"); at > 0; at = p.indexOf("/", at + 1)) out.push(p.slice(0, at)); return out; };
 
-// A folder's entries, NUL-separated kind and name, `.git` left out (as Herdr's files mod lists them).
-export const LIST = 'for p in "$1"/* "$1"/.[!.]* "$1"/..?*; do [ -e "$p" ] || [ -L "$p" ] || continue; n=${p##*/}; [ "$n" = .git ] && continue; if [ -d "$p" ]; then k=d; else k=f; fi; printf "%s\\0%s\\0" "$k" "$n"; done; test -d "$1"';
 // The same entries as paths from the space's folder ($2 is the folder's, "" or "src/"), a folder's with a slash, put to Git.
 export const IGNORED = 'for p in "$1"/* "$1"/.[!.]* "$1"/..?*; do [ -e "$p" ] || [ -L "$p" ] || continue; n=${p##*/}; [ "$n" = .git ] && continue; if [ -d "$p" ]; then printf "%s%s/\\0" "$2" "$n"; else printf "%s%s\\0" "$2" "$n"; fi; done | git check-ignore --stdin -z; :';
 // Before reading a file on another machine: its size, and NULs in its first 8 KB. readTextFile there turns a binary into
@@ -21,13 +17,6 @@ export const PROBE = 's=$(wc -c < "$1") || exit 1; h=$(head -c 8192 "$1" | wc -c
 // Search on another machine runs there: the whole list would take seconds to come over. Every term in the path, case
 // aside, REMOTE_MAX at most. The query goes as an argument, never into the script.
 export const REMOTE_SEARCH = `if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-files -co --exclude-standard -z | tr '\\0' '\\n'; else find . -name .git -prune -o -type f -print | sed 's|^\\./||'; fi | awk 'BEGIN { n = split(tolower(ARGV[1]), t, " "); ARGV[1] = "" } { p = tolower($0); for (i = 1; i <= n; i++) if (!index(p, t[i])) next; print; if (++c >= ${REMOTE_MAX}) exit }' "$1"`;
-
-// The listing script's output: a kind (d or f) and a name, each ended by NUL; in file-tree.js's order.
-export function parseListing(stdout) {
-  const fields = stdout.split("\0"), out = [];
-  for (let i = 0; i + 1 < fields.length; i += 2) out.push({ name: fields[i + 1], dir: fields[i] === "d" });
-  return sortEntries(out);
-}
 
 // `git check-ignore --stdin -z`'s answer: the paths it was given that Git ignores. A folder was asked with a trailing slash.
 export function parseIgnored(stdout) {

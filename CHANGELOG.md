@@ -4,6 +4,8 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-16
 
+- Review's file and folder rows now drag into terminals and use Files' same right-click menu without changing the current file or reviewed boxes. Deleted files offer only Copy path and cannot drag; subgroup rows have neither action.
+
 - Files: drag a file or folder row into a terminal to paste its path without Enter. Herdr handles quoting and cross-machine rules; normal clicks and Insert into terminal remain unchanged.
 - Spaces warns beside a machine's name when its agents stop after you disconnect, even while connected. Click for Herdr's fix instructions and Copy button; no privileged command runs automatically. Older cores without this report show no warning.
 - Closing a repository in Spaces now releases its folder watch immediately, without waiting for another file change. The standalone Review bar also releases old watches when you move elsewhere; periodic refreshes remain.

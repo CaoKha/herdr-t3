@@ -62,6 +62,8 @@ Apply 保存时，在独占的 `.preview/save-<unique-id>` 写入文本（不超
 - **弹窗关闭时间戳**：mod 整个就是一个弹窗时用 `<mod>.closed`（`t3-picker.closed`）；mod 平时是别的东西、另外还会以某种弹窗打开时用 `<mod>.<那种弹窗>Closed`（`t3-agents.sortClosed`）。键名只经 `shared/store.js` 的 `closedKey(mod, popup?)` 生成，读写两边不写字面量（`check-store.cjs` 扫描把关）。由弹窗的 `close()` 写，打开它的控件用 `shared/trigger.js` 读（内部是 `focus.js` 的 `justClosed`），按钮的 on 态也由它与打开时间比出来。Review 页内弹层不是 mod 弹窗，外部按下关闭时由页面写 `review.<名字>Closed`（`settingsClosed`、`scopeClosed` 等）。
 - **名字由别人定的键**，照用：和 Herdr 自带 mod 共用的 `layout`、`space.colors`、`agents.sort`；Inbox 的 mod 卡片约定 `<mod>.program`、`<mod>.status`、`<mod>.titles`。
 
+Review 的树菜单也是本 mod 的原生 popup，复用 `shared/menus.js`：顶层关闭写 `closedKey("review", "menu")`，子菜单写 `closedKey("review", "submenu")`。开启行的 id／时间只记本次运行；路径、来源 space／tab、删除标记只随 popup props 传递，不改变当前文件或已看状态。
+
 ## 读写
 
 `t3.settings` 默认 `{ afterAway: "home", homeMod: "t3-home" }`，Terminal 存为 `homeMod: null`。`t3-actions.actions` 是 `{ list: [{ id, name, command, icon, place, cwd? }], last }`，全局一份。`t3-inbox.rows`、`t3-agents.rows` 发布各自画出的 `{ order, view }`，供上／下 agent 键走同一顺序。重启保留 pins、settings、每 space 面板、Home id、最近 pane（`t3-tabs.recent`，至多 30 个）和终端标签；最后看的 agent 和关闭历史只在内存里。

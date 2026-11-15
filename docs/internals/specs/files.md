@@ -47,7 +47,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ## Tree behaviour
 
-- Files rows are native drag sources (`treeRow`'s `drag` option), carrying `[join(st.root, row.top)]` and `{ on: st.on }` to `.drag_paths()`. A compact folder chain carries its outermost path, not its last segment. Review rows do not opt in. Normal clicks still open files or expand/collapse folders; starting a drag must not choose a row. Insert into terminal remains a separate menu action.
+- Files and Review path rows are native drag sources (`treeRow`'s `drag` option), carrying the absolute path and the space's machine to `.drag_paths()`. Files uses `[join(st.root, row.top)]`; Review uses its repository root and real paths, never subgroup prefixes. A compact folder chain carries its outermost path, not its last segment. Deleted files and subgroup rows cannot drag. Normal clicks still open files or expand/collapse folders; starting a drag must not choose a row. Insert into terminal remains a separate menu action.
 - Herdr 0.1.16 owns delivery: quote and paste without Enter; local files may copy into a remote terminal, local folders cannot upload; remote paths only drop on their own machine. It rejects control-character paths. Dropping outside a terminal cancels. Do not reimplement quoting, copying or validation in the mod. These real gestures require user verification; an element-tree check proves only the path/machine payload and unchanged clicks.
 - Loaded single-folder chains stay compact when closed.
 - Order: folders first, natural order (a small ASCII digit-run comparer: QuickJS has no `Intl`, and `localeCompare` puts `file2` after `file10`). Dotfiles shown except `.git`. Ignored entries dim.
@@ -120,7 +120,7 @@ Only a missing file returns `null`; an empty file returns `""`. Binary and inval
 - Local: Open, Reveal (`open -R`), Open with (default app where supported); relative Copy path; Insert into the tab's last active terminal (disabled when there is none). Remote spaces get no local-app rows.
 - Arrows, Escape and typeahead work. `cmd-w` closes the menu before the tab.
 - Insert: save the text clipboard, write the path, `pane.focus` the terminal, `terminal.paste`, then restore the clipboard 150ms later (paste reads the clipboard late; restoring at once pastes the old text). Never presses Enter, never overwrites an image clipboard or something copied meanwhile. Paths with control characters are refused; Copy path still works.
-- Review's tree has no menu.
+- Files and Review share `shared/menus.js`, copied to each mod with its dependencies; each opens its own popup, so standalone Review needs no Files mod. Right-click does not select, toggle a folder or mark reviewed. The menu owner keeps the shared row's context highlight. Review's deleted files offer only relative Copy path; subgroup rows have no menu.
 
 ## Commands
 

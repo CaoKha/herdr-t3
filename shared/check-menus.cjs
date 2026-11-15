@@ -1,4 +1,4 @@
-// A tree row's menu offers what its row can do there; Insert pastes the path without losing the clipboard (menus.js).
+// Files and Review's menu offers what a path can do; Insert preserves the clipboard (menus.js).
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");

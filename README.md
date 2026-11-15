@@ -26,7 +26,7 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 - **Other machines**: their spaces grouped by machine, their Inbox cards marked. In Lists, hover an Agents row to see its machine's name.
 - **Disconnect warning**: a machine heading warns when its agents will stop after you disconnect. Click the warning for Herdr's fix instructions; nothing privileged runs automatically.
 - **Files**: a read-only T3-style tree, the same as Review's, and one tab per file. Search keeps the tree, directory breadcrumbs keep a return trail, and the header's controls keep fixed slots across Preview/Code. Hide retains tabs; close releases them. Large trees cancel obsolete expansion work and draw only visible rows. Drag a file or folder row into a terminal to insert its path without Enter; cross-machine copies and refusals follow Herdr’s rules. Insert into terminal remains in the menu.
-- **Review** (optional): one closable tab per space, with its own range and reading position. Switching retains it; closing and re-adding starts from the default range.
+- **Review** (optional): one closable tab per space, with its own range and reading position. Switching retains it; closing and re-adding starts from the default range. Drag file/folder rows into terminals or use Files' same right-click menu; deleted files only offer Copy path and cannot drag, and subgroup rows have neither action. Right-click preserves the current file and reviewed boxes.
 
 Each in detail: [the guide](docs/user/guide.md).
 

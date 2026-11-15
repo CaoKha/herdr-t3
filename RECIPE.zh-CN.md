@@ -72,7 +72,7 @@ Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件�
 
 ### 可选 Review
 
-Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)（CLI `jin.review`），只支持本机仓库，读标签工作处的仓库。32px 工具栏（同 Files 文件头，中心与工作列窗格头同高）有范围菜单（带数量的 Changes、Uncommitted、Outgoing、Incoming，再是 Commits）、分支比较目标或 commit 的 SHA 加 `‹ ›`、Analyze、折叠菜单、设置和导航开关。按钮图标 14px；diff 在 `background` 上，工具栏和导航列在 `chrome` 上，同 Files；页面里不画线、不描边：工具栏、文件头和组说明下都没有分隔线，hunk 行底是 `foreground` 5%，注释卡是 4%。有两个及以上组时，工具栏下是一行组页签，当前组照面板标签点亮；导航列用 Files 的树行列出当前组的文件，带已看框。非仓库或远程时只写 `Review`，范围无变化写 `No changes`。规格：[review](docs/internals/specs/review.md)。
+Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)（CLI `jin.review`），只支持本机仓库，读标签工作处的仓库。32px 工具栏（同 Files 文件头，中心与工作列窗格头同高）有范围菜单（带数量的 Changes、Uncommitted、Outgoing、Incoming，再是 Commits）、分支比较目标或 commit 的 SHA 加 `‹ ›`、Analyze、折叠菜单、设置和导航开关。按钮图标 14px；diff 在 `background` 上，工具栏和导航列在 `chrome` 上，同 Files；页面里不画线、不描边：工具栏、文件头和组说明下都没有分隔线，hunk 行底是 `foreground` 5%，注释卡是 4%。有两个及以上组时，工具栏下是一行组页签，当前组照面板标签点亮；导航列用 Files 的树行列出当前组的文件，带已看框，可拖进终端并共用 Files 的右键菜单。已删除文件只能复制路径、不能拖动；子组行两者都没有。右键不改当前文件和已看状态。非仓库或远程时只写 `Review`，范围无变化写 `No changes`。规格：[review](docs/internals/specs/review.md)。
 
 ### 弹层、对话框与 Home
 
