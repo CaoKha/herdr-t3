@@ -4,6 +4,7 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-16
 
+- Spaces warns beside a machine's name when its agents stop after you disconnect, even while connected. Click for Herdr's fix instructions and Copy button; no privileged command runs automatically. Older cores without this report show no warning.
 - Closing a repository in Spaces now releases its folder watch immediately, without waiting for another file change. The standalone Review bar also releases old watches when you move elsewhere; periodic refreshes remain.
 - Checking the layout no longer clears Files' image cache or wallpaper drafts, exports the theme, or starts the layout's startup probes and file writes. The check still initializes and renders the mods. Requires Herdr 0.1.16.
 

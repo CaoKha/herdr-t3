@@ -274,7 +274,11 @@ export default class Spaces extends View {
         // The dot describes the machine, so it follows its name, however short.
         .child(h_flex().flex_1().min_w(0).gap(8).items_center()
           .child(div().min_w(0).truncate().child(m ?? "This computer"))
-          .child(tipMark(this, t, `machine-state-${id}`, connected ? "Connected" : (machine?.state ?? "asleep").replace(/_/g, " ").replace(/^./, c => c.toUpperCase()), div().size(6).rounded_full().flex_none().bg(connected ? t.ansi2 : t.dim))))
+          .child(tipMark(this, t, `machine-state-${id}`, connected ? "Connected" : (machine?.state ?? "asleep").replace(/_/g, " ").replace(/^./, c => c.toUpperCase()), div().size(6).rounded_full().flex_none().bg(connected ? t.ansi2 : t.dim)))
+          .when(machine?.keeps_running_after_logout === false, el => el.child(trigger(this, t, `machine-logout-${id}`, {
+            icon: "mods/t3-spaces/icons/circle-alert.svg", label: "Agents stop when you disconnect. Show the fix", size: "micro", surface: "row", color: t.blocked, open: false,
+            onOpen: () => openOverlay({ mod: "machine-add", kind: "dialog", width: 560 }),
+          }))))
         .when(!connected && !rebuilt, el => el.child(div().flex_none().child((machine?.state ?? "asleep").replace(/_/g, " "))))
         .when(rebuilt, el => el.child(h_flex().flex_none().gap(4).items_center()
           .child(div().max_w(140).truncate().child(repair?.error || "rebuilt ·"))

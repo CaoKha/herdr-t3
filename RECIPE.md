@@ -40,6 +40,8 @@ A card (78px with all three lines) shows the space and the state or time (Workin
 
 Lists splits the sidebar into Spaces and Agents, each with a 32px heading aligned with the Inbox's top row. Spaces are 32px rows with a 16px mark and medium name, grouped by machine when there is more than one (an empty machine offers `New space here`). Unusual git facts show beside the name (`repo · branch ↑2 ↓1`; `main` and `master` left out), and worktrees nest under their repository with tree lines.
 
+A machine reported as unable to keep agents running after logout has a warning in its heading, even while connected. Click it for Herdr's Add machine fix instructions; never run privileged commands automatically. A missing report shows no warning.
+
 Agents are 36px rows with a program icon, time in state (`<1m`, `5m`, `3h`, `2d`) that becomes a pin on hover, and the status mark; viewed and attention-needing agents stand out. Sort by space or priority, Pinned a group in both. Sub-agents fold under their parent; blocked or failed ones stay visible. Spec: [lists](docs/internals/specs/lists.md).
 
 ### Tab bar

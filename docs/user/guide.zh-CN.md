@@ -26,6 +26,7 @@
   - 卡片右键可显示或隐藏这几项，或 Reset；全部隐藏时用 Choose what to show 找回。
   - 打开面板会收起详情；面板放大时，快捷键先恢复终端。Home 没有 Actions。
 - **其他机器**：机器多于一台时 Spaces 按机器分组，来自其他机器的 Inbox 卡片带服务器标记，标记不单独弹提示。Lists 的 Agents 行只在悬停详情里显示机器名；Inbox 卡片的悬停详情也能查看机器名。在 Herdr 的 Settings 里添加机器；重建过的机器会提供 Connect，New space 会先问建在哪台机器上。
+- 机器名旁的警告表示断开后 agent 会停止，即使现在仍已连接。点警告查看 Herdr 的说明和 Copy 按钮，再自行到那台机器上执行建议的命令。此报告需要远程 herdr-core 0.1.21 或更新版本；旧 core 没有该字段时不显示警告。
 - **程序图标**：Inbox、Agents、标签、窗格标题、Go to 和子 agent 菜单直接使用 Herdr 官方素材，保留原有留白和配色，图标槽按各组件的尺寸绘制。
 - **项目图标**：space 显示其仓库的 favicon（在它所在的机器上查找），没有时显示 T3 配色的首字母图标。
 - **右键菜单**：代表 agent、space、仓库、机器、标签或窗格的东西，右键都打开它的菜单，在哪里右键都是同一份。agent 的（Inbox 卡片、Agents 行、标签栏里的名字）：Pin、Settle、Snooze 或 Wake（只在 Inbox 下有；鼠标停在 Snooze 上，时间选项在菜单旁边展开，同 T3 的子菜单）、标签里只有它时的 Rename、Copy address、Send back 回父级、Close。space 的（Spaces 或 Agents 里的行、标签栏、Inbox 的筛选）：New tab、Rename、Copy path、New worktree 和 Open worktree、Remove worktree、Close。Spaces 里仓库那一行暗行：Open、Copy path。机器标题：New space here、Connect。标签的：New tab、Rename、Close。窗格的（终端、窗格标题栏）：Split、Zoom、Copy address、Send right-clicks to pane、Close pane。当下做不了的不列出来。

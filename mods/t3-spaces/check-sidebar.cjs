@@ -1833,6 +1833,20 @@ for (const width of [208, 256]) {
     const blank = find(lists.render(cx), "machine-new-spare");
     assert.deepEqual([blank.style.px, blank.items[0].style.size, blank.style.gap], [8, 16, 10], "New space here lays out as a space's row");
     lists.machines = [{ name: "vps", state: "connected" }];
+    for (const flag of [true, undefined, false]) {
+      lists.machines = [{ name: "vps", state: "connected", ...(flag === undefined ? {} : { keeps_running_after_logout: flag }) }];
+      const warning = find(lists.render(cx), "machine-logout-vps");
+      assert.equal(Boolean(warning), flag === false, "warn only on an explicit false, even while connected");
+    }
+    const warning = find(lists.render(cx), "machine-logout-vps"), before = f.labelled.length;
+    let stopped = false;
+    fire(warning, "on_click", {}, { ...cx, stop_propagation() { stopped = true; } });
+    assert.deepEqual(plain(f.overlays.pop()), { mod: "machine-add", kind: "dialog", width: 560 }, "the official dialog owns the fix and Copy");
+    assert.ok(stopped, "the warning's click cannot fold its machine");
+    assert.equal(lists.folded.has("vps"), false);
+    assert.equal(f.labelled.length, before, "opening the instructions never executes sudo or another core command");
+    lists.machines[0].keeps_running_after_logout = true;
+    assert.equal(find(lists.render(cx), "machine-logout-vps"), null, "a repaired machine loses the warning");
     const label = (id) => { lists.hot = id; fire(find(lists.render(cx), `tip-over-${id}`), "on_hover", true, cx); while (cx.timers.length) { const t = cx.timers.shift(); if (!t.gone) t.fn(cx); } return strings(find(lists.render(cx), `tip-${id}`).style.content); };
     assert.deepEqual(label("space-new"), ["New space"], "⌘N doesn't ask, as this does");
     assert.deepEqual(label("space-new-tab"), ["New tab"]);
