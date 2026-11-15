@@ -40,6 +40,12 @@ Herdr 自 0.1.14 起自动处理绑定 `tab.close`/`pane.close` 的关闭键，�
 
 点已开的 popup 按钮，outside press 先关弹层、click 才到按钮；`close()` 写时间，按钮经 `shared/trigger.js`（`trigger()`／`opener()`，内部是 `pressed`＋`justClosed`）避免立刻重开，各弹层用自己的键，所以开着一个时点另一个的按钮仍会打开它。Review 页内弹层也一样：外部按下关闭时写 `review.<名字>Closed`，不再用 300ms 时间窗。`t3-menu`、Files 和详情的菜单经 `shared/popup-menu.js` 登记谁挂在谁下面（子菜单关掉时在它的 `close()` 里把键盘交还上级；Herdr 不许在 render／layout 里 `focus()`，`scripts/render-guard.cjs` 让检查在那里聚焦时失败）：关闭时连带关掉后代，选中一项关掉整条链，子菜单旁开（`openBeside`）；子菜单关闭写各自的 `<mod>.submenuClosed`（详情的 Commits 写 `t3-actions.menuClosed`），上级渲染时读它重绘并收回键盘（`subGone`）。按钮下方的放置统一用 `shared/trigger.js` 的 `hang`。Review 页内子菜单复用 `shared/submenu.js` 的悬停意图/方向键规则。Snooze `Popover` 的 Enter/Space 要绑定在持 focus handle 的面板 context，否则宿主绑定只关菜单、不选项。滚动列表用 `shared/list.js` 同步 pointer/highlight/scroll，另包滚动容器会跟不上按键。
 
+### macOS 菜单绕过布局规则（Herdr 0.1.16）
+
+macOS 菜单的 `File > New Tab`、`File > Close Tab`、`Window > Go to Tab…` 分别直调 `tab.new`、`tab.close`、`mod.open:picker`，不查 `keys.json`，因此不经过 T3 的 Home 规则、关闭确认和 `t3-picker`：New Tab 能在 Home 里再开标签；Close Tab 对非最后一个、仍在运行程序的标签直接关闭（最后一个转成核心 `space.close`，仍可能有原生确认）；Go to Tab 打开的是官方 picker。键盘绑定仍走 T3，不能从菜单显示了同一个快捷键推断两者行为相同。
+
+这是宿主限制：核心命令优先于 mod 命令，不能覆盖；菜单动作从终端的宿主元素冒泡，不经过各 block 里的 mod，`on_action` 也拦不住。绑定与派发依据为 Herdr `src/macos.rs`、`src/window.rs`；命令行为已有独立演示窗回放，真实菜单点击未验证。不在布局加模拟拦截层，本轮不改代码、不提上游。
+
 ## 尺寸、滚动与重排
 
 文字截断提示统一经`shared/measured-text.js`：显示文字量容器，零高、不带truncate的副本量自然宽，二者字体／字重相同；只有布局宽度变化才更新。Actions、电脑名和surface tab仅截断或折成图标时提示，split箭头只有aria-label，面包屑／文件树行不放tooltip。T3原有状态／Woke动作提示保留。
