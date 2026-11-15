@@ -1,6 +1,6 @@
 # 布局实现中的宿主限制
 
-改 render/timer、键盘/hover、测量/滚动、Review 文本或壁纸转换时读本文。可见规格与验收在 [RECIPE](../../RECIPE.zh-CN.md)；尺寸/颜色以 [t3-tokens](t3-tokens.md) 为准，跨帧数据、文件和迁移以 [storage](storage.md) 为准。本文只记不能从 API 签名看出的限制，不复制这两份的表，也不归档旧版 RECIPE。
+改 render/timer、键盘/hover、测量/滚动、Review 文本或壁纸转换时读本文。可见规格与验收在 [RECIPE](../../RECIPE.zh-CN.md)；尺寸/颜色以 [t3-tokens](t3-tokens.md) 为准，跨帧数据和文件以 [storage](storage.md) 为准。本文只记不能从 API 签名看出的限制，不复制这两份的表，也不归档旧版 RECIPE。
 
 ## Render 只造 view
 
@@ -42,7 +42,7 @@ Herdr 自 0.1.14 起自动处理绑定 `tab.close`/`pane.close` 的关闭键，�
 
 `on_size_change` 返回乘 zoom 后像素；布局 resize 用逻辑像素，要除 `settings().zoom`。Actions/end 自定 block 宽，`tabs-row` 不可拖。Compact 在不受标签控件宽度影响的 `bar-measure` 测工作列；在标签区测会因控件收缩而反复开合。macOS traffic lights 是未缩放屏幕点，文件热加载补偿与并发安全写见 storage。
 
-Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切、`tab-strip.ml()` 偏移；零高全名副本量完整宽，只有 active/room 改变才修正。侧栏普通列表不能代码 scroll-to-current；搜索/树用可控虚拟列表。Agents 列表超过 50 行时改为窗口化（`mods/t3-agents/main.js`）：行高取自 `planMotion` 已有的条目高度和 y，只画视口内的行及上下各两行，滚轮自己移动，`leavingRows(view, top)` 跟着偏移；首次测量前按 800 高画。宿主的 `v_virtual_list` 行里不能挂处理函数，所以没用它。代价：窗口化时 Tab 只走到已画出的行。200 个 agent、5000 终端时一帧元素从 13,219 降到 427（`performance-audit/bench-render.mjs`）。
+Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切、`tab-strip.ml()` 偏移；零高全名副本量完整宽，只有 active/room 改变才修正。侧栏普通列表不能代码 scroll-to-current；搜索/树用可控虚拟列表。Agents 列表超过 50 行时改为窗口化（`mods/t3-agents/main.js`）：行高取自 `planMotion` 已有的条目高度和 y，只画视口内的行及上下各两行，滚轮自己移动，`leavingRows(view, top)` 跟着偏移；首次测量前按 800 高画。宿主的 `v_virtual_list` 行里不能挂处理函数，所以没用它。代价：窗口化时 Tab 只走到已画出的行。200 个 agent、5000 终端时一帧元素从 13,219 降到 427（2026-11-14 实测）。
 
 导航列不用宿主 `h_resizable`：它按 id 留各块大小并随页面等比缩放，面板变宽时会先错误缩放一帧再弹回。共用 `shared/nav-column.js` 自绘边缘，拖动只改本页、释放才保存。`holdWidth` 共用算法但每页独立状态：宽稳定 300ms 后重排；Files 在此之前固定旧 Editor 宽并裁切，Review 保留旧折行列数。Editor 的 soft wrap 配置创建时取，切换后绘制外重建。Files 超过 16KB 的文件被改写或切换 Wrap 时先建纯文本 Editor，着色由 `colorLater` 的 `cx.timer.after` 换上：每次推迟换一个 stamp，旧计时器到点即作废；到点时文件不在显示就不换，等 render 看到仍未着色再排一次，所以隐藏的页面不着色。Files/Review 刷新与缓存生命周期由 storage 定义；不调用不可可靠取消订阅的递归 `watchFolder`。
 
@@ -58,7 +58,7 @@ Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切�
 
 ## 壁纸转换而非用户生命周期
 
-`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 和运行时导入使用。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形，草稿就是Braille的采样网格（列×2、行×4，各模式最细的一档）：由系统缩放器直接出（sips、ImageMagick `-resize`），BMP base64一次回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`对草稿做整块面积平均得到其他模式的网格（Braille原样用）；RGBA在草稿中复用，不重读原图。2026-11-14 起不再照网站在JS里做4倍超采样再块平均：字形与旧流程逐格一致率87–99%（Braille最低），整图看不出差别，选图到预览快5–10倍（2026-11-14 实测，用户拍板接受）。同一份采样RGBA的字形及每格RGB仍须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
+`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 和运行时导入使用。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形，草稿就是Braille的采样网格（列×2、行×4，各模式最细的一档）：由系统缩放器直接出（sips、ImageMagick `-resize`），BMP base64一次回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`对草稿做整块面积平均得到其他模式的网格（Braille原样用）；RGBA在草稿中复用，不重读原图。不照网站在JS里做4倍超采样再块平均：字形逐格一致率87–99%（Braille最低），整图看不出差别，选图到预览快5–10倍（用户拍板）。同一份采样RGBA的字形及每格RGB仍须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
 
 宿主`exec`静默丢弃stdout超过8MiB的尾部；网格草稿最大960×384，BMP约1.1MB、base64约1.5MB，一次 exec 读完。`decodeBmp` 仍接受分块文本。分配RGBA前检查头部、尺寸与实际解码字节完整度；RGBA转码每4096像素yield，不能按固定64行分块（大宽图会单步卡近200ms）。
 
@@ -70,11 +70,11 @@ Dots/Blocks每格1×1采样，Quadrants为2×2，Braille为2×4；autoLevels两�
 
 图片加载与等待。`image()` 在后台栅格化，没有完成回调，自己的 `on_size_change` 也不触发（实测）。但 GPUI 只在拿到图后才给不设尺寸的 `image()` 定尺寸，包住它的 div 的 `on_size_change` 会触发：`layers()` 在一个 0×0、`overflow_hidden` 的盒里放一份不设尺寸的新画，外层 div 报出宽度大于0时算加载好（`loaded`），才把新画换上；之前一直画上一张（`held`）。图层按图片路径做 id，新画是新元素，直接以目标不透明度出现，没有淡入。`loaded` 只留这一帧画着的路径（显示的和下面的 warm），其余每次 render 删掉：宿主会放掉不再画的图，再切回来时重新探测（缓存还在就下一帧报尺寸）。2026-11-15 实测：留着不再画的路径，换回它时会当成已加载直接换上，而宿主要从文件重新栅格化，Home 空了约0.8s。Home 的第一张画没有上一张可留，探测到之前 Home 是空的。
 
-明暗切换不能靠「留上一张」：上一张是按旧明暗配色画的，浅色主题的纸面画（深色墨）放到深色底上几乎全黑，反过来是一片发白，等新图转换加探测要 0.5–1.9s（2026-11-15 VM 实测）。所以显示中的画加载好后，`warm()` 从 `settings()` 的 `theme_light`／`theme_dark` 和 `themes()` 取另一明暗主题的颜色（叠上 `settings().colors`），在后台做出那一张，用同样的 0×0 探测副本（`wallpaper-warm`）一直画着：一直画着宿主才不放掉它，所以它留在 `loaded` 里。切换的那次 render 里键已做好、已加载，新画与新底色同一帧出现。代价是多留一张载入的画（大小同显示中的那张，见上）。窗口变大时先做显示中的那张，它换上后另一张才按新尺寸重做，免得两张同时栅格化拖慢眼前这张。另选一个主题（不在当前这对里）仍要等它的图，期间留上一张。宿主放掉不再画的图后，只能从文件重新加载：同明暗旧调色板的文件被删时，它在 `pictures` 里的键也要删，否则切回那个调色板时路径还在、文件已无，探测永远不报尺寸，Home 停在上一张（2026-11-15 前的「黑屏」之一）。2026-11-14 前的做法是新画以 opacity 0 叠在上面固定等 400ms（`WARM`）再显示：显示的那一帧同时拿掉上一张，而新画的 opacity 0→1 有 150ms 过渡，Home 会先空一帧、再暗几帧。逐帧截图里旧做法有一帧整片空白接几帧渐显，新做法没有空白帧，也没有两张叠画的帧（先试过让上一张垫在下面150ms，结果透明底的点阵叠在一起，删了）。
+明暗切换不能靠「留上一张」：上一张是按旧明暗配色画的，浅色主题的纸面画（深色墨）放到深色底上几乎全黑，反过来是一片发白，等新图转换加探测要 0.5–1.9s（2026-11-15 VM 实测）。所以显示中的画加载好后，`warm()` 从 `settings()` 的 `theme_light`／`theme_dark` 和 `themes()` 取另一明暗主题的颜色（叠上 `settings().colors`），在后台做出那一张，用同样的 0×0 探测副本（`wallpaper-warm`）一直画着：一直画着宿主才不放掉它，所以它留在 `loaded` 里。切换的那次 render 里键已做好、已加载，新画与新底色同一帧出现。代价是多留一张载入的画（大小同显示中的那张，见上）。窗口变大时先做显示中的那张，它换上后另一张才按新尺寸重做，免得两张同时栅格化拖慢眼前这张。另选一个主题（不在当前这对里）仍要等它的图，期间留上一张。宿主放掉不再画的图后，只能从文件重新加载：同明暗旧调色板的文件被删时，它在 `pictures` 里的键也要删，否则切回那个调色板时路径还在、文件已无，探测永远不报尺寸，Home 停在上一张（2026-11-15 前的「黑屏」之一）。新画不从 opacity 0 渐显（上一张同帧拿掉，Home 会先空一帧、再暗几帧），上一张也不垫在下面（透明底的点阵叠在一起）。
 
 等待提示统一走 `track(key, on, cx)`：渲染时第一次看到某个等待才开始计时，150ms 内结束就不显示，显示后至少留300ms；草稿的等待键带草稿 id，Cancel 时一并清掉。图片读取的进度来自 `readImage` 各步骤结束时的回调（读图占进度条前一半，第一次画占后一半），不是估算的时间。
 
-渐进预览评估过，没做：读图后手里只有采样网格大小的 BMP，是原照片不是字符画，先显示它再换成点阵，画风会跳一下，而且只比正式预览早0.25–0.45s；换模式时上一个模式的画本来就是最好的粗预览；合成的耗时在 JS 的字符转图块上，降分辨率省不了。
+不做渐进预览：先显示读到的原照片再换成点阵，画风会跳，只早0.25–0.45s；换模式时上一个模式的画就是粗预览，降分辨率也省不了字符转图块的耗时。
 
 取景输入（`framing.js`）。滚轮事件的 `delta_lines` 只在带刻度的滚轮上出现（macOS `hasPreciseScrollingDeltas == NO`），触控板和 Magic Mouse 没有；据此判别：有 `delta_lines` 纵向缩放（6格翻倍）、横向占优时平移；没有时平移；带 ⌘ 或 Ctrl 一律缩放（200px翻倍）。缩放以指针为锚：`zoomAt` 先求指针下那一点在画上的比例位置，缩放后把它放回指针下，再把对齐比例钳在[0,1]。macOS 的惯性滚动没有单独阶段，抬指后照样以 `moved` 送达：收到 `ended` 后，间隔小于100ms的连续事件丢弃，`started` 或停顿≥100ms恢复。gpui-kit 没有暴露 GPUI 的 `PinchEvent`（`on_pinch`），捏合由 ⌘ 加双指滚动代替。取景卡浮在画布上、宿主没有 occlude：卡片自己的 `on_mouse_down`／`on_scroll_wheel` 先 `stop_propagation`，不让底下画布开始拖动或缩放；Zoom 行上滚动以 Home 中心缩放。`on_drop` 没有 drag-over 事件，拖入时无法高亮。
 

@@ -36,7 +36,7 @@ Two audiences, two sets:
 
 ### Domain docs
 
-Single-context: `GLOSSARY.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` and `docs/adr/` at the root. Before working in an area, read the ADRs that touch it. Name domain concepts with the glossary's terms; when your output contradicts an ADR, say which one and why it's worth reopening.
 
 ## Demo window
 

@@ -92,13 +92,13 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 - 会保留：置顶、折叠、排序、布局的设置、Settled 收纳区和已 Settle 的 agent（存在 `data/`、`shared.json` 和终端标签里），以及你的动作；已安装布局里的主题、当前选中的侧栏、聚焦边框颜色、面板的 Review 位、Review 栏和主题导出的块。
 - 会丢掉：你对被覆盖文件的其他修改，需要重新改。Settle 后跳到下一张卡片现在是一项设置，不用再改文件。
 - 如果首次安装时因为重名改过名字，脚本并不知道：它会装上原来的名字，你可以让布局改回指向自己那份，或者删掉那份。
-- 改了什么、一些键的效果有什么变化：见[更新日志](../../CHANGELOG.zh-CN.md)。从 Focus 改名为 Inbox 之前的版本升级（`t3-focus` → `t3-inbox`）时，先把 `data/t3-focus` 改名为 `data/t3-inbox`（卡片顺序和收纳区状态），再删掉 `mods/t3-focus`。
+- 改了什么、一些键的效果有什么变化：见[更新日志](../../CHANGELOG.zh-CN.md)。
 
 ## 已知限制
 
 - Home 是一个单独的 space：切到其他布局、执行 `herdr-app ls` 或从另一台机器看时，会看到它。
 - 你给 Home 改了名后，同一 Herdr core 的另一个窗口认不出它，会再建一个 Home。
-- 其他机器上的 space 没有 Review 栏，面板里的 Review 置灰。
+- 其他机器上的 space，面板里的 Review 置灰，你自己加的 Review 栏也不显示。
 - 其他机器上的 Files：可见时文本变化通常在 10 秒内显示，大仓库适当放慢；图片重新点选时重读，超过 512 KB 的图片不预览。
 - Files 只预览 1 MB 以内的文本，只给常见语言着色（JavaScript 和 TypeScript、JSON、YAML、Rust、Go、Python、shell、CSS、C 和 C++、Java、Kotlin、Ruby、PHP、SQL、Lua、GraphQL、Makefile）；TOML、HTML、Swift 等显示为纯文本。agent 改写你正看着的超过 16 KB 的文件、或你对它切换 Wrap 后，它先显示片刻纯文本，内容约 10 秒不再变化（Wrap 是 0.3 秒）后再着色；其间你滚动过，就保持纯文本，直到再次打开。超过 256 KB 的不自动着色，按代码上方的 **Highlight anyway** 才着色，着色时窗口会停顿片刻。
 - Files 保留宿主原生只读 Editor。其 gutter 底色与高度暂不能匹配 T3；保留文字选择，本次未验证真实 Herdr 鼠标拖选。

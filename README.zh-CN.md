@@ -84,7 +84,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 
 ## 可选扩展
 
-- **pulls.review**：Review 栏和面板里的 Review 标签。
+- **pulls.review**：面板里的 Review 标签；Review 栏布局默认没有，可以自己加。
 - **给 Pi 用的主题导出**：让 Pi 的配色跟着 Herdr 走。
 - **asciicn 壁纸**：Home 换成一张主题配色的静止画：自带4张，自己的图片可选 Dots、Braille、Blocks 或 Quadrants，也可导入 Studio `.ans`，从 `+` 选或直接拖到 Home 上。任何画都能用滚轮、触控板或拖动取景；浅色主题下图片像墨画在纸上。见[可选扩展](docs/user/extras.zh-CN.md#asciicn-壁纸)。
 - **主题**：Catppuccin 和 T3 Code，各有明暗两套。

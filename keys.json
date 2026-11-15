@@ -110,18 +110,6 @@
     "cmd-shift-w": "overlay.close",
     "ctrl-alt-x": "overlay.close"
   },
-  "mod:frame-settings": {
-    "cmd-w": "overlay.close",
-    "ctrl-alt-shift-x": "overlay.close",
-    "cmd-shift-w": "overlay.close",
-    "ctrl-alt-x": "overlay.close"
-  },
-  "mod:frame-palette": {
-    "cmd-w": "overlay.close",
-    "ctrl-alt-shift-x": "overlay.close",
-    "cmd-shift-w": "overlay.close",
-    "ctrl-alt-x": "overlay.close"
-  },
   "mod:help": {
     "cmd-w": "overlay.close",
     "ctrl-alt-shift-x": "overlay.close",

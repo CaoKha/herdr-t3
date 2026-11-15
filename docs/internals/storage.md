@@ -8,7 +8,7 @@
 
 | 存在哪里 | 放什么 | 谁看得到 | 留多久 | 例子 |
 |---|---|---|---|---|
-| 终端标签 | 某个终端（agent）自己的事实 | 每个窗口、每台机器 | 和终端一样长 | `settled`、`snoozed` |
+| 终端标签 | 某个终端（agent）自己的事实 | 每个窗口、每台机器 | 和终端一样长 | `settled`、`snoozed`（早于取名规则，不带前缀，不像 `herdr.seen`、`pi.session`） |
 | 共享状态 `shared()` | 本机几个 mod 共用的数据 | 本机所有 mod、所有窗口 | 重启后保留 | `t3.pins`、`t3.settings` |
 | `localStorage` | 一个 mod 自己的界面状态（折叠、筛选、收纳区开合） | 只有这个 mod 副本 | 重启后保留 | Inbox 的 `scope`、`settled.open` |
 | 内存 | 本次运行的记忆 | 只有这个 mod 副本 | 重启就没了 | `navigation.js` 的 `trail`、`lastIn`、`fresh` |
@@ -72,7 +72,7 @@ Files 的树按 space 共用，文件阅读位置按标签实例只记本次运�
 
 `globalThis.t3Titlebar` 只记本次运行测到的面板宽度（t3-chrome 的面板头），供键盘打开详情时锚定到同一入口；面板关着时详情的位置由 `panel.js` `windowEndPx` 和布局的 `tabs-end-inset` 算出，不靠测量。读写都经 `shared/titlebar.js`（`notePanelWidth`、`detailsAnchor`）；不写共享状态或磁盘。Files 的 Insert 借剪贴板粘贴路径，进行中只记本次运行的 `globalThis.t3PastePending`，防止连按把剪贴板换成半截；约 150ms 后放回原剪贴板并清掉。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
 
-详情只记本次运行的 `globalThis.t3Details.id`（打开着的详情 popup）。t3-menu、Files 和详情的菜单谁挂在谁下面，只记在本次运行的 `globalThis.t3Popups`（`shared/popup-menu.js`：overlay id → `{ mod, parent, kind, back? }`），用于行和split的开启态、关闭时连带关掉下级菜单，以及子菜单自己关闭时把键盘交回上级（`back`）；关闭即删。旧版 t3-menu 写过共享键 `t3-menu.chain`，`migrate` 时清掉。Commits 子菜单打开时从本次运行的 `globalThis.t3DetailsRange`（打开着的范围菜单）取已读到的提交，不再读 Git。都不写共享偏好。Open in菜单选择只更新既有全局目标名，真正执行只在主按钮点击发生。全局Actions的数据归属不改成项目脚本，已有动作不迁移或删除。
+详情只记本次运行的 `globalThis.t3Details.id`（打开着的详情 popup）。t3-menu、Files 和详情的菜单谁挂在谁下面，只记在本次运行的 `globalThis.t3Popups`（`shared/popup-menu.js`：overlay id → `{ mod, parent, kind, back? }`），用于行和split的开启态、关闭时连带关掉下级菜单，以及子菜单自己关闭时把键盘交回上级（`back`）；关闭即删。Commits 子菜单打开时从本次运行的 `globalThis.t3DetailsRange`（打开着的范围菜单）取已读到的提交，不再读 Git。都不写共享偏好。Open in菜单选择只更新既有全局目标名，真正执行只在主按钮点击发生。全局Actions的数据归属不改成项目脚本，已有动作不迁移或删除。
 
 `t3-actions.detailsItems` 保存详情中可用项目的显隐偏好：`environment`、`openIn`、`scripts`、`review`。默认全开，只存与默认不同的 `false`；Reset 清空。卡片右键与所有详情副本共用这一份，不存未知项目或缺少后端的T3功能。全隐藏仍显示 Choose what to show 入口，不改变Actions数据、面板标签或Git仓库。
 
@@ -90,16 +90,6 @@ Markdown 文件显示预览还是源码是 `t3-files.markdown`（`"code"` 或 `"
 
 小写单词，用点连接，写成 `<东西>.<状态>`：`settled.open`、`repos.folded`；只有一个词就够时用一个词：`scope`、`changes`。每个 mod 副本各有一份，不加 mod 前缀。
 
-Files 和 Review 各自保存 `lines.wrap`（布尔字符串）、`nav.width`（逻辑 px）和 `nav.open`。两页复用读写函数，但只访问自己副本的 `localStorage`。`migratePagePrefs()` 在各页初始化时，从旧 `t3.wrap`、`t3.navWidth` 复制尚未设置的初值；更早的 `review.prefs.wrap` 作为换行初值的后备。旧共用偏好暂留作尚未启动页面的迁移来源，不再写入，也不参与已迁移页面的日常读取。跨页请求 `review.reveal`、`t3-files.reveal` 已退休，迁移只清理它们。
+Files 和 Review 各自保存 `lines.wrap`（布尔字符串）、`nav.width`（逻辑 px）和 `nav.open`。两页复用读写函数，但只访问自己副本的 `localStorage`。
 
 两页的完整 space 数据都是本次运行的缓存，每页最多保留最近三个。较早的 space 只留轻量的选择、展开和评审范围等阅读设置；文件内容、Editor、diff 行、换行和布局缓存都要释放。驱逐时使已发出的异步读取失效；迟到的结果不能重新填满已释放的数据。两页使用仅可见时的有界刷新，不保留不可退订的目录监听。关闭 space 时一并清理它的内存记录。
-
-## 改名
-
-布局有真实用户（[ADR 0008](../adr/0008-change-behaviour-without-toggles.md)），所以改持久的名字必须带迁移：
-
-- 共享状态的键：在 `shared/store.js` 的 `RENAMED` 里加一条 `[旧名, 新名, 是否带走值]`。只是缓存或转瞬即逝的值不带走，只删旧键。新名下已有值时以新名为准，但空值（`null`、空数组、空对象）不算有值。`t3-tabs`、`t3-inbox`、`t3-actions` 在 `init` 里调 `migrate()`，它们任何一个都可能单独运行。
-- `localStorage` 的键：读它的 mod 在 `init` 里调 `migrateLocal([[旧名, 新名]])`。
-- 终端标签不改名：它们分布在各台机器上活着的终端里，没有地方能一次迁完。所以 `settled`、`snoozed` 不带前缀，和 `herdr.seen`、`pi.session` 不同，这是本规则之前就有的例外。
-
-迁移条目保留到确定所有安装都已更新过一次后再删。

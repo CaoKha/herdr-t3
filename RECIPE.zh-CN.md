@@ -199,7 +199,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 创建 `layouts/herdr-t3.json`、预览 `layouts/herdr-t3.svg`、`mods/t3-*` 和 `keys.json`。节点 id 唯一，下面这些结构 id 保持稳定，布局代码靠它们查找：
 
 ```text
-root: row, terminal_menu=t3-menu
+root: row, background=canvas, terminal_menu=t3-menu
 ├─ sidebar: column [256,min208,max480], chrome
 │  ├─ brand: t3-chrome [40]
 │  ├─ sidebar-lists: stack, active=inbox
@@ -210,7 +210,7 @@ root: row, terminal_menu=t3-menu
 │  ├─ tabs-row: row [40], 不可拖
 │  │  ├─ tabs: t3-tabs [weight1]
 │  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [自定宽]
-│  │  ├─ actions: t3-actions {block:"actions"} [自定宽]
+│  │  ├─ actions: t3-actions {block:"actions",details:true} [自定宽]
 │  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [自定宽]
 │  │  └─ tabs-end-inset: row [12]
 │  ├─ work-body: row, padding[0,8], gap8
@@ -221,8 +221,9 @@ root: row, terminal_menu=t3-menu
 │  └─ status: workspace-status [28,hidden]
 └─ panel: column [weight1,min480,hidden], chrome
    ├─ panel-head: t3-chrome {part:"panel"} [40], padding[0,12]
-   ├─ panel-body: stack, active=files
+   ├─ panel-body: stack, active=panel-empty
    │  ├─ files: t3-files
+   │  ├─ panel-empty: t3-chrome {part:"surface-empty"}
    │  └─ review: review [可选]
 floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 ```
@@ -235,7 +236,7 @@ sidebar、work、panel 列内部 `resizable:false`，外分隔线仍可拖。`sp
 
 必需 mod 以真实文件安装（SVG 软链不加载），布局、SVG 和按 context 合并的 keys 放在 `HERDR_APP_HOME` 或 `~/.config/herdr-app`；用 `layout.switch {"name":"herdr-t3"}` 选中。`scripts/update.sh`（需要 `jq`、`rsync`）先验证已装的布局和 keys，替换自己的 mod，保留主题、focus、stack 选择、extra 块和 Review 的 `config.json`，只更新已装的 extras 和主题，合并 keys 时仓库优先并报告替换。设置、pins 和用户的壁纸都不在被替换的目录里。`scripts/sync.sh` 还会写已装目录和同级的独立仓库。
 
-可选 Review：复制 `extras/mods/pulls-review` 和 `extras/mods/review`，按其指引装配 `jin.review`，在 `tabs-end` 前加一个 `review-bar` 块（`pulls-review`，`{block:"review-bar",toggle:true}`），在 `panel-body` 末尾加 `review` 页（extra 存在后 update 会自动加页）；不要把 id `review` 给 bar 用。壁纸和主题导出（`extras/mods/t3-theme-export`，一个零高的 `work` 块，给 Pi 写 `~/.cache/herdr-app-theme.json`）也是可选；配置见 [extras 使用文档](docs/user/extras.zh-CN.md)。
+可选 Review：复制 `extras/mods/pulls-review` 和 `extras/mods/review`，按其指引装配 `jin.review`，在 `panel-body` 末尾加 `review` 页（extra 存在后 update 会自动加页）。布局默认没有 Review 栏；可以自己在 `tabs-end` 前加一个 `review-bar` 块（`pulls-review`，`{block:"review-bar",toggle:true}`），id 不要用 `review`。壁纸和主题导出（`extras/mods/t3-theme-export`，一个零高的 `work` 块，给 Pi 写 `~/.cache/herdr-app-theme.json`）也是可选；配置见 [extras 使用文档](docs/user/extras.zh-CN.md)。
 
 ### Herdr 函数与程序
 

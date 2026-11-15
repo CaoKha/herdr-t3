@@ -4,21 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element() {
-  const node = { items: [], handlers: {}, style: {} };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => {
-      if (key === "when") { if (args[0]) args[1](proxy); }
-      else if (key === "children") node.items.push(...args[0]);
-      else if (key.startsWith("on_")) node.handlers[key] = args[0];
-      else if (key === "id") node.key = args[0];
-      else node.style[key] = args[0];
-      return proxy;
-    };
-  } });
-  return proxy;
-}
+const { elements } = require("./check-kit.js");
+const element = elements();
 
 let now = 0, zoom = 2;
 const src = fs.readFileSync(path.join(__dirname, "list.js"), "utf8")

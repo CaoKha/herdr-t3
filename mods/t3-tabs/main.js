@@ -14,7 +14,7 @@ import { litProp } from "./list.js";
 import { sidebarParts } from "./sidebar.js";
 import { navigation } from "./navigation.js";
 import { newTab, projectMark } from "./project.js";
-import { KEY, closedKey, migrate } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
@@ -91,8 +91,6 @@ const nameOf = (c, lead, name) => c.named ? c.name : lead ? name(lead) : "Termin
 
 export default class Tabs extends View {
   init(_props, cx) {
-    // Always in the layout: keys under old names move here, before anything is written (docs/internals/storage.md).
-    migrate();
     this.pressed = null;
     this.over = null;
     this.tabStrip = {};
@@ -484,7 +482,7 @@ export default class Tabs extends View {
       // The tabs' row, measured whole: with the Inbox the breadcrumb and the strip share it.
       .child(h_flex().id("tab-area").flex_1().min_w(0).h_full().items_center().gap(8)
         .on_size_change((size, cx) => { this.area = size.width / settings().zoom; cx.notify(); })
-        .when(Boolean(ctx), el => el.child(this.crumb(t, ctx, { every, all, under, st, ps, name: tabName, narrow: area - this.room - 8 < NARROW, stopPress })))
+        .when(Boolean(ctx), el => el.child(this.crumb(t, ctx, { every, ps, name: tabName, narrow: area - this.room - 8 < NARROW, stopPress })))
         .child(h_flex().id("tab-scroll").relative().h_full().items_center().overflow_hidden()
           // 8 from Actions, as from the breadcrumb: the bar's 4 and these 4.
           .when(Boolean(ctx), el => el.w(stripWant).flex_shrink(1).min_w(0).mr(4)
@@ -503,7 +501,7 @@ export default class Tabs extends View {
   // side with the one in view lit, the card the Inbox lights (docs/internals/specs/tab-bar.md). Held, a program there has the
   // focus: the one last looked at is outlined. Away, in a tab of programs: it all dims, and leads back. The title's ⌄ is the
   // tab's menu. A zoomed tab's panes come back by the pane header's zoom: the bar has no button for it.
-  crumb(t, ctx, { every, all, under, st, ps, name, narrow, stopPress }) {
+  crumb(t, ctx, { every, ps, name, narrow, stopPress }) {
     const space = ctx.space, dim = ctx.held || ctx.away, agentOf = (address) => every.find(a => a.address === address);
     const nameOf = (address) => { const a = agentOf(address); return a ? name(a) : address; };
     // The title's menu: the agent's (t3-menu's "agent", the same wherever it's opened), as T3's thread actions. It hangs 4 under

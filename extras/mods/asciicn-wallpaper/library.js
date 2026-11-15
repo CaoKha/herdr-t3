@@ -45,7 +45,7 @@ const pictures = new Map();
  * it declares (GPUI's SMOOTH_SVG_SCALE_FACTOR): that 2× keeps marks smaller than a pixel as bold as they were, where a
  * texture at the device px drew them visibly softer.
  */
-export const STEP = 512, MAX = 4096;
+const STEP = 512, MAX = 4096;
 export const pictureSide = (n) => (Number.isFinite(n) && n > 0 ? Math.min(MAX, Math.ceil(n / STEP) * STEP) : MAX);
 
 function forget(id) {

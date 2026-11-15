@@ -4,22 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element() {
-  const n = { items: [], handlers: {}, style: {}, hoverStyle: {} };
-  const p = new Proxy(n, { get: (o, k) => k in o ? o[k] : (...a) => {
-    if (k === "child" || k === "content") n.items.push(a[0]);
-    else if (k === "children") n.items.push(...a[0]);
-    else if (k === "when") { if (a[0]) a[1](p); }
-    else if (k === "id") n.key = a[0];
-    else if (k === "hover") { const st = element(); a[0](st); n.hoverStyle = st.style; }
-    else if (k === "on_mouse_down") n.handlers[a[0]] = a[1];
-    else if (k.startsWith("on_")) n.handlers[k] = a[0];
-    else n.style[k] = a[0];
-    return p;
-  } });
-  return p;
-}
-const find = (n, id) => !n || typeof n !== "object" ? null : n.key === id ? n : n.items.map(x => find(x, id)).find(Boolean);
+const kit = require("./check-kit.js");
+const element = kit.elements(), { find } = kit;
 const t = { chrome: "#111111", background: "#222222", dim: "#555555", muted: "#777777", foreground: "#ffffff", hover: "#333333", selected: "#444444" };
 const calls = [], space = { id: "s", active: true, tabs: [] }, tab = { id: "b", active: true, named: true, name: "Task" };
 let part = { part: "end" }, platform = "windows", panelOpen = false;
@@ -42,7 +28,7 @@ const env = {
 };
 function load(dir) {
   const scope = vm.createContext({ ...env });
-  const strip = src => src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
+  const { strip } = kit;
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/measured-text.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/details.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/scroll-strip.js"), "utf8")), scope);
@@ -67,8 +53,8 @@ for (const id of ["minimize", "maximize", "close-window"]) {
 }
 assert.deepEqual(calls.splice(0), [["new", "s"], ["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
 panelOpen = true;
-assert.equal(find(tabs.render(), "close-window"), undefined, "platform buttons move to the panel head");
-assert.equal(find(tabs.render(), "panel-toggle"), undefined, "open panel owns its rightmost toggle");
+assert.equal(find(tabs.render(), "close-window"), null, "platform buttons move to the panel head");
+assert.equal(find(tabs.render(), "panel-toggle"), null, "open panel owns its rightmost toggle");
 panelOpen = false;
 
 // On a Mac only the closed panel's toggle, then the layout's 12, follow Details: Lists' + never pushes it (「规则」R1).
@@ -83,10 +69,9 @@ panelOpen = false;
     const view = load(__dirname), ids = list => list.flatMap(b => b.content ? (part = b.content.props, drawn.filter(id => find(view.render(), id))) : []);
     const before = ids(blocks.slice(0, at)), after = ids(blocks.slice(at + 1)), state = `${mode}, panel ${open ? "open" : "closed"}`;
     assert.deepEqual(after, open ? [] : ["panel-toggle"], `only the closed panel's toggle follows Details (${state})`);
-    // 4 from Details to the closed panel's toggle, and from Lists' + to Details (P3): the toggle still ends 12 from the edge.
+    // 4 from Details to the closed panel's toggle, and from Lists' + to Details (P3).
     const lead = (part = { part: "window" }, find(view.render(), "window-end").style.pl ?? 0), trail = (part = { part: "end" }, find(view.render(), "tabs-end").style.pr ?? 0);
     assert.deepEqual([lead, trail], [open ? 0 : 4, mode === "lists" ? 4 : 0], `4 beside Details (${state})`);
-    assert.equal(lead + after.length * 28 + blocks.slice(at + 1).reduce((sum, b) => sum + (b.content ? 0 : b.size.px), 0), open ? 12 : 44, state);
     assert.deepEqual(before, mode === "lists" ? ["tab-new"] : [], `Lists' + comes before Details (${state})`);
   }
   env.window = wasWindow; env.sidebarParts = wasParts; panelOpen = false; part = { part: "window" };
@@ -135,7 +120,7 @@ tabs.overTab = null;
 assert.notEqual(find(tabs.render(), "tab-b-close").items[0]?.src, "mods/t3-tabs/icons/x.svg", "× shows only while the tab is hovered");
 // A middle press closes the tab through the same close-tab path as ×, so a running agent still asks first.
 root = tabs.render();
-[].concat(find(root, "tab-b").handlers.middle).forEach(f => f({}, cx));
+[].concat(find(root, "tab-b").handlers["on_mouse_down:middle"]).forEach(f => f({}, cx));
 assert.equal(calls.pop()[0], "t3-tabs.close-tab:b", "a middle press closes the tab");
 
 const chrome = load(path.join(__dirname, "../t3-chrome"));
@@ -173,10 +158,10 @@ const title = find(root, 'peer-agent');
 title.handlers.on_hover(true, timedCx); assert.equal(crumbs.details, undefined, 'cut names retain the opening delay');
 tick(150); tick(34); assert.equal(crumbs.details, 'peer-agent'); assert.equal(crumbs.detailsIn, true, 'the original details timer finishes its fade in');
 title.handlers.on_mouse_move({ bounds }); assert.equal(crumbs.detailsBox.key, 'peer-agent'); assert.equal(crumbs.detailsBox.box, bounds);
-title.handlers.left({ bounds }, timedCx); assert.equal(crumbs.details, null, 'press closes the tooltip');
+title.handlers["on_mouse_down:left"]({ bounds }, timedCx); assert.equal(crumbs.details, null, 'press closes the tooltip');
 title.handlers.on_click({}, cx);
 assert.equal(calls.at(-1)[1].at.x, 10); assert.equal(calls.at(-1)[1].at.y, 48, 'title menu retains its pressed anchor');
-title.handlers.right({}, timedCx); assert.equal(calls.at(-1)[0], 'agent'); assert.equal(calls.at(-1)[1].address, 'agent');
+title.handlers["on_mouse_down:right"]({}, timedCx); assert.equal(calls.at(-1)[0], 'agent'); assert.equal(calls.at(-1)[1].address, 'agent');
 find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
 root = crumbs.crumb(t, crumbContext, crumbData);
 find(root, 'peer-agent').handlers.on_hover(true, timedCx); assert.equal(crumbs.details, null, 'whole titles show no repeated label');

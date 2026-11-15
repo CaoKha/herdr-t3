@@ -6,7 +6,7 @@
 
 ## pulls.review
 
-`extras/mods/pulls-review` 和 `extras/mods/review` 为 space 面板添加 Review，使用[我的 pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)（`jin.review`）。安装两个 mod，`scripts/update.sh` 加入 review 渲染位。在 Herdr T3 用 + → Review 或 `cmd-shift-g` 打开唯一可关闭标签，无需额外 Review 栏；旧纯开关栏自动收成零宽。切换保留范围／组／文件／阅读位置，关闭重加回默认范围。在页内工具栏选择 Changes、Uncommitted、To push／To pull、Commits 或 Branches，与 Files 独立；树有已看框但无右键菜单。Herdr 自带布局里的 Review 栏仍用数量打开所选 diff。阅读操作和资源边界见[指南](guide.zh-CN.md)。
+`extras/mods/pulls-review` 和 `extras/mods/review` 为 space 面板添加 Review，使用[我的 pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)（`jin.review`）。安装两个 mod，`scripts/update.sh` 加入 review 渲染位。在 Herdr T3 用 + → Review 或 `cmd-shift-g` 打开唯一可关闭标签；布局默认没有 Review 栏，可以自己加；旧纯开关栏自动收成零宽。切换保留范围／组／文件／阅读位置，关闭重加回默认范围。在页内工具栏选择 Changes、Uncommitted、Outgoing、Incoming 或 Commits，与 Files 独立；树有已看框但无右键菜单。Herdr 自带布局里的 Review 栏仍用数量打开所选 diff。阅读操作和资源边界见[指南](guide.zh-CN.md)。
 
 Review 跟随你的主题，包括 Graphite 等主题里带透明度的复选框颜色。吸顶文件头保留不透明底色，滚动的代码不会透出并和文件名重叠。
 

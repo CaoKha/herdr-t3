@@ -4,7 +4,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Toolbar
 
-- T3 `DiffPanel`'s head, but 32 high, not T3's 40, as Files' file header: its row's centre (40 + 16 = 56) is the work column's pane header's, so the two read as one line (`check-pane.cjs` holds it to the layout). Its menus (scope, fold, settings, status, the comparison target's) hang 4 under their buttons from `controls.js` `HEADER` / `BELOW`, never a fixed offset. 12 horizontal (R1), no rule below (T3's subheaders in the panel). The scope button leading it keeps a `sm` button's own 10 padding both sides: its box at 12, under the panel head's first tab's box, its words at 22, where Files' first crumb's are (`check-pane.cjs`).
+- T3 `DiffPanel`'s head, but 32 high, not T3's 40, as [Files' file header](files.md#file-header) (`check-pane.cjs` holds it to the layout). Its menus (scope, fold, settings, status, the comparison target's) hang 4 under their buttons from `controls.js` `HEADER` / `BELOW`, never a fixed offset. 12 horizontal (R1), no rule below (T3's subheaders in the panel). The scope button leading it keeps a `sm` button's own 10 padding both sides: its box at 12, under the panel head's first tab's box, its words at 22, where Files' first crumb's are (`check-pane.cjs`).
 - Buttons are all `sm` (28) with 14px icons (T3's diff toolbar) and the `chrome` hover and on (t3-tokens「按钮」): range, commit `‹ ›`, Analyze, fold menu, settings, navigation toggle. Icon buttons are 4 apart (P3), the commit `‹ ›` too; text buttons and icon groups are 8 apart. The comparison target (a combobox trigger) stays `xs`, as T3.
 - Popovers open 4 below their button (top 38), right-aligned to it. Page popovers write `review.<name>Closed` when an outside press closes them (see [storage](../storage.md)).
 - No repository, or another machine: the toolbar says `Review` and navigation is disabled. A range with no changes says `No changes`.
@@ -55,7 +55,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 - While visible, refresh every 15s; catch up on return. Hiding or switching stops refresh and invalidates in-flight reads.
 - Full data, rows and layout caches only for the last three shown spaces; eviction releases them and late reads can't refill them. Analysis status stays light, per space.
-- No Review bar in this layout and no automatic analysis on opening a surface: pick a range and Analyze on the page.
+- The layout has no Review bar by default (one can be added as the RECIPE says), and nothing analyses on opening a surface: pick a range and Analyze on the page.
 
 ## Settings
 

@@ -1,16 +1,7 @@
 // The space panel's head and its surface menus, on inert elements: what a press, a key or the panel's cmd-t does.
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
-function element() {
-  const n = { items: [], handlers: {}, style: {} };
-  const e = new Proxy(n, { get: (o, k) => k in o ? o[k] : (...a) => {
-    if (k === 'child') n.items.push(a[0]); else if (k === 'children') n.items.push(...a[0]);
-    else if (k === 'when') { if (a[0]) a[1](e); } else if (k === 'id') n.id = a[0];
-    else if (k === 'on_mouse_down') n.handlers[a[0]] = a[1]; else if (k.startsWith('on_')) n.handlers[k] = a[0]; else n.style[k] = a[0];
-    return e;
-  } }); return e;
-}
-const find = (n, id) => !n || typeof n !== 'object' ? undefined : n.id === id ? n : n.items.map(x => find(x, id)).find(Boolean);
-const order = (n, ids) => { const seen = []; const walk = x => { if (!x || typeof x !== 'object') return; if (ids.includes(x.id)) seen.push(x.id); x.items.forEach(walk); }; walk(n); return seen; };
+const kit = require('./check-kit.js'), element = kit.elements(), { find } = kit;
+const order = (n, ids) => { const seen = []; const walk = x => { if (!x || typeof x !== 'object') return; if (ids.includes(x.key)) seen.push(x.key); x.items.forEach(walk); }; walk(n); return seen; };
 const calls = [], tips = [], commands = [];
 let props = { part: 'surface-empty' }, s = { pages: ['files', 'review', 'panel-empty'], tabs: [], active: null, open: true }, problem = '', folder = '/space';
 const win = () => ({ platform: 'macos' }); win.viewport_size = () => ({ width: 1800, height: 1000 });
@@ -27,7 +18,7 @@ const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_fl
   tip: (_v, _t, id, label, el) => { tips.push([id, label]); return el; }, stop: (_v, _t, _i, el) => el, focusRoot: (_v, el) => el, within: () => false,
   glow: () => () => {}, litOnHover: () => () => {}, keptHover: () => ({ hover() {}, move() {} }),
 });
-const load = f => vm.runInContext(fs.readFileSync(__dirname + '/' + f, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), c);
+const load = f => vm.runInContext(kit.strip(fs.readFileSync(__dirname + '/' + f, 'utf8')), c);
 ['color.js', 'list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js', 'status-mark.js', 'store.js', 'titlebar.js', 'palette.js'].forEach(load);
 vm.runInContext('(() => {\n' + ['button.js', 'trigger.js', 'tab.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.tint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang; globalThis.closableTab = tab; globalThis.ghostTint = tint;\n})();', c);
 load('menu-row.js');
@@ -52,7 +43,7 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   // while the window sat idle (performance-audit.md).
   problem = ''; folder = '/repo/sub'; view.render(cx); await flush();
   key('r'); assert.deepEqual(calls.pop(), ['add', 'review']);
-  s.pages = ['files', 'panel-empty']; assert.equal(find(view.surfaceView(t), 'surface-option-1'), undefined, 'uninstalled Review is absent');
+  s.pages = ['files', 'panel-empty']; assert.equal(find(view.surfaceView(t), 'surface-option-1'), null, 'uninstalled Review is absent');
   s.pages = ['files', 'review', 'panel-empty'];
   for (const part of ['surface-empty', 'surface-menu']) {
     props = { part }; const clocks = [];
@@ -89,7 +80,7 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   }
   {
     // Tabs and buttons light as T3's: the text color at 7% for the one shown or on, 4% hovered, not the theme's selected.
-    const hovered = (n) => { const st = element(); n.style.hover(st); return st.style.bg; };
+    const hovered = (n) => n.hoverStyle.bg;
     assert.equal(find(root, 'surface-file:f0.js').style.bg, '#ffffff12', 'the tab shown: 7%');
     assert.equal(hovered(find(root, 'surface-file:f1.js')), '#ffffff0a', 'another, hovered: 4%');
     assert.equal(find(root, 'panel-close').style.bg, '#ffffff12', 'the panel toggle, on while the panel shows: 7%');
@@ -117,13 +108,13 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   assert.equal(menu.height, 2 * 28 + 8, 'as tall as its rows');
   // A press on + : under its box.
   calls.length = 0; const add = find(root, 'surface-add');
-  add.handlers.left({ bounds: { x: 500, y: 10, width: 48, height: 48 } }, cx); add.handlers.on_click({}, cx);
+  add.handlers["on_mouse_down:left"]({ bounds: { x: 500, y: 10, width: 48, height: 48 } }, cx); add.handlers.on_click({}, cx);
   assert.deepEqual({ ...calls.find(([k]) => k === 'overlay')[1].at }, { x: 500, y: 70 });
   // A middle press closes its tab; a right press opens its menu, as tall as its rows: a file's has Copy path, Review's not.
-  find(root, 'surface-file:f0.js').handlers.middle({}, cx); assert.deepEqual(calls.at(-1), ['close', 'file:f0.js', undefined]);
+  find(root, 'surface-file:f0.js').handlers["on_mouse_down:middle"]({}, cx); assert.deepEqual(calls.at(-1), ['close', 'file:f0.js', undefined]);
   s.tabs.push({ id: 'review' });
   for (const [id, rows] of [['file:f0.js', 5], ['review', 4]]) {
-    calls.length = 0; find(head.panelHead(t), `surface-${id}`).handlers.right({}, cx);
+    calls.length = 0; find(head.panelHead(t), `surface-${id}`).handlers["on_mouse_down:right"]({}, cx);
     assert.equal(calls.find(([k]) => k === 'overlay')[1].height, rows * 28 + 8, `${id}: ${rows} rows`);
   }
   // Its menu: the rightmost can't close to its right; Close others closes the rest.

@@ -5,22 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element() {
-  const n = { items: [], down: {}, handlers: {}, style: {}, hoverStyle: {} };
-  const p = new Proxy(n, { get: (o, k) => k in o ? o[k] : (...a) => {
-    if (k === "child") n.items.push(a[0]);
-    else if (k === "children") n.items.push(...a[0]);
-    else if (k === "when") { if (a[0]) a[1](p); }
-    else if (k === "id") n.key = a[0];
-    else if (k === "hover") { const st = element(); a[0](st); n.hoverStyle = st.style; }
-    else if (k === "on_mouse_down") (n.down[a[0]] ??= []).push(a[1]);
-    else if (k.startsWith("on_")) n.handlers[k] = a[0];
-    else n.style[k] = a[0];
-    return p;
-  } });
-  return p;
-}
-const find = (n, id) => !n || typeof n !== "object" ? null : n.key === id ? n : n.items.map(x => find(x, id)).find(Boolean);
+const kit = require("./check-kit.js");
+const element = kit.elements(), { find } = kit;
 const srcs = (n) => !n || typeof n !== "object" ? [] : [...(typeof n.src === "string" ? [n.src] : []), ...n.items.flatMap(srcs)];
 const tips = [];
 const scope = vm.createContext({
@@ -31,7 +17,7 @@ const scope = vm.createContext({
   keptHover: (view, key, id) => ({ hover: (on) => { if (on) view[key] = id; else if (view[key] === id) view[key] = null; }, move() {} }),
   stop: (_v, _t, _id, el) => el, within: () => false,
 });
-const strip = (f) => fs.readFileSync(path.join(__dirname, f), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "");
+const strip = (f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"));
 vm.runInContext(strip("color.js"), scope);
 vm.runInContext(`(() => {\n${strip("button.js")}\nglobalThis.button = button; globalThis.ghostTint = tint;\n})();`, scope);
 vm.runInContext(strip("measured-text.js"), scope);
@@ -70,9 +56,9 @@ assert.equal(draw().items.filter(Boolean).length, 2, "no slot");
 el = draw();
 calls.length = 0;
 find(el, "tab-a-close").handlers.on_click({}, cx);
-el.down.middle.forEach(f => f({}, cx));
+el.handlers["on_mouse_down:middle"]({}, cx);
 view.hot = "tab-a";
-el.down.right.forEach(f => f({}, cx));
+el.handlers["on_mouse_down:right"]({}, cx);
 assert.deepEqual(calls, ["close", "close", "menu"]);
 assert.equal(view.hot, null, "the right press hides the label");
 

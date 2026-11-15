@@ -64,13 +64,6 @@ HERDR_APP_HOME="$app" "$src/scripts/update.sh" >/dev/null
 is '[.. | objects | select(.id? == "my-review")] | length' "$app/layouts/herdr-t3.json" 1
 is "$pages" "$app/layouts/herdr-t3.json" files,panel-empty,review
 
-# A Review bar named `review`, as the extra's README once had it, gives that id to the panel's page: it's renamed, its own sizing with it.
-jq '(.. | objects | select(.id? == "my-review")) |= (.id = "review" | .content.props.block = "review")' "$app/layouts/herdr-t3.json" > "$app/l" && mv "$app/l" "$app/layouts/herdr-t3.json"
-HERDR_APP_HOME="$app" "$src/scripts/update.sh" >/dev/null
-is '[.. | objects | select(.content?.mod? == "pulls-review") | .id + " " + .content.props.block] | join(",")' "$app/layouts/herdr-t3.json" "review-bar review-bar"
-is "$unique" "$app/layouts/herdr-t3.json" true
-is "$pages" "$app/layouts/herdr-t3.json" files,panel-empty,review
-
 # Without the extra, the panel has Files alone: a block naming a mod that isn't there shows an error.
 rm -rf "$app/mods/pulls-review" "$app/mods/review"
 HERDR_APP_HOME="$app" "$src/scripts/update.sh" >/dev/null

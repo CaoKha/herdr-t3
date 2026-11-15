@@ -1,19 +1,10 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
-function element() {
-  const n = { items: [], handlers: {}, style: {} };
-  const el = new Proxy(n, { get: (o, k) => k in o ? o[k] : (...a) => {
-    if (k === 'child' || k === 'content') n.items.push(a[0]); else if (k === 'children') n.items.push(...a[0]);
-    else if (k === 'when') { if (a[0]) a[1](el); } else if (k === 'id') n.id = a[0];
-    else if (k.startsWith('on_')) n.handlers[k] = a[0]; else n.style[k] = a[0];
-    return el;
-  } }); return el;
-}
-const find = (n, id) => !n || typeof n !== 'object' ? undefined : n.id === id ? n : n.items.map(x => find(x, id)).find(Boolean);
+const kit = require("./check-kit.js"), element = kit.elements(), { find } = kit;
 let zoom = 1, notices = 0;
 const cx = { notify() { notices++; } }, view = {}, tips = [];
 const c = vm.createContext({ div: element, settings: () => ({ zoom }), Popup: { new: (id, trigger) => element().id(id).child(trigger) },
   tip: (_v, _t, id, label, trigger, options) => { tips.push({ id, label, options }); return trigger; }, tipCard: (_t, id) => element().id(id), FADE: {} });
-vm.runInContext(fs.readFileSync(__dirname + '/measured-text.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, ''), c);
+vm.runInContext(kit.strip(fs.readFileSync(__dirname + '/measured-text.js', 'utf8')), c);
 let node = c.nameText(view, 'title', 'iiii', { size: 14, weight: 'medium' });
 assert.equal(c.isTextCut(view, 'title'), false, 'unmeasured names read as whole');
 find(node, 'text-name-title').handlers.on_size_change({ width: 24 }, cx);

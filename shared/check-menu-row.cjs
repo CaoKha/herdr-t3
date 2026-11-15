@@ -4,23 +4,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element(kind = "div") {
-  const node = { kind, items: [], handlers: {}, style: {} };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => {
-      if (key === "when") { if (args[0]) args[1](proxy); }
-      else if (key === "children") node.items.push(...args[0]);
-      else if (key === "child") node.items.push(args[0]);
-      else if (key.startsWith("on_")) node.handlers[key] = args[args.length - 1];
-      else if (key === "id") node.key = args[0];
-      else node.style[key] = args[0];
-      return proxy;
-    };
-  } });
-  return proxy;
-}
-const strip = (f) => fs.readFileSync(path.join(__dirname, f), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ");
+const kit = require("./check-kit.js");
+const element = kit.elements();
+const strip = (f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const tips = [];
 const context = vm.createContext({ div: () => element(), h_flex: () => element(), svg: () => element("svg"), settings: () => ({ zoom: 1 }), Date,
   DISABLED: 0.64, glow: (view, id) => (on) => { view.hot = on ? id : null; },

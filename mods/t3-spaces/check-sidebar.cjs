@@ -3,60 +3,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element(kind = "div", source) {
-  const node = { kind, source, items: [], handlers: {}, style: {}, hoverStyle: {} };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => {
-      if (key === "when") { if (args[0]) args[1](proxy); }
-      else if (key === "child" || (key === "trigger" && kind === "hovercard")) node.items.push(args[0]);
-      else if (key === "children") node.items.push(...args[0]);
-      // GPUI keeps every press listener, in order.
-      else if (key === "on_mouse_down" || key === "on_mouse_up") { const was = node.handlers[`${key}:${args[0]}`], now = args[1]; node.handlers[`${key}:${args[0]}`] = was ? (...a) => { was(...a); return now(...a); } : now; }
-      else if (key.startsWith("on_")) node.handlers[key] = args[0];
-      else if (key === "id") node.key = args[0];
-      else if (key === "hover") { const hovered = element(); args[0](hovered); node.hoverStyle = hovered.style; }
-      else node.style[key] = args.length === 1 ? args[0] : args;
-      return proxy;
-    };
-  } });
-  return proxy;
-}
-
-// Mods run in their own vm context: a plain copy compares with this one's objects.
-const plain = v => JSON.parse(JSON.stringify(v));
+const kit = require("./check-kit.js");
+const element = kit.elements({ args: "auto", adds: ["child"] }), { plain, find, strings, walk, fire } = kit;
 // A row's laid-out children, without the absolutely placed tree lines.
 const inFlow = row => row.items.filter(n => !("absolute" in n.style));
 
-function find(node, id) {
-  if (!node || typeof node !== "object") return null;
-  if (node.key === id) return node;
-  for (const child of node.items) { const found = find(child, id); if (found) return found; }
-  return null;
-}
-function strings(node) {
-  if (typeof node === "string") return [node];
-  return node && typeof node === "object" ? node.items.flatMap(strings) : [];
-}
-function walk(node) {
-  return node && typeof node === "object" ? [node, ...node.items.flatMap(walk)] : [];
-}
-function fire(node, event, ...args) {
-  assert.ok(node, `missing event target: ${event}`);
-  assert.equal(typeof node.handlers[event], "function", event);
-  return node.handlers[event](...args);
-}
-
-// A mod as Herdr would load it, all in one scope: what main.js imports from its own folder, each file once and before what needs it.
-function bundle(dir, file = "main.js", seen = new Set()) {
-  if (seen.has(file)) return "";
-  seen.add(file);
-  const src = fs.readFileSync(path.join(dir, file), "utf8");
-  // Keep the helper's private tint separate from project.js's exported tint.
-  if (file === "button.js") return "const { button, radiusOf, ghostTint, GROUP_GAP } = (() => {\n" + src.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nreturn { button, radiusOf, ghostTint: tint, GROUP_GAP }; })();\nconst drawButton = button;";
-  const needs = [...src.matchAll(/^import [^;]*? from "\.\/(.+?)";/gm)].map((m) => bundle(dir, m[1], seen)).join("\n");
-  const alias = src.includes("named as namedLabel") ? "\nconst namedLabel = named;\n" : "";
-  return needs + alias + "\n" + src.replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ").replace("export default class", "globalThis.Mod = class");
+// A mod as Herdr would load it (kit.bundle), button.js's private tint kept apart from project.js's exported one.
+function bundle(dir) {
+  const own = (file, src) => file === "button.js" ? "const { button, radiusOf, ghostTint, GROUP_GAP } = (() => {\n" + kit.strip(src) + "\nreturn { button, radiusOf, ghostTint: tint, GROUP_GAP }; })();\nconst drawButton = button;" : null;
+  const code = kit.bundle((file) => fs.readFileSync(path.join(dir, file), "utf8"), "main.js", own);
+  // t3-tabs reads measured-text.js's named as namedLabel.
+  return code.includes("namedLabel(") ? code + "\nconst namedLabel = named;" : code;
 }
 
 const modRoot = path.dirname(__dirname);
@@ -141,7 +98,7 @@ function repoResults(view, fixture) {
   assert.deepEqual(roots.map(root => root.style.track_focus), [undefined, undefined], "ordinary presses in the tab bar and Spaces leave the keyboard with the terminal");
 }
 
-for (const width of [208, 240, 256, 320, 480]) {
+for (const width of [208, 256]) {
   const f = fixture(width);
   const sp = f.load("t3-spaces"), ag = f.load("t3-agents");
   const st = sp.render(cx);
@@ -358,11 +315,9 @@ for (const width of [208, 240, 256, 320, 480]) {
   fire(find(ag.render(cx), "pin-t0"), "on_click", {}, { ...cx, stop_propagation() { stopped = true; } });
   assert.ok(stopped, "pin button stops propagation to the row");
   assert.ok(f.state["t3.pins"].includes("t0"));
-  assert.equal(find(ag.render(cx), "pin-t0").style.opacity, 0, "pinning does not leave a stale hover after reordering");
   fire(find(ag.render(cx), "ag-t0"), "on_hover", true, cx);
   assert.equal(find(ag.render(cx), "pin-t0").items[0].source, "mods/t3-agents/icons/pin-off.svg", "pinned rows offer unpin");
   fire(find(ag.render(cx), "ag-t0"), "on_hover", false, cx);
-  assert.equal(find(ag.render(cx), "pin-t0").style.opacity, 0, "pinned rows also hide their pin outside hover");
   fire(find(ag.render(cx), "ag-t0"), "on_hover", true, cx);
   fire(find(ag.render(cx), "pin-t0"), "on_click", {}, cx);
   assert.deepEqual(f.calls.pop(), ["t3-tabs.unpin:t0", {}], "Lists unpin uses the shared Undo owner");

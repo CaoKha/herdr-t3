@@ -11,7 +11,7 @@ import { menuKeys, litProp, propsLit } from "./list.js";
 import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
 import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY, closedKey, migrateLocal } from "./store.js";
+import { KEY, closedKey } from "./store.js";
 import { pinList, setPinned } from "./pins.js";
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
@@ -45,7 +45,6 @@ export default class Agents extends View {
     });
     this.folded = JSON.parse(localStorage.getItem("folded") ?? "{}");
     // Each agent's last state and when it changed (ms), kept across restarts.
-    migrateLocal([["changed", "changes"]]);
     this.changed = JSON.parse(localStorage.getItem("changes") ?? "{}");
     cx.timer.every(1000, () => this.compute());
     cx.timer.every(30000, (cx) => cx.notify()); // The rows' times move with nothing else changing.

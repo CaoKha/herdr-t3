@@ -199,7 +199,7 @@ Key labels follow Herdr's platform (`cmd` is Super off macOS). `cmd-d` stays Her
 Create `layouts/herdr-t3.json`, its preview `layouts/herdr-t3.svg`, the `mods/t3-*` folders and `keys.json`. Node ids are unique, and these structural ids stay stable because layout code looks them up:
 
 ```text
-root: row, terminal_menu=t3-menu
+root: row, background=canvas, terminal_menu=t3-menu
 ├─ sidebar: column [256, min208, max480], chrome
 │  ├─ brand: t3-chrome [40]
 │  ├─ sidebar-lists: stack, active=inbox
@@ -210,7 +210,7 @@ root: row, terminal_menu=t3-menu
 │  ├─ tabs-row: row [40], nonresizable
 │  │  ├─ tabs: t3-tabs [weight1]
 │  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [self-sized]
-│  │  ├─ actions: t3-actions {block:"actions"} [self-sized]
+│  │  ├─ actions: t3-actions {block:"actions",details:true} [self-sized]
 │  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [self-sized]
 │  │  └─ tabs-end-inset: row [12]
 │  ├─ work-body: row, padding[0,8], gap8
@@ -221,8 +221,9 @@ root: row, terminal_menu=t3-menu
 │  └─ status: workspace-status [28, hidden]
 └─ panel: column [weight1,min480,hidden], chrome
    ├─ panel-head: t3-chrome {part:"panel"} [40], padding[0,12]
-   ├─ panel-body: stack, active=files
+   ├─ panel-body: stack, active=panel-empty
    │  ├─ files: t3-files
+   │  ├─ panel-empty: t3-chrome {part:"surface-empty"}
    │  └─ review: review [optional]
 floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, visually empty
 ```
@@ -235,7 +236,7 @@ Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3
 
 Install the required mods as real files (symlinked SVGs don't load), the layout and its SVG, and context-merged keys under `HERDR_APP_HOME` or `~/.config/herdr-app`; select with `layout.switch {"name":"herdr-t3"}`. `scripts/update.sh` (needs `jq`, `rsync`) validates the installed layout and keys, replaces owned mods, keeps theme, focus and stack choices, extra blocks and Review's `config.json`, updates only extras and themes already installed, and merges keys with the repository winning, reporting replacements. Settings, pins and user wallpapers live outside replaced folders. `scripts/sync.sh` also writes the installed home and sibling standalone repositories.
 
-Optional Review: copy `extras/mods/pulls-review` and `extras/mods/review`, set up `jin.review` per its guide, add a `review-bar` block (`pulls-review`, `{block:"review-bar",toggle:true}`) just before `tabs-end`, and append the `review` page to `panel-body` (update adds the page once the extra exists); never reuse the id `review` for the bar. The wallpaper and the theme export (`extras/mods/t3-theme-export`, a zero-height `work` block writing `~/.cache/herdr-app-theme.json` for Pi) are opt-in too; [extras usage](docs/user/extras.md) covers setup.
+Optional Review: copy `extras/mods/pulls-review` and `extras/mods/review`, set up `jin.review` per its guide and append the `review` page to `panel-body` (update adds the page once the extra exists). The layout has no Review bar by default; one can be added as a `review-bar` block (`pulls-review`, `{block:"review-bar",toggle:true}`) just before `tabs-end`, never with the id `review`. The wallpaper and the theme export (`extras/mods/t3-theme-export`, a zero-height `work` block writing `~/.cache/herdr-app-theme.json` for Pi) are opt-in too; [extras usage](docs/user/extras.md) covers setup.
 
 ### Herdr functions and programs
 

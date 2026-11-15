@@ -92,13 +92,13 @@ Or tell your Herdr agent: "Update Herdr T3: clone github.com/JinJieBeWater/herdr
 - Kept: pins, folds, sort, the layout's settings, the Settled shelf and settled agents, which live in `data/`, `shared.json` and terminal labels, and your actions. From the installed layout: the theme, the sidebar you were on, the focus ring color, the panel's Review slot and the Review bar and theme-export blocks.
 - Lost: your other edits to the overwritten files; make those again. Going on to the next card after a Settle is a setting now, not an edit.
 - If the first install renamed something because of a clash, the script doesn't know: it installs the original names, so point the layout back at your copy or delete it.
-- What changed, and what some keys now do: the [changelog](../../CHANGELOG.md). From before Focus became Inbox (`t3-focus` → `t3-inbox`), first rename `data/t3-focus` to `data/t3-inbox` (the cards' order and shelves) and delete `mods/t3-focus`.
+- What changed, and what some keys now do: the [changelog](../../CHANGELOG.md).
 
 ## Known limits
 
 - Home is a space of its own: switch to another layout, run `herdr-app ls` or look from another machine, and it shows as one.
 - Rename Home and another window on the same Herdr core won't know it: it makes a second Home.
-- A space on another machine has no Review bar, and Review is greyed in the panel.
+- On a space on another machine, Review is greyed in the panel, and a Review bar you've added shows nothing.
 - Files on another machine: text changes usually show up within 10 seconds while visible (slower for expensive reads); select an image again to reload it. Images over 512 KB aren't previewed.
 - Files previews text up to 1 MB, and colors only common languages (JavaScript and TypeScript, JSON, YAML, Rust, Go, Python, shell, CSS, C and C++, Java, Kotlin, Ruby, PHP, SQL, Lua, GraphQL, Makefiles); TOML, HTML, Swift and others show plain. While an agent rewrites a file over 16 KB you're looking at, or after you switch Wrap on one, it shows plain for a moment and takes its colours once it has stopped changing (about 10 s) or once you leave it (0.3 s); if you scroll meanwhile, it stays plain until you open it again. Over 256 KB it stays plain unless you press **Highlight anyway** above the code, and colouring it holds the window for a moment.
 - Files keeps the host's native read-only Editor. Its gutter background and height cannot currently match T3; text selection is retained, but real Herdr mouse dragging was not verified in this change.

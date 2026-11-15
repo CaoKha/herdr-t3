@@ -10,7 +10,7 @@ import { terminalFor } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
 import { withNav, treeHead, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
 import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
-import { KEY, migratePagePrefs, wrapLines, setWrapLines } from "./store.js";
+import { KEY, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
 import { split, ghostButton, tint, GROUP_GAP } from "./button.js";
 import { loadingState, noticeBar } from "./panel-states.js";
@@ -69,7 +69,6 @@ export default class Files extends View {
   init(_props, cx) {
     // A copy opened as one of its menus is only that (menus.js).
     if (props()?.files) return initMenu(this, cx);
-    migratePagePrefs();
     this.states = new Map();
     this.treeHandle = cx.focus_handle();
     this.navHandle = cx.focus_handle();

@@ -6,17 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const vm = require("node:vm");
 const { execFileSync } = require("node:child_process");
-// Where the work column's pane header has its centre, from the layout: the tab row, the pane's border, half its header. The
-// space panel's page headers put their row there too (docs/internals/specs/files.md), so the two read as one line.
-const paneHeadCentre = (() => {
-  const root = JSON.parse(fs.readFileSync(path.join(__dirname, "../../layouts/herdr-t3.json"), "utf8"));
-  const node = (n, id) => n?.id === id ? n : (n?.children ?? []).map(c => node(c, id)).find(Boolean);
-  const pane = node(root, "main").content.pane;
-  // The panel head's first tab's box: the panel's padding and the head's (t3-chrome check-surfaces holds that the head draws none).
-  const panelNode = node(root, "panel"), side = (n) => [].concat(n?.padding ?? 0).at(-1);
-  return { left: node(root, "tabs-row").size.px + pane.border.width + pane.header.height / 2, head: node(root, "panel-head").size.px,
-    tabEdge: side(panelNode) + side(node(root, "panel-head")) };
-})();
+const kit = require("./check-kit.js");
+const paneHeadCentre = kit.paneHeadCentre(fs.readFileSync(path.join(__dirname, "../../layouts/herdr-t3.json"), "utf8"));
 
 const load = (file) => fs.readFileSync(path.join(__dirname, file), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (async function|function|const) /gm, "$1 ").replace(/^export \{[\s\S]*?\};?\s*$/m, "");
@@ -24,28 +15,11 @@ const context = vm.createContext({});
 vm.runInContext([load("color.js"), load("file-tree.js"), load("model.js"),
   "globalThis.m = { join, LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket };"].join("\n"), context);
 const m = context.m;
-const plain = (v) => JSON.parse(JSON.stringify(v));
+const { plain } = kit;
 
 // A fake `herdr` element tree, and finding in it.
-function element(...made) {
-  const node = { key: undefined, items: [], handlers: {}, calls: {}, made };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => {
-      if (key === "when") { if (args[0]) args[1](proxy); }
-      else if (key === "child") node.items.push(args[0]);
-      else if (key === "children") node.items.push(...args[0]);
-      else if (key === "id") node.key = args[0];
-      else if (String(key).startsWith("on_")) node.handlers[typeof args[0] === "string" ? `${key}:${args[0]}` : key] = args.at(-1);
-      else node.calls[key] = args;
-      return proxy;
-    };
-  } });
-  return proxy;
-}
-const walk = (node, out = []) => { if (node && typeof node === "object" && node.items) { out.push(node); node.items.forEach((c) => walk(c, out)); } return out; };
-const find = (root, id) => walk(root).find((n) => n.key === id) ?? null;
-const labels = (root) => walk(root).map((n) => n.calls.accessibility_label?.[0]).filter(Boolean);
+const element = kit.elements({ args: "all", adds: ["child"] }), { walk, find } = kit;
+const labels = (root) => walk(root).map((n) => n.style.accessibility_label?.[0]).filter(Boolean);
 const space = (id, folder, active = false, machine = null) => ({ id, folder, machine, active, tabs: [{ id: `${id}-tab`, active: true }] });
 
 // The page, started in a fake `herdr`: the panel on `page` with Review installed too, every folder holding a.js (changed) and
@@ -53,7 +27,7 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null } = {}) {
   const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
     props: null, overlays: [], closed: [], commands: [] };
-  const shared = { "t3.wrap": false, "t3.navWidth": 300 }, wrote = [], store = new Map(), timers = [], everies = [], failed = [];
+  const shared = {}, wrote = [], store = new Map([["lines.wrap", "false"], ["nav.width", "300"]]), timers = [], everies = [], failed = [];
   const commands = [];
   let wake = null, running = null;
   const exec = async (cmd, args, o = {}) => {
@@ -125,9 +99,6 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
 async function page() {
   const { view, cx, w, settle, fire, send, shared, wrote, store, ctx } = makePage();
   assert.equal(w.inputEvents.submit, undefined, "hierarchical search is not a flat picker that opens on input submit");
-  // Its own choices start from the ones both pages used to share; after that, they're this page's.
-  assert.equal(store.get("lines.wrap"), "false", "the old shared wrap is this page's first");
-  assert.equal(store.get("nav.width"), "300", "the old shared width is this page's first");
   let root = view.render(cx);
   await settle();
   root = view.render(cx);
@@ -137,12 +108,12 @@ async function page() {
   // file's 32 bars; the tree still starts 40 under the row's top, where it did and where it does under a nav column's head.
   {
     const holds = (n, id) => n && typeof n === "object" && n.items && (n.key === id || n.items.some((c) => holds(c, id)));
-    const head = walk(root).filter((n) => n.calls.h && holds(n, "t3-files-search-field") && n.key !== "t3-files-search-field").pop().calls;
+    const head = walk(root).filter((n) => n.style.h && holds(n, "t3-files-search-field") && n.key !== "t3-files-search-field").pop().style;
     assert.equal(paneHeadCentre.head + head.h[0] / 2, paneHeadCentre.left, "the search row's centre on the pane header's");
     assert.equal(head.h[0] + (head.mb?.[0] ?? 0), 40, "the tree where it was");
   }
   assert.ok(!w.ran.some(r => r.line.includes(" status ")), "Files reads ignored paths, not Review's change statuses");
-  assert.equal(find(root, "row-a.js").calls.tooltip, undefined, "tree rows have no path tooltip, including truncated names");
+  assert.equal(find(root, "row-a.js").style.tooltip, undefined, "tree rows have no path tooltip, including truncated names");
   find(root, "row-a.js").handlers.on_click({ modifiers: {} }, cx); await settle();
   find(view.render(cx), "row-b.js").handlers.on_click({ modifiers: { platform: true } }, cx); await settle();
   assert.equal(view.current().selected, "b.js", "one row selected: Cmd-click is a click, as there's nothing to do with many");
@@ -155,26 +126,26 @@ async function page() {
   assert.ok(find(root, "t3-files-code"), "the file shows");
   // Its header is Review's bar, controls centred: the Tree switch stays put between the pages (R1). Its centre is the work
   // column's pane header's, so the two rows read as one line across the window.
-  const bar = find(root, "t3-files-toolbar").calls.h[0];
-  assert.ok(bar === 32 && !find(root, "t3-files-toolbar").calls.mb, "Review's 32 bar, nothing under it");
+  const bar = find(root, "t3-files-toolbar").style.h[0];
+  assert.ok(bar === 32 && !find(root, "t3-files-toolbar").style.mb, "Review's 32 bar, nothing under it");
   assert.equal(paneHeadCentre.head + bar / 2, paneHeadCentre.left, "its row's centre on the pane header's");
   // Its first crumb's box at 12, under the panel head's first tab's box; its words a sm button's 10 in, where Review's scope
   // button has its words (check-pane.cjs), so switching pages doesn't move the first letter.
   {
-    const first = find(root, "crumb-").calls, crumbs = find(root, "t3-files-breadcrumbs").calls, box = find(root, "t3-files-toolbar").calls.px[0] + (crumbs.pl?.[0] ?? 0) + (first.ml?.[0] ?? 0);
+    const first = find(root, "crumb-").style, crumbs = find(root, "t3-files-breadcrumbs").style, box = find(root, "t3-files-toolbar").style.px[0] + (crumbs.pl?.[0] ?? 0) + (first.ml?.[0] ?? 0);
     assert.equal(box, paneHeadCentre.tabEdge, "the first crumb's box on the panel head's first tab's");
     assert.equal(box, 12);
     assert.equal(box + (first.pl ?? first.px)[0], 12 + 10, "its words 10 in, as a sm button's");
   }
   // Its icons 14 in their 28 buttons, as T3's file toolbar (the panel head's stay 16).
-  assert.equal(find(root, "t3-files-switches").calls.gap[0], 4, "Preview, Wrap and Tree 4 apart (P3), each its own fill");
-  for (const id of ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"]) assert.deepEqual(find(root, id).items.map((n) => n.calls.size?.[0]), [14], `${id}: a 14 icon`);
+  assert.equal(find(root, "t3-files-switches").style.gap[0], 4, "Preview, Wrap and Tree 4 apart (P3), each its own fill");
+  for (const id of ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"]) assert.deepEqual(find(root, id).items.map((n) => n.style.size?.[0]), [14], `${id}: a 14 icon`);
   // As T3's: the tree column's left rule at 60% of the border, no rule under its head, the search with no hover fill.
-  assert.ok(!find(root, "t3-files-nav").calls.border_l && find(root, "t3-files-nav-rule").calls.opacity[0] === 0.6, "a faint rule");
-  assert.ok(!find(root, "t3-files-nav-head").calls.border_b, "no rule under the column's head");
-  assert.equal(find(root, "t3-files-search-field").calls.hover, undefined, "the search field: no hover fill");
+  assert.ok(!find(root, "t3-files-nav").style.border_l && find(root, "t3-files-nav-rule").style.opacity[0] === 0.6, "a faint rule");
+  assert.ok(!find(root, "t3-files-nav-head").style.border_b, "no rule under the column's head");
+  assert.equal(find(root, "t3-files-search-field").style.hover, undefined, "the search field: no hover fill");
   // The crumbs' › lights as the bar's buttons: the text color at 4% hovered, 7% with its menu up.
-  { const st = element(); find(root, "browse-").calls.hover[0](st); assert.equal(st.calls.bg[0], "#ffffff0a"); }
+  assert.equal(find(root, "browse-").hoverStyle.bg[0], "#ffffff0a");
   assert.equal(w.focused, "terminal", "an external reveal doesn't focus the tree");
   w.focused = "native-editor"; cx.stopped = false;
   find(root, "t3-files-content").handlers["on_mouse_down:left"]({}, cx);
@@ -198,14 +169,13 @@ async function page() {
   // Wrap is this page's: the button writes nothing both pages share.
   find(root, "t3-files-wrap").handlers.on_click({}, cx);
   assert.equal(store.get("lines.wrap"), "true");
-  assert.equal(shared["t3.wrap"], false, "the old shared wrap is left as it was");
   root = view.render(cx);
   await fire(0);
   assert.equal(view.current().view.code.wrap, true, "the editor made again, wrapped");
 
   // The code keeps the width it was laid out at while its room moves, cut off; the new one once it holds 300 ms.
   const code = () => find(view.render(cx), "t3-files-code");
-  const editorWidth = () => code().items[0].calls.w?.[0];
+  const editorWidth = () => code().items[0].style.w?.[0];
   code().handlers.on_size_change({ width: 600, height: 400 }, cx);
   assert.equal(editorWidth(), 600, "the first width at once");
   code().handlers.on_size_change({ width: 640, height: 400 }, cx);
@@ -233,8 +203,8 @@ async function page() {
   root = view.render(cx);
   assert.equal(find(root, "tip-over-crumb-"), null, "the user explicitly removed breadcrumb tooltips even where T3 has them");
   assert.equal(find(root, "tip-over-t3-files-open-more"), null, "the split arrow keeps only its accessibility label");
-  assert.equal(find(root, "t3-files-open-group").calls.border_color?.[0], "#555555", "Open in is T3's header split: outlined in input, as button.js draws it");
-  assert.equal(find(root, "t3-files-main").calls.bg?.[0], "#111111", "the content on background, apart from the tree on chrome");
+  assert.equal(find(root, "t3-files-open-group").style.border_color?.[0], "#555555", "Open in is T3's header split: outlined in input, as button.js draws it");
+  assert.equal(find(root, "t3-files-main").style.bg?.[0], "#111111", "the content on background, apart from the tree on chrome");
   assert.ok(find(root, "t3-files-wrap"), "Preview keeps the word-wrap slot so the other controls do not move");
   assert.equal(find(root, "t3-files-wrap").handlers.on_click, undefined, "word wrap is off in Preview");
   find(root, "t3-files-render-mode").handlers.on_click({}, cx);
@@ -265,7 +235,7 @@ async function page() {
   find(root, "browse-").handlers.on_click({}, cx);
   const crumbMenu = w.overlays.at(-1);
   assert.deepEqual(plain([crumbMenu.props.files, crumbMenu.props.dir, crumbMenu.at]), ["folder", "", { x: 100, y: 74 }], "under the ›, its left edge with it");
-  assert.equal(find(view.render(cx), "browse-").calls.bg[0], "#ffffff12", "on while its menu is up");
+  assert.equal(find(view.render(cx), "browse-").style.bg[0], "#ffffff12", "on while its menu is up");
   const made = w.overlays.length;
   find(view.render(cx), "browse-").handlers["on_mouse_down:left"]({ bounds: { x: 100, y: 50, width: 16, height: 20 } }, cx);
   shared["t3-files.menuClosed"] = Date.now();

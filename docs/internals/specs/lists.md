@@ -38,7 +38,9 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 
 ### Sub-agents
 
-- A parent's fold chevron comes before the time. Folded by default, with a dim hidden count.
+- A parent's fold chevron comes before the time. Folded by default, with a dim hidden count in a badge 20 high and at least 20 wide.
+- A first-level sub-agent's row is 28 in, each level below 20 further. Status marks sit in a 20px column on every row.
+- Tree lines are 1.5 wide and run down the parent icon's centre, 15.25 from the row's edge (a level down, 35.25). A middle child's line runs on; a last child's turns in: 9.75 long, 6 radius, ending 4 before the child's icon. Worktrees under a checkout use the same lines, their icon 20 in, level with a sub-agent's.
 - Blocked or errored sub-agents still show one step in while folded.
 - A sub-agent with its own pane appears once, under its parent, unless pinned.
 - A folded sub-agent in view lights its parent. The viewed done agent stays Done until left.

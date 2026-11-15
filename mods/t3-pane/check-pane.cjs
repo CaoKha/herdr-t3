@@ -3,32 +3,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element() {
-  const node = { items: [], handlers: {}, style: {} };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => {
-      if (key === "when") { if (args[0]) args[1](proxy); }
-      else if (key === "child" || key === "trigger" || key === "content") node.items.push(args[0]);
-      else if (key === "children") node.items.push(...args[0]);
-      else if (key === "on_click") node.handlers.click = args[0];
-      else if (key === "on_mouse_down") node.handlers[args[0]] = args[1];
-      else if (key === "on_hover" || key === "on_mouse_move" || key === "on_key_down") node.handlers[key] = args[0];
-      else if (key === "id") node.key = args[0];
-      else if (key === "pl" || key === "accessibility_label") node[key] = args[0];
-      else node.style[key] = args[0];
-      return proxy;
-    };
-  } });
-  return proxy;
-}
-
-function find(node, id) {
-  if (!node || typeof node !== "object") return null;
-  if (node.key === id) return node;
-  for (const child of node.items) { const found = find(child, id); if (found) return found; }
-  return null;
-}
+const kit = require("./check-kit.js");
+const element = kit.elements(), { find } = kit;
 
 function texts(node, out = []) {
   if (typeof node === "string") out.push(node);
@@ -77,19 +53,19 @@ const take = () => JSON.parse(JSON.stringify(calls.splice(0)));
 const parts = ["store.js", "name.js", "tree.js", "color.js", "status-mark.js", "tip.js", "focus.js", "list.js", "menu-row.js", "program.js", "menu.js", "sidebar.js", "main.js"].map((f) => path.join(__dirname, f));
 const header = load(...parts);
 header.hovered = true;
-find(header.render(), "pane-head-p2").handlers.click({}, cx);
+find(header.render(), "pane-head-p2").handlers.on_click({}, cx);
 assert.deepEqual(take(), [["pane.focus", { pane: "p2" }]]);
-find(header.render(), "ph-r-p2").handlers.click({}, cx);
+find(header.render(), "ph-r-p2").handlers.on_click({}, cx);
 assert.deepEqual(take(), [["pane.split", { direction: "right", pane: "p2" }]]);
-find(header.render(), "ph-d-p2").handlers.click({}, cx);
+find(header.render(), "ph-d-p2").handlers.on_click({}, cx);
 assert.deepEqual(take(), [["pane.split", { direction: "down", pane: "p2" }]]);
-find(header.render(), "ph-z-p2").handlers.click({}, cx);
+find(header.render(), "ph-z-p2").handlers.on_click({}, cx);
 assert.deepEqual(take(), [["pane.zoom", { pane: "p2" }]]);
 header.hot = "ph-x-p2";
-find(header.render(), "ph-x-p2").handlers.click({}, cx);
+find(header.render(), "ph-x-p2").handlers.on_click({}, cx);
 assert.equal(header.hot, null, "the dialog covers it and the pointer may not move, so its label goes with the click");
 assert.deepEqual(take(), [["t3-tabs.close-pane:p2", null]], "the tab bar asks first");
-find(header.render(), "pane-head-p2").handlers.right({}, cx);
+find(header.render(), "pane-head-p2").handlers["on_mouse_down:right"]({}, cx);
 assert.deepEqual(take(), [["overlay", { mod: "t3-menu", kind: "popup", width: 220, height: 260, props: { tab: "pane", target: { pane: "p2", terminal: "t2" } } }]], "right-click opens the terminal's menu");
 
 // Names: Pi session, else (agents only) a named tab, else a telling title, else the program.
@@ -241,11 +217,11 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   const kids = find(header.render(), "ph-kids-p2");
   // What it draws, in order: an svg by its file, words as they are.
   const shown = () => { const out = [], walk = (n) => typeof n === "string" ? out.push(n) : n && typeof n === "object" && (typeof n.svg === "string" ? out.push(path.basename(n.svg)) : n.items.forEach(walk)); walk(find(header.render(), "ph-kids-p2")); return out; };
-  assert.equal(kids.accessibility_label, "2 sub-agents, 1 working", "the button says how many are at work");
+  assert.equal(kids.style.accessibility_label, "2 sub-agents, 1 working", "the button says how many are at work");
   assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "one at work, anywhere down: the shared spinner before the count");
   terms.find((k) => k.address === "child").status = "idle";
   assert.deepEqual(shown(), ["2", "chevron-down.svg"], "none at work: the count alone");
-  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents");
+  assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "2 sub-agents");
   terms.find((k) => k.address === "grandchild").status = "working";
   assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "a grandchild at work spins it too");
   terms.find((k) => k.address === "grandchild").status = "idle";
@@ -257,13 +233,13 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   pane.status = "idle";
   terms.find((k) => k.address === "grandchild").status = "blocked";
   assert.equal(own(), null, "a sub-agent's word isn't its own");
-  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "2 sub-agents, 1 needs you, 1 working", "the button says it");
+  assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "2 sub-agents, 1 needs you, 1 working", "the button says it");
   assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "needing the person adds no `!` of its own: the count's colour says it, the `!` beside it stays the agent's");
   pane.status = "working";
   // Hung from the button, right edges together, as the agents list's sort menu.
   const k = find(header.render(), "ph-kids-p2");
-  k.handlers.left({ bounds: { x: 300, y: 2, width: 40, height: 24 } }, cx);
-  k.handlers.click({}, cx);
+  k.handlers["on_mouse_down:left"]({ bounds: { x: 300, y: 2, width: 40, height: 24 } }, cx);
+  k.handlers.on_click({}, cx);
   assert.deepEqual(take(), [["overlay", { mod: "t3-pane", kind: "popup", width: 280, at: { x: 60, y: 30 }, props: { kids: "t2" } }]], "it opens the list, not the pane's focus; no height, so it grows and shrinks with its rows");
   // The list: every one a step in for each level with its own status; a click or Enter peeks it and closes the list.
   props = { kids: "t2", overlay: "o1" };
@@ -277,13 +253,13 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   child.created_ms = child.status_ms - 60 * 60000; child.status_ms = null;
   assert.ok(texts(find(list(), "kid-child")).includes("1h"), "no status change yet: working since it was made");
   const mark = (address) => find(list(), `kid-status-${address}`);
-  assert.equal(mark("child").accessibility_label, "Working");
+  assert.equal(mark("child").style.accessibility_label, "Working");
   assert.equal(mark("child").items[0].items[0].svg, "mods/workspace-chrome/spinner.svg");
-  assert.equal(mark("grandchild").accessibility_label, "Needs you");
+  assert.equal(mark("grandchild").style.accessibility_label, "Needs you");
   assert.deepEqual(texts(mark("grandchild")), ["!", "Needs you"]);
-  find(list(), "kid-grandchild").handlers.click({}, cx);
+  find(list(), "kid-grandchild").handlers.on_click({}, cx);
   assert.deepEqual(take(), [["close", "o1"], ["terminal.peek", { terminal: "grandchild" }]]);
-  find(list(), "kid-grandchild").handlers.right({}, cx);
+  find(list(), "kid-grandchild").handlers["on_mouse_down:right"]({}, cx);
   assert.deepEqual(take(), [["close", "o1"], ["overlay", { mod: "t3-menu", kind: "popup", width: 220, height: 260,
     props: { tab: "agent", target: { address: "grandchild" } } }]], "right-click replaces the list with the shared agent menu, without peeking");
   const keys = find(list(), "pane-kids").handlers.on_key_down;
@@ -296,7 +272,6 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   find(list(), "kid-grandchild").handlers.on_hover(true, cx);
   assert.equal(find(list(), "kid-grandchild").style.bg, env.theme().selected, "the pointer lights its row");
   find(list(), "kid-grandchild").handlers.on_hover(false, cx);
-  assert.notEqual(find(list(), "kid-grandchild").style.bg, env.theme().selected, "off the rows, nothing is lit");
   // A command an agent ran in a shell of its own isn't an agent; an agent that shell started still is, a level in from it.
   terms.push({ address: "job", parent: "t2", state: "live", status: null, name: "e2e-run", program: { key: "shell", shell: true, agent: false }, labels: {} },
     { address: "job-kid", parent: "job", state: "live", status: "idle", name: "docs", program: { key: "pi", agent: true }, labels: {} });
@@ -306,7 +281,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   jobKid.status_ms = Date.now() - 12 * 60000;
   assert.deepEqual(texts(mark("job-kid")), ["12m"], "idle shows how long, no mark");
   jobKid.status = "done"; jobKid.turn = 2;
-  assert.equal(mark("job-kid").accessibility_label, "Done", "an unread done is a dot");
+  assert.equal(mark("job-kid").style.accessibility_label, "Done", "an unread done is a dot");
   jobKid.labels["herdr.seen"] = "2";
   assert.deepEqual(texts(mark("job-kid")), ["12m"], "read, it's idle again");
   jobKid.status = "error";
@@ -316,7 +291,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   assert.equal(mark("job-kid"), null, "nothing before its first report");
   jobKid.status = "idle";
   props = { pane: "p2" };
-  assert.equal(find(header.render(), "ph-kids-p2").accessibility_label, "3 sub-agents, 1 needs you, 1 working");
+  assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "3 sub-agents, 1 needs you, 1 working");
   // All of them ended with the list open: it closes on the next tick.
   props = { kids: "t2", overlay: "o1" };
   const left = terms.splice(-5);

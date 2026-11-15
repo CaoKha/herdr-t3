@@ -62,7 +62,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     const here = machines().find(m => m.name === null);
     if (here && here.layout !== "ready") return;
     knowHome();
-    if (spaces().some(s => s.id === homeId())) return refitHome(true, cx);
+    if (spaces().some(s => s.id === homeId())) return refitHome(true);
     const before = new Set(spaces().map(s => s.id));
     run("space.new", { name: HOME_NAME, machine: "", folder: home() });
     const made = await seen(cx, () => spaces().find(s => !before.has(s.id) && s.name === HOME_NAME));
@@ -156,7 +156,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   // Home is one thing alone (docs/adr/0005): its own tab, a lone pane that is the setting's mod or, set so, a shell. Another mod
   // there, or an idle shell when a mod is wanted, gives way to it; a shell busy with something else keeps its tab, and Home
   // gets a new one.
-  async function refitHome(go, cx) {
+  async function refitHome(go) {
     const homeTabs = () => spaces().find(s => s.id === homeId())?.tabs.map(c => c.id) ?? [];
     const ps = panes(), mine = ps.filter(p => homeTabs().includes(p.tab));
     // panes() hasn't caught up with Home yet: showing it is all there is to do.
@@ -452,7 +452,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
       else if (command.startsWith("close-tab-now:")) await closeTabNow(command.slice("close-tab-now:".length), { confirmed: true }, cx);
       else if (command.startsWith("close-pane-now:")) await closePaneNow(command.slice("close-pane-now:".length), cx);
       else if (command === "home") await goHome(cx);
-      else if (command === "home-mod") await refitHome(false, cx);
+      else if (command === "home-mod") await refitHome(false);
       // As Herdr's own Settings, a dialog; pressed again, it replaces the open one (closing one already gone does nothing).
       else if (command === "settings") {
         if (settingsOpen) closeOverlay(settingsOpen);

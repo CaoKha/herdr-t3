@@ -3,15 +3,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function bundle(file, seen = new Set()) {
-  if (seen.has(file)) return "";
-  seen.add(file);
-  const src = fs.readFileSync(path.join(__dirname, file), "utf8");
-  const needs = [...src.matchAll(/^import [^;]*? from "\.\/(.+?)";/gm)].map(m => bundle(m[1], seen)).join("\n");
-  return needs + "\n" + src.replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ");
-}
-const source = bundle("repos.js");
-const plain = value => JSON.parse(JSON.stringify(value));
+const kit = require("./check-kit.js"), { plain } = kit;
+const source = kit.bundle((file) => fs.readFileSync(path.join(__dirname, file), "utf8"), "repos.js");
 const flush = async () => { for (let i = 0; i < 4; i++) await new Promise(setImmediate); };
 const status = ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain=v2", "--branch", "--untracked-files=no"];
 const space = (id, folder, machine = null) => ({ id, folder, machine, tabs: [{ id: `b-${id}` }] });

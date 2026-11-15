@@ -4,18 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const kit = require('./check-kit.js');
 function load(env) {
-  const seen = new Set();
-  const source = name => {
-    if (seen.has(name)) return '';
-    seen.add(name);
-    const src = fs.readFileSync(path.join(__dirname, name), 'utf8');
-    if (name === 'button.js') return '';
-    const needs = [...src.matchAll(/^import [^;]*? from "\.\/(.+?)";/gm)].map(m => source(m[1])).join('\n');
-    return needs + '\n' + src.replace(/^import [^;]*;\r?\n/gm, '').replace(/^export /gm, '');
-  };
   const context = vm.createContext(env);
-  vm.runInContext(source('review-scope.js') + '\nglobalThis.api = {openScope,releaseScope,scopeRows,scopeList,pickScopeRow,pickListed,menuKey,commitsKey};', context);
+  vm.runInContext(kit.bundle(name => fs.readFileSync(path.join(__dirname, name), 'utf8'), 'review-scope.js', name => name === 'button.js' ? '' : null) + '\nglobalThis.api = {openScope,releaseScope,scopeRows,scopeList,pickScopeRow,pickListed,menuKey,commitsKey};', context);
   return context.api;
 }
 const state = new Map(), reads = [], pending = [];
@@ -39,13 +31,7 @@ const view = (root='/repo', page='/branch/fix') => ({root,space:'s',page,width:7
   closePopup(){this.closed=true; api.releaseScope(this);},
   pick(page,opts){picked.push({page,...opts});},
   openCommits(cx,lit){this.commits=lit;}});
-function element() {
-  const el = new Proxy({}, {get(_target,key) {
-    if (key === 'when') return (test,fn) => {if(test) fn(el); return el;};
-    return () => el;
-  }});
-  return el;
-}
+const element = kit.elements();
 const api = load({exec,shared:k=>state.get(k),setShared:(k,v)=>state.set(k,v),settings:()=>({zoom:1}),
   div:element,h_flex:element,v_flex:element,svg:element,Input:{new:element},drawButton:element,ghostButton:element,DISABLED:0.64});
 const flush = async () => { for(let i=0;i<50;i++) await Promise.resolve(); };

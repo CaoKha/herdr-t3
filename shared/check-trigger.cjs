@@ -5,24 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element(kind = "div") {
-  const node = { kind, items: [], handlers: {}, style: {} };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => {
-      if (key === "when") { if (args[0]) args[1](proxy); }
-      else if (key === "child") node.items.push(args[0]);
-      else if (key === "content") node.items.push(args[0]);
-      else if (key === "id") node.key = args[0];
-      else if (key === "on_mouse_down") node.handlers[`${key}:${args[0]}`] = args[1];
-      else if (key.startsWith("on_")) node.handlers[key] = args[0];
-      else node.style[key] = args[0];
-      return proxy;
-    };
-  } });
-  return proxy;
-}
-const find = (n, key) => n?.key === key ? n : (n?.items ?? []).map((c) => find(c, key)).find(Boolean);
+const kit = require("./check-kit.js");
+const element = kit.elements(), { find } = kit;
 const findTip = (n) => n?.key?.startsWith?.("tip-body-") ? n : (n?.items ?? []).map(findTip).find(Boolean);
 
 const state = {};

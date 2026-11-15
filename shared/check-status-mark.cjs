@@ -4,14 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-function element(kind) {
-  const node = { kind, items: [], style: {} };
-  const proxy = new Proxy(node, { get(target, key) {
-    if (key in target) return target[key];
-    return (...args) => { if (key === "child") node.items.push(args[0]); else node.style[key] = args[0]; return proxy; };
-  } });
-  return proxy;
-}
+const element = require("./check-kit.js").elements();
 const src = ["color.js", "status-mark.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ");
 const context = vm.createContext({ div: () => element("div"), svg: () => element("svg") });
 vm.runInContext(src + "\nglobalThis.m = { statusMark };", context);
