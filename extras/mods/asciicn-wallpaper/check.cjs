@@ -4,6 +4,7 @@
 // the real one); everything else is the mod's own code, with real files.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
+const { existsSync } = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { runtime, find, texts } = require("./harness.cjs");
@@ -33,18 +34,24 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const { toSlider } = r.modules["framing.js"];
     Object.assign(look.colours, { ansi0: "#000001", ansi15: "#fffffe", ansi7: "#c0c0c1", ansi8: "#808081" });
     const h = await r.home();
-    // As Herdr, which loads a picture shortly after it is first drawn: its hidden copy then takes the picture's size.
-    const loads = (t, c = cx) => { find(t, "wallpaper-probe-size")?.handlers.on_size_change({ width: 640, height: 480 }, c); return t; };
+    // As Herdr, which loads a picture shortly after it is first drawn: its hidden copy then takes the picture's size. A file
+    // no longer there never loads.
+    const loads = (t, c = cx) => {
+      for (const id of ["wallpaper-probe", "wallpaper-warm"]) {
+        const box = find(t, `${id}-size`), file = find(box, `${id}-image`)?.props.path;
+        if (file && existsSync(path.join(app, file))) box.handlers.on_size_change({ width: 640, height: 480 }, c);
+      }
+      return t;
+    };
     const tree = () => loads(h.render(cx));
     const at = (id) => find(tree(), id);
     const click = (id) => at(id).handlers.on_click({}, cx);
     // The picture Home shows once the one for this theme is made and loaded.
     const shown = async (home = h, rt = r) => {
       const draw = () => loads(home.render(rt.cx), rt.cx);
-      const now = () => { const { madePicture, pictureKey, isLight } = rt.modules["library.js"], s = home.draft?.scene ?? home.all().find(x => x.id === (rt.state[KEY] ?? "lighthouse"));
-        return madePicture(pictureKey(s, { ...rt.look.colours }, isLight()))?.path; };
-      // Made, then loaded (shown in place of the last one).
-      draw(); await rt.settle(now); await rt.settle(() => find(draw(), "wallpaper-picture")?.props.path === now()); return now();
+      // Made for this theme at the size Home wants (pictureOf), then loaded in place of the last one.
+      const now = () => { draw(); const { path, small } = home.picture ?? {}; return small ? undefined : path; };
+      await rt.settle(now); await rt.settle(() => find(draw(), "wallpaper-picture")?.props.path === now()); return now();
     };
     const svgOf = async (p) => fs.readFile(path.join(app, p), "utf8");
     const ans = async () => (await fs.readdir(dir)).filter(n => n.endsWith(".ans")).sort();
@@ -58,14 +65,74 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     look.colours.ansi1 = "#aa0000";
     assert.equal(at("wallpaper-picture")?.props.path, dark, "the old picture stays up while the new one is made");
     writes = [];
+    const tiles = [];
+    hooks.afterRead = (file) => { if (file.includes("/scenes/")) tiles.push(file); };
     const recoloured = await shown();
+    hooks.afterRead = null;
     assert.notEqual(recoloured, dark);
     assert.ok((await svgOf(recoloured)).includes("#aa0000"), "a new palette is a new picture");
-    assert.equal(writes.length, 1, "a picture under 1 MiB is written in one go");
+    assert.equal(writes.length, 0, "a new palette colours the tiles kept on disk, writing nothing from here");
+    assert.deepEqual(tiles, [], "a new palette only colours the tiles again");
+    // Back to a palette seen before, though the newer one's picture took its place on disk.
+    look.colours.ansi1 = "#cd3131";
+    assert.equal(await shown(), dark, "the earlier palette's picture shows again");
+
+    // With the layout's light and dark themes known, the other appearance's picture is made and loaded while this one
+    // shows: a switch between them shows it in the same frame, never this one on the other's background.
+    look.themes = { dark: { ...look.colours }, light: { ...look.colours, foreground: "#111111", ansi1: "#aa0000" } };
+    const other = () => { const { madePicture, pictureKey } = r.modules["library.js"]; return madePicture(pictureKey(h.all()[0], { ...look.themes[look.dark ? "light" : "dark"] }, look.dark))?.path; };
+    await settle(() => { tree(); return !!other() && h.loaded.has(other()); });
+    const paper = other();
+    look.dark = false;
+    assert.equal(find(h.render(cx), "wallpaper-picture").props.path, paper, "light: its picture at once");
+    await settle(() => { tree(); return !!other() && h.loaded.has(other()); });
+    look.dark = true;
+    assert.equal(find(h.render(cx), "wallpaper-picture").props.path, dark, "and back");
+    // A picture no longer drawn, even out of sight, is no longer counted loaded: the host may let it go, and a newer palette
+    // may take its file, so showing it again waits for it to load, the last picture up meanwhile.
+    look.dark = false;
+    find(h.render(cx), "wallpaper-picture");
+    look.themes.dark = { ...look.colours, ansi1: "#00aa00" };
+    await settle(() => { tree(); return !!other() && h.loaded.has(other()); });
+    assert.ok(!h.loaded.has(dark), "the dark picture of the theme before is let go");
+    look.themes = null;
+    look.dark = true;
+    assert.equal(await shown(), dark);
+
+    // A picture's SVG declares the device pixels Home shows it at, rounded up to 512, and is named by them (Herdr rasterises
+    // it at twice that). A taller window, a denser screen or a zoom past what it was made for makes it again, the last one
+    // up meanwhile; a smaller window doesn't.
+    const sideOf = async (p) => { const [, w, ht] = (await svgOf(p)).match(/^<svg [^>]*width="(\d+)" height="(\d+)"/); return Math.max(+w, +ht); };
+    const pxOf = (p) => Number(p.match(/-(\d+)\.svg$/)?.[1]);
+    // Lighthouse is 331×137: covering 1000×800 it shows 1932.8 wide.
+    assert.deepEqual([pxOf(dark), await sideOf(dark)], [2048, 2048], "1x: 1932.8 device px, up to 2048");
+    h.height = 600;
+    assert.equal(await shown(), dark, "a smaller window keeps the picture");
+    h.height = 1000;
+    assert.equal(at("wallpaper-picture")?.props.path, dark, "a taller window keeps the last picture up while it's made again");
+    const taller = await shown();
+    assert.deepEqual([pxOf(taller), await sideOf(taller)], [2560, 2560], "1000 high: 2416 device px, up to 2560");
+    h.height = 700;
+    r.win.bounds = { ...r.win.bounds, x: 1440 };
+    const retina = await shown();
+    assert.deepEqual([pxOf(retina), await sideOf(retina)], [3584, 3584], "700 high on a 2x screen: 1691 points, 3382 device px");
+    r.win.bounds = { ...r.win.bounds, x: 0 };
+    assert.equal(await shown(), retina, "back on a 1x screen it keeps the sharper one");
+    h.height = 4000;
+    assert.equal(pxOf(await shown()), 4096, "never past 4096, the size before");
+    // A screen it hasn't seen is asked about again.
+    r.win.screens = [...r.win.screens, [2880, 0, 1440, 900, 3]];
+    r.win.bounds = { ...r.win.bounds, x: 2880 };
+    h.height = 800;
+    assert.equal(h.screenScale(cx), null, "a screen not known yet waits for its scale");
+    await settle(() => h.screenScale(cx) === 3);
+    r.win.bounds = { ...r.win.bounds, x: 0 };
+    const largest = await shown();
+    assert.equal((await fs.readdir(path.join(dir, ".builtin/lighthouse"))).filter((n) => /^dark-.*\.svg$/.test(n)).length, 1, "one picture per side on disk");
 
     // Switching to a picture not made yet keeps the last one up until the new one is ready.
     state[KEY] = "ember";
-    assert.equal(at("wallpaper-picture").props.path, recoloured, "the last picture stays up meanwhile");
+    assert.equal(at("wallpaper-picture").props.path, largest, "the last picture stays up meanwhile");
     const ember = await shown();
     assert.ok(ember.includes("/ember/"), "then the new one shows");
 
@@ -208,11 +275,12 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     look.dark = false;
     assert.deepEqual(await inks(), [false, true], "light theme: the black half is drawn");
     look.dark = true;
-    await shown();
+    const unzoomed = await shown();
 
-    // Framing: Fill/Fit, drag, keys, the zoom buttons, slider, wheel and trackpad, and Reset, with no file read or written.
+    // Framing: Fill/Fit, drag, keys, the zoom buttons, slider, wheel and trackpad, and Reset, converting nothing: zooming in
+    // only colours the kept tiles again at a larger size.
     await settle();
-    io = 0;
+    cats = []; writes = [];
     for (const id of ["wallpaper-cover", "wallpaper-style-dots", "wallpaper-zoom-in", "wallpaper-zoom-out"]) assert.ok(!hand(id), `${id} keeps the pointer`);
     assert.ok(hand("wallpaper-apply") && hand("wallpaper-cancel"), "the footer's filled buttons take the hand, as the layout's dialogs'");
     click("wallpaper-contain");
@@ -231,6 +299,13 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     canvas().handlers.on_mouse_move({ position: { x: 300, y: 2000 } }, cx);
     canvas().handlers.on_mouse_up({}, cx);
     assert.equal(h.draft.placement.y, 1, "dragging stops at the edge");
+    // Let go outside the window, or with the window no longer in front, no release comes: the drag ends once that's seen.
+    canvas().handlers.on_mouse_down({ position: { x: 300, y: 300 }, bounds: { x: 0, y: 0, width: 1000, height: 800 } }, cx);
+    r.win.active = false;
+    r.ticks();
+    r.win.active = true;
+    canvas().handlers.on_mouse_move({ position: { x: 300, y: 100 } }, cx);
+    assert.equal(h.draft.placement.y, 1, "a drag the window let go of moves nothing");
     canvas().handlers.on_key_down({ key: "up", modifiers: {} }, cx);
     assert.ok(h.draft.placement.y < 1, "arrow keys move it");
     click("wallpaper-zoom-in");
@@ -243,6 +318,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     near(h.draft.placement.zoom, 2, "the slider is logarithmic: halfway is 2×");
     h.scale.handlers.change(99, cx);
     assert.equal(h.draft.placement.zoom, 4, "zoom stops at 4×");
+    assert.ok(pxOf(await shown()) > pxOf(unzoomed), "zoomed in, the picture is made again sharper");
     h.setPlacement(h.draft, { zoom: 1 }, cx);
     const wheel = (o) => canvas().handlers.on_scroll_wheel({ delta: { x: 0, y: 0 }, touch_phase: "moved", modifiers: {}, position: { x: 500, y: 400 }, ...o }, cx);
     wheel({ delta: { x: 0, y: 60 }, delta_lines: { x: 0, y: 6 } });
@@ -258,7 +334,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     click("wallpaper-reset");
     assert.deepEqual({ ...h.draft.placement }, { mode: "contain", zoom: 1, x: 0.5, y: 0.5 }, "Reset goes back to 1×, the subject in view, and keeps Fit");
     assert.equal(at("wallpaper-reset").handlers.on_click, undefined, "Reset rests while there is nothing to reset");
-    assert.equal(io, 0, "framing reads and writes nothing");
+    assert.deepEqual([reads.length, cats, writes], [1, [], []], "framing reads, converts and saves nothing");
     h.setPlacement(h.draft, { zoom: 2, x: 0.25 }, cx);
 
     // Cancel leaves no trace; Apply saves one drawing, its framing and the selection, reusing the preview's picture.
@@ -271,7 +347,19 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     h.setPlacement(h.draft, kept, cx);
     const drawn = await svgOf(await shown());
     cats = []; writes = [];
-    await h.applyPreview(cx);
+    // Pressed, Apply leaves nothing on the card that looks pressable, as none would act while it saves; only its words wait
+    // 150ms to read Applying….
+    let saved_; const saving = new Promise(go => { saved_ = go; });
+    hooks.beforeWrite = async (file) => { io++; writes.push(file); if (file.includes("/.preview/save-")) await saving; };
+    const applying = h.applyPreview(cx);
+    const pressed = h.render(cx), { DISABLED } = r.modules["button.js"];
+    for (const id of ["wallpaper-style-dots", "wallpaper-cover", "wallpaper-contain", "wallpaper-zoom-in", "wallpaper-cancel", "wallpaper-apply"]) {
+      assert.ok(!find(pressed, id).handlers.on_click && find(pressed, id).props.opacity === DISABLED, `${id} shows disabled at once`);
+    }
+    assert.equal(texts(find(pressed, "wallpaper-apply")).join(""), "Apply");
+    saved_();
+    hooks.beforeWrite = (file) => { io++; writes.push(file); };
+    await applying;
     assert.equal(h.draft, null);
     assert.deepEqual(await ans(), ["Coast.ans"]);
     assert.equal(state[KEY], "file:Coast");
@@ -302,6 +390,17 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const h2 = await again.home();
     assert.equal(await shown(h2, again), saved, "the picture on disk is shown again");
     assert.deepEqual([cats2.filter(f => f.endsWith(".ans")), writes2], [[], []], "without converting or writing");
+    // A new palette after a restart only colours the tiles kept on disk beside the picture, uncoloured, one per side: the
+    // .ans isn't converted again.
+    const ansi15 = again.look.colours.ansi15;
+    again.look.colours.ansi15 = "#00aa01";
+    const restarted = await shown(h2, again);
+    assert.ok(restarted !== saved && (await svgOf(restarted)).includes("#00aa01"), "a new palette, a new picture");
+    assert.deepEqual(cats2.filter(f => f.endsWith(".ans")), [], "without converting again");
+    again.look.colours.ansi15 = ansi15;
+    assert.equal(await shown(h2, again), saved);
+    const kept2 = (await fs.readdir(path.join(dir, ".tiles/Coast"))).filter(n => !n.endsWith(".svg") && n !== "scene.json");
+    assert.ok(kept2.length >= 1 && kept2.length <= 2, `at most one set of tiles per side: ${kept2}`);
     h2.close();
 
     // Reframing a saved image opens its framing over the same picture, without modes, and saves only framing.
@@ -436,6 +535,43 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     await h.choose(cx);
     assert.equal(h.draft, null);
     assert.equal(r.messages.length, said);
+
+    // An edited picture is drawn again; meanwhile Home keeps it under its own name, and framing waits, so it can't frame or
+    // save another picture as the choice.
+    state[KEY] = "file:Coast";
+    const coastShown = await shown();
+    const tilesKept = async () => (await fs.readdir(path.join(dir, ".tiles/Coast"))).filter(n => n.endsWith(".tpl"));
+    const tilesBefore = await tilesKept();
+    let drawn_; const redrawn = new Promise(go => { drawn_ = go; });
+    hooks.beforeWrite = async (file) => { io++; writes.push(file); if (file.endsWith("/scene.json")) await redrawn; };
+    await fs.appendFile(path.join(dir, "Coast.ans"), "\n");
+    const redrawing = h.lib.refresh(cx);
+    await settle(() => h.lib.importing === "Coast");
+    await settle(null, 200);
+    tree();
+    const mid = tree();
+    assert.equal(find(mid, "wallpaper-picture").props.path, coastShown, "Home keeps the picture while it's drawn again");
+    assert.ok(texts(find(mid, "wallpaper-switcher")).some(s => s.includes("Coast")), "under its name");
+    assert.equal(find(mid, "wallpaper-frame").handlers.on_click, undefined, "framing waits for it");
+    drawn_();
+    hooks.beforeWrite = (file) => { io++; writes.push(file); };
+    await redrawing;
+    assert.equal(state[KEY], "file:Coast");
+    assert.ok((await shown()).includes("/Coast/"), "then the new drawing shows");
+    const tilesAfter = await tilesKept();
+    assert.ok(tilesBefore.length === 1 && tilesAfter.length === 1 && tilesAfter[0] !== tilesBefore[0], "an edited file's kept tiles are made again");
+
+    // A new draft leaves the last picture where it was until the draft's own picture has loaded.
+    state[KEY] = "lighthouse";
+    state[PLACEMENTS] = { ...state[PLACEMENTS], lighthouse: { mode: "cover", zoom: 3, x: 0.2, y: 0.8 } };
+    await shown();
+    const geometry2 = (t) => { const p = find(t, "wallpaper-picture").props.path, g = find(t, `wallpaper-at:${p}`).props; return [p, g.w, g.h, g.bottom, g.left]; };
+    const lit = geometry2(h.render(cx));
+    find(h.render(cx), "wallpaper").handlers.on_drop({ paths: ["/photos/New.png"] }, cx);
+    await settle(() => h.draft?.phase === "ready");
+    assert.deepEqual(geometry2(h.render(cx)), lit, "the last picture keeps its own framing");
+    await h.cancelPreview(cx);
+    delete state[PLACEMENTS].lighthouse;
 
     // Deleting asks by name first; a failed deletion changes nothing, a confirmed one moves the selection back.
     state[KEY] = "file:Coast";

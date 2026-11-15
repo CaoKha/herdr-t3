@@ -2,6 +2,9 @@
 # Every check this repo has: the shared modules' copies, `herdr-app check` and `tsc` on each mod, and each mod's checks in a fake herdr.
 # They run from an installed Herdr App home, where some look for the shipped icons.
 set -u
+# Run as a git hook (pre-commit), git's own variables point every git call at this repository, even in the throwaway
+# repositories some checks make: from a linked worktree that once re-initialised it as bare. They go.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 src=$(cd "$(dirname "$0")/.." && pwd)
 app=${HERDR_APP_HOME:-$HOME/.config/herdr-app}
 cd "$src"

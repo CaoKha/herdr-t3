@@ -49,13 +49,20 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   const app = path.join(base, "app 'quoted"), dir = path.join(app, "asciicn-wallpaper");
   await fs.mkdir(path.join(app, "mods/asciicn-wallpaper"), { recursive: true });
   await fs.symlink(path.join(__dirname, "scenes"), path.join(app, "mods/asciicn-wallpaper/scenes")).catch((e) => { if (e.code !== "EEXIST") throw e; });
-  const state = {}, messages = [], overlays = [], runs = [], hooks = {}, view = { props: null }, look = { dark: true, colours: { foreground: "#dddddd", ansi1: "#cd3131" } };
+  // `look.themes`: the layout's { light, dark } themes' colours, as settings() and themes() name them; without, one palette.
+  // `win.active`: whether the window has focus (window().active).
+  // `win.screens`: what macOS says of each screen, [x, y, width, height, backing scale]; `win.bounds`: the window's frame.
+  const win = { active: true, screens: [[0, 0, 1440, 900, 1], [1440, 0, 1440, 900, 2]], bounds: { x: 0, y: 0, width: 1000, height: 800 } }, every = [];
+  const state = {}, messages = [], overlays = [], runs = [], hooks = {}, view = { props: null },
+    look = { dark: true, colours: { foreground: "#dddddd", ansi1: "#cd3131" }, themes: null, now() { return { ...(this.themes?.[this.dark ? "dark" : "light"] ?? this.colours) }; } };
   const env = {
     View: class {}, div: () => element("div"), svg: (p) => Object.assign(element("svg"), { path: p }), image: (p) => { const e = element("image"); e.props.path = p; return e; },
     h_flex: () => element("div"), v_flex: () => element("div"),
     SliderState: { new: () => ({ current: 1, handlers: {}, value() { return this.current; }, on(k, f) { this.handlers[k] = f; }, set_value(n) { this.current = n; }, release() {} }) },
     Slider: { new: () => element("slider") }, SliderTrack: { new: () => element("div") }, SliderIndicator: { new: () => element("div") }, SliderThumb: { new: () => element("div") },
-    appHome: () => app, window: () => ({ platform }), settings: () => ({ dark: look.dark }), theme: () => ({ ...look.colours }),
+    appHome: () => app, window: Object.assign(() => ({ platform, active: win.active }), { bounds: () => ({ ...win.bounds }) }), theme: () => look.now(),
+    settings: () => ({ dark: look.dark, ...(look.themes ? { theme_light: "Paper", theme_dark: "Ink", colors: {} } : {}) }),
+    themes: () => look.themes ? [{ name: "Paper", light: true, colors: { ...look.themes.light } }, { name: "Ink", light: false, colors: { ...look.themes.dark } }] : [],
     shared: k => state[k], setShared: (k, v) => { state[k] = v; },
     notify: v => messages.push(v), openOverlay: v => overlays.push(v), closeOverlay: () => null, run: (name, args) => { runs.push([name, args]); return null; },
     props: () => view.props,
@@ -75,6 +82,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
       await fs.writeFile(file, body, { flag: "wx" });
     },
     exec: async (cmd, args = [], options = {}) => {
+      if (cmd === "osascript" && args[0] === "-l" && args[3]?.includes("NSScreen")) return { code: 0, stdout: `${JSON.stringify(win.screens)}\n`, stderr: "" };
       if (cmd === "osascript" && args[0] === "-e") return hooks.picked == null ? { code: 1, stdout: "", stderr: "User canceled. (-128)" } : { code: 0, stdout: `${hooks.picked}\n`, stderr: "" };
       await hooks.beforeExec?.(cmd, args);
       let result;
@@ -94,14 +102,16 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   // Keyboard stops and tooltips have their own checks in shared/.
   stubs = { "focus.js": () => ({ stop: (_v, _t, _id, el) => el, focusRoot: (_v, el) => el, stopsInit: v => { v.fs = {}; }, stopsEnd() {}, enter() {},
     pressed: v => { v.pressAt = Date.now(); }, justClosed: () => false }),
-    "tip.js": () => ({ tip: (_v, _t, _id, _label, el) => el, glow: () => () => {}, FADE: { duration: 150, easing: "ease-out" } }), ...stubs };
+    "tip.js": () => ({ tip: (_v, _t, _id, _label, el) => el, glow: () => () => {}, FADE: { duration: 150, easing: "ease-out" },
+      POINTER_WATCH: 100, pointerMoved() {}, dragGone: () => !win.active }), ...stubs };
   for (const file of MODULES) {
     if (stubs[file]) context.__m[file] = stubs[file](context.__m);
     else link(context, file, readFileSync(path.join(__dirname, file), "utf8"));
   }
   const Mod = context.__m["main.js"].default;
   let focused = null;
-  const cx = { notify() {}, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => setImmediate(() => fn(cx)) },
+  const cx = { notify() {}, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => setImmediate(() => fn(cx)),
+    every: (_ms, fn) => { const t = { fn, cancel() { every.splice(every.indexOf(t) >>> 0, 1); } }; every.push(t); return t; } },
     focus_handle: () => { const h = { focus: () => { focused = h; }, is_focused: () => focused === h }; return h; } };
   // A Home as Herdr lays it out: sized, its files scanned.
   const home = async ({ width = 1000, height = 800 } = {}) => {
@@ -117,7 +127,9 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
     for (const end = Date.now() + ms; Date.now() < end && !done?.();) await new Promise(r => setTimeout(r, 5));
     if (done) assert.ok(done(), "settled");
   };
-  return { app, dir, state, messages, overlays, runs, hooks, view, look, cx, home, settle, modules: context.__m };
+  // `ticks()`: each repeating timer (cx.timer.every) fires once.
+  const ticks = () => { for (const t of [...every]) t.fn(cx); };
+  return { app, dir, state, messages, overlays, runs, hooks, view, look, win, ticks, cx, home, settle, modules: context.__m };
 }
 
 module.exports = { runtime, find, texts };

@@ -166,7 +166,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 
 ### 可选 asciicn 壁纸 Home
 
-装 `extras/mods/asciicn-wallpaper` 并在 Home shows 选它，Home 就是一张静态、按主题上色的 ASCII 画。内置画来自 [asciicn](https://asciicn.dev)（MIT）。右下角的切换器在悬停时出现，可以换画、给当前画取景，用 `+` 添加：选图片、导入 Studio `.ans`、打开 asciicn Studio、打开壁纸文件夹；把文件拖到 Home 上也行。新画打开取景卡：模式（Dots、Braille、Blocks、Quadrants）、Fill/Fit、缩放和 Apply/Cancel。Home 不会空白：上一张画一直留到下一张加载好，等待超过 150ms 显示进度。规格：[wallpaper](docs/internals/specs/wallpaper.md)。
+装 `extras/mods/asciicn-wallpaper` 并在 Home shows 选它，Home 就是一张静态、按主题上色的 ASCII 画。内置画来自 [asciicn](https://asciicn.dev)（MIT）。右下角的切换器在悬停时出现，可以换画、给当前画取景，用 `+` 添加：选图片、导入 Studio `.ans`、打开 asciicn Studio、打开壁纸文件夹；把文件拖到 Home 上也行。新画打开取景卡：模式（Dots、Braille、Blocks、Quadrants）、Fill/Fit、缩放和 Apply/Cancel。Home 不会空白：上一张画一直留到下一张加载好，另一明暗的画在切换前就备好，等待超过 150ms 显示进度。规格：[wallpaper](docs/internals/specs/wallpaper.md)。
 
 ### 键盘与焦点
 
@@ -265,6 +265,6 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 7. Actions 增、改、删，在各位置和目录运行：必填项、确认、上次选择、shell 保留。
 8. space 面板与 Files：每条打开、替换、去重、关闭、批量、隐藏、放大和驱逐规则；本机与远程；菜单与剪贴板；禁用、缺失、长名和大量文件；面板与终端快捷键。详情：Actions 空与满、locked 机器行、选择与执行、键盘走查、分层 Escape、来源失效、冷暖打开耗时。
 9. Review 范围、base、远程、commit、组、已看、`j`/`k`、Analyze、Unicode、二进制、空与失败：树和 diff 同序，不误分析，换行安全，吸顶头不透明，勾选框 alpha 正确。
-10. 壁纸：启动时从磁盘加载；`+` 菜单和拖入；取景卡向上展开、底栏不动；四种模式、浅色纸面、EXIF 方向；任何画取景都不重新转换；以指针为中心缩放、滑条同步；Apply、Cancel、重试、两个 Home、迟到任务和 Delete，不改原图、不复活；构图经重启、缓存、主题和尺寸变化保留；特殊文件名可用。
+10. 壁纸：启动时从磁盘加载；`+` 菜单和拖入；取景卡向上展开、底栏不动；四种模式、浅色纸面、EXIF 方向；任何画取景都不重新转换；以指针为中心缩放、滑条同步；Apply、Cancel、重试、两个 Home、迟到任务和 Delete，不改原图、不复活；构图经重启、缓存、主题和尺寸变化保留；切换明暗时画与背景同一帧换好；特殊文件名可用。
 
 检查通过不能替代亲眼看和亲手用。没试过的真实点击和按键须注明未验证，只清理本次创建的 demo 资源。

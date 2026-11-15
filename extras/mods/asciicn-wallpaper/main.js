@@ -2,7 +2,7 @@
 // person's images drawn in Dots/Braille/Blocks/Quadrants, or a frame they made in that Studio, in the theme's colours.
 // Every picture, saved or previewed, is drawn one way: its tiles put together in the theme's colours as one image
 // (library.js), which GPUI rasterises once off the UI thread and scales on the GPU. A new theme makes another, and until it
-// is ready the old one stays up.
+// is ready the old one stays up; the layout's other appearance's is made ahead (warm()), so light/dark switches at once.
 // The pointer near the bottom-right corner shows the switcher: ‹ › step, the crop button frames the picture shown, `+` opens
 // a menu of where a new one comes from; a file dropped on Home is one too. A new or reframed picture is edited across Home
 // with the framing card in the switcher's place; only Apply publishes an import's .ans, and any picture's framing.
@@ -19,15 +19,15 @@
 // through sips (macOS) or ImageMagick (Linux); on Windows the menu offers no file dialog, until Herdr gives mods a file picker.
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
-import { appHome, closeOverlay, exec, nextCommand, notify, openOverlay, props, run, settings, setShared, shared, theme, watchFolder, window } from "herdr";
+import { appHome, closeOverlay, exec, nextCommand, notify, openOverlay, props, run, settings, setShared, shared, theme, themes, watchFolder, window } from "herdr";
 import { SCENES } from "./scenes.js";
 import { imageAns, sampleImage } from "./ascii-art.js";
-import { KEY, Library, MOD, finish, isLight, madePicture, makePicture, pictureKey, placement, tick } from "./library.js";
+import { KEY, Library, MOD, finish, isLight, madePicture, makePicture, pictureKey, pictureSide, placement, tick } from "./library.js";
 import { readImage } from "./source.js";
 import { fromSlider, nextPreset, pan, scroll, toSlider, zoomAt } from "./framing.js";
 import { enter, focusRoot, stop, stopsEnd, stopsInit } from "./focus.js";
 import { DISABLED, button as drawButton, ghostButton, radiusOf } from "./button.js";
-import { FADE, tip } from "./tip.js";
+import { FADE, POINTER_WATCH, dragGone, pointerMoved, tip } from "./tip.js";
 import { popupOpen, trigger } from "./trigger.js";
 import { MENU_ROW, menuRow } from "./menu-row.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
@@ -57,6 +57,12 @@ const menuHeight = (items) => 8 + items.length * MENU_ROW + NOTE;
 // Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so
 // nothing flashes. FILL: the progress bar's last stretch, while Home loads the first picture.
 const SHOW = 150, KEEP = 300, FILL = 400;
+// What macOS says of each screen: [x, y (from the top of the first), width, height, backing scale]. Shared by every Home:
+// the list, the window middle it was last asked for, and whether it is being asked.
+const SCREENS = 'ObjC.import("AppKit"); const s = $.NSScreen.screens, top = s.objectAtIndex(0).frame.size.height, out = [];'
+  + ' for (let i = 0; i < s.count; i++) { const n = s.objectAtIndex(i), f = n.frame;'
+  + ' out.push([f.origin.x, top - f.origin.y - f.size.height, f.size.width, f.size.height, n.backingScaleFactor]); } JSON.stringify(out)';
+let screens = null, screensAt = null, askingScreens = false;
 
 export default class Wallpaper extends View {
   init(_props, cx) {
@@ -69,6 +75,8 @@ export default class Wallpaper extends View {
     stopsInit(this, cx);
     this.dir = `${appHome()}/${MOD}`;
     this.lib = new Library(this.dir);
+    // A file imported now is made at what Home would show it at, as it would be without framing.
+    this.lib.fit = (w, h) => this.need(w, h, placement(null, 0.5), this.scaleNow ?? 2);
     this.builtIn = SCENES.map((s) => ({ ...s, dir: `${this.dir}/.builtin/${s.id}` }));
     this.height = null;
     this.over = false;
@@ -235,9 +243,9 @@ export default class Wallpaper extends View {
 
   // Makes the draft's picture for the theme now; the draft shows it once made.
   async showDraft(d, scene, cx, current) {
-    const made = await makePicture(scene, theme(), isLight(), cx, current);
+    const made = await makePicture(scene, theme(), isLight(), (w, h) => this.need(w, h, d.placement, this.scaleNow ?? 2), cx, current);
     if (!made || !current()) return false;
-    d.scene = { ...scene, width: made.width, height: made.height };
+    d.scene = { ...scene, width: made.width, height: made.height, ...(made.paper ? { paper: true } : {}) };
     return true;
   }
 
@@ -347,23 +355,60 @@ export default class Wallpaper extends View {
     } });
   }
 
-  // The picture for the theme now: made, being made (the last one of this scene stays up meanwhile), or failed.
-  pictureOf(scene, t, cx) {
+  /**
+   * The picture for the theme now: made, being made (the last one of this scene stays up meanwhile), or failed. `small`:
+   * the one made is smaller than `fit` (makePicture) wants, so a larger one is being made, the smaller one up meanwhile.
+   */
+  pictureOf(scene, t, fit, cx) {
     const light = isLight(), key = pictureKey(scene, t, light), made = madePicture(key);
-    if (made?.path) return made.path;
-    if (!made?.error && this.asked !== key) {
+    const small = !!made?.path && !made.error && made.px < fit(made.width, made.height);
+    if (made?.path && !small) return { path: made.path, small };
+    if (!made?.error && !made?.promise && this.asked !== key) {
       this.asked = key;
       const d = this.draft;
       cx.timer.after(0, (cx) => cx.spawn(async (cx) => {
-        try { await makePicture(scene, t, light, cx); }
+        try { await makePicture(scene, t, light, fit, cx); }
         catch (e) {
           if (d && d === this.draft && d.scene === scene) d.message = `${e?.message ?? e}`;
           else if (!d) notify({ title: "Couldn't draw the wallpaper", body: `${scene.name}: ${e?.message ?? e}`, level: "warning" });
         }
+        // Asked again if it is let go later (library.js draw: a newer palette took its file).
+        if (this.asked === key) this.asked = null;
         if (!this.closed) cx.notify();
       }));
     }
-    return null;
+    return { path: made?.path ?? null, small };
+  }
+
+  /**
+   * The backing scale of the screen the window is on (2 on Retina), null while macOS is asked; off macOS, 2.
+   * shortcut: matched by the window's middle x alone (GPUI gives its y on its own screen), taking the largest of screens
+   * stacked there, and asked again only for a place no screen known covers; upgrade once mods can read Window::scale_factor.
+   */
+  screenScale(cx) {
+    if (window()?.platform !== "macos") return 2;
+    const b = /** @type {any} */ (globalThis).window?.bounds?.(), x = b ? b.x + b.width / 2 : 0;
+    const on = (screens ?? []).filter(([left, , width]) => x >= left && x < left + width);
+    if (on.length && !askingScreens) return Math.max(...on.map((s) => s[4]));
+    if (!askingScreens && screensAt !== x) {
+      screensAt = x;
+      askingScreens = true;
+      cx.timer.after(0, (cx) => cx.spawn(async (cx) => {
+        const said = await exec("osascript", ["-l", "JavaScript", "-e", SCREENS]).catch(() => null);
+        let list = null;
+        try { list = JSON.parse(said?.stdout ?? ""); } catch { list = null; }
+        screens = Array.isArray(list) ? list.filter((s) => Array.isArray(s) && s.length === 5 && s.every(Number.isFinite)) : screens ?? [];
+        askingScreens = false;
+        if (!this.closed) cx.notify();
+      }));
+    }
+    return askingScreens ? null : 2;
+  }
+
+  // The px the picture needs on its long edge as Home shows it at framing `p`: its size × the app's zoom × the screen's
+  // scale, up to pictureSide's step.
+  need(width, height, p, scale) {
+    return pictureSide(Math.max(...this.size({ width, height }, p)) * zoom() * scale);
   }
 
   /**
@@ -390,23 +435,46 @@ export default class Wallpaper extends View {
   // its picture: a new one starts whole, with nothing to fade in from. `dim` fades it while a mode is drawing.
   layers(scene, p, path, dim) {
     const fade = dim ? 0.7 : 1, ready = !!path && this.loaded.has(path);
-    // The same picture, or a draft's (one framing for all its modes), moves with the framing; another stays where it was.
-    const at = (shown) => ({ ...shown, p: shown.scene.id === scene.id || this.draft ? p : shown.p });
+    // The same picture, or an earlier mode of this draft (one framing for all its modes), moves with the framing; another,
+    // such as the last picture under a new draft, stays where it was.
+    const mine = (s) => s.id === scene.id || (!!this.draft && (s.id === `preview:${this.draft.id}` || s.id.startsWith(`preview:${this.draft.id}:`)));
+    const at = (shown) => ({ ...shown, p: mine(shown.scene) ? p : shown.p });
     const layer = ({ scene: s, path: src, p: pp }) => {
       const [w, h] = this.size(s, pp);
       return div().id(`wallpaper-at:${src}`).absolute().bottom((this.height - h) * (1 - pp.y)).left(`${pp.x * 100}%`).ml(-pp.x * w).w(w).h(h)
         .opacity(fade).transition("opacity", FADE).child(image(src).id("wallpaper-picture").size_full());
     };
-    // Not drawn after this, the host may let the last one go: coming back, it is loaded again first.
-    if (ready && this.held && this.held.path !== path) this.loaded.delete(this.held.path);
     if (ready) this.held = { scene, path, p };
-    return [this.held && layer(at(this.held)),
-      path && !ready && div().id("wallpaper-probe").absolute().size(0).overflow_hidden().child(div().id("wallpaper-probe-size").absolute()
-        .on_size_change((size, cx) => {
-          if (!size.width || this.loaded.has(path)) return;
-          this.loaded.add(path);
-          if (!this.closed) cx.notify();
-        }).child(image(path).id("wallpaper-probe-image")))].filter(Boolean);
+    // Only what is drawn stays loaded: the host may let any other go, so coming back, it is loaded again first. The other
+    // appearance's is drawn out of sight (warm).
+    for (const had of this.loaded) if (had !== this.held?.path && had !== this.warmed) this.loaded.delete(had);
+    return [this.held && layer(at(this.held)), path && !ready && this.probe(path, "wallpaper-probe")].filter(Boolean);
+  }
+
+  // A copy of picture `path` at its own size, clipped to nothing: its box reports a size once the image has loaded (layers()).
+  probe(path, id) {
+    return div().id(`${id}:${path}`).absolute().size(0).overflow_hidden().child(div().id(`${id}-size`).absolute()
+      .on_size_change((size, cx) => {
+        if (!size.width || this.loaded.has(path)) return;
+        this.loaded.add(path);
+        if (!this.closed) cx.notify();
+      }).child(image(path).id(`${id}-image`)));
+  }
+
+  // The picture for the layout's other appearance (settings' theme_light or theme_dark), made once this one shows and drawn
+  // out of sight from then on: switching between light and dark shows it in the same frame, never this one on the other's
+  // background. Its path once made, else null.
+  // `fit` as this one's; a larger one only once this one's larger one is up (`grow`), so it doesn't slow that one down.
+  warm(scene, fit, grow, cx) {
+    const s = settings();
+    if (typeof s?.dark !== "boolean") return null;
+    const light = s.dark, colours = themes().find((x) => x.name === (light ? s.theme_light : s.theme_dark))?.colors;
+    if (!colours) return null;
+    const t = { ...colours, .../** @type {Record<string, string>} */ (s.colors) }, made = madePicture(pictureKey(scene, t, light));
+    if (grow && !made?.promise && !made?.error && !(made?.path && made.px >= fit(made.width, made.height))) {
+      cx.timer.after(0, (cx) => cx.spawn(async (cx) => { await makePicture(scene, t, light, fit, cx).catch(() => null); if (!this.closed) cx.notify(); }));
+    }
+    return made?.path ?? null;
   }
 
   render(cx) {
@@ -425,17 +493,25 @@ export default class Wallpaper extends View {
       .on_drop(({ paths }, cx) => { if (paths?.[0] && this.draft?.phase !== 'applying') cx.spawn((cx) => this.open(paths[0], cx)); });
     if (!this.height) return root;
     const p = placement(d?.scene ? d.placement : shared(KEY.placements)?.[scene.id], scene.focus);
-    const path = this.pictureOf(scene, t, cx), loaded = !!path && this.loaded.has(path);
+    // A picture being drawn again (library.js refresh) has no files to show meanwhile, nor one before the screen's scale is
+    // known: the last one stays up.
+    const scale = this.scaleNow = this.screenScale(cx) ?? this.scaleNow, fit = (w, h) => this.need(w, h, p, scale);
+    const { path, small } = this.picture = scene.redrawing || !scale ? { path: null, small: false } : this.pictureOf(scene, t, fit, cx);
+    const loaded = !!path && this.loaded.has(path);
+    this.warmed = !d && loaded ? this.warm(scene, fit, !small, cx) : null;
     if (d) {
       if (loaded && d.scene) d.shown = true;
-      // The waits the card shows: the first picture (read, drawn, loaded), a mode or theme redrawing, Apply.
+      // The waits the card shows: the first picture (read, drawn, loaded), a mode or theme redrawing, a larger one for a zoom
+      // (the picture not dimmed meanwhile), Apply.
       const waits = { load: this.track(`load:${d.id}`, !d.shown && ['loading', 'converting', 'ready'].includes(d.phase), cx),
         draw: this.track(`draw:${d.id}`, !!d.shown && (d.phase === 'converting' || !loaded), cx),
+        larger: this.track(`larger:${d.id}`, !!d.shown && small, cx),
         apply: this.track(`apply:${d.id}`, d.phase === 'applying', cx) };
       return focusRoot(this, root.children(this.layers(scene, p, path, waits.draw))
         .when(Boolean(d.scene), (el) => el.child(this.compositionCanvas(t))).child(this.card(t, waits)));
     }
-    const picture = this.layers(scene, p, path, false), waiting = this.track("picture", !loaded, cx);
+    const picture = this.layers(scene, p, path, false), waiting = this.track("picture", !loaded || small, cx);
+    if (this.warmed) picture.push(this.probe(this.warmed, "wallpaper-warm"));
     const button = (id, name, label, act, disabled = false) => tip(this, t, id, label,
       stop(this, t, id, ghostButton(this, t, id, { icon: icon(name), label, act, disabled, surface: "chrome" }), radiusOf("xs")));
     const go = (by) => () => setShared(KEY.wallpaper, all[(i + by + all.length) % all.length].id);
@@ -451,7 +527,7 @@ export default class Wallpaper extends View {
         .when(waiting, (el) => el.child(spinner(12)))
         .child(div().min_w(0).truncate().child(this.opening ? "Choosing…" : this.lib.importing ? `Importing ${this.lib.importing}…` : scene.name)))
       .child(button("wallpaper-next", "chevron-right", "Next wallpaper", go(1), all.length < 2))
-      .child(button("wallpaper-frame", "crop", `Frame ${scene.name}`, (cx) => cx.spawn((cx) => this.startPreview(null, scene.name, cx, false, scene))))
+      .child(button("wallpaper-frame", "crop", `Frame ${scene.name}`, (cx) => cx.spawn((cx) => this.startPreview(null, scene.name, cx, false, scene)), !!scene.redrawing))
       .child(trigger(this, t, "wallpaper-add", { icon: icon("plus"), label: "Add a wallpaper", hint: "Or drop an image or .ans on Home", size: "xs",
         closed: MENU_CLOSED, open: this.opening || undefined, onOpen: (b) => this.openMenu(b) }));
     const corner = div().id("wallpaper-corner").absolute().right(0).bottom(0).w(CORNER.w).h(CORNER.h)
@@ -500,6 +576,7 @@ export default class Wallpaper extends View {
       .on_mouse_move((e, cx) => {
         // Step by step from where the picture is, so a zoom or key mid-drag doesn't make it jump.
         if (!this.drag) return;
+        pointerMoved(e.position);
         const from = this.drag.at;
         this.drag.at = e.position;
         move(d.placement, (e.position.x - from.x) / zoom(), (e.position.y - from.y) / zoom(), cx);
@@ -532,7 +609,13 @@ export default class Wallpaper extends View {
       .on_mouse_down("left", (e, cx) => {
         if (!active()) return;
         this.composeFocus.focus();
-        this.drag = { at: e.position };
+        const drag = this.drag = { at: e.position };
+        // Let go outside the window, or once it's no longer in front, no release comes (tip.js dragGone).
+        const watch = cx.timer.every(POINTER_WATCH, () => {
+          if (this.drag === drag && !dragGone(e.bounds)) return;
+          if (this.drag === drag) this.drag = null;
+          watch.cancel();
+        });
         cx.stop_propagation();
       });
   }
@@ -555,10 +638,11 @@ export default class Wallpaper extends View {
   // The framing card, T3's popover in the switcher's place (docs/internals/specs/wallpaper.md). Name, then until the picture shows only how far
   // it has got; once shown it opens out upward: mode (an image's), Fill/Fit and Reset, Zoom. Its footer never moves: a status
   // slot, then Cancel and Apply, which become Close and Choose another… when the file can't be read. `waits`: which of the
-  // card's waits show now (track()); before one does, nothing says so.
+  // card's waits show now (track()); before one does, nothing says so. Applying, every control is off at once, as none would
+  // act; only Apply's words wait to read Applying….
   card(t, waits) {
-    const d = this.draft, p = d.placement, broken = d.phase === 'broken', busy = waits.apply;
-    const open = !!d.scene && !!d.shown && !waits.load, still = d.phase === 'applying';
+    const d = this.draft, p = d.placement, broken = d.phase === 'broken', busy = d.phase === 'applying';
+    const open = !!d.scene && !!d.shown && !waits.load;
     const spinner = (size) => svg("mods/workspace-chrome/spinner.svg").size(size).flex_none().text_color(t.dim).spin(900);
     const drawing = `Drawing ${d.image ? styleName(d.style) : "picture"}…`;
     let rows = [div().id("wallpaper-card-name").h(20).flex_none().truncate().text_size(13).font_semibold().text_color(t.foreground).child(d.name)];
@@ -581,15 +665,15 @@ export default class Wallpaper extends View {
     }
     // Broken, the reason is the card's body already.
     const status = broken ? null : d.message ? div().truncate().text_color(t.ansi1).child(d.message)
-      : open && waits.draw ? h_flex().gap(6).items_center().child(spinner(12)).child(d.phase === 'converting' ? drawing : "Loading picture…")
-      : open && d.saved?.id.startsWith("file:") && !still ? this.action(t, "wallpaper-delete", "Delete", () => this.askRemove(d.saved), { variant: "danger" })
+      : open && (waits.draw || waits.larger) ? h_flex().gap(6).items_center().child(spinner(12)).child(d.phase === 'converting' ? drawing : "Loading picture…")
+      : open && d.saved?.id.startsWith("file:") && !busy ? this.action(t, "wallpaper-delete", "Delete", () => this.askRemove(d.saved), { variant: "danger" })
       : null;
     const footer = h_flex().id("wallpaper-card-footer").h(28).flex_none().gap(8).items_center()
       .child(h_flex().id("wallpaper-card-status").flex_1().min_w(0).items_center().text_size(12).text_color(t.dim).when(Boolean(status), (el) => el.child(status)))
       .child(broken ? this.action(t, "wallpaper-close", "Close", cx => cx.spawn(cx => this.cancelPreview(cx)))
-        : this.action(t, "wallpaper-cancel", "Cancel", cx => { if (!still) cx.spawn(cx => this.cancelPreview(cx)); }, { disabled: busy }))
+        : this.action(t, "wallpaper-cancel", "Cancel", cx => { if (!busy) cx.spawn(cx => this.cancelPreview(cx)); }, { disabled: busy }))
       .child((broken ? this.action(t, "wallpaper-choose-another", "Choose another…", cx => cx.spawn(cx => this.choose(cx, !d.image)), { variant: "primary", disabled: window()?.platform === "windows" })
-        : this.action(t, "wallpaper-apply", busy || (d.waiting && waits.draw) ? "Applying…" : "Apply", cx => cx.spawn(cx => this.applyPreview(cx)),
+        : this.action(t, "wallpaper-apply", waits.apply || (d.waiting && waits.draw) ? "Applying…" : "Apply", cx => cx.spawn(cx => this.applyPreview(cx)),
           { variant: "primary", disabled: !open || busy || (!!d.waiting && waits.draw) })).min_w(72));
     return v_flex().id("wallpaper-card").absolute().right(12).bottom(12).w(this.cardWidth()).p(16).gap(12)
       .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(12).text_color(t.muted)

@@ -236,13 +236,16 @@ export function* convert(text, aspect, paper = false) {
   return { width: round(columns * aspect), height: lines.length, aspect, ...(style ? { paper: true } : {}) };
 }
 
+/** The size a picture `width`×`height` declares with `side` px on its long edge. */
+export const pictureSize = (width, height, side) => [width, height].map((n) => Math.ceil((n * side) / Math.max(width, height)));
+
 /**
  * Tiles (`{ svg, tint, opacity }`, as convert yields them or scripts/wallpaper.mjs saved them) as one SVG, `side` px on its
  * long edge, each tile in `colour(tint)`. Opacity goes on strokes and fills, not a group, which would composite offscreen.
  */
 export function picture(tiles, colour, width, height, side = 4096) {
-  const scale = side / Math.max(width, height);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width * scale)}" height="${Math.ceil(height * scale)}" viewBox="0 0 ${width} ${height}">`
+  const [w, h] = pictureSize(width, height, side);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${width} ${height}">`
     + tiles.map(({ svg, tint, opacity }) => {
       const c = colour(tint);
       return `<g fill="none" stroke="${c}" stroke-linecap="round" stroke-opacity="${opacity}" fill-opacity="${opacity}">`

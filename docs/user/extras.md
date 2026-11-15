@@ -16,7 +16,7 @@ Review follows your theme, including translucent checkbox colors in themes such 
 
 ## asciicn wallpaper
 
-A Home that is a still picture in [asciicn](https://asciicn.dev)'s style, in your theme's colours, so it changes with the theme, light or dark. It comes with four of asciicn's pictures (Lighthouse, Mountain dusk, Nebula, Ember), and takes your own images or `.ans` files.
+A Home that is a still picture in [asciicn](https://asciicn.dev)'s style, in your theme's colours, so it changes with the theme, light or dark. It comes with four of asciicn's pictures (Lighthouse, Mountain dusk, Nebula, Ember), and takes your own images or `.ans` files. The picture is drawn as sharp as your screen shows it and no sharper, which keeps the memory it takes down: when the window grows, moves to a Retina screen or you zoom in while framing, it is drawn again, the current one staying up meanwhile.
 
 Move the pointer to Home's bottom-right corner and a switcher shows there: `‹ ›` step through the pictures, the crop button frames the picture shown, and `+` adds one. A long name or *Importing…* is cut to fit; `‹ ›` are greyed out only when there's a single picture.
 

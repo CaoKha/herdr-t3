@@ -1,10 +1,11 @@
 // What the wallpaper keeps on disk, under <appHome>/asciicn-wallpaper/ (docs/internals/storage.md): the person's `.ans`
 // files, each one's `.tiles/<name>/scene.json` once it converts, and the pictures Home draws: a wallpaper's tiles put
-// together in the theme's colours as one image (picture() in ascii-art.js), one per appearance, made again for a new palette.
+// together in the theme's colours as one image (picture() in ascii-art.js), one per appearance, made again for a new palette
+// from the uncoloured one kept beside it (templateOf).
 // Module state is shared by every copy of the mod: two Homes don't convert one file twice, and a confirmed deletion stops
 // another Home's conversion or Apply of that file.
 import { appHome, exec, notify, readTextFile, setShared, settings, shared, theme, writeTextFile } from "herdr";
-import { VERSION, convert, picture } from "./ascii-art.js";
+import { VERSION, convert, picture, pictureSize } from "./ascii-art.js";
 
 export const MOD = "asciicn-wallpaper";
 // The shared keys this mod writes (storage.md): the picture picked, and each added one's framing.
@@ -36,8 +37,16 @@ const converting = new Map(), applying = new Set();
 let placementsVersion = 0;
 // Clear abandoned previews once per app run, before any copy starts a new one.
 let previewsReady;
-// Pictures by key: { path } once made, { error }, or { promise } while making.
+// Pictures by key: { path, px } once made, { error }, or { promise } while making, with the smaller one made before.
 const pictures = new Map();
+/**
+ * The px a picture's SVG declares on its long edge, for `n` device px as Home shows it: up to the next STEP, so a window
+ * dragged larger makes few; never past MAX, the size every picture had before. Herdr rasterises an SVG at twice the size
+ * it declares (GPUI's SMOOTH_SVG_SCALE_FACTOR): that 2× keeps marks smaller than a pixel as bold as they were, where a
+ * texture at the device px drew them visibly softer.
+ */
+export const STEP = 512, MAX = 4096;
+export const pictureSide = (n) => (Number.isFinite(n) && n > 0 ? Math.min(MAX, Math.ceil(n / STEP) * STEP) : MAX);
 
 function forget(id) {
   const kept = { ...shared(KEY.placements) };
@@ -59,28 +68,92 @@ export const pictureKey = (scene, t, light) => [scene.dir, scene.sum ?? VERSION,
 export const madePicture = (key) => pictures.get(key);
 // A folder emptied: what was made in it is gone.
 const dropPictures = (dir) => { for (const key of pictures.keys()) if (key.startsWith(`${dir}\n`)) pictures.delete(key); };
+/**
+ * The scene's picture for a side with each tint's name for its colour (`@ansi1@`), kept beside its pictures: a new palette,
+ * after a restart too, is one sed over it (draw), never a conversion. Named by source and version like the pictures; one
+ * per side, and it goes with its folder.
+ */
+const templateOf = (scene, side) => `${scene.dir}/tiles-${side}-${hash([scene.dir, scene.sum ?? VERSION, side].join("\n"))}.tpl`;
+// A theme colour as sed may write it: #hex only.
+const hex = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(c ?? "") ? c : null);
 
 /**
- * Makes the scene's picture for theme `t` once, however many Homes ask: `{ path, width, height, paper }`, its path relative
- * to appHome as image() takes it. Null if `current()` turns false first (the next ask starts again); rejects if it fails.
+ * Makes the scene's picture for theme `t` once, however many Homes ask: `{ path, width, height, px, paper }`, its path
+ * relative to appHome as image() takes it. `fit(width, height)`: the px wanted on its long edge (pictureSide); one made at
+ * least that size serves. While a larger one is made the smaller stays the key's, so Homes keep it up. One at a time per
+ * key: a larger ask meanwhile gets that one, and asks again. Null if `current()` turns false first (the next ask starts
+ * again); rejects if it fails.
  */
-export function makePicture(scene, t, light, cx, current = () => true) {
+export function makePicture(scene, t, light, fit, cx, current = () => true) {
   const key = pictureKey(scene, t, light), had = pictures.get(key);
-  if (had?.path) return Promise.resolve(had);
   if (had?.promise) return had.promise;
-  const promise = draw(scene, t, light, key, cx, current).then(
-    (made) => { if (made) pictures.set(key, made); else pictures.delete(key); return made; },
-    (e) => { pictures.set(key, { error: `${e?.message ?? e}` }); throw e; });
-  pictures.set(key, { promise });
+  if (had?.path && (had.error || had.px >= fit(had.width, had.height))) return Promise.resolve(had);
+  const kept = had?.path ? { path: had.path, width: had.width, height: had.height, px: had.px, ...(had.paper ? { paper: true } : {}) } : null;
+  const promise = draw(scene, t, light, key, fit, cx, current).then(
+    (made) => { if (made) pictures.set(key, made); else if (kept) pictures.set(key, kept); else pictures.delete(key); return made; },
+    (e) => { pictures.set(key, { ...kept, error: `${e?.message ?? e}` }); throw e; });
+  pictures.set(key, { ...kept, promise });
   return promise;
 }
 
-async function draw(scene, t, light, key, cx, current) {
-  // Named by its key, never rewritten: one on disk already (made by an earlier run, or an Apply's preview) is this picture.
-  const side = light ? "light" : "dark", name = `${side}-${hash(key)}.svg`, at = `${scene.dir}/${name}`;
-  if (scene.text == null && scene.width && scene.height && (await exec("test", ["-s", at])).code === 0) {
-    return { path: at.slice(appHome().length + 1), width: scene.width, height: scene.height, ...(scene.paper ? { paper: true } : {}) };
+async function draw(scene, t, light, key, fit, cx, current) {
+  // Named by its key and px, never rewritten: one on disk already at least the px wanted (made by an earlier run, or an
+  // Apply's preview) is this picture, the smallest such.
+  const side = light ? "light" : "dark", base = `${side}-${hash(key)}`;
+  if (scene.text == null && scene.width && scene.height) {
+    const want = fit(scene.width, scene.height);
+    const listed = await sh(`cd ${quote(scene.dir)} 2>/dev/null || exit 0; for f in ${base}-*.svg; do [ -s "$f" ] && echo "$f"; done`);
+    const [found] = listed.stdout.split("\n").map((f) => /** @type {[string, number]} */ ([f, Number(f.slice(base.length + 1, -4))]))
+      .filter(([, px]) => px >= want).sort((a, b) => a[1] - b[1]);
+    if (found) {
+      return { path: `${scene.dir}/${found[0]}`.slice(appHome().length + 1), width: scene.width, height: scene.height, px: found[1],
+        ...(scene.paper ? { paper: true } : {}) };
+    }
   }
+  const template = templateOf(scene, side);
+  let { width, height, paper } = scene;
+  if (!(width && height && (await exec("test", ["-s", template])).code === 0)) {
+    const set = await tilesOf(scene, light, cx, current);
+    if (!set || !current()) return null;
+    ({ width, height, paper } = set);
+    const made = await exec("mkdir", ["-p", scene.dir]);
+    if (made.code !== 0) throw new Error(made.stderr.trim());
+    await publish(scene.dir, template, (staged) => stage(staged, picture(set.tiles, (tint) => `@${tint}@`, width, height)));
+    await sh(`for f in tiles-${side}-*.tpl; do [ "$f" = ${quote(template.slice(scene.dir.length + 1))} ] || rm -f "./$f"; done`, scene.dir);
+  }
+  if (!current()) return null;
+  const px = fit(width, height), name = `${base}-${px}.svg`, at = `${scene.dir}/${name}`, [w, h] = pictureSize(width, height, px);
+  // Each tint its colour, as picture() would: the theme's, else its foreground's. The size is the first on its first line.
+  const fallback = hex(t.foreground) ?? "#000", colours = Object.keys(t).filter((n) => /^[a-z0-9_]+$/.test(n) && hex(t[n]))
+    .map((n) => `s/@${n}@/${t[n]}/g`).concat(`s/@[a-z0-9_]*@/${fallback}/g`, `1s/ width="[0-9]*" height="[0-9]*"/ width="${w}" height="${h}"/`)
+    .map((e) => `-e ${quote(e)}`).join(" ");
+  // image() keeps what it loaded from a path: a new picture gets a new name, never a rewrite.
+  await publish(scene.dir, at, async (staged) => {
+    const coloured = await sh(`sed ${colours} ${quote(template)} > ${quote(staged)}`, scene.dir);
+    if (coloured.code !== 0) throw new Error(coloured.stderr.trim());
+  });
+  // The other palettes and sizes of this appearance go; Homes showing one keep the image they loaded. Their keys go too: a
+  // file no longer there never loads, so going back to one of them makes it again. This key's is replaced once it returns.
+  await sh(`for f in ${side}-*.svg; do [ "$f" = ${quote(name)} ] || rm -f "./$f"; done`, scene.dir);
+  const path = at.slice(appHome().length + 1), gone = `${path.slice(0, path.lastIndexOf("/") + 1)}${side}-`;
+  for (const [k, had] of pictures) if (k !== key && had.path?.startsWith(gone) && had.path !== path) pictures.delete(k);
+  return { path, width, height, px, ...(paper ? { paper } : {}) };
+}
+
+// `file`, written whole by `write(staged)` under a temporary name, then moved into place.
+async function publish(dir, file, write) {
+  const staged = `${dir}/.stage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    await write(staged);
+    const moved = await exec("mv", ["-f", staged, file]);
+    if (moved.code !== 0) throw new Error(moved.stderr.trim());
+  } finally {
+    await exec("rm", ["-rf", staged, `${staged}.parts`]);
+  }
+}
+
+// The scene's tiles for a side: a built-in's from its files, else its .ans converted. Null if `current()` turns false first.
+async function tilesOf(scene, light, cx, current) {
   let tiles = [], { width, height } = scene, paper;
   if (scene.tiles) {
     tiles = await Promise.all(scene.tiles.map(async (l) => ({ ...l, svg: (await readTextFile(`${appHome()}/mods/${MOD}/scenes/${scene.id}/${l.file}`)) ?? "" })));
@@ -105,22 +178,7 @@ async function draw(scene, t, light, key, cx, current) {
     ({ width, height, paper } = frame);
   }
   if (!tiles.length) throw new Error("No visible marks. Try another picture or adjust its contrast in Studio.");
-  const body = picture(tiles, (tint) => t[tint] ?? t.foreground ?? "#000", width, height);
-  if (!current()) return null;
-  // image() keeps what it loaded from a path: a new picture gets a new name, never a rewrite.
-  const made = await exec("mkdir", ["-p", scene.dir]);
-  if (made.code !== 0) throw new Error(made.stderr.trim());
-  const staged = `${scene.dir}/.stage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  try {
-    await stage(staged, body);
-    const moved = await exec("mv", ["-f", staged, at]);
-    if (moved.code !== 0) throw new Error(moved.stderr.trim());
-  } finally {
-    await exec("rm", ["-rf", staged, `${staged}.parts`]);
-  }
-  // The other palettes of this appearance go; Homes showing one keep the image they loaded.
-  await sh(`for f in ${side}-*.svg; do [ "$f" = ${quote(name)} ] || rm -f "./$f"; done`, scene.dir);
-  return { path: at.slice(appHome().length + 1), width, height, ...(paper ? { paper } : {}) };
+  return { tiles, width, height, paper };
 }
 
 // `text` written to the new file `file`: in one write while it is surely under the host's 1 MiB limit (3 UTF-8 bytes at most
@@ -146,6 +204,8 @@ export class Library {
     this.imported = [];
     this.importing = null;
     this.closed = false;
+    // The px a newly imported file's picture is made at (makePicture's `fit`); its Home sets it.
+    this.fit = (_width, _height) => MAX;
     this.ready = previewsReady ??= exec("rm", ["-rf", `${dir}/.preview`]).then(() => exec("mkdir", ["-p", `${dir}/.tiles`, `${dir}/.preview`]));
   }
 
@@ -182,8 +242,12 @@ export class Library {
     for (const f of files) {
       let kept = null;
       try { kept = JSON.parse((await readTextFile(`${this.dir}/.tiles/${f.name}/scene.json`)) ?? "null"); } catch { kept = null; }
-      if (kept?.sum !== f.sum || (kept.failed && f.name === retryName)) todo.push(f);
-      else if (!kept.failed) shown.push(this.sceneOf(f.name, kept));
+      if (kept?.sum !== f.sum || (kept.failed && f.name === retryName)) {
+        todo.push(f);
+        // One listed already is drawn again: it stays listed, `redrawing`, so Home keeps it under its name meanwhile.
+        const was = this.imported.find((s) => s.name === f.name);
+        if (was) shown.push({ ...was, redrawing: true });
+      } else if (!kept.failed) shown.push(this.sceneOf(f.name, kept));
     }
     this.imported = shown.sort((a, b) => a.name.localeCompare(b.name));
     cx.notify();
@@ -220,7 +284,7 @@ export class Library {
       dropPictures(out);
       if (text.code !== 0) throw new Error(text.stderr.trim());
       const t = theme(), light = isLight();
-      const made = await makePicture({ ...scene, text: text.stdout }, t, light, cx, () => !job.cancelled);
+      const made = await makePicture({ ...scene, text: text.stdout }, t, light, this.fit, cx, () => !job.cancelled);
       if (!made || !(await current())) { stale = true; return true; }
       const { width, height, paper } = made;
       await mark({ focus: 0.5, width, height, ...(paper ? { paper } : {}) });
@@ -229,6 +293,7 @@ export class Library {
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch (e) {
       if (job.cancelled) return;
+      this.imported = this.imported.filter((s) => s.name !== f.name);
       await mark({ failed: true }).catch(() => null);
       const waiting = [...applying].filter(a => a.name === f.name);
       for (const a of waiting) a.error = `${e?.message ?? e}`;
@@ -270,10 +335,12 @@ export class Library {
     const sum = await sh(`cksum < ${quote(staged)}`, this.dir);
     if (sum.code !== 0) return;
     const scene = this.sceneOf(name, { sum: `${sum.stdout.trim().split(/\s+/).join("-")}-${VERSION}` });
-    const at = `${scene.dir}/${light ? "light" : "dark"}-${hash(pictureKey(scene, t, light))}.svg`;
+    const at = `${scene.dir}/${light ? "light" : "dark"}-${hash(pictureKey(scene, t, light))}-${made.px}.svg`;
     await exec("rm", ["-rf", scene.dir]);
     dropPictures(scene.dir);
     if ((await exec("mkdir", ["-p", scene.dir])).code !== 0 || (await exec("link", [`${appHome()}/${made.path}`, at])).code !== 0) return;
+    const side = light ? "light" : "dark";
+    await exec("link", [templateOf(draft.scene, side), templateOf(scene, side)]);
     const { width, height, paper } = made;
     await writeTextFile(`${scene.dir}/scene.json`, JSON.stringify({ sum: scene.sum, focus: 0.5, width, height, ...(paper ? { paper } : {}) }), null).catch(() => null);
   }
