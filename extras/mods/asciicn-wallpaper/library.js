@@ -1,5 +1,5 @@
-// What the wallpaper keeps on disk, under <appHome>/asciicn-wallpaper/ (docs/internals/storage.md): the person's `.ans`
-// files, each one's `.tiles/<name>/scene.json` once it converts, and the pictures Home draws: a wallpaper's tiles put
+// What the wallpaper keeps on disk, under <appHome>/asciicn-wallpaper/ (docs/internals/storage.md): the `.ans` file of each
+// picture the person added, each one's `.tiles/<name>/scene.json` once it converts, and the pictures Home draws: a wallpaper's tiles put
 // together in the theme's colours as one image (picture() in ascii-art.js), one per appearance, made again for a new palette
 // from the uncoloured one kept beside it (templateOf).
 // Module state is shared by every copy of the mod: two Homes don't convert one file twice, and a confirmed deletion stops
@@ -165,7 +165,7 @@ async function tilesOf(scene, light, cx, current) {
       text = read.stdout;
     }
     const gather = function* () {
-      const it = convert(text, undefined, light);
+      const it = convert(text, light);
       for (;;) {
         const step = it.next();
         if (step.done) return step.value;
@@ -177,7 +177,7 @@ async function tilesOf(scene, light, cx, current) {
     if (!frame) return null;
     ({ width, height, paper } = frame);
   }
-  if (!tiles.length) throw new Error("No visible marks. Try another picture or adjust its contrast in Studio.");
+  if (!tiles.length) throw new Error("No visible marks. Try another picture.");
   return { tiles, width, height, paper };
 }
 
@@ -300,6 +300,8 @@ export class Library {
       if (!waiting.length) notify({ title: "Couldn't import the wallpaper", body: `${f.name}.ans: ${e?.message ?? e}`, level: "warning" });
     } finally {
       if (job.cancelled || stale) { await exec("rm", ["-rf", out]); dropPictures(out); }
+      // Deleted meanwhile (remove() cancels it): the entry kept listed while it was drawn again goes too.
+      if (job.cancelled) this.imported = this.imported.filter((s) => s.name !== f.name);
       this.importing = null;
       cx.notify();
     }

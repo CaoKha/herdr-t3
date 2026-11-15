@@ -1,44 +1,36 @@
-// An asciicn frame (its `.ans` export) as one-colour SVG tiles the theme tints: what the mod imports at run time and
-// scripts/wallpaper.mjs makes the built-in pictures with. Plain JavaScript, no host calls, so both can run it.
+// A picture made here (an image drawn in a mode, saved as `.ans` text) as one-colour SVG tiles the theme tints. Plain
+// JavaScript, no host calls. The built-in pictures are tiles already, in the mod's scenes/.
 //
-// Each glyph is drawn as shapes, never as text: a mod's text collapses runs of spaces and its newlines, and the fonts at
-// hand join `##` and `::` into ligatures. The shapes are asciicn's own (lib/ascii/glyphs.ts, MIT, LICENSE-asciicn):
-// Braille as its 2×4 dots, blocks, quadrants and shades as rectangles, halftone dots as dots, diagonals as lines.
-// Units: a cell is 1 tall and `aspect` wide; a dot's radius is in cell widths, as asciicn has it.
+// Each glyph is drawn as shapes, never as text: a mod's text collapses runs of spaces and its newlines. The shapes are
+// asciicn's own (lib/ascii/glyphs.ts, MIT, LICENSE-asciicn): Braille as its 2×4 dots, blocks, quadrants and shades as
+// rectangles, halftone dots as dots. Units: a cell is 1 tall and ASPECT wide; a dot's radius is in cell widths.
 //
-// A cell's colour picks a theme colour (an ANSI 16 colour as itself; truecolor by hue, grey as the foreground) and its
-// brightness a step of opacity. Cells of one colour and step are one layer, cut into tiles of at most TILE cell heights
+// A cell's colour picks the nearest VGA theme slot and its brightness a step of opacity (tintOf). Cells of one colour and step are one layer, cut into tiles of at most TILE cell heights
 // across and down, each its own small SVG; picture() puts them together, in the theme's colours, as the one image Home draws.
 
 // Part of each import's cache key: raise it whenever a frame or its cache would come out differently, and every import
-// converts again.
-export const VERSION = 5;
-const STEPS = [0.18, 0.32, 0.5, 0.75];
+// converts again. 6: only frames made here convert; another .ans in the folder fails once, with a notice.
+export const VERSION = 6;
 const IMAGE_STEPS = [0.1, 0.18, 0.28, 0.4, 0.55, 0.7, 0.85, 1];
-// v3: half-width cells and the 8-step VGA mapping. v4 adds the mode and colours blank opaque cells, so the frame can
-// turn over for light themes (`paper`) without its source picture.
-const IMAGE_HEADER = /^\x1b\]777;asciicn-wallpaper;image-v(3|4)(?:;(dots|blocks|quadrants|braille))?\x07/;
+// The non-drawing header a frame made here starts with: its mode, so it can turn over for light themes (`paper`) without
+// its source picture. Half-width cells.
+const IMAGE_HEADER = /^\x1b\]777;asciicn-wallpaper;image-v4;(dots|blocks|quadrants|braille)\x07/;
 const imageMark = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
-/** Whether a frame came from an image here (its mode is then fixed), rather than from Studio or by hand. */
-export const fromImage = (text) => IMAGE_HEADER.test(text);
+const ASPECT = 0.5;
 // Dense shade rectangles must also fit the host's 1 MiB text-write limit.
 const TILE = 40;
-// A line's width, in cell heights.
-const WEIGHT = 0.14;
 
 const SHAPES = new Map();
 const dot = (cx, cy, r) => ({ kind: "dot", cx, cy, r });
 const rect = (x, y, w, h) => ({ kind: "rect", x, y, w, h });
-const line = (x1, y1, x2, y2) => ({ kind: "line", x1, y1, x2, y2 });
 const define = (glyphs, shape) => { for (const g of glyphs) SHAPES.set(g, shape); };
 
 define("█", [rect(0, 0, 1, 1)]);
-[..."▁▂▃▄▅▆▇"].forEach((g, i) => define(g, [rect(0, 1 - (i + 1) / 8, 1, (i + 1) / 8)]));
-[..."▏▎▍▌▋▊▉"].forEach((g, i) => define(g, [rect(0, 0, (i + 1) / 8, 1)]));
+// Halves as one rectangle each.
 define("▀", [rect(0, 0, 1, 0.5)]);
-define("▔", [rect(0, 0, 1, 0.125)]);
+define("▄", [rect(0, 0.5, 1, 0.5)]);
+define("▌", [rect(0, 0, 0.5, 1)]);
 define("▐", [rect(0.5, 0, 0.5, 1)]);
-define("▕", [rect(0.875, 0, 0.125, 1)]);
 // Quadrants by mask: top-left 1, top-right 2, bottom-left 4, bottom-right 8.
 [..." ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"].forEach((g, mask) => {
   if (mask === 0 || mask === 15 || SHAPES.has(g)) return;
@@ -55,61 +47,18 @@ for (let mask = 1; mask < 256; mask++) {
   define(String.fromCodePoint(0x2800 + mask), BRAILLE_BITS.flatMap((bits, row) =>
     bits.flatMap((bit, column) => mask & bit ? [dot(column === 0 ? 0.3 : 0.7, (row + 0.5) / 4, 0.17)] : [])));
 }
-// Halftone dots, and what Mountain dusk's and Ocean waves' frames use as dots.
-for (const [g, r] of Object.entries({ "·": 0.07, "∙": 0.13, "•": 0.24, "⦁": 0.33, "●": 0.42, ".": 0.1, ",": 0.1, "'": 0.1, "`": 0.1, "*": 0.24, "+": 0.24 })) define(g, [dot(0.5, 0.5, r)]);
-define("╱/", [line(0, 1, 1, 0)]);
-define("╲\\", [line(0, 0, 1, 1)]);
-define("╳", [line(0, 1, 1, 0), line(0, 0, 1, 1)]);
-define("-~", [line(0, 0.5, 1, 0.5)]);
-define("_", [line(0, 0.95, 1, 0.95)]);
-define("^", [line(0, 0.7, 0.5, 0.3), line(0.5, 0.3, 1, 0.7)]);
-const HALFTONE = new Set("·∙•⦁●");
+// Halftone dots.
+for (const [g, r] of Object.entries({ "·": 0.07, "∙": 0.13, "•": 0.24, "⦁": 0.33, "●": 0.42 })) define(g, [dot(0.5, 0.5, r)]);
+const shapeOf = (g) => SHAPES.get(g) ?? [];
 
-// Any other glyph (a custom ramp's `#`, `@`) is a round-ended bar standing in the cell, wider and taller the darker it is,
-// by its place in this ramp, darkest last: in text cells, half as wide as tall, a dot would leave rows of stripes.
-// shortcut: the glyph's own outline is lost; draw letters as paths if someone imports a frame where it matters.
-const RAMP = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
-const inked = (g) => {
-  const at = RAMP.indexOf(g), t = at < 0 ? 0.6 : at / (RAMP.length - 1);
-  return [{ kind: "bar", cx: 0.5, cy: 0.5, r: round(0.12 + 0.3 * t), k: round(0.05 + 0.25 * t) }];
-};
-const shapeOf = (g) => SHAPES.get(g) ?? (g.trim() === "" || g === "\u2800" ? [] : inked(g));
-
-// The colour SGR codes leave set: null (the default ink), { ansi: n } or { rgb: [r, g, b] }.
+// The colour a frame's SGR codes leave set: null, or { rgb: [r, g, b] } (38;2, the only colour a frame made here writes).
 function sgr(codes, color) {
   const p = codes === "" ? [0] : codes.split(";").map(Number);
   for (let i = 0; i < p.length; i++) {
-    const n = p[i];
-    if (n === 0 || n === 39) color = null;
-    else if (n >= 30 && n <= 37) color = { ansi: n - 30 };
-    else if (n >= 90 && n <= 97) color = { ansi: n - 90 + 8 };
-    else if (n === 38 || n === 48) {
-      const own = n === 38;
-      if (p[i + 1] === 2) { if (own) color = { rgb: p.slice(i + 2, i + 5) }; i += 4; }
-      else if (p[i + 1] === 5) { if (own) color = xterm(p[i + 2]); i += 2; }
-    }
+    if (p[i] === 0 || p[i] === 39) color = null;
+    else if (p[i] === 38 && p[i + 1] === 2) { color = { rgb: p.slice(i + 2, i + 5) }; i += 4; }
   }
   return color;
-}
-function xterm(n) {
-  if (n < 16) return { ansi: n };
-  if (n >= 232) { const v = 8 + 10 * (n - 232); return { rgb: [v, v, v] }; }
-  const c = n - 16, v = (x) => (x ? 55 + 40 * x : 0);
-  return { rgb: [v(Math.floor(c / 36)), v(Math.floor(c / 6) % 6), v(c % 6)] };
-}
-
-/** The theme colour (`foreground` or `ansiN`) and opacity step a cell's colour takes. */
-export function legacyTintOf(color) {
-  if (!color) return { tint: "foreground", step: 3 };
-  if (color.ansi !== undefined) return { tint: `ansi${color.ansi}`, step: 3 };
-  const [r, g, b] = color.rgb;
-  const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255, l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  const step = l < 0.12 ? 0 : l < 0.25 ? 1 : l < 0.5 ? 2 : 3;
-  if (max === 0 || (max - min) / max < 0.18) return { tint: "foreground", step };
-  const [R, G, B] = [r, g, b].map((v) => v / 255), d = max - min;
-  const hue = (max === R ? ((G - B) / d + 6) % 6 : max === G ? (B - R) / d + 2 : (R - G) / d + 4) * 60;
-  const n = hue < 15 || hue >= 345 ? 1 : hue < 75 ? 3 : hue < 165 ? 2 : hue < 190 ? 6 : hue < 280 ? 4 : 5;
-  return { tint: `ansi${l >= 0.45 ? n + 8 : n}`, step };
 }
 
 // asciicn palettes.ts: VGA reference slots and perceptual nearestIndex (MIT, LICENSE-asciicn).
@@ -126,7 +75,6 @@ const VGA_LAB = VGA.map(oklab);
 /** New image colours: nearest VGA theme slot, with eight steps of HSV value (not luminance); on paper, of darkness. */
 export function tintOf(color, paper = false) {
   if (!color) return { tint: "foreground", step: 7 };
-  if (color.ansi !== undefined) return { tint: `ansi${color.ansi}`, step: 7 };
   const lab = oklab(color.rgb);
   let nearest = 0, distance = Infinity;
   for (const [index, target] of VGA_LAB.entries()) {
@@ -139,18 +87,12 @@ export function tintOf(color, paper = false) {
 
 const round = (v) => +v.toFixed(3);
 
-// One tile's svg: dots as zero-length round-capped strokes a path per size, bars as short upright ones a path per size,
-// rectangles one filled path, lines one stroke.
+// One tile's svg: dots as zero-length round-capped strokes a path per size, rectangles one filled path.
 function svg(cells, aspect, box) {
-  const bySize = new Map(), bars = new Map(), rects = [], lines = [];
+  const bySize = new Map(), rects = [];
   for (const c of cells) for (const s of shapeOf(c.g)) {
     if (s.kind === "rect") rects.push([c, s]);
-    else if (s.kind === "line") lines.push([c, s]);
-    else if (s.kind === "bar") {
-      const key = `${s.r} ${s.k}`;
-      if (!bars.has(key)) bars.set(key, []);
-      bars.get(key).push(`M${round((c.column + s.cx) * aspect)} ${round(c.row + s.cy - s.k)}v${round(2 * s.k)}`);
-    } else {
+    else {
       if (!bySize.has(s.r)) bySize.set(s.r, []);
       bySize.get(s.r).push([(c.column + s.cx) * aspect, c.row + s.cy]);
     }
@@ -166,31 +108,25 @@ function svg(cells, aspect, box) {
     }
     return `<path stroke-width="${round(2 * r * aspect)}" d="${d}"/>`;
   });
-  for (const [key, d] of bars) paths.push(`<path stroke-width="${round(2 * Number(key.split(" ")[0]) * aspect)}" d="${d.join("")}"/>`);
   if (rects.length) {
     const d = rects.map(([c, s]) => `M${round((c.column + s.x) * aspect)} ${round(c.row + s.y)}h${round(s.w * aspect)}v${round(s.h)}h${round(-s.w * aspect)}z`).join("");
     paths.push(`<path fill="#000" stroke="none" d="${d}"/>`);
-  }
-  if (lines.length) {
-    const d = lines.map(([c, s]) => `M${round((c.column + s.x1) * aspect)} ${round(c.row + s.y1)}L${round((c.column + s.x2) * aspect)} ${round(c.row + s.y2)}`).join("");
-    paths.push(`<path stroke-width="${WEIGHT}" d="${d}"/>`);
   }
   const { x0, y0, x1, y1 } = box;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${round(x1 - x0)} ${y1 - y0}" fill="none" stroke="#000" stroke-linecap="round">${paths.join("")}</svg>\n`;
 }
 
 /**
- * Converts a frame's `.ans` text. Yields `null` now and then, a place to let the UI breathe, and each tile as
- * `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect }`, in cell heights, plus
- * `paper: true` for a frame that can turn over for a light theme.
- * New image exports carry a non-drawing OSC header for half-width cells and the new theme mapping. Unmarked frames
- * keep legacy mapping and aspect inference: halftone dots alone are square; other text cells have aspect 0.5.
- * `paper` turns a v4 frame's tones over (each glyph its opposite, blank opaque cells full); other frames ignore it.
+ * Converts the `.ans` text of a frame made here (imageAns). Yields `null` now and then, a place to let the UI breathe, and
+ * each tile as `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect, paper: true }`, in cell
+ * heights. `paper` turns its tones over for a light theme (each glyph its opposite, blank opaque cells full). Throws for any
+ * other text.
  */
-export function* convert(text, aspect, paper = false) {
-  const header = text.match(IMAGE_HEADER), image = !!header, style = header?.[2];
-  if (image) { text = text.slice(header[0].length); aspect ??= 0.5; }
-  const turn = paper && style ? PAPER[style] : null;
+export function* convert(text, paper = false) {
+  const header = text.match(IMAGE_HEADER), aspect = ASPECT;
+  if (!header) throw new Error("This isn't a picture made here: add it with Choose image… or by dropping the image on Home.");
+  text = text.slice(header[0].length);
+  const turn = paper ? PAPER[header[1]] : null;
   const lines = text.replace(/\r/g, "").split("\n");
   while (lines.length && lines.at(-1) === "") lines.pop();
   const cells = [];
@@ -209,17 +145,16 @@ export function* convert(text, aspect, paper = false) {
     columns = Math.max(columns, column);
     if (row % 16 === 15) yield null;
   }
-  aspect ??= cells.length && cells.every((c) => HALFTONE.has(c.g)) ? 1 : 0.5;
   const layers = new Map();
   for (const [index, c] of cells.entries()) {
-    const { tint, step } = image ? tintOf(c.color, !!turn) : legacyTintOf(c.color), key = `${tint}-${step}`;
+    const { tint, step } = tintOf(c.color, !!turn), key = `${tint}-${step}`;
     if (!layers.has(key)) layers.set(key, { tint, step, cells: [] });
     layers.get(key).cells.push(c);
-    if (image && index % 1024 === 1023) yield null;
+    if (index % 1024 === 1023) yield null;
   }
   yield null;
   for (const [key, { tint, step, cells: mine }] of [...layers].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-    const opacity = image ? IMAGE_STEPS[step] : step === 3 && tint === "foreground" ? 1 : STEPS[step];
+    const opacity = IMAGE_STEPS[step];
     const groups = new Map();
     for (const c of mine) {
       const t = `${Math.floor((c.column * aspect) / TILE)}-${Math.floor(c.row / TILE)}`;
@@ -233,14 +168,14 @@ export function* convert(text, aspect, paper = false) {
       yield { file: `${key}-${t}.svg`, svg: svg(these, aspect, box), tint, opacity, ...box };
     }
   }
-  return { width: round(columns * aspect), height: lines.length, aspect, ...(style ? { paper: true } : {}) };
+  return { width: round(columns * aspect), height: lines.length, aspect, paper: true };
 }
 
 /** The size a picture `width`×`height` declares with `side` px on its long edge. */
 export const pictureSize = (width, height, side) => [width, height].map((n) => Math.ceil((n * side) / Math.max(width, height)));
 
 /**
- * Tiles (`{ svg, tint, opacity }`, as convert yields them or scripts/wallpaper.mjs saved them) as one SVG, `side` px on its
+ * Tiles (`{ svg, tint, opacity }`, as convert yields them or scenes/ holds them) as one SVG, `side` px on its
  * long edge, each tile in `colour(tint)`. Opacity goes on strokes and fills, not a group, which would composite offscreen.
  */
 export function picture(tiles, colour, width, height, side = 4096) {
@@ -253,7 +188,7 @@ export function picture(tiles, colour, width, height, side = 4096) {
     }).join("") + "</svg>\n";
 }
 
-// ---- An image, without the Studio: the frame its default for an image in Braille and true colour would make.
+// ---- An image: the frame asciicn's default for an image in Braille and true colour would make.
 
 /** 96 rows of half-width cells. Each style requests its own samples per cell. */
 export function imageGrid(width, height, style = "braille") {
@@ -361,7 +296,7 @@ export function* decodeBmp(base64) {
   return { width, height, rgba };
 }
 
-// Studio's autoLevels for an image: tones stretched so 0.5% of them clip at each end.
+// asciicn's autoLevels for an image: tones stretched so 0.5% of them clip at each end.
 function* imageLevels({ width, height, rgba, tones: sampled }) {
   const tones = new Float32Array(width * height), bins = new Uint32Array(256);
   let counted = 0;

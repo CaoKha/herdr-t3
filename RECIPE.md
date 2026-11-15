@@ -166,7 +166,7 @@ Layout Settings (footer sliders or `cmd-shift-,`) has exactly two preferences:
 
 ### Optional asciicn wallpaper Home
 
-Installing `extras/mods/asciicn-wallpaper` and choosing it in Home shows makes Home a static, theme-coloured ASCII picture. Built-ins come from [asciicn](https://asciicn.dev) (MIT). A switcher at the bottom right, shown on hover, steps between pictures, frames the current one and adds more through `+`: choose an image, import a Studio `.ans`, open asciicn Studio, or open the wallpaper folder; dropping a file on Home works too. A new picture opens a framing card with modes (Dots, Braille, Blocks, Quadrants), Fill/Fit, zoom and Apply/Cancel. Home never blanks: the last picture stays until the next has loaded, the other appearance's picture is ready before a light/dark switch, and waits over 150ms show progress. Spec: [wallpaper](docs/internals/specs/wallpaper.md).
+Installing `extras/mods/asciicn-wallpaper` and choosing it in Home shows makes Home a static, theme-coloured ASCII picture. Built-ins come from [asciicn](https://asciicn.dev) (MIT). A switcher at the bottom right, shown on hover, steps between pictures, frames the current one and adds more through `+`: choose an image (not on Windows), or open the wallpaper folder; dropping an image on Home works too. A new picture opens a framing card with modes (Dots, Braille, Blocks, Quadrants), Fill/Fit, zoom and Apply/Cancel. Home never blanks: the last picture stays until the next has loaded, the other appearance's picture is ready before a light/dark switch, and waits over 150ms show progress. Spec: [wallpaper](docs/internals/specs/wallpaper.md).
 
 ### Keyboard and focus
 

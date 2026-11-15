@@ -6,8 +6,8 @@ The optional Home mod `extras/mods/asciicn-wallpaper`: its controls, waits, fram
 
 - Built-ins: Lighthouse, Mountain dusk, Nebula, Ember, from [asciicn](https://asciicn.dev), MIT. Static, theme-coloured; no animation.
 - Saved and previewed pictures take one path: glyphs composed into one image in theme colours (ANSI16 slots, opacity steps).
-- Light themes draw pictures imported from images on paper (marks where the photo is dark). Studio and hand-made `.ans` files and built-ins keep their tones.
-- Geometric glyphs keep their shapes; other characters become bars sized by darkness. So only the shape modes are offered (Dots, Braille, Blocks, Quadrants): their glyphs match asciicn's own `mapTones` cell for cell, while letter ramps (Classic, Dense) would need glyph outlines the tiles don't draw.
+- Light themes draw added pictures on paper (marks where the photo is dark). Built-ins keep their tones.
+- Only the shape modes are offered (Dots, Braille, Blocks, Quadrants): their glyphs match asciicn's own `mapTones` cell for cell, while letter ramps (Classic, Dense) would need glyph outlines the tiles don't draw.
 - Without a saved framing, a picture covers Home from the bottom with its subject anchored across; a narrower one fills the width. A smaller Home height counts only once stable for 250ms.
 
 ## Switcher
@@ -20,10 +20,10 @@ The optional Home mod `extras/mods/asciicn-wallpaper`: its controls, waits, fram
 
 ## `+` menu
 
-- This mod's own popup: 260 wide, 6 above `+`, right edges aligned; `popover` background, padding 4, 28px `menu-row.js` rows, icons image / file / external-link / folder.
-- `+`'s tooltip second line: "Or drop an image or .ans on Home".
-- Rows: Choose image…, Import Studio file (.ans)…, asciicn Studio (44 high, second line "Export .ans there, then drop it here" in 12px `dim`; opens `https://asciicn.dev/studio?source=image&charset=braille&color=truecolor`), Open wallpaper folder. Windows lists only the last two.
-- A file dropped on Home does the same: first path only, `.ans` as a Studio file, anything else as an image. No drag-over highlight. The Downloads folder isn't watched.
+- This mod's own popup: 260 wide, 6 above `+`, right edges aligned; `popover` background, padding 4, 28px `menu-row.js` rows, icons image / folder.
+- `+`'s tooltip second line: "Or drop an image on Home".
+- Rows: Choose image…, Open wallpaper folder. Windows, with no file dialog for mods, lists only Open wallpaper folder; an image comes by dropping it.
+- A file dropped on Home does what Choose image… does: first path only, read as an image. No drag-over highlight. The Downloads folder isn't watched.
 
 ## Framing card
 
@@ -71,7 +71,7 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 - Nothing shows for waits under 150ms; once shown, an indicator stays at least 300ms (`main.js` `track`).
 - The last picture stays up until the next one has loaded, then the next replaces it whole in one frame, without fading in, so Home never blanks. Meanwhile the last one keeps its own framing, a new draft's included. How the mod knows it has loaded: [layout implementation](../layout-implementation.md)「壁纸转换」.
 - **Light/dark**: once the picture shows, the one for the layout's other appearance (its `theme_light` or `theme_dark`) is made and loaded out of sight, so switching shows it in the same frame as the new background. Another theme only recolours the picture, then loads it: its uncoloured tiles are kept on disk beside it, one set per side, so this holds after a restart too; the last picture stays up meanwhile. Going back to a palette whose file a newer one replaced makes it again.
-- **Compact card progress**: under the name, a 26 high block: the step name (12px `dim`, 16 high), 6 gap, a 4 high bar (track `border`, radius 4, `overflow_hidden`, progress `foreground`). Images have steps, so progress is determinate: the width follows the steps over 300ms ease-out, the last part linear to full within `FILL` (400ms). `.ans` has no steps: a segment 30% of the track sweeps back and forth with `loop("left")`, every 1600ms. Before the indicator shows, the block is an empty 26 so the card's height doesn't change. Texts: *Reading image…*, *Drawing Dots…*.
+- **Compact card progress**: under the name, a 26 high block: the step name (12px `dim`, 16 high), 6 gap, a 4 high bar (track `border`, radius 4, `overflow_hidden`, progress `foreground`). Images have steps, so progress is determinate: the width follows the steps over 300ms ease-out, the last part linear to full within `FILL` (400ms). A picture framed again has none: a segment 30% of the track sweeps back and forth with `loop("left")`, every 1600ms. Before the indicator shows, the block is an empty 26 so the card's height doesn't change. Texts: *Reading image…*, *Drawing Dots…*.
 - **Mode switch**: the previous mode's picture stays at opacity 0.7 (150ms ease-out); the segment being drawn spins; the footer status reads a 12px spinner and "Drawing Braille…", then "Loading picture…" while it loads.
 - **Apply**: pressed, every control on the card is disabled at once (modes, Fill/Fit, Reset, Zoom, Cancel, Apply), since none would act while it saves; only after 150ms does Apply read "Applying…".
 - **Zoom past the picture's size while framing**: the footer status reads a 12px spinner and "Loading picture…"; the picture isn't dimmed.
@@ -86,14 +86,14 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 
 ## Files
 
-- `.ans` files copied into `<appHome>/asciicn-wallpaper/` appear without preview, covering Home; edits redraw them. While the picture shown is drawn again, Home keeps it under its name and the crop button is disabled until it's done.
+- Each added picture is a `.ans` file in `<appHome>/asciicn-wallpaper/`, starting with the header only this mod writes ([storage](../storage.md)「壁纸草稿」). One copied in appears without preview, covering Home; edits redraw it. Any other `.ans` (asciicn Studio's, a hand-made one) fails once with a notice and isn't listed. While the picture shown is drawn again, Home keeps it under its name and the crop button is disabled until it's done; deleted meanwhile, from any Home, it leaves every list.
 - Unicode, leading-dash and hidden names work; `.ans`, `..ans`, `...ans` are refused.
 - Updates keep user files outside the mod folder.
 
 ## Programs
 
-- Pickers: `osascript` on macOS, `zenity` on Linux; Windows has no picker (drop a file, or copy `.ans` through Open wallpaper folder).
-- Images to BMP: `sips` on macOS, ImageMagick (`convert`) on Linux; without either, import Studio `.ans`. Read back with base64.
+- Pickers: `osascript` on macOS, `zenity` on Linux; Windows has no picker (drop the image on Home).
+- Images to BMP: `sips` on macOS, ImageMagick (`convert`) on Linux; without either, an image can't be added. Read back with base64.
 - Photos come upright by EXIF orientation.
-- `open` / `xdg-open` / `explorer` open Studio and the folder.
+- `open` / `xdg-open` / `explorer` open the folder.
 - Failed or empty imports say why; no automatic retry.

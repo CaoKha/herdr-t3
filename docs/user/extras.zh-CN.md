@@ -16,15 +16,15 @@ Review 跟随你的主题，包括 Graphite 等主题里带透明度的复选框
 
 ## asciicn 壁纸
 
-把 Home 换成一张静止的 [asciicn](https://asciicn.dev) 风格的画，颜色取自你的主题，换主题或明暗模式时跟着变。自带 4 张 asciicn 的画（灯塔、黄昏山峦、星云、余烬），也可以用你自己的图片或 `.ans` 文件。画只按屏幕实际显示的清晰度绘制，不多画，以减少占用的内存：窗口变大、移到 Retina 屏幕或取景时放大，会重新绘制一张，期间当前这张一直留着。
+把 Home 换成一张静止的 [asciicn](https://asciicn.dev) 风格的画，颜色取自你的主题，换主题或明暗模式时跟着变。自带 4 张 asciicn 的画（灯塔、黄昏山峦、星云、余烬），也可以用你自己的图片。画只按屏幕实际显示的清晰度绘制，不多画，以减少占用的内存：窗口变大、移到 Retina 屏幕或取景时放大，会重新绘制一张，期间当前这张一直留着。
 
 鼠标移到 Home 的右下角，那里会出现切换器：`‹ ›` 换画，裁切按钮给当前这张画取景，`+` 添加。长画名或 *Importing…* 截断显示；只有一张画时 `‹ ›` 置灰。
 
-`+` 打开一个菜单：**Choose image…** 选一张图片（PNG、JPG、HEIC 等），**Import Studio file (.ans)…** 导入在 asciicn Studio 做好的画，**asciicn Studio** 在浏览器里打开 Studio（做好画，用画面下方的 **.ans** 按钮保存，再把这个文件拖到 Home 上），**Open wallpaper folder** 打开存画的文件夹。也可以直接把图片或 `.ans` 文件拖到 Home 上。
+`+` 打开一个菜单：**Choose image…** 选一张图片（PNG、JPG、HEIC 等），**Open wallpaper folder** 打开存画的文件夹。也可以直接把图片拖到 Home 上。
 
 之后取景卡出现在切换器的位置。读取期间只显示画名；要等一会儿时，再显示进度条和当前步骤（*Reading image…*、*Drawing Dots…*）。文件读不了时写明原因，并给出 **Choose another…** 和 **Close**。画显示出来后卡片向上展开，**Cancel** 和 **Apply** 留在原处。新画准备好之前，当前壁纸一直留着。
 
-图片在整个 Home 上以 **Dots**（半调圆点）预览。模式行有 **Dots**、**Braille**、**Blocks**（`░▒▓█`）和 **Quadrants**（窄卡写作 **Quads**）：点击，或在上面用方向键切换。它们照 asciicn Studio 处理图片的方式绘制，颜色取自主题。第一次画某个模式时，原来的画留着、稍微变暗，那个模式的按钮在转圈。切回看过的模式是瞬间的。Studio 文件保留自己的字符，没有模式行。
+图片在整个 Home 上以 **Dots**（半调圆点）预览。模式行有 **Dots**、**Braille**、**Blocks**（`░▒▓█`）和 **Quadrants**（窄卡写作 **Quads**）：点击，或在上面用方向键切换。它们照 asciicn 处理图片的方式绘制，颜色取自主题。第一次画某个模式时，原来的画留着、稍微变暗，那个模式的按钮在转圈。切回看过的模式是瞬间的。
 
 保存前先取景：**Fill** 铺满 Home，可能裁切；**Fit** 显示整张图。拖动、在触控板上双指滑动，或用方向键移动（按住 Shift 移得更远）。用鼠标滚轮或 ⌘ 加滚动（Linux 上是 Ctrl 加滚动）以指针为中心缩放，范围 100%–400%，滑块和它两边的 − + 会跟着动；`-` 和 `=` 也能缩放。**Reset**（或 `0`）回到 100%，画的主体在画面内。**Apply**（或 Enter）保存这张画和构图并选中它；**Cancel**（或 Esc）回到原来的壁纸，什么都不保存。原图不会被修改或复制，只保存由它生成的画。
 
@@ -32,13 +32,13 @@ Review 跟随你的主题，包括 Graphite 等主题里带透明度的复选框
 
 换画之间 Home 不会空白：切换、换主题或 Apply 后，原来的画一直留到下一张加载好，切换器的画名旁边（或 Home 右下角）有一个小圈在转。很快就完成的操作（约六分之一秒以内）不显示任何转圈。
 
-浅色主题里，从图片添加的画像墨画在纸上：照片暗的地方落笔。从 Studio 添加的画和内置画在明暗主题下明暗不变。横着存的手机照片会先转正。
+浅色主题里，从图片添加的画像墨画在纸上：照片暗的地方落笔。内置画在明暗主题下明暗不变。横着存的手机照片会先转正。
 
 Apply 未能完成时，卡片保持打开，底部写明原因：处理后再点 **Apply**，它会沿用已经保存的那张画。Apply 成功之前，当前壁纸不会变。删除自己加的画：对它按裁切按钮，点卡片左下角的 **Delete**，在确认里核对画名；构图也一并删除。
 
-你的画是 `~/.config/herdr-app/asciicn-wallpaper/` 里的 `.ans` 文件。复制进去的 `.ans` 不经预览直接出现在切换器里，铺满 Home；在那里修改的会重新绘制，构图保留。Braille、方块、象限和半调圆点保留形状；其他字符按暗度画成大小不同的短条。文件名可以是 Unicode、以 `-` 开头或隐藏文件（`.hidden.ans`）；名字只是 `.ans`、`..ans`、`...ans` 的文件会被拒绝，先改名。
+你的画是 `~/.config/herdr-app/asciicn-wallpaper/` 里的 `.ans` 文件，即由你的图片画成的画。从别的 Herdr 复制进去的不经预览直接出现在切换器里，铺满 Home；在那里修改的会重新绘制，构图保留。其他 `.ans`（比如从 asciicn Studio 导出的）不显示，会提示一次。文件名可以是 Unicode、以 `-` 开头或隐藏文件（`.hidden.ans`）；名字只是 `.ans`、`..ans`、`...ans` 的文件会被拒绝，先改名。
 
-安装：把 `extras/mods/asciicn-wallpaper` 复制到 `~/.config/herdr-app/mods/`，然后在这套布局的设置里，把 **Home shows** 选成 asciicn wallpaper。它由 `scripts/update.sh` 负责更新，不会动你加的画。选图片在 macOS 上、以及装了 `zenity` 和 ImageMagick 的 Linux 上可用；没有 ImageMagick 时用 **Import Studio file (.ans)…**。没有文件选择框的平台（包括 Windows），把文件拖到 Home 上，或用 **Open wallpaper folder** 把 `.ans` 文件复制进去。自带的画来自 asciicn，MIT 许可（`LICENSE-asciicn`）。
+安装：把 `extras/mods/asciicn-wallpaper` 复制到 `~/.config/herdr-app/mods/`，然后在这套布局的设置里，把 **Home shows** 选成 asciicn wallpaper。它由 `scripts/update.sh` 负责更新，不会动你加的画。选图片在 macOS 上、以及装了 `zenity` 和 ImageMagick 的 Linux 上可用。没有文件选择框的平台（包括 Windows），把图片拖到 Home 上；那里的菜单只有 **Open wallpaper folder**。自带的画来自 asciicn，MIT 许可（`LICENSE-asciicn`）。
 
 ## 主题和设置
 

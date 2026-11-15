@@ -51,7 +51,7 @@ export async function readImage(from, dir, cx, current, step = (_f) => {}) {
     step(1);
     return pixels && { pixels, plan };
   } catch (e) {
-    if (!mac && /ENOENT|not found|spawn/i.test(String(e?.message ?? e))) throw new Error("Install ImageMagick to import pictures, or import a .ans file from Studio.");
+    if (!mac && /ENOENT|not found|spawn/i.test(String(e?.message ?? e))) throw new Error("Install ImageMagick to import pictures.");
     throw e;
   } finally {
     await exec("rm", ["-f", scaled, bmp]);

@@ -86,7 +86,7 @@ The layout sends no telemetry. The optional Review extra uses its configured ana
 
 - **pulls.review**: the panel's Review surface, and a Review bar the layout doesn't have by default but you can add.
 - **Theme export for Pi**: Pi's colors follow Herdr's.
-- **asciicn wallpaper**: Home as a still picture in your theme's colours: four built in, your own images in Dots, Braille, Blocks or Quadrants, or a Studio `.ans`, chosen from `+` or dropped on Home. Frame any picture with the wheel, trackpad or drag; in a light theme an image is drawn like ink on paper. See [the extras](docs/user/extras.md#asciicn-wallpaper).
+- **asciicn wallpaper**: Home as a still picture in your theme's colours: four built in, your own images in Dots, Braille, Blocks or Quadrants, chosen from `+` or dropped on Home. Frame any picture with the wheel, trackpad or drag; in a light theme an image is drawn like ink on paper. See [the extras](docs/user/extras.md#asciicn-wallpaper).
 - **Themes**: Catppuccin and T3 Code, light and dark.
 
 How to add them: [the extras](docs/user/extras.md).

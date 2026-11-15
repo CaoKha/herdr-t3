@@ -1,10 +1,10 @@
-// Home as a still picture in asciicn's style (https://asciicn.dev, MIT, see LICENSE-asciicn): one of its own, one of the
-// person's images drawn in Dots/Braille/Blocks/Quadrants, or a frame they made in that Studio, in the theme's colours.
+// Home as a still picture in asciicn's style (https://asciicn.dev, MIT, see LICENSE-asciicn): one of its own, or one of the
+// person's images drawn in Dots/Braille/Blocks/Quadrants, in the theme's colours.
 // Every picture, saved or previewed, is drawn one way: its tiles put together in the theme's colours as one image
 // (library.js), which GPUI rasterises once off the UI thread and scales on the GPU. A new theme makes another, and until it
 // is ready the old one stays up; the layout's other appearance's is made ahead (warm()), so light/dark switches at once.
 // The pointer near the bottom-right corner shows the switcher: ‹ › step, the crop button frames the picture shown, `+` opens
-// a menu of where a new one comes from; a file dropped on Home is one too. A new or reframed picture is edited across Home
+// a menu of where a new one comes from; an image dropped on Home is one too. A new or reframed picture is edited across Home
 // with the framing card in the switcher's place; only Apply publishes an import's .ans, and any picture's framing.
 // The picture picked is the person's, shared under KEY.wallpaper, so a new Home shows it too.
 // With props.menu this mod is + 's menu, opened as a popup: its picks go back to the Home that opened it as commands.
@@ -38,22 +38,19 @@ const styleName = (style) => STYLES.find(([id]) => id === style)?.[1] ?? style;
 const zoom = () => Number(settings()?.zoom) || 1;
 // Where the pointer shows the switcher: it at its widest, 12 from the corner, and about 60 more each way.
 const CORNER = { w: 368, h: 104 };
-// Studio on an image, in Braille and true colour: the set that converts most faithfully.
-const STUDIO = "https://asciicn.dev/studio?source=image&charset=braille&color=truecolor";
 const opener = () => ({ macos: "open", windows: "explorer" })[window()?.platform] ?? "xdg-open";
 const ARROWS = ['left', 'right', 'up', 'down'];
 const plainKey = (e) => !e.modifiers.control && !e.modifiers.platform && !e.modifiers.alt;
 const icon = (name) => `mods/${MOD}/icons/${name}.svg`;
 const token = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-// + 's menu. Windows has no file dialog for mods: there files come by dropping them or through the folder.
-const MENU_CLOSED = closedKey(MOD, "menu"), MENU_W = 260, NOTE = 16;
+// + 's menu. Windows has no file dialog for mods: there an image comes by dropping it on Home, and the menu has the folder.
+const MENU_CLOSED = closedKey(MOD, "menu"), MENU_W = 260;
 const menuItems = (windows) => [
-  ...(windows ? [] : [{ id: "image", label: "Choose image…", icon: "image" }, { id: "ans", label: "Import Studio file (.ans)…", icon: "file" }]),
-  { id: "studio", label: "asciicn Studio", note: "Export .ans there, then drop it here", icon: "external-link" },
+  ...(windows ? [] : [{ id: "image", label: "Choose image…", icon: "image" }]),
   { id: "folder", label: "Open wallpaper folder", icon: "folder" },
 ];
-const menuHeight = (items) => 8 + items.length * MENU_ROW + NOTE;
+const menuHeight = (items) => 8 + items.length * MENU_ROW;
 // Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so
 // nothing flashes. FILL: the progress bar's last stretch, while Home loads the first picture.
 const SHOW = 150, KEEP = 300, FILL = 400;
@@ -118,7 +115,7 @@ export default class Wallpaper extends View {
       if (await this.lib.remove(scene, this.all(), cx)) this.hot = null;
     } else if (this.menuToken && command.startsWith(`add:${this.menuToken}:`)) {
       this.menuToken = null;
-      await this.choose(cx, command.endsWith(":ans"));
+      await this.choose(cx);
     }
     if (!this.closed) cx.notify();
   }
@@ -146,67 +143,64 @@ export default class Wallpaper extends View {
     openOverlay({ mod: MOD, kind: "popup", width: MENU_W, height, ...(at ? { at } : {}), props: { menu: "add", token: this.menuToken, ...litProp(!b) } });
   }
 
-  // menu-row.js's rows; Studio's says on a second line what to bring back.
+  // menu-row.js's rows.
   renderMenu(t) {
     const p = props(), items = menuItems(window()?.platform === "windows");
     const pick = (i) => {
       const it = items[i];
       if (!it) return;
       closeOverlay(p.overlay);
-      if (it.id === "studio") exec(opener(), [STUDIO]);
-      else if (it.id === "folder") exec(opener(), [`${appHome()}/${MOD}`]);
+      if (it.id === "folder") exec(opener(), [`${appHome()}/${MOD}`]);
       else run(`${MOD}.add:${p.token}:${it.id}`);
     };
     return v_flex().id("wallpaper-menu").size_full().p(4).bg(t.popover).track_focus(this.menuKeys)
       .on_key_down(menuKeys(this, items.map((it) => it.label), pick, { at: "menuAt" }))
       .children(items.map((it, i) => menuRow(this, t, `wallpaper-menu-${it.id}`, {
-        at: [this, "menuAt", i], icon: icon(it.icon), pick: () => pick(i),
-        label: it.note ? v_flex().child(div().truncate().child(it.label)).child(div().truncate().text_size(12).text_color(t.dim).child(it.note)) : it.label,
-        also: it.note ? (el) => el.h(MENU_ROW + NOTE).accessibility_label(`${it.label}. ${it.note}`) : undefined })));
+        at: [this, "menuAt", i], icon: icon(it.icon), label: it.label, pick: () => pick(i) })));
   }
 
   // No activate (a macOS focus timeout) or default location (an extra Downloads permission prompt).
-  async choose(cx, ans = false) {
+  async choose(cx) {
     if (this.opening) return;
     this.opening = true;
     cx.notify();
     const mac = window()?.platform === "macos";
-    const title = ans ? "Import a Studio .ans file" : "Choose an image for your wallpaper";
+    const title = "Choose an image for your wallpaper";
     const picked = await (mac
-      ? exec("osascript", ["-e", `POSIX path of (choose file with prompt "${title}" of type {"${ans ? "ans" : "public.image"}"})`], { timeout: 600000 })
+      ? exec("osascript", ["-e", `POSIX path of (choose file with prompt "${title}" of type {"public.image"})`], { timeout: 600000 })
       : exec("zenity", ["--file-selection", `--title=${title}`,
-        ans ? "--file-filter=Studio files | *.ans" : "--file-filter=Images | *.png *.jpg *.jpeg *.webp *.gif *.bmp *.tif *.tiff *.heic"], { timeout: 600000 })).catch(() => null);
+        "--file-filter=Images | *.png *.jpg *.jpeg *.webp *.gif *.bmp *.tif *.tiff *.heic"], { timeout: 600000 })).catch(() => null);
     this.opening = false;
     cx.notify();
     if (this.closed) return;
     if (!picked) {
-      notify({ title: "No file dialog here", body: `Drop the file on Home, or copy .ans files into ${this.dir}: Open wallpaper folder shows it.`, level: "info" });
+      notify({ title: "No file dialog here", body: "Drop the image on Home instead.", level: "info" });
       return;
     }
     const from = picked.stdout.replace(/\r?\n$/, "");
     // Cancelled: osascript's -128, zenity's 1, nothing said.
     if (picked.code !== 0 || !from) return;
-    return this.open(from, cx, !ans);
+    return this.open(from, cx);
   }
 
-  // A file chosen or dropped: an image drawn in a mode, else a Studio file.
-  open(from, cx, image = !from.toLowerCase().endsWith(".ans")) {
+  // An image chosen or dropped, drawn in a mode.
+  open(from, cx) {
     let base = from.split("/").pop().replace(/\.[^.]*$/, "").replace(/[\x00-\x1f\x7f/\\]/g, "-");
     if (!base || base === "." || base === "..") base = "wallpaper";
-    return this.startPreview(from, base, cx, image);
+    return this.startPreview(from, base, cx);
   }
 
   /**
-   * A draft across Home: of a picture file (`image`, drawn in any mode), a Studio `.ans` file, or `saved`, a picture already
-   * there (built in or added) to frame again, as it is drawn. `phase`: loading, converting, ready, applying, or broken
+   * A draft across Home: of an image file (drawn in any mode), or `saved`, a picture already there (built in or added) to
+   * frame again, as it is drawn. `phase`: loading, converting, ready, applying, or broken
    * (nothing drawn to apply); `message`, what went wrong; `frames`, each mode drawn so far, `{ scene, text }`.
    */
-  async startPreview(from, name, cx, image, saved = null) {
+  async startPreview(from, name, cx, saved = null) {
     const cancelled = this.cancelPreview(cx), request = this.previewRequest = {};
     await cancelled;
     await this.lib.ready;
     if (this.closed || this.previewRequest !== request) return;
-    const id = token();
+    const id = token(), image = !saved;
     const d = this.draft = { id, name, image, dir: `${this.dir}/.preview/${id}`, style: 'dots', drawn: null, frames: {}, pixels: null, plan: null,
       text: null, scene: saved, saved, phase: saved ? 'ready' : 'loading', message: null, progress: image ? 0 : null, placement: placement(saved ? shared(KEY.placements)?.[saved.id] : null, saved?.focus) };
     this.scale.set_value(toSlider(d.placement.zoom));
@@ -219,20 +213,10 @@ export default class Wallpaper extends View {
     try {
       const made = await exec("mkdir", ["-p", d.dir]);
       if (made.code !== 0) throw new Error(made.stderr.trim());
-      if (image) {
-        const read = await readImage(from, d.dir, cx, current, (f) => { if (current()) { d.progress = f / 2; cx.notify(); } });
-        if (!read || !current()) return;
-        Object.assign(d, read);
-        return await this.renderDraft(d, cx);
-      }
-      if (!from.toLowerCase().endsWith(".ans")) throw new Error("Choose a .ans file exported from Studio.");
-      const read = await exec("cat", [from]);
-      if (read.code !== 0) throw new Error(read.stderr.trim());
-      if (!current()) return;
-      d.text = read.stdout;
-      d.phase = 'converting';
-      cx.notify();
-      if (await this.showDraft(d, { id: `preview:${id}`, name, dir: `${d.dir}/frame-0`, text: d.text, focus: 0.5 }, cx, current)) d.phase = 'ready';
+      const read = await readImage(from, d.dir, cx, current, (f) => { if (current()) { d.progress = f / 2; cx.notify(); } });
+      if (!read || !current()) return;
+      Object.assign(d, read);
+      return await this.renderDraft(d, cx);
     } catch (e) {
       if (current()) { d.phase = 'broken'; d.message = `${e?.message ?? e}`; }
     } finally {
@@ -527,8 +511,8 @@ export default class Wallpaper extends View {
         .when(waiting, (el) => el.child(spinner(12)))
         .child(div().min_w(0).truncate().child(this.opening ? "Choosing…" : this.lib.importing ? `Importing ${this.lib.importing}…` : scene.name)))
       .child(button("wallpaper-next", "chevron-right", "Next wallpaper", go(1), all.length < 2))
-      .child(button("wallpaper-frame", "crop", `Frame ${scene.name}`, (cx) => cx.spawn((cx) => this.startPreview(null, scene.name, cx, false, scene)), !!scene.redrawing))
-      .child(trigger(this, t, "wallpaper-add", { icon: icon("plus"), label: "Add a wallpaper", hint: "Or drop an image or .ans on Home", size: "xs",
+      .child(button("wallpaper-frame", "crop", `Frame ${scene.name}`, (cx) => cx.spawn((cx) => this.startPreview(null, scene.name, cx, scene)), !!scene.redrawing))
+      .child(trigger(this, t, "wallpaper-add", { icon: icon("plus"), label: "Add a wallpaper", hint: "Or drop an image on Home", size: "xs",
         closed: MENU_CLOSED, open: this.opening || undefined, onOpen: (b) => this.openMenu(b) }));
     const corner = div().id("wallpaper-corner").absolute().right(0).bottom(0).w(CORNER.w).h(CORNER.h)
       .on_hover((on, cx) => { this.over = on; if (!on) this.hot = null; cx.notify(); })
@@ -649,7 +633,7 @@ export default class Wallpaper extends View {
     if (!open) {
       rows.push(broken
         ? div().id("wallpaper-card-error").flex_none().max_h(48).overflow_hidden().text_size(12).text_color(t.ansi1).child(d.message ?? "")
-        : waits.load ? this.progress(t, d, d.phase === 'loading' ? (d.image ? "Reading image…" : "Reading file…") : drawing)
+        : waits.load ? this.progress(t, d, d.phase === 'loading' ? "Reading image…" : drawing)
         : div().h(26).flex_none());
     } else {
       if (d.pixels) rows.push(this.modes(t, d, spinner, waits.draw));
@@ -672,7 +656,7 @@ export default class Wallpaper extends View {
       .child(h_flex().id("wallpaper-card-status").flex_1().min_w(0).items_center().text_size(12).text_color(t.dim).when(Boolean(status), (el) => el.child(status)))
       .child(broken ? this.action(t, "wallpaper-close", "Close", cx => cx.spawn(cx => this.cancelPreview(cx)))
         : this.action(t, "wallpaper-cancel", "Cancel", cx => { if (!busy) cx.spawn(cx => this.cancelPreview(cx)); }, { disabled: busy }))
-      .child((broken ? this.action(t, "wallpaper-choose-another", "Choose another…", cx => cx.spawn(cx => this.choose(cx, !d.image)), { variant: "primary", disabled: window()?.platform === "windows" })
+      .child((broken ? this.action(t, "wallpaper-choose-another", "Choose another…", cx => cx.spawn(cx => this.choose(cx)), { variant: "primary", disabled: window()?.platform === "windows" })
         : this.action(t, "wallpaper-apply", waits.apply || (d.waiting && waits.draw) ? "Applying…" : "Apply", cx => cx.spawn(cx => this.applyPreview(cx)),
           { variant: "primary", disabled: !open || busy || (!!d.waiting && waits.draw) })).min_w(72));
     return v_flex().id("wallpaper-card").absolute().right(12).bottom(12).w(this.cardWidth()).p(16).gap(12)
@@ -686,7 +670,7 @@ export default class Wallpaper extends View {
   cardWidth() { return Math.min(300, Math.max(0, (this.width ?? 324) - 24)); }
 
   // What the compact card says while the first picture comes: the step and a bar. An image's steps are known, so the bar
-  // shows how far (eased to each, and over FILL to the end while Home loads the picture); a .ans file's isn't, so it sweeps.
+  // shows how far (eased to each, and over FILL to the end while Home loads the picture); with none known, it sweeps.
   progress(t, d, label) {
     const w = this.cardWidth() - 32, f = d.progress == null ? null : d.phase === 'ready' ? 1 : d.progress;
     const bar = div().id("wallpaper-progress-bar").absolute().top(0).h_full().rounded(4).bg(t.foreground);

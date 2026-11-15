@@ -58,7 +58,7 @@ Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切�
 
 ## 壁纸转换而非用户生命周期
 
-`extras/mods/asciicn-wallpaper/ascii-art.js` 同时供 `scripts/wallpaper.mjs` 和运行时导入使用。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形，草稿就是Braille的采样网格（列×2、行×4，各模式最细的一档）：由系统缩放器直接出（sips、ImageMagick `-resize`），BMP base64一次回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`对草稿做整块面积平均得到其他模式的网格（Braille原样用）；RGBA在草稿中复用，不重读原图。不照网站在JS里做4倍超采样再块平均：字形逐格一致率87–99%（Braille最低），整图看不出差别，选图到预览快5–10倍（用户拍板）。同一份采样RGBA的字形及每格RGB仍须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
+`extras/mods/asciicn-wallpaper/ascii-art.js` 是运行时把图片画成 `.ans`、再把 `.ans` 转成图块的唯一实现；内置画的图块已固定在 `scenes/`。asciicn无CLI/包。`imagePlan`按96格行、比例16–480列、格宽高比0.5算cover矩形，草稿就是Braille的采样网格（列×2、行×4，各模式最细的一档）：由系统缩放器直接出（sips、ImageMagick `-resize`），BMP base64一次回读，解码支持24/32位及两种行序。`sampleImage(pixels,style,plan)`对草稿做整块面积平均得到其他模式的网格（Braille原样用）；RGBA在草稿中复用，不重读原图。不照网站在JS里做4倍超采样再块平均：字形逐格一致率87–99%（Braille最低），整图看不出差别，选图到预览快5–10倍（用户拍板）。同一份采样RGBA的字形及每格RGB仍须与真正 `mapTones` 逐格一致，不能用手抄算法当oracle。
 
 宿主`exec`静默丢弃stdout超过8MiB的尾部；网格草稿最大960×384，BMP约1.1MB、base64约1.5MB，一次 exec 读完。`decodeBmp` 仍接受分块文本。分配RGBA前检查头部、尺寸与实际解码字节完整度；RGBA转码每4096像素yield，不能按固定64行分块（大宽图会单步卡近200ms）。
 
@@ -78,6 +78,6 @@ Dots/Blocks每格1×1采样，Quadrants为2×2，Braille为2×4；autoLevels两�
 
 取景输入（`framing.js`）。滚轮事件的 `delta_lines` 只在带刻度的滚轮上出现（macOS `hasPreciseScrollingDeltas == NO`），触控板和 Magic Mouse 没有；据此判别：有 `delta_lines` 纵向缩放（6格翻倍）、横向占优时平移；没有时平移；带 ⌘ 或 Ctrl 一律缩放（200px翻倍）。缩放以指针为锚：`zoomAt` 先求指针下那一点在画上的比例位置，缩放后把它放回指针下，再把对齐比例钳在[0,1]。macOS 的惯性滚动没有单独阶段，抬指后照样以 `moved` 送达：收到 `ended` 后，间隔小于100ms的连续事件丢弃，`started` 或停顿≥100ms恢复。gpui-kit 没有暴露 GPUI 的 `PinchEvent`（`on_pinch`），捏合由 ⌘ 加双指滚动代替。取景卡浮在画布上、宿主没有 occlude：卡片自己的 `on_mouse_down`／`on_scroll_wheel` 先 `stop_propagation`，不让底下画布开始拖动或缩放；Zoom 行上滚动以 Home 中心缩放。`on_drop` 没有 drag-over 事件，拖入时无法高亮。
 
-`+` 的菜单是本 mod 以 `props.menu = "add"` 开的 popup 副本：它没有 Home 的草稿，选项通过 `run("asciicn-wallpaper.add:<token>:<image|ans>")` 回到开它的那个 Home（`nextCommand` 会送到每个副本，token 只认自己开的那次）；Studio 和打开目录在菜单里直接执行。菜单 `close()` 盖 `asciicn-wallpaper.menuClosed` 时间戳，`+` 用共享 `trigger.js`，靠它判断第二次点击是关闭。keys.json 因此要有 `mod:asciicn-wallpaper` 一节；Home 停靠副本拿焦点时这几个键也会被拦，那时什么都不关。
+`+` 的菜单是本 mod 以 `props.menu = "add"` 开的 popup 副本：它没有 Home 的草稿，Choose image… 通过 `run("asciicn-wallpaper.add:<token>:image")` 回到开它的那个 Home（`nextCommand` 会送到每个副本，token 只认自己开的那次）；打开目录在菜单里直接执行。菜单 `close()` 盖 `asciicn-wallpaper.menuClosed` 时间戳，`+` 用共享 `trigger.js`，靠它判断第二次点击是关闭。keys.json 因此要有 `mod:asciicn-wallpaper` 一节；Home 停靠副本拿焦点时这几个键也会被拦，那时什么都不关。
 
 原生 chooser 按 `window().platform`，不加 macOS `activate`（多等约2s）或 `default location`（Downloads 会请求目录权限，所以也不监视「下载」文件夹）。Windows 菜单不列两个选文件项，靠拖入和目录。EXIF 方向：`sips -g` 报存储尺寸、不报方向；`-z`／`-c` 按存储方向工作，写BMP时才应用方向标签。故 macOS 用 `osascript -l JavaScript` 经 ImageIO 读 Orientation（读不到当作1），5–8（侧放）时按转正后的宽高做计划、给 `-z` 的宽高对调，BMP 写出来已转正；2–4 的镜像和180°也由写BMP完成。不再先把整张原图转正成BMP（48MP 约0.57s）。sips 一次调用里同时 `-c` 和 `-z` 时，裁切量大就出错尺寸（极宽或极高图，例：应得32×384得32×307），所以分两步：先把整张缩到「裁切区正好是网格」，再在小BMP上 `-c` 裁出网格。Linux 每次 `convert` 带 `-auto-orient`，尺寸也经它读。浅色主题取 `settings().dark === false`；纸面取反在 `ascii-art.js` 的 `PAPER`：ramp 倒读、象限／Braille 掩码取补，色阶按暗度（1−亮度）而非HSV明度。导入/草稿/保存的路径、缓存键、分块原子发布、并发作废与清理条件只在 storage 维护，改这些先读它，不在这里写第二套规则。

@@ -9,7 +9,11 @@ const { promisify } = require("node:util");
 const { runtime } = require("./harness.cjs");
 const run = promisify(execFile);
 const onlyCase = process.argv.find(a => a.startsWith("--case="))?.slice(7);
-const FRAME = "\x1b[38;2;200;150;220m●\x1b[0m\n";
+// A picture as this mod saves one: its header, then a frame.
+const FRAME = "\x1b]777;asciicn-wallpaper;image-v4;dots\x07\x1b[38;2;200;150;220m●\x1b[0m\n";
+// The picture file reader stood in for (check-source.cjs runs the real one): any image is a small grey photo.
+const W = 16, H = 8, PHOTO = { width: W, height: H, rgba: new Uint8Array(W * H * 4).fill(160) };
+const stubs = { "source.js": (m) => ({ readImage: async () => ({ pixels: PHOTO, plan: m["ascii-art.js"].imagePlan(W, H) }) }) };
 const KEY = "asciicn-wallpaper.scene";
 const PLACEMENTS = "asciicn-wallpaper.placements";
 const pending = () => {
@@ -17,6 +21,13 @@ const pending = () => {
   const promise = new Promise(r => { resolve = r; });
   return { promise, resolve };
 };
+const CASE_MS = 10000;
+let running = "setup";
+process.on("beforeExit", () => {
+  if (running === null) return;
+  console.error(`FAIL check-filesystem stopped during ${running}: not every case ran`);
+  process.exit(1);
+});
 const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENOENT") return false; throw e; });
 
 (async () => {
@@ -25,35 +36,37 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
     for (const result of results) console.log(JSON.stringify(result));
     if (results.some(r => r.verdict === "broken")) process.exitCode = 1;
   };
+  // A case that never settles fails at its timeout; one that leaves nothing pending to wake it would end the process
+  // early, so ending before every case ran fails too (beforeExit, below), naming the case.
   const test = async (name, fn) => {
     if (onlyCase && !name.startsWith(onlyCase)) return;
-    let evidence;
-    try { await fn(v => { evidence = v; }); results.push({ name, verdict: "survived", evidence }); }
+    let evidence, timer;
+    running = name;
+    const late = new Promise((_, fail) => { timer = setTimeout(() => fail(Object.assign(new Error(`timed out after ${CASE_MS}ms`), { code: "ERR_ASSERTION" })), CASE_MS); });
+    try { await Promise.race([fn(v => { evidence = v; }), late]); results.push({ name, verdict: "survived", evidence }); }
     catch (e) {
       if (e.code !== "ERR_ASSERTION") throw e;
       results.push({ name, verdict: "broken", assertion: e.message.split("\n")[0], evidence });
-    }
+    } finally { clearTimeout(timer); }
   };
   try {
-    for (const [label, filename] of [["plain", "Plain.ans"], ["unicode", "图片.ans"], ["option", "-option.ans"], ["hidden", ".hidden.ans"], ["spaces", " spaced .ans"]]) {
+    for (const [label, stem] of [["plain", "Plain"], ["unicode", "图片"], ["option", "-option"], ["hidden", ".hidden"], ["spaces", " spaced "]]) {
       await test(`file-name:${label}`, async record => {
-        const r = await runtime(path.join(root, label)), h = await r.home();
-        const input = path.join(root, filename);
-        await fs.writeFile(input, FRAME);
-        r.hooks.picked = input;
-        await h.choose(r.cx, true);
-        assert.ok(h.draft, "Studio import previews without publishing");
+        const r = await runtime(path.join(root, label), { stubs }), h = await r.home();
+        r.hooks.picked = path.join(root, `${stem}.png`);
+        await h.choose(r.cx);
+        assert.ok(h.draft, "an import previews without publishing");
         await h.applyPreview(r.cx);
-        record({ filename, saved: (await fs.readdir(r.dir)).filter(n => n.endsWith(".ans")), imported: h.lib.imported.map(s => s.id), selected: r.state[KEY] ?? null, notices: r.messages.length });
+        record({ stem, saved: (await fs.readdir(r.dir)).filter(n => n.endsWith(".ans")), imported: h.lib.imported.map(s => s.id), selected: r.state[KEY] ?? null, notices: r.messages.length });
         assert.equal(h.lib.imported.length, 1, "a valid named .ans must be visible after successful import");
-        assert.equal(h.lib.imported[0].name + ".ans", filename, "valid names are preserved");
-        await h.choose(r.cx, true);
+        assert.equal(h.lib.imported[0].name, stem, "valid names are preserved");
+        await h.choose(r.cx);
         await h.applyPreview(r.cx);
         assert.equal(h.lib.imported.length, 2, "reimport allocates a distinct name, including hidden names");
       });
     }
     await test("shell-metacharacters-and-publication", async record => {
-      const r = await runtime(path.join(root, "shell")), h = await r.home();
+      const r = await runtime(path.join(root, "shell"), { stubs }), h = await r.home();
       const sentinel = path.join(r.dir, "AUDIT_PWNED");
       const names = ["literal; touch AUDIT_PWNED.ans", "$(touch AUDIT_PWNED).ans", "`touch AUDIT_PWNED`.ans", "single'quote.ans", 'double"quote.ans', "line\nbreak.ans", "-dash.ans", ".hidden.ans"];
       for (const name of names) await fs.writeFile(path.join(r.dir, name), FRAME);
@@ -78,7 +91,7 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       record({ literalNames: names.length, largeUtf8Bytes: Buffer.byteLength(text), existingFileDirectoryAndSymlinkProtected: true, sentinelCreated: false, stagingEmpty: true });
     });
     await test("reserved-stems-and-hidden-cache-cleanup", async record => {
-      const r = await runtime(path.join(root, "reserved")), h = await r.home();
+      const r = await runtime(path.join(root, "reserved"), { stubs }), h = await r.home();
       const names = [".ans", "..ans", "...ans", ".hidden.ans"];
       for (const name of names) await fs.writeFile(path.join(r.dir, name), FRAME);
       await h.lib.refresh(r.cx);
@@ -91,11 +104,10 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       record({ invalidNamesRejected: 3, sourceFilesKept: true, hiddenCacheCleaned: true });
     });
     await test("cache-failure-after-publish", async record => {
-      const r = await runtime(path.join(root, "cache-failure")), h = await r.home();
-      const input = path.join(root, "Fail.ans");
-      await fs.writeFile(input, FRAME);
+      const r = await runtime(path.join(root, "cache-failure"), { stubs }), h = await r.home();
+      const input = path.join(root, "Fail.png");
       r.hooks.picked = input;
-      await h.choose(r.cx, true);
+      await h.choose(r.cx);
       const composed = { mode: "contain", zoom: 1.5, x: 0.3, y: 0.7 }, out = h.draft.dir;
       h.draft.placement = composed;
       r.hooks.beforeWrite = async file => { if (file.includes("/.tiles/Fail/")) throw new Error("ENOSPC: simulated cache write failure"); };
@@ -122,30 +134,29 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       assert.equal(r.state[PLACEMENTS]["file:Fail"], undefined);
     });
     await test("retry-preserves-replaced-source", async record => {
-      const r = await runtime(path.join(root, "replaced")), h = await r.home();
-      const input = path.join(root, "Replaced.ans");
-      await fs.writeFile(input, FRAME);
+      const r = await runtime(path.join(root, "replaced"), { stubs }), h = await r.home();
+      const input = path.join(root, "Replaced.png");
       r.hooks.picked = input;
-      await h.choose(r.cx, true);
+      await h.choose(r.cx);
       r.hooks.beforeWrite = async file => { if (file.includes("/.tiles/")) throw new Error("cache failure"); };
       await h.applyPreview(r.cx);
       assert.ok(h.draft);
+      const drawn = h.draft.text;
       await fs.writeFile(path.join(r.dir, "Replaced.ans"), FRAME + "●\n");
       r.hooks.beforeWrite = null;
       await h.applyPreview(r.cx);
       assert.equal(await fs.readFile(path.join(r.dir, "Replaced.ans"), "utf8"), FRAME + "●\n");
-      assert.equal(await fs.readFile(path.join(r.dir, "Replaced 2.ans"), "utf8"), FRAME);
+      assert.equal(await fs.readFile(path.join(r.dir, "Replaced 2.ans"), "utf8"), drawn);
       assert.equal(r.state[KEY], "file:Replaced 2");
       assert.equal(h.draft, null);
       record({ externallyReplacedSourceKept: true, draftSavedSeparately: true });
     });
     await test("delete-before-apply-commit", async record => {
-      const r = await runtime(path.join(root, "delete-apply")), a = await r.home(), b = await r.home();
-      const input = path.join(root, "import.ans");
-      await fs.writeFile(input, FRAME);
+      const r = await runtime(path.join(root, "delete-apply"), { stubs }), a = await r.home(), b = await r.home();
+      const input = path.join(root, "import.png");
       r.hooks.picked = input;
-      await a.choose(r.cx, true);
-      await a.lib.saveFile("Tracked", FRAME);
+      await a.choose(r.cx);
+      await a.lib.saveFile("Tracked", a.draft.text);
       await a.lib.refresh(r.cx); await b.lib.refresh(r.cx);
       a.draft.savedName = "Tracked";
       r.state[KEY] = "lighthouse";
@@ -165,10 +176,10 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       record({ deletedSourceKeptAbsent: true, lateApplyDidNotCommit: true });
     });
     await test("deleted-retry-cannot-republish-source", async record => {
-      const r = await runtime(path.join(root, "delete-retry")), a = await r.home(), b = await r.home();
-      const input = path.join(root, "retry.ans"), file = path.join(r.dir, "Tracked.ans");
-      await fs.writeFile(input, FRAME); r.hooks.picked = input;
-      await a.choose(r.cx, true); await a.lib.saveFile("Tracked", FRAME);
+      const r = await runtime(path.join(root, "delete-retry"), { stubs }), a = await r.home(), b = await r.home();
+      const input = path.join(root, "retry.png"), file = path.join(r.dir, "Tracked.ans");
+      r.hooks.picked = input;
+      await a.choose(r.cx); await a.lib.saveFile("Tracked", a.draft.text);
       await a.lib.refresh(r.cx); await b.lib.refresh(r.cx);
       a.draft.savedName = "Tracked"; a.draft.name = "Tracked"; r.state[KEY] = "lighthouse";
       const read = pending(), release = pending();
@@ -186,18 +197,19 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       assert.equal(r.state[PLACEMENTS]?.["file:Tracked"], undefined);
     });
     await test("delete-waits-for-source-publication", async record => {
-      const r = await runtime(path.join(root, "delete-publish")), a = await r.home(), b = await r.home();
-      const input = path.join(root, "Tracked.ans"), file = path.join(r.dir, "Tracked.ans");
-      await fs.writeFile(input, FRAME); r.hooks.picked = input;
-      await a.choose(r.cx, true); await a.lib.saveFile("Tracked", FRAME);
+      const r = await runtime(path.join(root, "delete-publish"), { stubs }), a = await r.home(), b = await r.home();
+      const input = path.join(root, "Tracked.png"), file = path.join(r.dir, "Tracked.ans");
+      r.hooks.picked = input;
+      await a.choose(r.cx); await a.lib.saveFile("Tracked", a.draft.text);
       await a.lib.refresh(r.cx); await b.lib.refresh(r.cx);
       const scene = b.lib.imported[0];
       a.draft.savedName = "Tracked"; r.state[KEY] = "lighthouse";
       await fs.unlink(file);
       const writing = pending(), release = pending();
       let published = false, removedBeforePublication = false;
+      // Held while the drawing is staged, before it's linked into place (a small one is one write, no parts).
       r.hooks.beforeWrite = async output => {
-        if (!output.endsWith('.part')) return;
+        if (!output.includes("/.preview/save-")) return;
         r.hooks.beforeWrite = null; writing.resolve(); await release.promise;
       };
       r.hooks.beforeExec = async (cmd, args) => { if (cmd === 'sh' && args[1].startsWith('rm -f')) removedBeforePublication = !published; };
@@ -212,11 +224,10 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       assert.equal(r.state[PLACEMENTS]?.['file:Tracked'], undefined);
     });
     await test("old-scan-preserves-new-composition", async record => {
-      const r = await runtime(path.join(root, "scan-placement")), a = await r.home(), b = await r.home();
-      const input = path.join(root, "replace.ans");
-      await fs.writeFile(input, FRAME);
+      const r = await runtime(path.join(root, "scan-placement"), { stubs }), a = await r.home(), b = await r.home();
+      const input = path.join(root, "replace.png");
       r.hooks.picked = input;
-      await b.choose(r.cx, true);
+      await b.choose(r.cx);
       b.draft.name = "Reused";
       const composed = { mode: "contain", zoom: 2, x: 0.2, y: 0.8 };
       r.state[PLACEMENTS] = { "file:Reused": composed };
@@ -234,7 +245,7 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       record({ newlySavedCompositionKept: true });
     });
     await test("closed-scan-cannot-prune-metadata", async record => {
-      const r = await runtime(path.join(root, "closed-scan")), h = await r.home();
+      const r = await runtime(path.join(root, "closed-scan"), { stubs }), h = await r.home();
       const composed = { mode: "contain", zoom: 2, x: 0.2, y: 0.8 };
       r.state[PLACEMENTS] = { "file:Reused": composed };
       const scanned = pending(), release = pending();
@@ -249,8 +260,8 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       assert.deepEqual(r.state[PLACEMENTS]["file:Reused"], composed, "a closed module cannot prune framing owned by the next module run");
       record({ closedScanIgnored: true });
     });
-    await test("confirmed-delete-after-list-removal", async record => {
-      const r = await runtime(path.join(root, "confirm-race")), h = await r.home();
+    await test("confirmed-delete-while-redrawing", async record => {
+      const r = await runtime(path.join(root, "confirm-race"), { stubs }), h = await r.home();
       const file = path.join(r.dir, "Tracked.ans");
       await fs.writeFile(file, FRAME); await h.lib.refresh(r.cx);
       const scene = h.lib.imported[0];
@@ -260,15 +271,16 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       r.hooks.afterExec = async (cmd, args) => { if (cmd === "cat" && args[0] === file) { read.resolve(); await release.promise; } };
       const conversion = h.lib.refresh(r.cx);
       await read.promise;
-      assert.equal(h.lib.imported.length, 0, "the old list item is temporarily absent during reconversion");
+      assert.deepEqual(JSON.parse(JSON.stringify(h.lib.imported.map(s => [s.name, s.redrawing]))), [["Tracked", true]], "listed still while it is drawn again");
       await h.lib.remove(scene, h.all(), r.cx);
       release.resolve(); await conversion;
-      record({ sourceExists: await exists(file), cacheExists: await exists(path.join(r.dir, ".tiles/Tracked")) });
-      assert.equal(await exists(file), false, "confirmation must delete even after the list temporarily removed its entry");
+      record({ sourceExists: await exists(file), cacheExists: await exists(path.join(r.dir, ".tiles/Tracked")), imported: h.lib.imported.map(s => s.id) });
+      assert.equal(await exists(file), false, "confirmation deletes the file while it is drawn again");
+      assert.equal(h.lib.imported.length, 0, "the late conversion doesn't list it again");
       assert.equal(await exists(path.join(r.dir, ".tiles/Tracked")), false);
     });
     await test("source-changes-during-conversion", async record => {
-      const r = await runtime(path.join(root, "changed")), h = await r.home();
+      const r = await runtime(path.join(root, "changed"), { stubs }), h = await r.home();
       const file = path.join(r.dir, "Changing.ans");
       await fs.writeFile(file, FRAME);
       r.hooks.beforeWrite = async output => {
@@ -283,7 +295,7 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       record({ currentSourcePublished: true });
     });
     await test("delete-during-conversion", async record => {
-      const r = await runtime(path.join(root, "delete-race")), a = await r.home(), b = await r.home();
+      const r = await runtime(path.join(root, "delete-race"), { stubs }), a = await r.home(), b = await r.home();
       const file = path.join(r.dir, "Tracked.ans");
       await fs.writeFile(file, FRAME);
       await a.lib.refresh(r.cx); await b.lib.refresh(r.cx);
@@ -304,5 +316,6 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
       assert.equal(await exists(path.join(r.dir, ".tiles/Tracked")), false, "late conversion leaves no cache");
     });
     emit();
+    running = null;
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 })().catch(e => { console.error(e); process.exitCode = 2; });

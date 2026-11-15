@@ -166,7 +166,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 
 ### 可选 asciicn 壁纸 Home
 
-装 `extras/mods/asciicn-wallpaper` 并在 Home shows 选它，Home 就是一张静态、按主题上色的 ASCII 画。内置画来自 [asciicn](https://asciicn.dev)（MIT）。右下角的切换器在悬停时出现，可以换画、给当前画取景，用 `+` 添加：选图片、导入 Studio `.ans`、打开 asciicn Studio、打开壁纸文件夹；把文件拖到 Home 上也行。新画打开取景卡：模式（Dots、Braille、Blocks、Quadrants）、Fill/Fit、缩放和 Apply/Cancel。Home 不会空白：上一张画一直留到下一张加载好，另一明暗的画在切换前就备好，等待超过 150ms 显示进度。规格：[wallpaper](docs/internals/specs/wallpaper.md)。
+装 `extras/mods/asciicn-wallpaper` 并在 Home shows 选它，Home 就是一张静态、按主题上色的 ASCII 画。内置画来自 [asciicn](https://asciicn.dev)（MIT）。右下角的切换器在悬停时出现，可以换画、给当前画取景，用 `+` 添加：选图片（Windows 上没有）或打开壁纸文件夹；把图片拖到 Home 上也行。新画打开取景卡：模式（Dots、Braille、Blocks、Quadrants）、Fill/Fit、缩放和 Apply/Cancel。Home 不会空白：上一张画一直留到下一张加载好，另一明暗的画在切换前就备好，等待超过 150ms 显示进度。规格：[wallpaper](docs/internals/specs/wallpaper.md)。
 
 ### 键盘与焦点
 

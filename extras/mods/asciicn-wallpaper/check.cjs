@@ -174,8 +174,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const Mod = r.modules["main.js"].default, m = new Mod();
     m.init({}, cx);
     const rows = m.render(cx);
-    for (const id of ["wallpaper-menu-image", "wallpaper-menu-ans", "wallpaper-menu-studio", "wallpaper-menu-folder"]) assert.ok(find(rows, id), `the menu has ${id}`);
-    assert.ok(texts(find(rows, "wallpaper-menu-studio")).some(s => /drop it here/.test(s)), "Studio's row says what to do with its file");
+    assert.deepEqual(texts(rows), ["Choose image…", "Open wallpaper folder"], "the menu: an image, or the folder");
     hooks.picked = "/photos/Coast.png";
     find(rows, "wallpaper-menu-image").handlers.on_click({}, cx);
     const [sent] = r.runs.at(-1);
@@ -432,26 +431,11 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     await h.lib.refresh(cx);
     assert.equal(state[PLACEMENTS].lighthouse?.zoom, 1.5, "and a rescan of the folder keeps it");
 
-    // A Studio file keeps its characters: no mode row.
-    const studio = path.join(root, "Studio.ans");
-    await fs.writeFile(studio, "\x1b[38;2;200;150;220m⣿⣿⡇\n⣿⠁⣿\n");
-    hooks.picked = studio;
-    await h.choose(cx, true);
-    assert.equal(h.draft.phase, "ready");
-    assert.equal(at("wallpaper-styles"), undefined, "a Studio file keeps its fixed characters");
-    await h.setStyle("dots", cx);
-    assert.equal(h.draft.text, await fs.readFile(studio, "utf8"), "it can't be redrawn in another mode");
-    await h.applyPreview(cx);
-    assert.equal(state[KEY], "file:Studio");
-
-    // Dropped on Home: an image previews as one chosen, a .ans as a Studio file; a new drop replaces the draft.
+    // Dropped on Home: an image previews as one chosen.
     at("wallpaper").handlers.on_drop({ paths: ["/photos/Dropped.jpg", "/photos/Other.jpg"] }, cx);
     await settle(() => h.draft?.phase === "ready");
     assert.equal(h.draft.name, "Dropped");
     assert.ok(h.draft.pixels, "a dropped image is drawn in a mode");
-    at("wallpaper").handlers.on_drop({ paths: [studio] }, cx);
-    await settle(() => h.draft?.name === "Studio" && h.draft.phase === "ready");
-    assert.equal(h.draft.pixels, null, "a dropped .ans is a Studio file");
     await h.cancelPreview(cx);
 
     // An unreadable picture: the card says why, offers another, and closes.
@@ -477,30 +461,24 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     await settle(() => h.draft === null);
     assert.match(await fs.readFile(path.join(dir, "Wait.ans"), "utf8"), /image-v4;quadrants/, "the mode chosen last is the one saved");
 
-    // A drawing past the host's 1 MiB write limit saves whole.
-    const large = "\x1b[38;2;123;234;210m⦁🌅\n".repeat(70000);
-    await fs.writeFile(path.join(root, "Large.ans"), large);
-    hooks.picked = path.join(root, "Large.ans");
-    await h.choose(cx, true);
-    await h.applyPreview(cx);
-    assert.ok((await fs.readFile(path.join(dir, "Large.ans"), "utf8")) === large);
-
     // Another Home's file under the same name is never overwritten: the preview stays, the error in the footer, Apply retryable.
     hooks.picked = "/photos/Coast.png";
     await h.choose(cx);
-    hooks.beforeExec = async (cmd, args) => { if (cmd === "link" && args[1].endsWith(".ans")) await fs.writeFile(args[1], "another Home's picture"); };
+    // Another Home's picture, made here as every one is.
+    const othersFrame = "\x1b]777;asciicn-wallpaper;image-v4;dots\x07\x1b[38;2;200;150;220m●\x1b[0m\n";
+    hooks.beforeExec = async (cmd, args) => { if (cmd === "link" && args[1].endsWith(".ans")) await fs.writeFile(args[1], othersFrame); };
     await h.applyPreview(cx);
     hooks.beforeExec = null;
-    assert.equal(await fs.readFile(path.join(dir, "Coast 2.ans"), "utf8"), "another Home's picture");
+    assert.equal(await fs.readFile(path.join(dir, "Coast 2.ans"), "utf8"), othersFrame);
     assert.equal(h.draft.phase, "ready");
     assert.match(texts(at("wallpaper-card-status")).join(""), /exists/);
-    assert.equal(state[KEY], "file:Large");
+    assert.equal(state[KEY], "file:Wait");
     await h.applyPreview(cx);
     assert.equal(state[KEY], "file:Coast 3", "a retry takes the next free name");
 
     // Cancelling while progress shows takes it away with the card.
     hold = new Promise(go => { release = go; });
-    const slow = h.startPreview("/photos/Slow.png", "Slow", cx, true);
+    const slow = h.startPreview("/photos/Slow.png", "Slow", cx);
     await settle(() => reads.at(-1) === "/photos/Slow.png");
     tree();
     await sleep(200);
@@ -514,14 +492,14 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
 
     // A slow picture can't replace a newer choice, nor reopen a cancelled one.
     hold = new Promise(go => { release = go; });
-    const old = h.startPreview("/photos/Old.png", "Old", cx, true);
+    const old = h.startPreview("/photos/Old.png", "Old", cx);
     await settle(() => reads.at(-1) === "/photos/Old.png");
-    const latest = h.startPreview("/photos/New.png", "New", cx, true);
+    const latest = h.startPreview("/photos/New.png", "New", cx);
     release(); hold = null;
     await Promise.all([old, latest]);
     assert.equal(h.draft.name, "New");
     hold = new Promise(go => { release = go; });
-    const late = h.startPreview("/photos/Late.png", "Late", cx, true);
+    const late = h.startPreview("/photos/Late.png", "Late", cx);
     await settle(() => reads.at(-1) === "/photos/Late.png");
     await h.cancelPreview(cx);
     release(); hold = null;
@@ -595,13 +573,14 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.notEqual(state[KEY], "file:Coast");
     assert.equal(state[PLACEMENTS]["file:Coast"], undefined, "its framing goes too");
 
-    // On Windows, with no file dialog, the menu offers Studio and the folder; files arrive by dropping them.
+    // On Windows, with no file dialog, the menu is the folder alone; an image arrives by dropping it on Home.
     const win = await runtime(path.join(root, "win"), { stubs: source, platform: "windows" });
     win.view.props = { menu: "add", token: "t" };
     const wm = new (win.modules["main.js"].default)();
     wm.init({}, win.cx);
     const winRows = wm.render(win.cx);
-    assert.deepEqual(["wallpaper-menu-image", "wallpaper-menu-ans", "wallpaper-menu-studio", "wallpaper-menu-folder"].map(id => Boolean(find(winRows, id))), [false, false, true, true]);
+    assert.deepEqual(texts(winRows), ["Open wallpaper folder"]);
+    assert.ok(find(winRows, "wallpaper-menu-folder").handlers.on_click, "its one row opens the folder");
 
     console.log("ok: wallpaper pictures, + menu, drops, the framing card, modes, paper, framing, Apply/Cancel, reframing, deletion, no work twice.");
   } finally {

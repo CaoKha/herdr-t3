@@ -1,4 +1,4 @@
-// Loads ascii-art.js and converts small asciicn-style frames: colours to theme tints, glyphs to shapes, the cell aspect.
+// Loads ascii-art.js: images drawn in each mode, the frames saved for them converted to tinted tiles, anything else refused.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -6,14 +6,14 @@ const vm = require("node:vm");
 const crypto = require("node:crypto");
 
 const src = fs.readFileSync(path.join(__dirname, "ascii-art.js"), "utf8").replace(/^export (function\*?|const) /gm, "$1 ")
-  + "\nglobalThis.art = { convert, picture, fromImage, tintOf, legacyTintOf, imageGrid, decodeBmp, imageAns, imagePlan: typeof imagePlan === 'function' ? imagePlan : null, sampleImage: typeof sampleImage === 'function' ? sampleImage : null };";
+  + "\nglobalThis.art = { convert, picture, tintOf, imageGrid, decodeBmp, imageAns, imagePlan: typeof imagePlan === 'function' ? imagePlan : null, sampleImage: typeof sampleImage === 'function' ? sampleImage : null };";
 const context = vm.createContext({});
 vm.runInContext(src, context);
-const { convert, picture, fromImage, tintOf, legacyTintOf, imageGrid, decodeBmp, imageAns, imagePlan, sampleImage } = context.art;
+const { convert, picture, tintOf, imageGrid, decodeBmp, imageAns, imagePlan, sampleImage } = context.art;
 
 // All of a conversion: the tiles and what it returns.
-function run(text, aspect, paper) {
-  const it = convert(text, aspect, paper), tiles = [];
+function run(text, paper) {
+  const it = convert(text, paper), tiles = [];
   for (;;) {
     const step = it.next();
     if (step.done) return { tiles, ...step.value };
@@ -22,69 +22,40 @@ function run(text, aspect, paper) {
 }
 const count = (svg, s) => svg.split(s).length - 1;
 const E = (codes) => `\x1b[${codes}m`;
+const markOf = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
 
 // New images use eight brightness steps and all sixteen nearest VGA slots, not the old hue buckets.
 assert.deepEqual(JSON.parse(JSON.stringify(tintOf({ rgb: [255, 255, 255] }))), { tint: "ansi15", step: 7 });
 
-// Truecolor Braille, as Studio's .ans export writes it: each set bit a dot, the cells text cells half as wide as tall.
+// Only a frame made here converts: an unmarked one, or one from before modes (v3), is refused, before anything is drawn.
+for (const text of ["\x1b[38;2;255;0;0m⠿⣿\x1b[0m\n", "·•●\n", "\x1b]777;asciicn-wallpaper;image-v3\x07\x1b[38;2;9;9;9m●\n"]) {
+  assert.throws(() => run(text), /made here/, JSON.stringify(text));
+}
+// Truecolor Braille: each set bit a dot, the cells half as wide as tall.
 {
-  const r = run(`${E("38;2;255;0;0")}⠿⣿${E("0")}\n`);
-  assert.equal(r.aspect, 0.5, "Braille sits in text cells");
-  assert.deepEqual([r.width, r.height], [1, 1]);
-  assert.equal(r.tiles.length, 1);
+  const r = run(`${markOf("braille")}${E("38;2;170;0;0")}⠿⣿${E("0")}\n`);
+  assert.deepEqual([r.aspect, r.width, r.height, r.paper], [0.5, 1, 1, true]);
   const [t] = r.tiles;
-  assert.deepEqual({ tint: t.tint, opacity: t.opacity }, { tint: "ansi1", opacity: 0.32 }, "dark red: red, a low step");
+  assert.deepEqual({ tint: t.tint, opacity: t.opacity }, { tint: "ansi1", opacity: 0.7 }, "VGA red, its value's step");
   assert.equal(count(t.svg, "h0"), 6 + 8, "⠿ has six dots, ⣿ eight");
   assert.match(t.svg, /stroke-width="0\.17"/, "radius 0.17 cell widths, at half a cell height wide");
 }
-// Halftone dots alone: asciicn's square dot cells; one size a path.
-{
-  const r = run("·•●\n●•·\n");
-  assert.equal(r.aspect, 1);
-  assert.deepEqual([r.width, r.height], [3, 2]);
-  assert.equal(r.tiles[0].tint, "foreground", "no colour: the theme's foreground, at full");
-  assert.equal(r.tiles[0].opacity, 1);
-  assert.equal(count(r.tiles[0].svg, "<path"), 3);
-}
-// ANSI 16 colours are the theme's own; 256 colours by their rgb; a reset goes back to the foreground.
-{
-  const r = run(`${E("94")}█${E("38;5;196")}█${E("39")}█\n`);
-  assert.deepEqual(r.tiles.map(t => t.tint).sort(), ["ansi1", "ansi12", "foreground"].sort());
-  assert.ok(r.tiles.every(t => count(t.svg, 'fill="#000"') === 1), "blocks are filled rectangles");
-  assert.deepEqual(plainTint([255, 255, 255]), { tint: "foreground", step: 3 });
-}
-function plainTint(rgb) { return JSON.parse(JSON.stringify(legacyTintOf({ rgb }))); }
-// A background colour doesn't change the ink; CRLF lines and other escapes are no cells.
-{
-  const r = run(`${E("48;2;0;0;255")}${E("38;2;0;200;0")}▀\x1b[2K${E("48;5;4")}▄\r\n▌\r\n`);
-  assert.deepEqual([r.width, r.height], [1, 2], "two columns at half a cell each, two rows");
-  assert.deepEqual(r.tiles.map(t => t.tint), ["ansi10"], "green throughout, the background ignored");
-  assert.equal(count(r.tiles[0].svg, "z"), 3, "▀ ▄ ▌: three rectangles");
-}
-// A custom ramp's other glyphs are upright bars as big as they're dark; spaces and the empty Braille cell draw nothing.
-{
-  const bar = (g) => { const s = run(`${g}\n`).tiles[0].svg; return [Number(s.match(/stroke-width="([\d.]+)"/)[1]), Number(s.match(/v([\d.]+)"/)[1])]; };
-  const [at, colon] = [bar("@"), bar(":")];
-  assert.ok(at[0] > colon[0] && at[1] > colon[1] && colon[0] > 0, "@ wider and taller than :");
-  assert.ok(at[1] + at[0] > 0.6, "a dark one stands most of the cell's height: no rows of stripes");
-  assert.deepEqual(run("  \u2800 \n").tiles, []);
-}
 // Dense supported shapes must fit the host's 1 MiB limit for each tile write.
 {
-  for (const glyph of ["░", "▒", "▓", "⣿", "▟", "╳", "@", "●"]) {
-    const r = run(`${glyph.repeat(160)}\n`.repeat(80));
-    assert.deepEqual([r.width, r.height], [glyph === "●" ? 160 : 80, 80], "tiling keeps the complete canvas");
+  for (const glyph of ["░", "▒", "▓", "⣿", "▟", "●"]) {
+    const r = run(`${markOf("dots")}${E("38;2;255;255;255")}${`${glyph.repeat(160)}\n`.repeat(80)}`);
+    assert.deepEqual([r.width, r.height], [80, 80], "tiling keeps the complete canvas");
     assert.ok(r.tiles.length > 0);
     for (const t of r.tiles) assert.ok(Buffer.byteLength(t.svg) <= 1024 * 1024, `${glyph}: ${Buffer.byteLength(t.svg)}-byte tile exceeds the native write limit`);
   }
 }
 // Tiles cut at 40 cell heights, the box in cell heights.
 {
-  const r = run(`${"●".repeat(170)}\n`);
-  assert.deepEqual(r.tiles.map(t => [t.x0, t.x1]), [[0, 40], [40, 80], [80, 120], [120, 160], [160, 170]]);
-  assert.equal(new Set(r.tiles.map(t => t.file)).size, 5, "a name each");
+  const r = run(`${markOf("dots")}${E("38;2;255;255;255")}${"●".repeat(170)}\n`);
+  assert.deepEqual(r.tiles.map(t => [t.x0, t.x1]), [[0, 40], [40, 80], [80, 85]]);
+  assert.equal(new Set(r.tiles.map(t => t.file)).size, 3, "a name each");
 }
-// An image without the Studio. A BMP as sips writes it (24-bit, top-down, rows padded to 4 bytes) or ImageMagick's
+// An image. A BMP as sips writes it (24-bit, top-down, rows padded to 4 bytes) or ImageMagick's
 // bmp3 (bottom-up), here 32-bit too; pixels given top row first as [r, g, b].
 const finish = (it) => { for (;;) { const s = it.next(); if (s.done) return s.value; } };
 function bmp(rows, { bits = 24, topDown = true } = {}) {
@@ -138,8 +109,7 @@ function bmp(rows, { bits = 24, topDown = true } = {}) {
 }
 console.log("ok: BMP chunks preserve pixels; incomplete/forged headers fail before RGBA allocation.");
 // The image generator emits website image-cell geometry, persisted in a non-drawing OSC header.
-const MARK = "\x1b]777;asciicn-wallpaper;image-v3\x07", HEADER = /^\x1b\]777;asciicn-wallpaper;image-v\d[^\x07]*\x07/;
-const markOf = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
+const HEADER = /^\x1b\]777;asciicn-wallpaper;image-v\d[^\x07]*\x07/;
 const plain = (text) => text.replace(HEADER, "").replace(/\x1b\[[0-9;]*m/g, "");
 const pixelsOf = (rows) => finish(decodeBmp(bmp(rows)));
 {
@@ -176,7 +146,7 @@ assert.equal(typeof imagePlan, "function", "image import exposes the resize/crop
   assert.equal(pending.next().done, false, "expensive sampling yields before completion, so callers can cancel");
   pending.return();
 }
-console.log("ok: ascii-art converts legacy frames and website image frames.");
+console.log("ok: ascii-art converts website image frames and refuses any other.");
 
 // Independent mapTones fixtures hash every glyph and visible cell's RGB, across the full 96-row image.
 const oracle = require("./fixtures/image-v3-map-tones.json");
@@ -213,15 +183,6 @@ for (let step = 0; step < 8; step++) {
 }
 console.log("ok: four full image modes match upstream mapTones cell-for-cell; eight values and VGA16 match.");
 
-// Captured before changing VERSION=2: rebuilding an old .ans keeps exactly the same tiles and geometry.
-for (const [text, sha256] of [
-  ["\x1b[38;2;255;0;0m⠿⣿\x1b[0m\n", "8a779473382673fce941935103e24f0821ff3daff336c34eec7ecb5e69f5dca4"],
-  ["·•●\n●•·\n", "2016cad3b6651f36ed883ddace410e70fe23afc6ac55d2d32248e0678239fcf3"],
-  ["\x1b[94m█\x1b[38;5;196m█\x1b[39m█\n", "ba38d61ab1be36b2755363d3f7219d7985b9b55d4ef98e4f07d821d8d21c7204"],
-  ["\x1b[38;2;120;130;140m░▒▓█ ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█\n", "b3f7ce6f2e9a2facabdfcac2b6602a1543a9381f6abd6bcdde770251187e1f65"],
-  ["\x1b[38;2;255;255;255m● \n  \n", "40f8e7880b866d873b64a9205794e2d24fa31b6adf24a491552359cc5848e863"],
-  ["  ⠀ \n", "231d643a8292ee771b7535b636cc403cc75aa872d72c7527c4850228fc983dc4"],
-]) assert.equal(hash(run(text)), sha256, "legacy conversion output is byte-for-byte unchanged");
 {
   const bytesHash = value => crypto.createHash("sha256").update(value).digest("hex");
   const directory = path.join(__dirname, "scenes");
@@ -260,12 +221,11 @@ for (const style of ["", "other", "Braille", null, 1, {}, []]) assert.throws(() 
 }
 assert.equal(imageGrid(4000, 100).columns, 480);
 assert.equal(imageGrid(100, 4000).columns, 16);
-assert.equal(run("●\n", 0.75).width, 0.75, "builtins can still pass their known aspect");
-console.log("ok: six legacy conversion hashes and all 263 builtin scene files are unchanged.");
+console.log("ok: blank edges and the image grid's limits; all 263 builtin scene files are unchanged.");
 
 // Light themes draw on paper: a new image's tones turn over (blank cells become full ones) and opacity follows darkness.
 {
-  const tilesOf = (text, paper) => run(text, undefined, paper).tiles;
+  const tilesOf = (text, paper) => run(text, paper).tiles;
   const solid = (rgb, style) => finish(imageAns(pixelsOf([[rgb]]), style));
   for (const style of ["dots", "blocks", "quadrants", "braille"]) {
     const [gx, gy] = { dots: [1, 1], blocks: [1, 1], quadrants: [2, 2], braille: [2, 4] }[style];
@@ -286,22 +246,17 @@ console.log("ok: six legacy conversion hashes and all 263 builtin scene files ar
   assert.equal(tilesOf(one("dots", "·"), true)[0].opacity, 0.4, "grey 128 on paper: eight darkness steps");
   const clear = finish(imageAns({ width: 1, height: 1, rgba: new Uint8ClampedArray([0, 0, 0, 0]) }, "dots"));
   assert.equal(tilesOf(clear, true).length, 0, "transparent cells stay empty on paper");
-  for (const text of ["\x1b[38;2;255;0;0m⠿⣿\x1b[0m\n", "·•●\n●•·\n", `${MARK}${E("38;2;9;9;9")}●\n`]) {
-    assert.equal(hash(run(text, undefined, true)), hash(run(text)), "Studio, legacy and v3 frames draw the same on paper");
-    assert.equal(run(text).paper, undefined, "and their result is unchanged");
-  }
 }
-console.log("ok: new images turn over on paper; older frames draw unchanged.");
+console.log("ok: new images turn over on paper.");
 
 // One picture of every tile, each in its theme colour at its opacity, 4096px on the long edge; a new image says it is one.
 {
-  const { tiles, width, height } = run(`${E("38;2;255;255;255")}█${E("31")}▒\n`);
+  const { tiles, width, height } = run(`${markOf("blocks")}${E("38;2;255;255;255")}█${E("38;2;170;0;0")}▒\n`);
   const svg = picture(tiles, (tint) => ({ ansi15: "#fffffe", ansi1: "#cd3131", foreground: "#000000" })[tint], width, height);
   assert.match(svg, /^<svg [^>]*width="4096" height="4096" viewBox="0 0 1 1"/, "two half-width cells: a square");
   assert.equal(count(svg, "<svg"), 1, "the tiles are one picture");
-  assert.match(svg, /stroke="#000000"[^>]*stroke-opacity="1"[^>]*fill-opacity="1"><path fill="#000000"/, "white truecolor: the ink colour, full");
-  assert.match(svg, /stroke="#cd3131"[^>]*stroke-opacity="0.75"[^>]*fill-opacity="0.75"><path fill="#cd3131"/, "ANSI red at its step");
+  assert.match(svg, /stroke="#fffffe"[^>]*stroke-opacity="1"[^>]*fill-opacity="1"><path fill="#fffffe"/, "white: bright white, full");
+  assert.match(svg, /stroke="#cd3131"[^>]*stroke-opacity="0.7"[^>]*fill-opacity="0.7"><path fill="#cd3131"/, "VGA red at its value's step");
   assert.ok(!svg.includes("#000\""), "no tile keeps its placeholder ink");
-  assert.ok(fromImage(finish(imageAns(pixelsOf([[[9, 9, 9]]]), "dots"))) && !fromImage("⣿\n"), "an image's frame is known by its header");
   console.log("ok: tiles become one theme-coloured picture.");
 }
