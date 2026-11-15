@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const store = new Map();
-const src = fs.readFileSync(path.join(__dirname, "nav-column.js"), "utf8")
+const src = ["tip.js", "color.js", "nav-column.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
   + "\nglobalThis.nav = { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth };";
 // Elements that keep their handlers and widths: a fake page to drag the column's edge in.
@@ -28,7 +28,8 @@ const proxies = new Map();
 const proxy = (target) => proxies.get(target);
 const make = () => { const p = element(); proxies.set(made.at(-1), p); return p; };
 const sets = [];
-const context = vm.createContext({ KEY: { navWidth: "t3.navWidth" }, shared: (k) => store.get(k) ?? null,
+let win = { active: true };
+const context = vm.createContext({ KEY: { navWidth: "t3.navWidth" }, shared: (k) => store.get(k) ?? null, keys: () => [], window: () => win, Popup: { new: () => make() },
   setShared: (k, v) => { sets.push([k, v]); store.set(k, v); }, settings: () => ({ zoom: 2 }),
   div: make, h_flex: make, v_flex: make, svg: make, ghostButton: make,
   localStorage: { getItem: (k) => store.get(`local:${k}`) ?? null, setItem: (k, v) => { sets.push([k, String(v)]); store.set(`local:${k}`, String(v)); } } });
@@ -55,7 +56,7 @@ assert.equal(navOpen(), false);
 // alone, and the width it lands at is written once, on release. Its width is this page's own, whatever the page's width:
 // nothing is named after the page, so a page's resize can't scale it for a frame (Herdr's resizable groups did).
 {
-  const cx = { notified: 0, notify() { this.notified++; }, stop_propagation() {} };
+  const cx = { notified: 0, notify() { this.notified++; }, stop_propagation() {}, timer: { every: () => ({ cancel() {} }) } };
   const page = () => { made.length = 0; proxies.clear(); withNav({ border: "#333" }, "p", 1000, { content: make(), head: make(), list: make(), open: true }); return made; };
   const nav = (els) => els.find(e => e.ids.includes("p-nav")), edge = (els) => els.find(e => e.ids.includes("p-nav-edge")), root = (els) => els.find(e => e.on.on_mouse_move);
   store.set("local:nav.width", "300"); sets.length = 0;
@@ -80,6 +81,22 @@ assert.equal(navOpen(), false);
   root(page()).on.on_mouse_move({ position: { x: 980, y: 10 } }, cx);
   root(page()).on.on_hover(false, cx);
   assert.deepEqual(sets, [["nav.width", "310"]]);
+  // The window goes inactive mid-drag (a release outside it brings neither a release nor a leave): the drag ends there, as
+  // the sidebar's and Inbox's do (tip.js dragGone), and the column stops following the pointer.
+  store.set("local:nav.width", "300"); sets.length = 0;
+  const watches = [], tcx = { ...cx, timer: { every: (_ms, fn) => { const w = { fn, cancel() { w.gone = true; } }; watches.push(w); return w; } } };
+  edge(page()).on.on_mouse_down({ position: { x: 1000, y: 10 } }, tcx);
+  root(page()).on.on_mouse_move({ position: { x: 980, y: 10 }, bounds: { x: 0, y: 0, width: 1000, height: 800 } }, tcx);
+  assert.equal(nav(page()).w, 310);
+  win = { active: false };
+  watches.filter(w => !w.gone).forEach(w => w.fn(tcx));
+  assert.deepEqual(sets, [["nav.width", "310"]], "let go where it was, saved");
+  win = { active: true };
+  root(page()).on.on_mouse_move({ position: { x: 950, y: 10 } }, tcx);
+  assert.equal(nav(page()).w, 310, "back in the window, the pointer moves nothing");
+  assert.ok(watches.every(w => w.gone), "and nothing is left watching");
+  root(page()).on.on_mouse_up({ position: { x: 400, y: 400 } }, tcx);
+  assert.deepEqual(sets, [["nav.width", "310"]], "a later click saves nothing more");
 }
 
 // The other page has its own localStorage even though the renderer and drag algorithm are the same.

@@ -10,7 +10,7 @@ import { menuKeys, scrollList, propsLit } from "./list.js";
 import { menuRow, menuRule, MENU_ROW } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
 import { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed } from "./popup-menu.js";
-import { targetsMenu, openTarget, targetIcon } from "./open-in.js";
+import { targetsMenu, awaitTargets, openTarget, targetIcon } from "./open-in.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { KEY, closedKey } from "./store.js";
 import { LIST, join, parseListing } from "./model.js";
@@ -85,6 +85,7 @@ export function initMenu(view, cx) {
   // A breadcrumb menu's folder: it starts at its crumb's (`p.dir`), and Back goes no higher.
   view.dir = p.dir;
   if (p.files === "folder") readFolder(view, cx);
+  if (p.files === "open-in") awaitTargets(cx);
   cx.timer.every(250, () => { if (!sourceOkay(p.source)) closeOverlay(p.overlay); });
 }
 

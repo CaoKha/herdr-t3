@@ -18,6 +18,7 @@ import { pierreFileIcon } from "./pierre-icons.js";
 import { statusMark } from "./status-mark.js";
 import { tab as closableTab } from "./tab.js";
 import { keycap } from "./palette.js";
+import { alpha } from "./color.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file: their names and icons. Review wears pulls.review's own mark,
 // as the Review bar does: a review, not a git command. In its colors, so an image.
@@ -122,7 +123,7 @@ export default class WorkspaceChrome extends View {
           .child(button("t3-settings", "mods/t3-chrome/icons/sliders-horizontal.svg", "Herdr T3 settings", () => run("t3-tabs.settings"), "t3-tabs.settings")))
         .child(notice || div().flex_1())
         .when(Boolean(ready), el => el.child(tip(this, t, "app-update", `Update ${ready} downloaded. Click to restart`, stop(this, t, "app-update", div().id("app-update").h(32).px(12).flex_none().flex().items_center()
-          .rounded_full().bg(t.accent + "26").text_size(12).text_color(t.accent).hover(s => s.bg(t.accent + "40")).on_hover(glow(this, "app-update"))
+          .rounded_full().bg(alpha(t.accent, "26")).text_size(12).text_color(t.accent).hover(s => s.bg(alpha(t.accent, "40"))).on_hover(glow(this, "app-update"))
           .role("button").accessibility_label(`Restart into Herdr ${ready}`)
           .on_click(() => run("app.update")).child("Update"), 16))))));
     }

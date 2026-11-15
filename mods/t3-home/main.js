@@ -8,6 +8,7 @@ import { stopsInit, stopsEnd, stop, focusRoot, pressed, justClosed } from "./foc
 import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
 import { keycap } from "./palette.js";
+import { alpha } from "./color.js";
 
 // The selected sidebar keeps its rows current while hidden too.
 function hasNext() {
@@ -39,7 +40,7 @@ export default class Home extends View {
         .when(Boolean(key), (r) => r.child(h_flex().flex_none().gap(4).children(caps(key).map((cap) => keycap(t, cap)))));
       // Nowhere to go: dimmed, as the key does nothing either. The theme's hover can be the pane's own color, so a tint of the text, as Go to's rows.
       return off ? el.opacity(0.5) : stop(this, t, id, el.role("button").accessibility_label(a.word)
-        .hover((s) => s.bg(t.foreground + "0f").text_color(t.foreground)).active((s) => s.bg(t.selected)).on_mouse_down("left", () => pressed(this)).on_click(() => { if (!a.pops || !justClosed(this, a.pops)) a.go(); }), 8);
+        .hover((s) => s.bg(alpha(t.foreground, "0f")).text_color(t.foreground)).active((s) => s.bg(t.selected)).on_mouse_down("left", () => pressed(this)).on_click(() => { if (!a.pops || !justClosed(this, a.pops)) a.go(); }), 8);
     };
     // As T3's launcher: pb its top bar's height, so the list centers on the whole panel.
     return focusRoot(this, v_flex().size_full().px(24).pb(40).items_center().justify_center()

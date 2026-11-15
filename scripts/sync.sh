@@ -45,6 +45,7 @@ share nav-column mods/t3-files extras/mods/review
 share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox extras/mods/review extras/mods/asciicn-wallpaper extras/mods/pulls-review
 share open-in mods/t3-files mods/t3-actions
 share panel-states mods/t3-files extras/mods/review
+share color mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files mods/t3-home mods/t3-new-menu mods/t3-picker extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share button mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share trigger mods/t3-actions mods/t3-chrome mods/t3-pane mods/t3-tabs mods/t3-inbox mods/t3-spaces mods/t3-agents mods/t3-files extras/mods/review extras/mods/asciicn-wallpaper extras/mods/pulls-review
 share popup-menu mods/t3-menu mods/t3-files mods/t3-actions

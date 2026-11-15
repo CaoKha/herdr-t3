@@ -32,6 +32,7 @@ const scope = vm.createContext({
   stop: (_v, _t, _id, el) => el, within: () => false,
 });
 const strip = (f) => fs.readFileSync(path.join(__dirname, f), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "");
+vm.runInContext(strip("color.js"), scope);
 vm.runInContext(`(() => {\n${strip("button.js")}\nglobalThis.button = button; globalThis.ghostTint = tint;\n})();`, scope);
 vm.runInContext(strip("measured-text.js"), scope);
 vm.runInContext(strip("tab.js") + "\nglobalThis.tab = tab;", scope);

@@ -27,7 +27,7 @@ const findTip = (n) => n?.key?.startsWith?.("tip-body-") ? n : (n?.items ?? []).
 
 const state = {};
 let now = 1000, zoom = 1;
-const src = ["store.js", "focus.js", "tip.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["store.js", "focus.js", "tip.js", "color.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
   + "\nglobalThis.tr = { trigger, hang };";
 const context = vm.createContext({
@@ -89,4 +89,55 @@ assert.deepEqual(JSON.parse(JSON.stringify(hang(at24, 220, { align: "start", gap
 zoom = 2;
 assert.deepEqual(JSON.parse(JSON.stringify(hang(at24, 50, { gap: 5, nudge: 1 }))), { at: { x: 26, y: 44 } });
 assert.deepEqual(JSON.parse(JSON.stringify(hang(null, 220))), {});
+
+// A press that came to nothing (released off the button: no click), then the keyboard. The host clicks a focused stop on Enter's
+// release, after its key-down went to that stop; the press mustn't still count: no old box to hang from, no old close to
+// swallow the open (t3-tokens「菜单行」: opened by keys, its first row lights). Every handler an element gets runs, as GPUI's.
+{
+  const all = (kind = "div") => {
+    const node = { kind, items: [], handlers: {}, style: {} };
+    const proxy = new Proxy(node, { get(target, key) {
+      if (key === "tracked" || key in target) return target[key];
+      return (...args) => {
+        if (key === "when") { if (args[0]) args[1](proxy); }
+        else if (key === "child" || key === "content") node.items.push(args[0]);
+        else if (key === "children") node.items.push(...args[0].filter(Boolean));
+        else if (key === "id") node.key = args[0];
+        else if (key === "track_focus") node.tracked = args[0];
+        else if (key === "on_mouse_down") (node.handlers[`${key}:${args[0]}`] ??= []).push(args[1]);
+        else if (key.startsWith("on_")) (node.handlers[key] ??= []).push(args[0]);
+        else node.style[key] = args[0];
+        return proxy;
+      };
+    } });
+    return proxy;
+  };
+  const fire = (el, name, event) => (el.handlers[name] ?? []).forEach((h) => h(event, cx));
+  const kstate = {};
+  let know = 1000;
+  const kc = vm.createContext({
+    div: () => all(), h_flex: () => all(), v_flex: () => all(), svg: () => all("svg"),
+    Popup: { new: (id, child) => { const p = all("popup"); p.key = id; p.items.push(child); return p; } },
+    shared: (k) => kstate[k], setShared: (k, v) => { kstate[k] = v; }, props: () => ({}), closeOverlay: () => {},
+    keys: () => [], window: { mouse_position: () => null, viewport_size: () => null }, Date: { now: () => know }, settings: () => ({ zoom: 1 }),
+  });
+  vm.runInContext(["store.js", "focus.js", "tip.js", "color.js", "button.js", "list.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+    .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.tr = { trigger, openLit, MODE };", kc);
+  const { trigger: ktrigger, openLit, MODE } = kc.tr;
+  const kview = { fs: { modal: false, handles: new Map(), free: [{ is_focused: () => true }], keyboard: false } };
+  const at = [];
+  const btn = () => find(ktrigger(kview, t, "menu-btn", { icon: "x.svg", label: "Menu", closed: CLOSED, onOpen: (b) => { at.push(b); } }), "menu-btn");
+  const enter = () => { const b = btn(); assert.ok(b.tracked, "a stop, so Enter reaches it"); fire(b, "on_key_down", { key: "enter", keystroke: "enter" }); fire(b, "on_click", { click_count: 1, modifiers: {} }); };
+  const abandoned = () => fire(btn(), "on_mouse_down:left", { bounds: { x: 400, y: 12, width: 28, height: 28 } });
+  const tabBack = () => { kstate[MODE] = kview.fs.me = "me"; };
+  // The press ends the keyboard mode; Tab brings it back; then Enter.
+  abandoned(); tabBack(); enter();
+  assert.ok(at[0] == null, "the abandoned press's box isn't where the keys' menu hangs");
+  assert.equal(openLit(!at[0]), 0, "opened by keys: its first row lights");
+  // That press closed the popup that was up (its close stamped the key): the keys' open still goes, the first time.
+  at.length = 0; know += 400; kstate[CLOSED] = undefined;
+  abandoned(); kstate[CLOSED] = know; tabBack();
+  enter();
+  assert.equal(at.length, 1, "the first Enter opens it: the abandoned press closed nothing it asked");
+}
 console.log("trigger ok");

@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const src = fs.readFileSync(path.join(__dirname, "file-tree.js"), "utf8")
+const src = ["color.js", "file-tree.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
   + "\nglobalThis.tree = { treeRows, pathEntries, rowAt, treeKey, naturalCompare, sortEntries };";
 // The row as drawn: each element a tag and what it holds, in order.

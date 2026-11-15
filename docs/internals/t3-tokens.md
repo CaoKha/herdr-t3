@@ -87,6 +87,7 @@
 - 打开弹层或菜单的按钮一律用 `shared/trigger.js` 的 `trigger(view, t, id, { label, hint?, action?, below?, open?, closed?, onOpen, icon?, iconSize?, text?, size?, surface?, color?, disabled? }, extra?)`（P6）：画 `button()`（默认 `sm`／`chrome`）、`tip()` 卡片和 `stop()`；按下记 `pressed()` 和按钮位置，点击时若这次按下刚关掉弹层（`justClosed(view, closed)`）就不再打开，否则 `onOpen(bounds, cx)`；`open` 为真时按钮 on、提示 `off`。`closed` 是弹层 `close()` 写的时间戳键（见 [storage.md](storage.md)）；不传 `open` 时由 `popupOpen(view, id, closed)` 判断：本按钮打开之后键还没再写过。`onOpen` 返回 `false` 表示没开出弹层（如直接新建 space）。不是按钮的触发处（split 的箭头半、详情行、标题、面包屑 ›）用同文件的 `opener(view, { id?, closed?, onOpen, press? })` 接同样的按下和点击，on 态自己画。Review 页内弹层由 `closePopup` 在外部按下时写 `review.<名字>Closed`。
 - svg 不吃悬停样式，ghost 的字色变化靠调用方传 `hot`（`view.hot === id`）。卡片上的 ghost 图标按钮一律用同文件的 `ghostButton(view, t, id, { icon, label, act, press?, on?, disabled?, color?, size?, iconSize?, surface? })`（`surface` 默认 `card`，40px 顶栏上传 `chrome`）：它接好悬停（tip.js `glow`）、按下不下传、点击执行，调用方只加 `stop()` 和 `tip()`。
 - 不是按钮却按 ghost 方式点亮的元素（标签、详情行、Review 分组标签、面包屑 ›），底色取同文件导出的 `tint(t, surface, on)`。
+- 从主题色取比例（悬停底、淡底、焦点环、徽章底）一律经 `shared/color.js` 的 `alpha(color, "12")`：主题色可以是 `#rgb`、`#rrggbb` 或带透明度的 `#rrggbbaa`，后者按自身透明度再乘比例；直接拼两位会得到宿主不认的 5 位或 10 位色。`scripts/check.sh` 拦直接拼接。
 - 尺寸：`default` 32、`sm` 28、`compact` 28（字 12、圆角 6）、`xs` 24、`micro` 20（字 11、圆角 4）、`tiny` 16（圆角 4）；只有图标时是正方形，图标 16/16/14/14/12/12。子标题栏（Files 文件头、Review 顶栏）的 `sm` 按钮传 `iconSize: 14`，照 T3 文件和 diff 工具栏的 `size-3.5`；面板头和其他 40 栏仍是 16。
 
 分体控件（T3 OpenInPicker、ProjectScriptsControl、ThreadDetailsControl 的 primary＋secondary）一律用同文件的 `split()`，mod 不自己画描边。T3 按所在位置分两种画法，`size` 二选一：
@@ -104,7 +105,7 @@
 - 只在指针停在行上或键盘选中时用 `selected` 底；指针离开就熄灭，宿主晚到的 leave 不熄灭指针已进入的下一行（`shared/list.js` 的 `litOnHover`）。子菜单开着时（`open`）父行保持点亮。
 - 禁用：整行透明度 0.64（`DISABLED`），不点亮、不响应点击；`hint` 用 `tip()` 说明原因，不用宿主 `.tooltip()`。
 - 行尾提示用 `menuHint`，分隔线用 `menuRule`。按键用 `list.js` 的 `menuKeys`，滚动用 `scrollList`，子菜单用 `popup-menu.js`／`submenu.js`，由各菜单自己接。`label` 不是文字（元素）时，调用方自己设 `accessibility_label`；role 不是按钮的（设置页 Select 的选项 `list_box_option`、base 的 `radio_button`）在调用方覆盖。
-- 子 agent 列表也用 `menuRow`：每级缩进 16 用 `lead` 放 `16 × 层级 − 8` 的占位（加上行的 gap 8），状态用 `trail`。Review 的 base 和 Commits 列表、设置页 Select 的选项也用 `menuRow`：指针离开即熄灭，和其余菜单一致（2026-11-14 用户决定）。
+- 子 agent 列表也用 `menuRow`：每级缩进 16 用 `lead` 放 `16 × 层级 − 8` 的占位（加上行的 gap 8），状态用 `trail`。Review 的 base 和 Commits 列表、Review 设置的语言／agent／model 子菜单、设置页 Select 的选项也用 `menuRow`：指针离开即熄灭，和其余菜单一致（2026-11-14 用户决定）。
 
 ## 程序标志
 

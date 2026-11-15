@@ -58,6 +58,12 @@ for p in $(grep -rhoE --include='*.js' --exclude=gpui-kit.d.ts 'mods/workspace-c
     || { echo "FAIL $p is borrowed at Herdr's stroke, not 1.75 (t3-tokens P4): give the mod its own copy"; fail=1; }
 done
 
+# A theme color at a share of its opacity goes through shared/color.js alpha: a color with its own alpha (#rrggbbaa, which
+# Herdr's themes take) plus two more digits is 10, which the host refuses, and #rgb plus two is 5.
+grep -rnE --include='*.js' --exclude=gpui-kit.d.ts --exclude=color.js \
+    -e '\+ *"[0-9a-fA-F]{2}"' -e '\+ *\([^)]*\? *"[0-9a-fA-F]{2}" *:' -e '`\$\{[^}]+\}[0-9a-fA-F]{2}`' shared mods extras/mods | grep -v '/vendor/' \
+  && { echo "FAIL a color + two hex digits (above): use color.js alpha(color, share)"; fail=1; }
+
 # accent is the focus ring's and emphasis's color, never a button's fill (docs/internals/t3-tokens.md「按钮」): its foreground
 # only goes on the few non-buttons filled with it, listed here.
 for f in $(grep -rlE --include='*.js' --exclude=gpui-kit.d.ts 'accent_foreground' shared mods extras/mods); do

@@ -16,6 +16,7 @@ import { trigger } from "./trigger.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
 import { button, radiusOf } from "./button.js";
+import { alpha } from "./color.js";
 
 // How long a checkout being opened may take to show up before it's asked for again.
 const OPENING = 5000;
@@ -398,7 +399,7 @@ export default class Spaces extends View {
           .when(Boolean(tree), el => el.pl(20).child(h_flex().size(16).flex_none().items_center().justify_center()
             .child(svg("mods/t3-spaces/icons/git-branch.svg").size(16).text_color(t.dim))))
           .when(!tree, el => el.child(projectMark("mods/t3-spaces", w, 16, t, ps)))
-          .child(div().min_w(0).max_w(150).truncate().font_medium().text_color(t.foreground + "e6").child(w.name))
+          .child(div().min_w(0).max_w(150).truncate().font_medium().text_color(alpha(t.foreground, "e6")).child(w.name))
           .child(g ? this.gitTail(g, tree, w.name, t, w.id, ghost) : div().flex_1())
           .when(kids > 0, el => el.child(this.foldButton(t, foldId, g.repo, hiding, ghost))),
       );

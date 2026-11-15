@@ -15,6 +15,7 @@ import { MOTION, foldArrow } from "./motion.js";
 import { pin } from "./pins.js";
 import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
+import { alpha } from "./color.js";
 
 // T3's one-line row and shelf or folder header, its folders 8 apart and its list's 1px between items (gap-px).
 const ROW = 36, HEAD = 32, HEAD_GAP = 8;
@@ -279,7 +280,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
       .items_center()
       .rounded(8)
       .child(projectMark("mods/t3-agents", space, 16, t, ps, true))
-      .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.foreground + "e6").child(g.label))
+      .child(div().flex_1().min_w(0).truncate().font_medium().text_color(alpha(t.foreground, "e6")).child(g.label))
       .when(Boolean(dot), (el) => el.child(div().size(6).flex_none().rounded_full().bg(t[top]).role("status").accessibility_label(SECTION[RANK[top]])))
       .when(hiding.length > 0, (el) => el.child(div().flex_none().text_size(12).text_color(t.dim).child(String(hiding.length))))
       .child(chevron(g, open, ghost));

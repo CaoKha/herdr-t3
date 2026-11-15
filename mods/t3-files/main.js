@@ -20,6 +20,7 @@ import { tip, hoverKept, glow } from "./tip.js";
 import { MENU_ROW } from "./menu-row.js";
 import { LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, join, parentOf, nameOf, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, terms, narrows,
   filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket } from "./model.js";
+import { alpha } from "./color.js";
 
 const MOD = "mods/t3-files";
 const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
@@ -677,7 +678,7 @@ export default class Files extends View {
         .when(Boolean(this.searchFocused), el => el.bg(t.background))
         .on_mouse_down("left", (_e, cx) => { this.search.focus(); cx.stop_propagation(); })
         .child(Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files"))
-        .when(Boolean(this.searchFocused), el => el.child(div().id("t3-files-search-ring").absolute().inset_0().rounded(6).border(3).border_color(t.accent + "3d"))), 6, { enter: () => this.search.focus() }))
+        .when(Boolean(this.searchFocused), el => el.child(div().id("t3-files-search-ring").absolute().inset_0().rounded(6).border(3).border_color(alpha(t.accent, "3d")))), 6, { enter: () => this.search.focus() }))
       .when(folders > 0, el => el.child(this.control(t, "t3-files-fold-all", this.allExpanded(st) ? "chevrons-down-up" : "chevrons-up-down", this.allExpanded(st) ? "Collapse all folders" : "Expand all folders", cx => this.foldAll(st, cx))));
   }
 

@@ -17,7 +17,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 - Breadcrumbs on the left: each crumb at most 160 wide, padding 2; the first (the root's) 10 on its left, so its box is at 12, under the panel head's first tab's, and its words at 22, where Review's scope button has them (`check-files.cjs`). The `›` slot is 16×20, 2 outside, 14px icon; the `chrome` hover fill, on while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
 - On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, `sm` (28) buttons 4 apart with 14px icons (T3's file toolbar; the Open in icon too, its chevron 16). All take the `chrome` hover and on (`foreground` 4% / 7%, P7). Open in is 24 high, as T3's xs beside its 28 toolbar toggles.
 - Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Wrap; deliberate).
-- Clickable buttons and menu rows show the pointer cursor.
+- Pointer shapes are t3-tokens「按钮」's: the ghost toggles (Preview/Code, Wrap, Tree) and the crumbs' `›` keep the arrow; Open in's two halves, a folder crumb, menu rows and tree rows show the hand.
 
 ## Open in
 

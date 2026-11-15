@@ -20,7 +20,7 @@ function link(context, file, source) {
   vm.runInContext(`__m[${JSON.stringify(file)}] = (() => {\n${body}\nreturn { ${exported.map(([k, n]) => `${k}: ${n}`).join(", ")} };\n})();`, context, { filename: file });
 }
 
-const MODULES = ["ascii-art.js", "scenes.js", "library.js", "source.js", "framing.js", "tip.js", "focus.js", "button.js", "list.js", "menu-row.js", "trigger.js", "store.js", "main.js"];
+const MODULES = ["ascii-art.js", "scenes.js", "library.js", "source.js", "framing.js", "tip.js", "focus.js", "color.js", "button.js", "list.js", "menu-row.js", "trigger.js", "store.js", "main.js"];
 
 // A render tree: what a test can find by id, read the geometry of and press.
 function element(kind) {
