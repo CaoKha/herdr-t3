@@ -44,6 +44,9 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 - Commits opens beside it in its own popup, 320 wide (T3 `w-80`), list at most 320 high, placed with `submenu.js` `subPlace` next to the Commits row.
 - Choosing a range shows Review on it and closes Details.
 - Counts, commits and refs are read afresh on every opening, outside render; a late read applies only if its token, root, space and base haven't changed. No Git writes, no PR rows.
+- Details opening already reads them, for its own space only (`review-details.js` `prefetchRange`: `reviewRepo`, then `readScope`), when its Review row shows and can open.
+- The menu draws at once, never a "Reading…" note: the last read of the same repository root and base (`review-scope.js`, kept for the mod's run, [storage](../storage.md)), its numbers replaced as the fresh read lands; the root the space read last (`roots`) is used at once and checked behind it. With nothing read for that root and base: the rows' names, their counts' places blank and not greyed; past 150ms still reading, `…` there (the wallpaper's rule: nothing for waits under 150ms). ↑/↓, Home, End and typeahead work throughout.
+- A range picked before the fresh read lands (drawn from the last read, or not read yet) waits for it, then goes only if that row is still pickable in the fresh read (a count, or the range shown); otherwise nothing happens and the menu stays with the fresh counts. Commits opens at once (its commits are the last read's until the fresh one lands). The Review page's own range menu follows the same rules (shared `readScope`).
 - Review not installed, or a remote space: disabled with a reason. Outside a Git repository, the menu says so.
 
 ## Keyboard and lifecycle

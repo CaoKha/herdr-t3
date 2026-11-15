@@ -93,7 +93,7 @@ export default class NewMenu extends View {
       .on_click(() => this.choose(item))
       // As T3's CommandPaletteTitleIcon: level with the title, not the row.
       .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center()
-        .child(s ? projectMark(s, 16, t, ps) : svg(`mods/t3-new-menu/icons/${item.machine ? "server" : "monitor"}.svg`).size(16).text_color(t.muted)))
+        .child(s ? projectMark("mods/t3-new-menu", s, 16, t, ps) : svg(`mods/t3-new-menu/icons/${item.machine ? "server" : "monitor"}.svg`).size(16).text_color(t.muted)))
       .child(v_flex().flex_1().min_w(0)
         .child(div().truncate().text_color(t.foreground).child(s ? s.name : item.name))
         .child(h_flex().min_w(0).gap(4).items_center().text_size(12).line_height("16px").text_color(t.dim)

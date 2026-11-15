@@ -2,7 +2,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
 import { tip, glow } from "./tip.js";
-import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
+import { stopsInit, stopsEnd, stop, focusRoot } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { notePanelWidth } from "./titlebar.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
@@ -13,10 +13,10 @@ import { KEY, closedKey } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo, layoutNode, REVIEW_STATUS } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { stripAt, stripEnds, stripWheel, stripPage, stripFades } from "./scroll-strip.js";
-import { button as drawButton, radiusOf, tint, GROUP_GAP } from "./button.js";
+import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { statusMark } from "./status-mark.js";
-import { nameText, measuredTooltip } from "./measured-text.js";
+import { tab as closableTab } from "./tab.js";
 import { keycap } from "./palette.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file: their names and icons. Review wears pulls.review's own mark,
@@ -204,27 +204,16 @@ export default class WorkspaceChrome extends View {
     const widths = this.surfaceWidths;
     for (const id of Object.keys(widths)) if (!s.tabs.some(tab => tab.id === id)) delete widths[id];
     const page = (tab) => {
-      const id = tab.id, [label, icon, colored] = PAGES[id] ?? [tab.path?.split("/").at(-1) ?? id, "folder-tree"], on = s.active === id, key = `surface-${id}`;
-      const closeId = `surface-close-${id}`, closing = this.hot === key || within(this, [key, closeId]);
-      // The icon and × share the leading slot.
-      const glyph = closing ? svg("mods/t3-chrome/icons/x.svg").size(12).text_color(t.dim)
-        : tab.folder ? svg("mods/t3-chrome/icons/folder-tree.svg").size(12).text_color(t.dim)
+      const id = tab.id, [label, art, colored] = PAGES[id] ?? [tab.path?.split("/").at(-1) ?? id, "folder-tree"], on = s.active === id, key = `surface-${id}`;
+      const icon = tab.folder ? svg("mods/t3-chrome/icons/folder-tree.svg").size(12).text_color(t.dim)
         : tab.path ? pierreFileIcon(t, "mods/t3-chrome", tab.path, 12)
-        : colored ? image(`mods/t3-chrome/icons/${icon}.svg`).size(12).opacity(on ? 1 : 0.7)
-        : svg(`mods/t3-chrome/icons/${icon}.svg`).size(12).text_color(t.dim);
-      // As T3's: same names aren't told apart; a name cut short says itself whole.
-      return measuredTooltip(this, t, key, label, stop(this, t, key, own(h_flex().id(key).h(24).max_w(144).pl(6).pr(8).gap(2).flex_none().items_center().rounded(6).text_size(12)
-        .bg(on ? tint(t, "chrome", true) : t.chrome).text_color(on || this.hot === key ? t.foreground : t.muted)
-        .when(!on, el => el.hover(st => st.bg(tint(t, "chrome", false)))).on_hover(glow(this, key))
-        .role("tab").accessibility_label(label)
+        : colored ? image(`mods/t3-chrome/icons/${art}.svg`).size(12).opacity(on ? 1 : 0.7)
+        : svg(`mods/t3-chrome/icons/${art}.svg`).size(12).text_color(t.dim);
+      // As T3's: same names aren't told apart. Shared with the tab bar's (tab.js); selecting and the measured width are the head's own.
+      return closableTab(this, t, key, { mod: "mods/t3-chrome", label, icon, active: on, maxW: 144, mark: id === "review" ? mark : null, close: () => closeSurface(id),
+        menu: () => openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(tab.path ? 5 : 4), props: { part: "surface-context", target: id, space: space?.id } }) }, el => el
         .on_click(() => activateSurface(id))
-        .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (widths[id] !== w) { widths[id] = w; cx.notify(); } })
-        .on_mouse_down("middle", (_e, cx) => { cx.stop_propagation(); closeSurface(id); })
-        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(tab.path ? 5 : 4), props: { part: "surface-context", target: id, space: space?.id } }); })
-        .child(tip(this, t, closeId, `Close ${label}`, stop(this, t, closeId, own(drawButton(t, closeId, { size: "tiny", label: `Close ${label}`, surface: "tab" }).child(glyph)
-          .on_click((_e, cx) => { cx.stop_propagation(); closeSurface(id); })), 4), { below: true }))
-        .child(nameText(this, key, label).flex_1().whitespace_nowrap())
-        .when(id === "review" && mark != null, el => el.child(mark))), 6), { below: true });
+        .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (widths[id] !== w) { widths[id] = w; cx.notify(); } }));
     };
     const button = (id, icon, label, action, { key = undefined, size = /** @type {"xs" | "sm"} */ ("sm"), disabled = false } = {}) => tip(this, t, id, label, stop(this, t, id, drawButton(t, id, {
       size, disabled, on: id === "panel-close" || (id === "panel-wide" && s.wide), icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })

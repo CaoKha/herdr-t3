@@ -22,6 +22,7 @@ import { ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { pinList } from "./pins.js";
 import { sidebarParts } from "./sidebar.js";
 import { closedKey } from "./store.js";
+import { keyLabel } from "./tip.js";
 
 // What a submenu's close() stamps, for the menu it hangs off (popup-menu.js subGone).
 const SUB_CLOSED = closedKey("t3-menu", "submenu");
@@ -116,7 +117,6 @@ function items(p, git) {
             ]
           : [],
         [
-          // To tell an agent which terminal: the address shows where a key would.
           ...(term ? [["Copy address", "copy", { text: term.address }]] : []),
           ...(term
             ? [
@@ -149,14 +149,14 @@ function items(p, git) {
       const folder = s && place(s);
       return grouped(
         [["New tab", "tab.new", { space: tg.id, folder }]],
-        [["Rename", "space.rename", { id: tg.id }], ...(folder ? [["Copy path", "copy", { text: folder }, ""]] : [])],
+        [["Rename", "space.rename", { id: tg.id }], ...(folder ? [["Copy path", "copy", { text: folder }]] : [])],
         git ? [["New worktree", "worktree", { space: tg.id, action: "new" }], ["Open worktree", "worktree", { space: tg.id, action: "open" }]] : [],
         [...(git === "linked" ? [["Remove worktree", "worktree", { space: tg.id, action: "remove" }]] : []), ["Close", "space.close", { id: tg.id }]],
       );
     }
     // A repo's checkout with no space open: the dim row in Spaces, as T3's project folder (New thread, Copy path).
     case "checkout":
-      return grouped([["Open", "space.new", { folder: tg.folder, machine: tg.machine ?? "" }]], [["Copy path", "copy", { text: tg.folder }, ""]]);
+      return grouped([["Open", "space.new", { folder: tg.folder, machine: tg.machine ?? "" }]], [["Copy path", "copy", { text: tg.folder }]]);
     // A machine's heading in Spaces: its + and, when its core was rebuilt, its Connect.
     case "machine":
       return grouped([
@@ -168,26 +168,25 @@ function items(p, git) {
   }
 }
 
-// Null: a Snooze time, drawn as the card's menu draws them, with none.
+// Every icon is this mod's own, Lucide's at the layout's 1.75 (t3-tokens P4; check-menu.cjs reads each). Null: a Snooze
+// time, drawn as the card's menu draws them, with none.
 function menuIcon(command, label, args) {
-  if (command === "copy") return "mods/t3-menu/icons/copy.svg";
   if (command.startsWith("t3-tabs.snooze:") || command === "custom-snooze") return null;
-  const own = command.startsWith("t3-tabs.settle") ? (label === "Settle" ? "check" : "undo") : command.startsWith("t3-tabs.pin:") ? "pin"
-    : command.startsWith("t3-tabs.unpin:") ? "pin-off" : command === "snooze" ? "alarm-clock" : command.startsWith("t3-tabs.wake:") ? "alarm-clock-off" : null;
-  if (own) return `mods/t3-menu/icons/${own}.svg`;
-  const name = command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command === "space.new" && args?.folder ? "folder"
+  const name = command === "copy" ? "copy" : command.startsWith("t3-tabs.settle") ? (label === "Settle" ? "check" : "undo") : command.startsWith("t3-tabs.pin:") ? "pin"
+    : command.startsWith("t3-tabs.unpin:") ? "pin-off" : command === "snooze" ? "alarm-clock" : command.startsWith("t3-tabs.wake:") ? "alarm-clock-off"
+    : command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command === "space.new" && args?.folder ? "folder"
     : command.endsWith(".new") ? "plus" : command === "worktree" ? (args?.action === "remove" ? "x" : "git-branch") : command.startsWith("t3-spaces.reconnect:") ? "server"
-    : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
-  return `mods/workspace-chrome/${name}.svg`;
+    : command === "pane.split" ? (args?.direction === "down" ? "panel-bottom" : "panel-right") : command === "pane.zoom" ? "square" : "terminal";
+  return `mods/t3-menu/icons/${name}.svg`;
 }
 
-// The key bound to a command, for the hint on the right.
+// The key bound to a command, for the hint on the right, written as tooltips and New write keys (tip.js keyLabel): ⇧⌘D.
 function shortcut(name, args) {
   // `pane.split:right` binds pane.split with { direction: "right" }.
   const value = args && Object.values(args)[0];
   // A layout's own keys too: Settle's is the herdr-t3 layout's.
   const k = keys().find((b) => (b.section === "global" || b.section?.startsWith("layout:")) && (b.action === name || b.action === `${name}:${value}`));
-  return k ? k.keys : "";
+  return k ? keyLabel(k.keys) : "";
 }
 
 export default class Menu extends View {
@@ -267,10 +266,10 @@ export default class Menu extends View {
           v_flex()
             .when(i > 0 && list[i - 1][4] !== it[4], el => el.child(menuRule(t)))
             .child(menuRow(this, t, `mi-${i}`, {
-              at: [this, "at", i], label: it[0], open: i === this.sub?.row, icon: menuIcon(it[1], it[0], it[2]) || null, sub: it[1] === "snooze",
+              at: [this, "at", i], label: it[0], open: i === this.sub?.row, icon: menuIcon(it[1], it[0], it[2]) || null, sub: it[1] === "snooze" && "mods/t3-menu/icons",
               // Only what deletes something is red, in words, as T3's destructive item: a Close asks first while a program runs.
               color: it[1] === "worktree" && it[2].action === "remove" ? t.ansi1 : null,
-              trail: it[1] === "snooze" ? null : menuHint(t, it[3] ?? (it[1] === "copy" ? it[2].text : shortcut(it[1], it[2]))),
+              trail: it[1] === "snooze" ? null : menuHint(t, it[3] ?? shortcut(it[1], it[2])),
               pick: (cx) => this.choose(i, cx),
               also: (el) => el.on_mouse_move((e, cx) => {
                 this.rowsAt[i] = e.bounds;

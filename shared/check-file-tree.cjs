@@ -86,4 +86,17 @@ const icon = (open) => treeRow(t, "mods/x", { path: "src", name: "src", dir: tru
 assert.notDeepEqual(icon(true), icon(false), "an open folder's icon differs from a closed one's");
 assert.equal(treeKey("space", all, 4)?.pick.path, "README.md", "Space activates like Enter");
 
+// Indent guides: no level's line crosses the row's own box or icon, with a box or without; without one, each still runs
+// down its folder icon's centre (Files' place).
+const guides = (opts, depth) => {
+  const row = treeRow(t, "mods/x", { path: "a.ts", name: "a.ts", depth }, "g", { guides: true, ...opts });
+  return { pl: row.calls.pl[0], gap: row.calls.gap[0], lines: row.calls.children[0].map((g) => g.calls.left[0]) };
+};
+for (const depth of [1, 2, 4]) for (const leading of [el("box"), undefined]) {
+  const { pl, gap, lines } = guides({ leading }, depth);
+  const boxes = leading ? [[pl, pl + 16], [pl + 16 + gap, pl + 32 + gap]] : [[pl, pl + 16]];
+  for (const x of lines) for (const [a, b] of boxes) assert.ok(x + 1 <= a || x >= b, `depth ${depth}${leading ? " with a box" : ""}: the line at ${x} crosses [${a}, ${b}]`);
+}
+assert.deepEqual(plain(guides({}, 3).lines), [0, 1, 2].map((l) => 6.4 + l * 20.8 + 8 - 0.5), "Files' guides stay on its folder icons' centres");
+
 console.log("ok: file tree: lone folders flatten (groups never), paths keep their order, a path finds its row, the keys move as Pierre's, and both pages draw one row.");

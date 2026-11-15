@@ -5,7 +5,7 @@ Geometry, constants and edge rules of the 40px tab row (`t3-tabs`, plus the `act
 ## Lists tabs
 
 - 24px, radius 6, 12px text; the active tab and a hovered one take the `chrome` on and hover fills (t3-tokens「按钮」).
-- All the space's tabs: a 12px program or terminal icon, the name, a trailing 16px state slot. Hover replaces the state with the 16px close button (12px `×`, radius 4, `tab` surface).
+- `shared/tab.js`, shared with the panel head's tabs. All the space's tabs: a 16px leading slot with the 12px program or terminal icon, the name, a trailing 16px state slot (kept empty without a state, so the width doesn't follow it). Hover or keyboard focus turns the leading slot into the close button (12px `×`, radius 4, `tab` surface), over the icon as T3's; the state stays at the end. The `×` is a keyboard stop only while it shows.
 - At least 96px for short names (t3-tokens「有意不同」).
 - Full names until crowded. Then the longest shrink first, the active tab to 240px and the others to 144px; then the strip scrolls.
 - On active-tab or room changes only, bring the active tab into view with the least movement. Wheel scrolling is left alone.
@@ -13,7 +13,7 @@ Geometry, constants and edge rules of the 40px tab row (`t3-tabs`, plus the `act
 ## Inbox bar
 
 - Left, a breadcrumb: space / relevant parent / viewed agent. 14px medium, 12 apart, dim slashes; the space `muted`, the viewed agent `foreground`. A sub-agent split with its parent follows it after another slash. Peers in the same tab get no switcher: their cards and panes reach them.
-- Right, tool tabs: icon and name, sized to content, no minimum width and no state slot; hover `×` replaces the icon.
+- Right, tool tabs: the same tab (`shared/tab.js`), sized to content, no minimum width and no state slot; hover `×` covers the icon.
 - Tool order: non-agent panes hidden by zoom, the current family's other tabs, then tabs with no agent. 16px-high rules between non-empty groups. Tabs already in the breadcrumb (current, parent) aren't repeated.
 
 ### Room
@@ -42,8 +42,8 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 
 ## Tab tooltips
 
-- Clipped names, and Lists tabs with a state, get a 12px label 4px below, its text aligned with the name. Whole names get none. Inbox labels carry no state.
-- The close button's tooltip waits 500ms; only the active tab's shows the key.
+- Only a clipped name gets a label: `tip.js`'s tooltip, below the tab, with the whole name (t3-tokens P5). Whole names get none, and the state isn't said, as `×` no longer covers the mark. Any press on the tab hides it; it stays down while a drag is held.
+- The close button's tooltip, `Close tab`, waits 500ms; only the active tab's shows the key.
 
 ## Zoom group
 
@@ -64,7 +64,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 ## Tab interactions
 
-- Lists: click selects, double-click renames, right-click opens the tab menu. Drag starts at 6px; Esc or leaving the bar cancels; keyboard focus is held only while dragging. Wheel only scrolls; it never switches tabs.
+- Lists: click selects, double-click renames, right-click opens the tab menu, middle-click closes (the same `t3-tabs.close-tab:<id>` as `×`, so a running program asks first). Drag starts at 6px; Esc or leaving the bar cancels; keyboard focus is held only while dragging. Wheel only scrolls; it never switches tabs.
 - Inbox: only tabs with no agent can be dragged, among themselves.
 - The breadcrumb's space reuses a lone prompt-shell tab in that space, most recently viewed first, and creates one only if none exists, so repeated clicks don't pile up empty tabs. `cmd-t` always creates.
 
@@ -83,7 +83,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 ## Close confirmation
 
-- Every layout ×, close key, context-menu Close and Go to's `ctrl-d` asks `hc get <terminal> --json` first. Only the terminal's own shell: close at once. A running program, or no answer: ask.
+- Every layout ×, a tab's middle-click, close key, context-menu Close and Go to's `ctrl-d` asks `hc get <terminal> --json` first. Only the terminal's own shell: close at once. A running program, or no answer: ask.
 - `Close terminal "<name>"?` with `This stops the running process and clears its history.` Several programs: a plural title and a list of names. A tab's lone pane uses the tab's name.
 - Enter confirms, Esc cancels. The space's last pane uses Herdr's own Close space. Direct `tab.close` / `pane.close`, palette included, stay native.
 

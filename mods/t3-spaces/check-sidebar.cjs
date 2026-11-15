@@ -11,7 +11,8 @@ function element(kind = "div", source) {
       if (key === "when") { if (args[0]) args[1](proxy); }
       else if (key === "child" || (key === "trigger" && kind === "hovercard")) node.items.push(args[0]);
       else if (key === "children") node.items.push(...args[0]);
-      else if (key === "on_mouse_down" || key === "on_mouse_up") node.handlers[`${key}:${args[0]}`] = args[1];
+      // GPUI keeps every press listener, in order.
+      else if (key === "on_mouse_down" || key === "on_mouse_up") { const was = node.handlers[`${key}:${args[0]}`], now = args[1]; node.handlers[`${key}:${args[0]}`] = was ? (...a) => { was(...a); return now(...a); } : now; }
       else if (key.startsWith("on_")) node.handlers[key] = args[0];
       else if (key === "id") node.key = args[0];
       else if (key === "hover") { const hovered = element(); args[0](hovered); node.hoverStyle = hovered.style; }
@@ -1388,9 +1389,9 @@ for (const width of [208, 240, 256, 320, 480]) {
     const room = (width) => fire(find(view.render(cx), "tab-area"), "on_size_change", { width }, cx);
     const wheel = (x, y) => fire(view.render(cx), "on_scroll_wheel", { delta: { x, y } }, cx);
     // A name's width, so its tab is `whole` wide: 51 around the name.
-    const name = (id, whole) => fire(find(view.render(cx), `text-measure-${id}`), "on_size_change", { width: whole - 51 }, cx);
+    const name = (id, whole) => fire(find(view.render(cx), `text-measure-tab-${id}`), "on_size_change", { width: whole - 51 }, cx);
     assert.equal(w("a"), 144, "before its name is measured");
-    assert.equal(find(view.render(cx), "text-measure-a").style.h, 0, "the measure doesn't show");
+    assert.equal(find(view.render(cx), "text-measure-tab-a").style.h, 0, "the measure doesn't show");
     for (const id of "abcd") name(id, 300);
     room(1212);
     assert.deepEqual([..."abcd"].map(w), [300, 300, 300, 300], "room for them all: every name whole");
@@ -1580,7 +1581,7 @@ for (const width of [208, 240, 256, 320, 480]) {
   fire(find(measure.render(cx), "bar-measure"), "on_size_change", { width: 0 }, cx);
   measure.close();
   assert.equal(f.scopes.get("t3-tabs").shared("t3-tabs.compact"), false, "gone with its layout, it leaves no bar compact");
-  fire(find(root, "close-b0"), "on_click", {}, cx);
+  fire(find(root, "tab-b0-close"), "on_click", {}, cx);
   assert.deepEqual(f.calls.pop(), ["t3-tabs.close-tab:b0", {}], "the × goes through the tab bar's answer");
   const pane = f.load("t3-pane", { pane: "p0" });
   pane.hovered = true;
@@ -1801,7 +1802,7 @@ for (const width of [208, 240, 256, 320, 480]) {
       assert.ok(n.style.accessibility_label, `${n.key}: a label`);
       assert.ok(!("tooltip" in n.style), `${n.key}: the shell's tooltip isn't T3's`);
       const tipped = walk(view.render(cx)).some(c => String(c.key).startsWith("tip-over-") && c.items.some(i => i.key === n.key));
-      const icon = n.items.length === 1 && n.items[0].kind === "svg", plain = /agent-fold|^(icon|sub|ag|card|slim|close-b|close-o)/.test(n.key);
+      const icon = n.items.length === 1 && n.items[0].kind === "svg", plain = /agent-fold|^(icon|sub|ag|card|slim)/.test(n.key);
       if (icon && !plain) assert.ok(tipped, `${n.key}: an icon alone has a hover label`);
     }
   }
@@ -1984,53 +1985,33 @@ for (const width of [208, 240, 256, 320, 480]) {
     for (const [name, view] of Object.entries({ tabs: f.load("t3-tabs"), inbox, agents: f.load("t3-agents"), pane: f.load("t3-pane", { pane: "p0" }) })) {
       const nodes = walk(view.render(cx));
       assert.ok(nodes.some(n => n.source === "icons/pi.svg"), `${name}: the icon is there`);
-      // A label whose trigger is the icon alone; a tab's, with its name, is the tab's.
-      assert.ok(!nodes.some(n => String(n.key).startsWith("tip-") && strings(n.items[0]).length === 0 && walk(n).some(c => c.source === "icons/pi.svg")), `${name}: no label on a program's icon`);
+      // A label whose trigger is the icon alone; a tab's, with its name, is the tab's. A tab's × holds its icon at rest, but its
+      // label shows only once the hover has put × over the icon (shared/tab.js).
+      assert.ok(!nodes.some(n => String(n.key).startsWith("tip-") && !String(n.key).endsWith("-close") && strings(n.items[0]).length === 0 && walk(n).some(c => c.source === "icons/pi.svg")), `${name}: no label on a program's icon`);
     }
   }
   {
-    // A tab as T3's panel tab: 24px, 12px; unlike T3's its icon stays, and × comes at its end, over the status mark, while the tab is hovered.
-    // A tab drags as a space does, and leaving ends either.
+    // A tab as T3's panel tab (shared/tab.js): 24px, 12px; × covers its icon while the tab is hovered, its status mark stays
+    // at the end. A tab drags as a space does, and leaving ends either.
     const f = fixture(256), tabs = f.load("t3-tabs"), spaces = f.load("t3-spaces");
     f.spaces()[0].active = f.spaces()[0].tabs[0].active = true;
     f.spaces()[0].tabs.push({ id: "other", index: 2, name: "other", named: true });
     const tab = find(tabs.render(cx), "tab-other").style;
     assert.deepEqual([tab.h, tab.text_size, tab.pl, tab.pr, tab.gap], [24, 12, 6, 8, 2]);
-    const close = () => find(tabs.render(cx), "close-other");
+    const close = () => find(tabs.render(cx), "tab-other-close");
     assert.deepEqual([close().style.h, close().style.w, close().style.accessibility_label], [16, 16, "Close other"], "every tab has it, not only the active one");
-    assert.equal(close().items.length, 0, "at rest it's empty, with no status to show");
-    assert.ok(walk(find(tabs.render(cx), "tab-other")).some(n => n.source === "mods/t3-tabs/icons/terminal.svg"), "the tab's icon, a terminal's when it has no program");
-    // The pointer on a tab's name is on the tab too; the card goes by the name, the × by the tab.
-    const hoverName = (id, on) => { fire(find(tabs.render(cx), `tab-${id}`), "on_hover", on, cx); fire(find(tabs.render(cx), `label-${id}`), "on_hover", on, cx); };
-    hoverName("other", true);
-    assert.equal(close().items[0].source, "mods/t3-tabs/icons/x.svg", "hovered, a ×");
-    assert.ok(walk(find(tabs.render(cx), "tab-other")).some(n => n.source === "mods/t3-tabs/icons/terminal.svg"), "and the icon stays");
+    assert.equal(walk(close()).find(n => n.source)?.source, "mods/t3-tabs/icons/terminal.svg", "at rest it holds the tab's icon, a terminal's when it has no program");
+    fire(find(tabs.render(cx), "tab-other"), "on_hover", true, cx);
+    assert.deepEqual(walk(close()).filter(n => n.source).map(n => n.source), ["mods/t3-tabs/icons/x.svg"], "hovered, × over the icon");
     assert.equal(find(tabs.render(cx), "tab-other").style.text_color, f.theme().foreground);
-    // Its whole name and nothing else, with an Inbox row's timing: after 150ms for the first and at once for the next.
-    const tabCard = (id) => find(tabs.render(cx), `details-${id}`)?.style.content;
-    assert.equal(tabCard("other"), undefined, "the first waits");
-    cx.timers.filter(t => t.ms === 150 && !t.gone).forEach(t => { t.gone = true; t.fn(cx); });
-    assert.equal(tabCard("other").style.opacity, 0, "drawn clear first");
-    cx.timers.filter(t => t.ms === 34 && !t.gone).forEach(t => { t.gone = true; t.fn(cx); });
-    assert.equal(tabCard("other").style.opacity, 1, "then it fades in");
-    assert.equal(tabCard("other").style.mt, 4);
-    assert.deepEqual(strings(tabCard("other")), ["other"], "only its whole name: the project and branch are in the sidebar");
-    assert.deepEqual([find(tabs.render(cx), "details-other").style.bottom, find(tabs.render(cx), "details-other").style.left, find(tabs.render(cx), "details-other").style.size], [0, 15, 1], "a Popup hangs from the tab's bottom, its words under the tab's name");
-    hoverName("b0", true);
-    assert.equal(tabCard("b0").style.opacity, 1, "the next tab's opens at once");
-    hoverName("b0", false);
-    hoverName("other", true);
-    fire(find(tabs.render(cx), "tab-other"), "on_mouse_down:left", { click_count: 1 }, cx);
-    assert.equal(tabCard("other").style.opacity, 0, "a press fades it away");
-    fire(find(tabs.render(cx), "tab-other"), "on_mouse_up:left", {}, cx);
-    f.calls.pop();
+    assert.equal(find(tabs.render(cx), "tab-other").items.at(-1).style.size, 16, "the end slot kept for the status mark, × or no ×");
+    fire(find(tabs.render(cx), "tab-other"), "on_mouse_down:middle", {}, cx);
+    assert.deepEqual(f.calls.pop(), ["t3-tabs.close-tab:other", {}], "a middle press goes through the tab bar's answer, as × does");
     assert.ok(walk(find(tabs.render(cx), "tab-other")).some(n => "truncate" in n.style && n.style.min_w === 0), "the name truncates in the tab itself");
-    hoverName("other", false);
-    assert.equal(close().items.length, 0, "the × goes with the pointer");
+    fire(find(tabs.render(cx), "tab-other"), "on_hover", false, cx);
+    assert.equal(walk(close()).find(n => n.source)?.source, "mods/t3-tabs/icons/terminal.svg", "the × goes with the pointer");
     fire(close(), "on_click", {}, cx);
     assert.deepEqual(f.calls.pop(), ["t3-tabs.close-tab:other", {}], "the × goes through the tab bar's answer");
-    cx.timers.filter(t => t.ms === 150 && !t.gone).forEach(t => { t.gone = true; t.fn(cx); });
-    assert.equal(find(tabs.render(cx), "details-other"), null, "not when the pointer is away, once it has faded");
     fire(find(tabs.render(cx), "tab-b0"), "on_mouse_down:left", { click_count: 1, position: { x: 0, y: 0 } }, cx);
     assert.equal(find(tabs.render(cx), "tab-b0").style.opacity, undefined, "a press alone doesn't lift it");
     fire(find(tabs.render(cx), "tab-other"), "on_mouse_move", { position: { x: 40, y: 0 } }, cx);
@@ -2045,67 +2026,30 @@ for (const width of [208, 240, 256, 320, 480]) {
     assert.equal(spaces.drag, null, "leaving the list ends a space's drag");
   }
   {
-    // On the way to a tab's ×, nothing in the way: the name's card goes, and its own label waits.
+    // A tab's name: said whole in a label below only when cut short (t3-tokens P5), as the panel's tabs; a press hides it.
     const f = fixture(256), tabs = f.load("t3-tabs");
     f.spaces()[0].tabs.push({ id: "other", index: 2, name: "other", named: true });
-    const pending = () => cx.timers.filter(t => !t.gone).forEach(t => { t.gone = true; t.fn(cx); });
-    const card = () => find(tabs.render(cx), "details-other")?.style.content;
-    const hoverName = (on) => { fire(find(tabs.render(cx), "tab-other"), "on_hover", on, cx); fire(find(tabs.render(cx), "label-other"), "on_hover", on, cx); };
-    tabs.room = 2000;
-    tabs.nameW = Object.fromEntries(f.spaces().flatMap(s => s.tabs).map(c => [c.id, 40]));
-    hoverName(true);
+    const pending = () => { while (cx.timers.some(t => !t.gone)) cx.timers.filter(t => !t.gone).forEach(t => { t.gone = true; t.fn(cx); }); };
+    const label = () => find(tabs.render(cx), "tip-tab-other")?.style.content;
+    const hover = (on) => { fire(find(tabs.render(cx), "tip-over-tab-other"), "on_hover", on, cx); fire(find(tabs.render(cx), "tab-other"), "on_hover", on, cx); };
+    tabs.nameW = { "tab-other": 40 }; tabs.textW = { "tab-other": 40 };
+    assert.equal(find(tabs.render(cx), "tip-tab-other"), null, "a name the tab shows whole has no label: it would only repeat it");
+    tabs.nameW["tab-other"] = 400;
+    hover(true); pending();
+    assert.deepEqual(strings(label()), ["other"], "a name cut short does");
+    assert.equal(find(tabs.render(cx), "tip-tab-other").style.anchor, "top_center", "below the tab");
+    fire(find(tabs.render(cx), "tab-other"), "on_mouse_down:left", { click_count: 1, position: { x: 0, y: 0 } }, cx);
+    assert.equal(label(), undefined, "a press hides it");
+    fire(find(tabs.render(cx), "tab-other"), "on_mouse_up:left", {}, cx);
+    f.calls.pop();
+    hover(false);
+    // × has its own label, which waits long enough for a straight click and has a key only on the active tab.
+    fire(find(tabs.render(cx), "tip-over-tab-other-close"), "on_hover", true, cx);
+    fire(find(tabs.render(cx), "tab-other-close"), "on_hover", true, cx);
+    assert.equal(cx.timers.at(-1).ms, 500);
     pending();
-    assert.equal(card(), undefined, "a name the tab shows whole has no card: it would only repeat it");
-    assert.equal(tabs.details ?? null, null, "nor does it open the next tab's at once");
-    hoverName(false);
-    tabs.room = 300;
-    tabs.nameW.other = 400;
-    hoverName(true);
-    pending();
-    assert.deepEqual(strings(card()), ["other"], "a name cut short does");
-    // The pointer moves on within the tab: off the name, onto the ×.
-    fire(find(tabs.render(cx), "label-other"), "on_hover", false, cx);
-    fire(find(tabs.render(cx), "close-other"), "on_hover", true, cx);
-    assert.deepEqual([card().style.opacity, card().style.top], [0, -4], "the × fades the card away");
-    fire(find(tabs.render(cx), "tip-over-close-other"), "on_hover", true, cx);
-    assert.equal(cx.timers.at(-1).ms, 500, "its label waits long enough for a straight click");
-    while (cx.timers.length) { const t = cx.timers.shift(); if (!t.gone) t.fn(cx); }
-    const label = find(tabs.render(cx), "tip-close-other");
-    assert.deepEqual(strings(label.style.content), ["Close tab"], "and it has no key: it closes the active tab only");
-    assert.equal(label.style.anchor, "top_center");
-    fire(find(tabs.render(cx), "close-other"), "on_hover", false, cx);
-    fire(find(tabs.render(cx), "label-other"), "on_hover", true, cx);
-    pending();
-    assert.deepEqual(strings(card()), ["other"], "back on the name, it returns");
-    // A tab gone from under the pointer reports no leaving; every other tab's card still has to open.
-    tabs.hot = "close-gone";
-    tabs.render(cx);
-    assert.equal(tabs.hot, null);
-    // A × that slid under a still pointer (the tab before it closed) has no box yet. Its leave can be dropped, so the first move away decides.
-    {
-      const every = cx.timer.every, watches = [], w = f.scopes.get("t3-tabs").window;
-      cx.timer.every = (_ms, fn) => { const task = { fn, cancel() { task.gone = true; } }; watches.push(task); return task; };
-      let at = { x: 500, y: 12 };
-      f.scopes.get("t3-tabs").window = Object.assign(() => ({ platform: "macos", active: true }), { mouse_position: () => at, viewport_size: () => ({ width: 1000, height: 800 }) });
-      const tick = () => watches.filter(task => !task.gone).forEach(task => task.fn(cx));
-      fire(find(tabs.render(cx), "tip-over-close-other"), "on_hover", true, cx);
-      fire(find(tabs.render(cx), "close-other"), "on_hover", true, cx);
-      tick();
-      assert.equal(tabs.hot, "close-other", "a still pointer: no word either way");
-      at = { x: 700, y: 300 };
-      tick();
-      assert.equal(tabs.hot, null, "moved off with no leave reported, the × isn't left lit, keeping every tab's card away");
-      // A move that stays on it reports a box, so it isn't taken for leaving.
-      at = { x: 500, y: 12 };
-      fire(find(tabs.render(cx), "tip-over-close-other"), "on_hover", true, cx);
-      fire(find(tabs.render(cx), "close-other"), "on_hover", true, cx);
-      at = { x: 502, y: 12 };
-      fire(find(tabs.render(cx), "tip-over-close-other"), "on_mouse_move", { position: at, bounds: { x: 490, y: 4, width: 16, height: 16 } }, cx);
-      tick();
-      assert.equal(tabs.hot, "close-other");
-      fire(find(tabs.render(cx), "close-other"), "on_hover", false, cx);
-      cx.timer.every = every; f.scopes.get("t3-tabs").window = w;
-    }
+    assert.deepEqual(strings(find(tabs.render(cx), "tip-tab-other-close").style.content), ["Close tab"], "no key: it closes the active tab only");
+    fire(find(tabs.render(cx), "tab-other-close"), "on_hover", false, cx);
   }
   {
     // The keys copy alone consumes commands; the dialog it opens clears the card under the pointer in the strip.
@@ -2120,7 +2064,7 @@ for (const width of [208, 240, 256, 320, 480]) {
     f.also("t3-tabs", { part: "keys" });
     cx.spawn = spawn;
     assert.equal(jobs.length, 2, "the strip listens for closes; of the layout's copies only keys answers, or one close opens several dialogs");
-    Object.assign(view, { overTab: "b0", hot: "close-b0", details: "b0" });
+    Object.assign(view, { overTab: "tab-b0", hot: "tab-b0-close", details: "b0" });
     // Each shown copy hears a command: one each for the strip and keys.
     f.commands.push("close-tab", "close-tab"); for (const job of jobs) job(cx); await new Promise(setImmediate);
     assert.deepEqual([view.overTab, view.hot, view.details], [null, null, null], "cmd-w over a hovered tab takes its card too");
@@ -2239,11 +2183,11 @@ for (const width of [208, 240, 256, 320, 480]) {
       assert.equal(find(view.render(cx), id).style.tab_index, 0, `${id} is a stop`);
     assert.equal(find(f.load("t3-tabs", { part: "end" }).render(cx), "tab-new").style.tab_index, 0);
     // Tab's × and the pin come with the keyboard, as with the pointer.
-    assert.equal(find(tabs.render(cx), "close-b0").style.tab_index, undefined);
+    assert.equal(find(tabs.render(cx), "tab-b0-close").style.tab_index, undefined);
     on(tabs, "tab-b0");
     const tab = find(tabs.render(cx), "tab-b0");
-    assert.equal(find(tab, "close-b0").style.tab_index, 0);
-    assert.ok(walk(find(tab, "close-b0")).some((n) => n.source === "mods/t3-tabs/icons/x.svg"), "the × shows");
+    assert.equal(find(tab, "tab-b0-close").style.tab_index, 0);
+    assert.ok(walk(find(tab, "tab-b0-close")).some((n) => n.source === "mods/t3-tabs/icons/x.svg"), "the × shows");
     assert.ok(tab.items.some((n) => n.style?.border === 2 && n.style.border_color === f.theme().accent), "the ring is on the tab");
     // A tab and a space go by their mouse-ups: a key has to say so itself.
     fire(tab, "on_key_down", { keystroke: "enter" }, cx);
@@ -2467,13 +2411,12 @@ for (const width of [208, 240, 256, 320, 480]) {
     fire(find(view.render(cx), "tab-scroll"), "on_size_change", { width: 300 }, cx);
     // Its tabs hug their icon and name, as T3's panel tabs: no 96px floor, no slot kept for the ×, so the group sits flush
     // against Actions and the gaps between them are even. Hovered, the icon turns to the ×, as T3's does.
-    fire(find(view.render(cx), "text-measure-prog"), "on_size_change", { width: 30 }, cx);
+    fire(find(view.render(cx), "text-measure-tab-prog"), "on_size_change", { width: 30 }, cx);
     const progTab = () => find(view.render(cx), "tab-prog");
     assert.equal(progTab().style.w, 30 + 32, "6 in, the 16px icon, 2, the name, 8");
-    assert.equal(find(progTab(), "close-prog"), null, "at rest, no × and no room kept for one");
+    assert.equal(progTab().items.length, 2, "the icon's slot and the name: no end slot kept");
     fire(progTab(), "on_hover", true, cx);
-    const label = find(progTab(), "label-prog");
-    assert.ok(find(label.items[0], "close-prog"), "hovered, the icon's slot is the ×");
+    assert.ok(walk(find(progTab(), "tab-prog-close")).some(n => n.source === "mods/t3-tabs/icons/x.svg"), "hovered, the icon's slot is the ×");
     fire(progTab(), "on_hover", false, cx);
     fire(find(root, "peer-A"), "on_hover", true, cx);
     assert.equal(find(view.render(cx), "crumb-menu").style.opacity, 1, "hovering the title shows it");

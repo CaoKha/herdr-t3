@@ -13,7 +13,7 @@ import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, 
 import { KEY, migratePagePrefs, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
 import { split, ghostButton, tint, GROUP_GAP } from "./button.js";
-import { loadingState } from "./panel-states.js";
+import { loadingState, noticeBar } from "./panel-states.js";
 import { stopsInit, stopsEnd, enter, focusRoot, stop, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { tip, hoverKept, glow } from "./tip.js";
@@ -29,6 +29,12 @@ const EXPAND_MAX = 200;
 // Asked again while it shows: here every 5 s, another machine every 10; a refresh that took long, 10 times as long, a minute at
 // most. Nothing is watched: Herdr's folder watch can't be stopped once asked, and a hidden page runs nothing.
 const LOCAL_EVERY = 5000, REMOTE_EVERY = 10000, SLOWEST = 60000;
+// Herdr colors code on the UI thread, the whole file each time, ~1.5 ms a KB (research large-file-highlight.md), and a new
+// editor starts at the top. Opened, a file up to AUTO_MAX is colored at once: a stall, not a jump. Where it's back at the top
+// anyway, a file over SYNC_MAX (~25 ms) shows plain first and is colored once left alone: rewritten text once it has held
+// SETTLED, Wrap switched after IDLE; never once scrolled while plain. Past AUTO_MAX only when asked. Counted in characters.
+// shortcut: it only moves the stall; drop it once the host colors off the UI thread.
+const SYNC_MAX = 16 * 1024, AUTO_MAX = 256 * 1024, IDLE = 300, SETTLED = 10000;
 // The active surface of a space, and what names one pick of it: its instance and how many times it was picked.
 const activeTab = (space) => { const s = surfacesFor(space); return s.tabs.find(t => t.id === s.active) ?? null; };
 const tabKey = (tab) => tab ? `${tab.id}:${tab.born}:${tab.reveal ?? 0}` : "";
@@ -329,7 +335,9 @@ export default class Files extends View {
     const fresh = this.fresh(st, "file"), abs = join(st.root, rel), kind = kindOf(rel);
     if (!fresh()) return;
     if (!again && !st.view.loading) {
-      if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(st.view, rel);
+      if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(st.view, rel, this.fits(st.view));
+      // Plain, picked again: colored now, as it's opened.
+      else if (st.view.code && st.view.lang && !st.view.colored && this.fits(st.view)) { st.view.scrolled = false; this.editor(st.view, rel, true); }
       this.keepPreview(st, rel, st.view); return;
     }
     cx.spawn(async (cx) => {
@@ -340,9 +348,13 @@ export default class Files extends View {
       const old = st.view;
       if (again && old && view.text !== undefined && view.text === old.text) return;
       if (old?.image && old.image !== view.image) this.uncache(old.image);
-      if (view.text !== undefined && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(view, rel);
+      // Asked to color, or scrolled while plain: still so for its new text, until it's opened again.
+      view.force = again && old?.force; view.scrolled = again && old?.scrolled;
+      if (view.text !== undefined && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(view, rel, (!old?.code || this.small(view)) && this.fits(view));
       if (old?.code) old.code.release();
       st.view = view; this.keepPreview(st, rel, view);
+      // Rewritten: colored again only once it holds, so an agent writing it stalls the window once, not every read.
+      if (again && this.wantsColor(view)) this.colorLater(st, view, SETTLED, cx);
       cx.notify();
     });
   }
@@ -400,11 +412,34 @@ export default class Files extends View {
   }
 
   // The view's code, wrapped as the layout's Lines choice says (store.js), which it notes: the editor takes it only when made.
-  editor(view, rel) {
-    const t = theme();
-    view.wrap = wrapLines();
-    view.code = EditorState.new({ language: languageOf(nameOf(rel)), value: view.text, readonly: true, soft_wrap: view.wrap, font_family: /** @type {string} */ (settings().font_family), font_size: 12,
+  // Colored if `color` and it has a language; else plain, for colorLater. Its old editor goes.
+  editor(view, rel, color) {
+    const t = theme(), old = view.code;
+    view.wrap = wrapLines(); view.lang = languageOf(nameOf(rel));
+    view.colored = Boolean(view.lang) && color;
+    view.code = EditorState.new({ language: view.colored ? view.lang : undefined, value: view.text, readonly: true, soft_wrap: view.wrap, font_family: /** @type {string} */ (settings().font_family), font_size: 12,
       syntax: { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi1, constant: t.ansi6 } });
+    old?.release();
+  }
+
+  // Colored without asking: up to AUTO_MAX, or once asked (force).
+  fits(v) { return Boolean(v.force || v.text.length <= AUTO_MAX); }
+  // Colored at once even where plain would do: a few ms.
+  small(v) { return v.text.length <= SYNC_MAX; }
+  // Plain code to color once left alone: not once scrolled, as the colored editor would start at the top.
+  wantsColor(v) { return Boolean(v?.code && v.lang && !v.colored && !v.scrolled && this.fits(v)); }
+
+  // Colored `ms` after the last call, if it's still what shows; else render asks again once it does.
+  colorLater(st, view, ms, cx) {
+    const stamp = view.stamp = (view.stamp ?? 0) + 1;
+    view.waiting = true;
+    cx.timer.after(ms, (cx) => {
+      if (view.stamp !== stamp) return;
+      view.waiting = false;
+      if (st.view !== view || this.current() !== st || !this.shown() || !this.wantsColor(view) || view.wrap !== wrapLines()) return cx.notify();
+      this.editor(view, st.file, true);
+      cx.notify();
+    });
   }
 
   // Every term in the path, case aside, ranked (model.js rankPaths): here over the folder's whole list, kept until the next
@@ -513,11 +548,11 @@ export default class Files extends View {
     const v = st.view;
     if (v?.code && v.wrap !== wrapLines()) cx.timer.after(0, (cx) => {
       if (st.view !== v || !v.code || v.wrap === wrapLines()) return;
-      const old = v.code;
-      this.editor(v, st.file);
-      old.release();
+      this.editor(v, st.file, this.small(v) && this.fits(v));
       cx.notify();
     });
+    // Plain code shown: colored once left alone. Behind, not asked: a refresh draws it again once it's in front.
+    else if (!v?.waiting && this.wantsColor(v) && this.shown()) this.colorLater(st, v, IDLE, cx);
     // The search field shows this space's words.
     if (this.searchFor !== st.id) { this.searchFor = st.id; if (this.search.value() !== st.query) this.search.set_value(st.query); }
     const width = this.size?.width ?? 800;
@@ -530,13 +565,16 @@ export default class Files extends View {
   }
 
   // Only a file has a subheader; Markdown uses one icon toggle, not a segmented text control. 12 in, as the panel head above
-  // (t3-tokens「规则」R1); 40 high, its controls centred, as Review's bar, so Tree stays put between the pages. Open in, then
+  // (t3-tokens「规则」R1); 32 high, not T3's 40: its row's centre is the work column's pane header's (specs/files.md). Its controls
+  // centred, as Review's bar, so Tree stays put between the pages. Open in, then
   // the three switches a group's gap apart, 8 between the two (P3); its buttons on chrome, as the head's (P7), their icons 14, as T3's file toolbar.
   toolbar(st, t) {
     const md = kindOf(st.file ?? "") === "markdown", code = shared(MARKDOWN) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
     const crumb = (label, path, last) => {
-      const id = `crumb-${path}`, el = div().id(id).flex_none().max_w(160).truncate().px(2).rounded(4).text_color(last ? t.foreground : t.dim).when(last, el => el.font_medium())
+      // The first, the root's, has its box at 12 and its words a sm button's 10 in, where Review's scope button has them, so
+      // switching pages doesn't move the first letter (t3-tokens「规则」R1); its right stays a crumb's 2, before its ›.
+      const id = `crumb-${path}`, el = div().id(id).flex_none().max_w(160).truncate().px(2).when(path === "", el => el.pl(10)).rounded(4).text_color(last ? t.foreground : t.dim).when(last, el => el.font_medium())
         .when(!last, el => el.cursor_pointer().role("button").accessibility_label(`Go to ${label}`).hover(s => s.text_color(t.foreground)).on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => this.navigate(st, path, cx)))
         .child(label);
       return last ? el : stop(this, t, id, el, 4);
@@ -548,14 +586,14 @@ export default class Files extends View {
       } })(div().id(id).w(16).h(20).mx(2).rounded(4).flex_none().flex().items_center().justify_center().cursor_pointer()
         .when(on, s => s.bg(tint(t, "chrome", true))).when(!on, el => el.hover(s => s.bg(tint(t, "chrome", false)))))
       .child(svg(`${MOD}/icons/chevron-right.svg`).size(14).text_color(on ? t.foreground : t.dim)).role("button").accessibility_label(`Browse ${path || nameOf(st.root)}`), 4); };
-    return h_flex().id("t3-files-toolbar").h(40).flex_none().px(12).gap(8).items_center()
+    return h_flex().id("t3-files-toolbar").h(32).flex_none().px(12).gap(8).items_center()
         .child(h_flex().id("t3-files-breadcrumbs").flex_1().min_w(0).overflow_x_scroll().bg("#00000000").items_center().text_size(12)
           .when(Boolean(st.root), (el) => el.child(crumb(nameOf(st.root.replace(/\/$/, "")) || st.root, "", current === "")))
           .children(parts.flatMap((part, i) => [separator(parts.slice(0, i).join("/")), crumb(part, parts.slice(0, i + 1).join("/"), parts.slice(0, i + 1).join("/") === current)])))
         .child(this.openControl(st, t))
         .child(h_flex().id("t3-files-switches").flex_none().gap(GROUP_GAP).items_center()
           .child(this.control(t, "t3-files-render-mode", md && !code ? "code-xml" : "eye", md ? code ? "Show preview" : "Show code" : "Preview is not available for this file", cx => {
-            if (!code && st.view?.text !== undefined && !st.view.code) this.editor(st.view, st.file);
+            if (!code && st.view?.text !== undefined && !st.view.code) this.editor(st.view, st.file, this.fits(st.view));
             setShared(MARKDOWN, code ? "preview" : "code"); cx.notify();
           }, { on: md && !code, disabled: !md, size: "sm", iconSize: 14 }))
           // Wrap or scroll long lines, this page's own choice.
@@ -599,13 +637,18 @@ export default class Files extends View {
           // 12 in, the page's edge (t3-tokens「规则」R1), not T3's px-6.
           : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
           // Laid out at the width its room last held (nav-column.js holdWidth), cut off or short of it while the room moves.
-          : v.code ? this.codeView(v.code)
+          : v.code && v.lang && !v.colored && !this.fits(v) ? v_flex().size_full().min_h(0)
+            .child(noticeBar(t, "t3-files-highlight", `Syntax highlighting is off for files over ${AUTO_MAX / 1024} KB.`, t.ansi3, "anyway", "Highlight anyway", (cx) => { v.force = true; this.editor(v, st.file, true); cx.notify(); }, this))
+            .child(div().flex_1().min_h(0).child(this.codeView(v.code, v)))
+          : v.code ? this.codeView(v.code, v)
           : div());
   }
 
-  codeView(code) {
+  codeView(code, v) {
     const hold = this.codeHold;
     return div().id("t3-files-code").size_full().min_w(0).overflow_hidden()
+      // Scrolled while plain: left so until opened again.
+      .on_scroll_wheel(() => { if (!v.colored) v.scrolled = true; })
       .on_size_change((size, cx) => {
         const width = size.width / zoom();
         if (Math.abs(width - (hold.want ?? hold.at ?? -1)) < 1) return;

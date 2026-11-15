@@ -18,6 +18,7 @@ share project mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-picker mods/t3-s
 share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share details mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-tabs extras/mods/pulls-review
 share measured-text mods/t3-actions mods/t3-chrome mods/t3-tabs
+share tab mods/t3-tabs mods/t3-chrome
 share motion mods/t3-inbox mods/t3-agents mods/t3-spaces
 share focus extras/mods/review mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
 share list mods/t3-chrome mods/t3-tabs mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
@@ -52,6 +53,10 @@ share palette mods/t3-home mods/t3-chrome mods/t3-new-menu mods/t3-picker
 # The file tree's icons (pierre-icons.js's, scripts/vendor-files-icons.ts makes them; a folder's two): each mod draws only its own.
 for d in mods/t3-files mods/t3-chrome extras/mods/review; do rsync -a --delete "$src/shared/icons/pierre/" "$src/$d/icons/pierre/"; done
 for d in mods/t3-files extras/mods/review; do rsync -a --delete "$src/shared/icons/tree/" "$src/$d/icons/tree/"; done
+# What shared modules draw from the mod's own icons/ (they name `${mod}/icons/…`), for the mods that pass them: menu-row.js's
+# submenu chevron, project.js's plain folder. Herdr's own are drawn at 2, not the layout's 1.75 (check.sh).
+for d in mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/chevron-right.svg" "$src/$d/icons/"; done
+for d in mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/folder.svg" "$src/$d/icons/"; done
 # Open in's app artwork, the ones Details uses, copied into Files' own folder.
 for icon in finder vscode vscodium cursor zed app-window; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
 

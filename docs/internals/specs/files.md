@@ -13,8 +13,8 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ## File header
 
-- Inline: 40 high, controls centred, as Review's toolbar, so Tree and its neighbours keep their place between the pages; 12 horizontal (R1, the panel head's edge), no bottom rule.
-- Breadcrumbs on the left: each crumb at most 160 wide, padding 2. The `›` slot is 16×20, 2 outside, 14px icon; the `chrome` hover fill, on while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
+- Inline: 32 high, not T3's 40: its row's centre (40 + 16 = 56) is the work column's pane header's (the tab row's 40, the pane's 2 border, half its 28 header), so the two read as one line across the window; `check-files.cjs` holds it to the layout. Controls centred, as Review's toolbar, so Tree and its neighbours keep their place between the pages; 12 horizontal (R1, the panel head's edge), no bottom rule.
+- Breadcrumbs on the left: each crumb at most 160 wide, padding 2; the first (the root's) 10 on its left, so its box is at 12, under the panel head's first tab's, and its words at 22, where Review's scope button has them (`check-files.cjs`). The `›` slot is 16×20, 2 outside, 14px icon; the `chrome` hover fill, on while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
 - On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, `sm` (28) buttons 4 apart with 14px icons (T3's file toolbar; the Open in icon too, its chevron 16). All take the `chrome` hover and on (`foreground` 4% / 7%, P7). Open in is 24 high, as T3's xs beside its 28 toolbar toggles.
 - Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Wrap; deliberate).
 - Clickable buttons and menu rows show the pointer cursor.
@@ -39,7 +39,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 - Row 24, 12px text, radius 6, padding 6.4, margin 1.6, 16px icons, gap 4.8. Each level indents 16 + 4.8 = 20.8, so a child's icon sits under its parent's name.
 - No fold chevron: folders are Lucide `folder` / `folder-open` (`dim`), files Pierre's shapes coloured by theme ANSI or `dim` (t3-tokens「有意不同」).
 - Review's reviewed box is a fixed 16 slot (plus the gap) before the icon; tri-state boxes and status letters as before.
-- With the pointer over the tree, each level draws a 1px `foreground` 14% indent guide on its folder icon's centre line.
+- With the pointer over the tree, each level draws a 1px `foreground` 14% indent guide on the centre line of its folder row's first 16 slot: the icon in Files, the reviewed box in Review, so no line crosses a child's box.
 - Hover 7%, selected 12%, a row whose context menu is open 7%. The `accent` 1px keyboard ring appears only after a key moves the selection.
 - Ignored and reviewed rows: text `dim`, icon 50%; reviewed is also struck through.
 - The viewport pads 10.4 each side: with the row margin, row boxes sit 12 inside the column, the head's edge (R1); Pierre uses 16.
@@ -83,6 +83,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 - Read-only: Markdown preview (`TextView.markdown`, 12 inside, not T3's `px-6`), the native read-only `Editor` with syntax colours, images. No editing or saving.
 - The content area stops left presses from bubbling, so the root doesn't steal native selection focus; selecting and copying work.
+- Colours: Herdr's `EditorState` colours on the UI thread, the whole file each `new` or `set_value`, about 1.5ms per KB; 1MB takes about 1.46s, a one-line change as long. Wrap is only an option of `new`, and a new editor starts at the top: the host gives no scroll position to read or set. So a file opened, or picked again, up to 256KB (`AUTO_MAX`) is coloured at once: a stall, never a jump (user's choice over plain-first). Plain first only where the text is back at the top anyway, and only over 16KB (`SYNC_MAX`, about 25ms; smaller is coloured at once): text rewritten while it shows goes in plain (1MB in about 12ms) and is coloured once it has held 10s (`SETTLED`), so an agent writing it stalls the window once; Wrap switched, plain, coloured after 300ms (`IDLE`). Either waits only while that file shows with the window in front. A scroll wheel over the plain code (`scrolled`) stops the swap, for its rewrites too, until the file is opened again. Over 256KB it isn't coloured without asking: `noticeBar` (`shared/panel-states.js`, T3's `FileSurfaceNotice`, `ansi3`) says so with **Highlight anyway**, which colours it at once, and its rewrites once they hold, while the page keeps it.
 - The host has no gutter colour or height API, so the gutter can't match T3; the user kept the native Editor rather than an HTML renderer (a 40,000-line HTML prototype stalled painting).
 
 ### Editor languages

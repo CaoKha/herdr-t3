@@ -100,7 +100,7 @@ export default class Pane extends View {
           // A level steps in by the icon's 16: the spacer and the row's gap.
           return menuRow(this, t, `kid-${k.address}`, { at: [this, "at", i], label: kidName(k), pick: () => peek(i),
             lead: depth > 0 ? div().w(depth * 16 - 8).flex_none() : undefined,
-            icon: programIcon(k.program, 16, t.muted) ?? "mods/workspace-chrome/terminal.svg",
+            icon: programIcon(k.program, 16, t.muted) ?? "mods/t3-pane/icons/terminal.svg",
             trail: trail(k, kidStatus(k, listed)),
             also: (row) => row.on_mouse_down("right", (_e, cx) => { closeOverlay(props().overlay); openMenu(this, "agent", { address: k.address }, cx); }) });
         } }));
@@ -197,7 +197,7 @@ export default class Pane extends View {
       .on_hover((on, cx) => this.headHover(on, cx))
       .on_mouse_move((e) => { pointerMoved(e.position); this.box = e.bounds; })
       .on_click(() => run("pane.focus", { pane }))
-      // The terminal's own right-click menu (the layout's terminal_menu), whose Copy address gives the address.
+      // The terminal's own right-click menu (the layout's terminal_menu), whose Copy address copies the address.
       .on_mouse_down("right", (_e, cx) => openMenu(this, "pane", { pane, terminal: p.terminal }, cx))
       .child(div().id(`ph-icon-${pane}`).size(16).mr(-4).flex_none().flex().items_center().justify_center().when(quiet, (el) => el.opacity(0.5)).when(Boolean(pic), (el) => el.child(pic)))
       .when(Boolean(name), (el) => el.child(div().id(`ph-name-${pane}`).min_w(0).truncate().font_medium().text_color(p.focused ? t.foreground : t.muted).when(quiet, (e) => e.opacity(0.5)).child(name)))

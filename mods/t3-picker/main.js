@@ -76,7 +76,7 @@ export default class Picker extends View {
       .on_hover((over, cx) => { if (over && this.at !== i) { this.at = i; cx.notify(); } })
       .on_click(() => this.choose(item))
       // As T3's CommandPaletteTitleIcon: level with the title, not the row.
-      .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center().child(projectMark(s, 16, t, ps, true)))
+      .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center().child(projectMark("mods/t3-picker", s, 16, t, ps, true)))
       .child(v_flex().flex_1().min_w(0)
         .child(div().truncate().text_color(t.foreground).when(Boolean(item.here), (d) => d.font_medium()).child(item.label))
         .child(h_flex().min_w(0).gap(4).items_center().text_size(12).line_height("16px").text_color(t.dim)

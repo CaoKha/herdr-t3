@@ -1,11 +1,11 @@
 import { View, div, svg } from "gpui-kit";
-import { h_flex, Popup } from "gpui-base";
+import { h_flex } from "gpui-base";
 import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
-import { statusMark, STATUS_WORD } from "./status-mark.js";
+import { statusMark } from "./status-mark.js";
 import { tip, glow } from "./tip.js";
-import { detailsFor, detailsAt, detailsWatch } from "./details.js";
+import { detailsFor, detailsAt } from "./details.js";
 import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
@@ -23,6 +23,7 @@ import { rememberTerminal } from "./terminal-context.js";
 import { stripAt, stripWheel, stripFades } from "./scroll-strip.js";
 import { button as drawButton, radiusOf, tint as ghostTint, GROUP_GAP } from "./button.js";
 import { nameText, named as namedLabel } from "./measured-text.js";
+import { tab } from "./tab.js";
 
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
@@ -45,11 +46,10 @@ const TAB_GAP = 4;
 // A tab's name gives way to T3's 144px at most, the active one's to 240px; past that the strip scrolls.
 // Unlike T3's, a tab is 96px at least: a short name (`Pi`) left one too small to aim at.
 const TAB_FLOOR = 144, TAB_ACTIVE = 240, TAB_MIN = 96;
-// A tab around its name: padding, the icon's slot, the gaps and the slot its status mark and × share.
+// A tab around its name: padding, the icon's slot (× covers it hovered, tab.js), the gaps and the end slot its status mark keeps.
 const TAB_CHROME = 51;
 // With the Inbox, the tools at the right hug their icon and name: padding, the icon's slot and the gap. Their tabs have no status
-// mark (docs/adr/0002), so the end slot a Lists tab keeps for its mark and × would hold nothing at rest; hovered, the × takes the
-// icon's slot. Nothing kept empty, they sit flush and evenly against Actions.
+// mark (docs/adr/0002), so they keep no end slot, which would only ever be empty. Nothing kept empty, they sit flush and evenly against Actions.
 const SNUG_CHROME = 32;
 // A zoomed tab's pane segment around its name: a tab's padding, icon slot and gap, with no ×. The rule between the Inbox's groups.
 const SEG_CHROME = 32, RULE_W = 9;
@@ -268,10 +268,10 @@ export default class Tabs extends View {
   // Where the tab strip sits (scroll-strip.js): the tab the keyboard's on, else the active one, in view. The Inbox's strip
   // stands at the right, beside Actions, so it holds its place from its end.
   stripAt(shown, widths, fromEnd = false) {
-    const walked = shown.findIndex(c => within(this, [`tab-${c.id}`, `close-${c.id}`])), i = walked >= 0 ? walked : shown.findIndex(c => c.active);
+    const walked = shown.findIndex(c => within(this, [`tab-${c.id}`, `tab-${c.id}-close`])), i = walked >= 0 ? walked : shown.findIndex(c => c.active);
     // A rule or a zoomed tab's panes has no name of its own to wait for.
     return stripAt(this.tabStrip, { widths: shown.map(c => widths.get(c.id)), gap: TAB_GAP, room: this.room ?? 0, focus: i, focusKey: shown[i]?.id ?? "",
-      ready: shown.every(c => c.rule || c.group || this.nameW[c.id]), fromEnd });
+      ready: shown.every(c => c.rule || c.group || this.nameW[`tab-${c.id}`]), fromEnd });
   }
 
   // With the sidebar hidden, its toggle also says how the agents are doing, with the sidebar's own marks.
@@ -371,8 +371,6 @@ export default class Tabs extends View {
     const { tabs: shown, context: ctx } = this.navigation.frame(!props()?.part), inbox = inboxShown();
     // With the Inbox, the breadcrumb holds the tab in view and the parent's: the strip has the rest.
     const strip = ctx ? [...ctx.kin, ...ctx.programs] : shown;
-    // A tab that goes under the pointer reports no leaving, and a lit × would keep every tab's card away.
-    if (this.hot?.startsWith("close-") && !strip.some(c => this.hot === `close-${c.id}`)) this.hot = null;
     // Each agent with its sub-agents (tree.js).
     const every = agents(), all = terminals(), under = subAgents(every, all);
     const st = (a) => treeStatus(ownStatus(a.status, a.address, all), under(a.address));
@@ -406,7 +404,7 @@ export default class Tabs extends View {
     const segWant = (p, on) => Math.min(on ? TAB_ACTIVE : TAB_FLOOR, this.nameW[`seg-${p.pane}`] ? Math.ceil(this.nameW[`seg-${p.pane}`]) + SEG_CHROME : TAB_FLOOR);
     const want = (e) => e.rule ? RULE_W
       : e.group ? e.group.panes.reduce((sum, p) => sum + segWant(p, p === e.group.z), 2 + (e.group.status ? 16 : 0))
-      : this.nameW[e.id] ? (ctx ? Math.ceil(this.nameW[e.id]) + SNUG_CHROME : Math.max(TAB_MIN, Math.ceil(this.nameW[e.id]) + TAB_CHROME)) : TAB_FLOOR;
+      : this.nameW[`tab-${e.id}`] ? (ctx ? Math.ceil(this.nameW[`tab-${e.id}`]) + SNUG_CHROME : Math.max(TAB_MIN, Math.ceil(this.nameW[`tab-${e.id}`]) + TAB_CHROME)) : TAB_FLOOR;
     // With the Inbox the strip asks for what its tabs want and gets what the breadcrumb leaves (measured: stripW); in Lists, the row.
     const area = this.area ?? 0, stripWant = Math.max(0, entries.reduce((sum, e) => sum + want(e) + TAB_GAP, -TAB_GAP));
     this.room = ctx ? this.stripW ?? Math.min(stripWant, area) : area;
@@ -420,39 +418,13 @@ export default class Tabs extends View {
       const program = lead && programOf(lead);
       const name = nameOf(c, lead, tabName);
       // With the Inbox showing, what needs the person is the sidebar's to say, shown or hidden.
-      const status = inbox ? null : statusOf(c), label = name;
-      // As T3's panel tabs: 24px, 12px words. Unlike T3's, the icon stays: it tells tabs apart, so hovering puts × over the status mark instead.
-      const tabId = `tab-${c.id}`, closeId = `close-${c.id}`;
-      const over = this.overTab === c.id || within(this, [tabId, closeId]);
+      const status = inbox ? null : statusOf(c);
       const glyph = programIcon(program, 12, t.muted) ?? svg("mods/t3-tabs/icons/terminal.svg").size(12).text_color(t.muted);
-      // Its whole name, in a hover label's quiet style: the project, branch and program are already in the sidebar and the pane's header.
-      // A Popup hanging from a 1px anchor at the tab's bottom, with an Inbox row's timing; the label's words start where the tab's name does
-      // (the tab's 6px padding, 16px icon slot and 2px gap, less the label's 1px border and 8px padding). Up from the hover on: a Popup must
-      // have measured its anchor before the frame a label starts to fade in. It says the status too, as × covers the mark while it shows.
-      // Only what the tab isn't showing: a name cut short or that status. Not yet measured counts as cut.
-      const says = status || !(widths.get(c.id) >= Math.ceil(this.nameW[c.id]) + (ctx ? SNUG_CHROME : TAB_CHROME));
-      const cardShown = /** @type {any} */ (this).details === c.id && /** @type {any} */ (this).detailsIn && !this.hot, cardFade = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
-      const details = Popup.new(`details-${c.id}`, div()).absolute().bottom(0).left(6 + 16 + 2 - (1 + 8)).size(1)
-        .when((/** @type {any} */ (this).details === c.id && this.pressed === null) || /** @type {any} */ (this).detailsOut === c.id, pop => pop.content(div().id(`details-card-${c.id}`)
-          .mt(4).max_w(320).px(8).py(4).rounded(6).border(1).border_color(t.border).bg(t.chrome).shadow_md().text_size(12).text_color(t.foreground)
-          .opacity(cardShown ? 1 : 0).top(cardShown ? 0 : -4).transition("opacity", cardFade).transition("top", cardFade)
-          .child(status ? `${name} · ${STATUS_WORD[status]}` : name)));
-      // Its label waits longer than a card's 150ms, so a straight click never meets it. Its key closes the active tab only.
-      const close = tip(this, t, closeId, "Close tab", drawButton(t, closeId, {
-        size: "tiny", surface: "tab", icon: over ? "mods/t3-tabs/icons/x.svg" : undefined, label: `Close ${name}`, hot: over })
-        .on_hover(glow(this, closeId))
-        .on_mouse_down("left", stopPress).on_click((_e, cx) => { cx.stop_propagation(); run(`t3-tabs.close-tab:${c.id}`); })
-        .when(!over && status != null, el => el.child(statusMark(t, status, 14)))
-        .when(over, el => stop(this, t, closeId, el, radiusOf("tiny"))), { action: c.active ? "t3-tabs.close-tab" : undefined, below: true, delay: 500 });
-      const tab = h_flex().id(tabId).relative().h(24).w(widths.get(c.id)).pl(6).pr(8).gap(2).rounded(6).items_center().flex_none().text_size(12)
-        .bg(c.active ? ghostTint(t, "chrome", true) : t.chrome).text_color(c.active || over ? t.foreground : t.muted)
-        .role("button").accessibility_label(name)
-        .on_hover((on, cx) => {
-          if (on) { this.overTab = c.id; detailsWatch(this, c.id, cx); }
-          else if (this.overTab === c.id) { this.overTab = null; detailsFor(this, null, cx); }
-          cx.notify();
-        })
-        .when(!c.active, el => el.hover(s => s.bg(ghostTint(t, "chrome", false))))
+      // Shared with the panel's tabs (tab.js); the drag, double-click rename and the click that selects are the bar's own.
+      // A Lists tab keeps its end slot for its status, so its width doesn't move with it; the Inbox's tools have none (docs/adr/0002).
+      return tab(this, t, `tab-${c.id}`, { mod: "mods/t3-tabs", label: name, icon: glyph, active: c.active, width: widths.get(c.id), mark: status && statusMark(t, status, 14),
+        slot: !ctx, closeLabel: "Close tab", closeAction: c.active ? "t3-tabs.close-tab" : undefined, quiet: this.pressed !== null,
+        close: () => run(`t3-tabs.close-tab:${c.id}`), menu: (cx) => openMenu(this, "tab", { id: c.id, space: space.id }, cx), enter: () => run("tab.select", { id: c.id }) }, el => el
         // Dragged as a space is: the source fades, a line shows where it lands. `over` is null until the drag starts.
         .when(pressedAt === i && this.over !== null && this.over !== c.id, el => el.opacity(0.5))
         .when(pressedAt >= 0 && this.over === c.id && pressedAt !== i, el => el.child(
@@ -460,9 +432,8 @@ export default class Tabs extends View {
             .when(pressedAt < i, line => line.right(0))
             .when(pressedAt > i, line => line.left(0)),
         ))
-        .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); detailsFor(this, null, cx); this.pressed = c.id; this.over = null; this.dragFrom = e.position; if (e.click_count === 2) run("tab.rename", { id: c.id }); })
+        .on_mouse_down("left", (e, cx) => { this.pressed = c.id; this.over = null; this.dragFrom = e.position; if (e.click_count === 2) run("tab.rename", { id: c.id }); cx.notify(); })
         .on_mouse_move((e, cx) => {
-          detailsAt(this, c.id, e);
           const held = strip.find(x => x.id === this.pressed);
           if (!held || this.over === c.id || !loose(held) || !loose(c)) return;
           // As T3's tabs: a drag starts 6px from the press, so a click's wobble only selects.
@@ -480,17 +451,7 @@ export default class Tabs extends View {
           // Short of a drag it was a click on the pressed tab, wherever the release lands. A tab gone from the bar took its press along.
           else if (strip.some(x => x.id === from)) run("tab.select", { id: from });
           cx.notify();
-        })
-        .on_mouse_down("right", (_e, cx) => { detailsFor(this, null, cx); openMenu(this, "tab", { id: c.id, space: space.id }, cx); })
-        // The card belongs to the icon and name, as T3's and Zed's: on the way to the × it goes.
-        .child(h_flex().id(`label-${c.id}`).flex_1().min_w(0).h_full().gap(2).items_center()
-          .on_hover((on, cx) => { detailsFor(this, on && says ? c.id : null, cx); cx.notify(); })
-          .child(ctx && over ? close : div().size(16).flex_none().flex().items_center().justify_center().child(glyph))
-          .child(nameText(this, c.id, label).flex_1()))
-        .when(!ctx, el => el.child(close))
-        .when([this.overTab, /** @type {any} */ (this).details, /** @type {any} */ (this).detailsOut].includes(c.id), el => el.child(details));
-      // A tab goes by its mouse-up, which a key isn't.
-      return stop(this, t, tabId, tab, 6, { enter: () => run("tab.select", { id: c.id }) });
+        }));
     };
     const root = layout(), { rail: sidebar } = sidebarParts(root);
     // Old saved rails and a dragged-narrow sidebar can be smaller than the window buttons.
@@ -597,7 +558,7 @@ export default class Tabs extends View {
     return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(14).font_medium()
       .child(link("crumb-space", `Open a tab in ${space.name}`, h_flex().min_w(0).flex_shrink(1).gap(6).items_center()
         .text_color(this.hot === "crumb-space" ? t.foreground : t.muted).on_mouse_down("right", context("space", { id: space.id }))
-        .child(projectMark(space, 14, t, ps)).child(div().min_w(0).truncate().child(space.name)), () => run("t3-tabs.open-empty")))
+        .child(projectMark("mods/t3-tabs", space, 14, t, ps)).child(div().min_w(0).truncate().child(space.name)), () => run("t3-tabs.open-empty")))
       .when(Boolean(ctx.parent), el => el.child(sep("crumb-sep-parent")).child(named("crumb-parent", nameOf(ctx.parent),
         h_flex().min_w(0).flex_shrink(1).items_center().text_color(this.hot === "crumb-parent" ? t.foreground : t.muted)
           .child(narrow ? div().child("…") : text("crumb-parent", nameOf(ctx.parent))),

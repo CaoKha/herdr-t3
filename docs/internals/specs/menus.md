@@ -10,7 +10,8 @@ Context menus (`t3-menu`, opened through `shared/menu.js`), submenus (`shared/su
 - **Groups**, in this order, separated by rules, empty groups not drawn: destination (New tab, Open, New space here, Split, Zoom); state (Pin, Settle, Snooze or Wake); names and copies (Rename, Copy address, Copy path, Send back, Send right-clicks); worktrees (New worktree, Open worktree); ending (Close, Close pane, Remove worktree last).
 - **Wording**: verbs only; the object is what was right-clicked. The pane menu keeps `Close pane` to tell it apart from the tab. Toggles name the state after acting: Pin / Unpin, Settle / Un-settle, Snooze / Wake. Only items that open another dialog end in `…`.
 - **Unavailable items are left out**, not greyed as T3 does: a shorter menu costs less attention ([ADR 0001](../../adr/0001-trade-off-order.md)).
-- **Icons**: the same icon as the button doing the same thing elsewhere (the card's check, undo and alarm clock; Agents' pin and pin-off). New icons go in `t3-menu/icons/`.
+- **Icons**: the same icon as the button doing the same thing elsewhere (the card's check, undo and alarm clock; Agents' pin and pin-off), every one `t3-menu/icons/`' own at the layout's 1.75 stroke, none borrowed from Herdr's `workspace-chrome` (drawn at 2; `check.sh` fails a borrowed one, `check-menu.cjs` reads each row's). Split right is `panel-right`, Split down `panel-bottom`. A submenu's `›` is the mod's own `chevron-right` too (`menu-row.js` `sub`, copied by `scripts/sync.sh`).
+- **Right column**: only a command's key, written as tooltips and New write keys (`tip.js` `keyLabel`: `⌘D`, `⇧⌘D`), never the raw binding; Snooze's times say when each wakes. Nothing else goes there.
 - **Danger**: only `Remove worktree`, which deletes, uses `ansi1` text; never a filled block. `Close` already confirms when a program runs, so it stays plain, as T3's Archive.
 - The standalone Inbox has no `t3-menu`: its `menu` prop names the menu mod, and without it no menu opens.
 
@@ -22,7 +23,7 @@ Context menus (`t3-menu`, opened through `shared/menu.js`), submenus (`shared/su
 - Rename: the agent is its tab's only top-level agent and the tab name isn't Pi's.
 - Send back: a sub-agent split out on its own whose parent still lives.
 - Close: the agent has a pane; runs `t3-tabs.close-pane` and confirms and leaves first, as ×.
-- Copy address: terminals and pane headers, with the address (such as `t2`) in the hint column; never mod panes.
+- Copy address: terminals and pane headers; a click copies the address (such as `t2`), which the row doesn't show; never mod panes.
 - Machine heading: New space here and Connect, only when connected or its core was rebuilt.
 
 ### Not done

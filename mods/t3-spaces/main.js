@@ -362,7 +362,7 @@ export default class Spaces extends View {
   repoHead(r, t, ps, ghost) {
     const { w, g, hiding = 0 } = r, rowId = w.id, foldId = `${rowId}-fold`;
     const el = h_flex().h(ROW).flex_none().px(8).gap(10).items_center().rounded(8)
-      .child(div().flex_none().opacity(0.5).child(projectMark(w, 16, t, ps)))
+      .child(div().flex_none().opacity(0.5).child(projectMark("mods/t3-spaces", w, 16, t, ps)))
       .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.dim).child(w.name))
       .child(this.foldButton(t, foldId, g.repo, hiding, ghost));
     return ghost ? el : stop(this, t, rowId, el.id(rowId)
@@ -397,7 +397,7 @@ export default class Spaces extends View {
           .items_center()
           .when(Boolean(tree), el => el.pl(20).child(h_flex().size(16).flex_none().items_center().justify_center()
             .child(svg("mods/t3-spaces/icons/git-branch.svg").size(16).text_color(t.dim))))
-          .when(!tree, el => el.child(projectMark(w, 16, t, ps)))
+          .when(!tree, el => el.child(projectMark("mods/t3-spaces", w, 16, t, ps)))
           .child(div().min_w(0).max_w(150).truncate().font_medium().text_color(t.foreground + "e6").child(w.name))
           .child(g ? this.gitTail(g, tree, w.name, t, w.id, ghost) : div().flex_1())
           .when(kids > 0, el => el.child(this.foldButton(t, foldId, g.repo, hiding, ghost))),

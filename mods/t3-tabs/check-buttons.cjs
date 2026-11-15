@@ -31,7 +31,8 @@ const env = {
   spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => ({}), shared: () => null,
   sidebarParts: () => ({ stack: { active: "lists" } }), panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
-  glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false, tipCard: (_t, id) => element().id(id), FADE: {},
+  glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
+  keptHover: (view, key, id) => ({ hover: on => { view[key] = on ? id : null; }, move() {} }), tipCard: (_t, id) => element().id(id), FADE: {},
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {}, REVIEW_STATUS: "review.status",
   navigation: () => ({ atHome: false, frame: () => ({ tabs: [tab], context: null }) }),
@@ -49,7 +50,7 @@ function load(dir) {
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/store.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/list.js"), "utf8")), scope);
   vm.runInContext('globalThis.namedLabel = named;', scope);
-  vm.runInContext("(() => {\n" + strip(["button.js", "trigger.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; Object.assign(globalThis, { trigger, opener, popupOpen, hang });\n})();", scope);
+  vm.runInContext("(() => {\n" + strip(["button.js", "trigger.js", "tab.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; Object.assign(globalThis, { trigger, opener, popupOpen, hang });\n})();", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, surfaceWidths: {}, surfaceStrip: {}, pressed: null, over: null, area: 600 });
 }
@@ -124,14 +125,18 @@ assert.equal(tabs.sidebarToggle(t, () => {}, [], a => a.status).style.w, 28, "no
 click(toggle, "sidebar-toggle");
 assert.equal(calls.pop()[0], "layout.toggle");
 part = {};
-tabs.overTab = "b";
+tabs.overTab = "tab-b";
 root = tabs.render();
-const close = click(root, "close-b");
+const close = click(root, "tab-b-close");
 assert.equal(close.style.h, 16); assert.equal(close.items.length, 1); assert.equal(close.items[0].style.size, 12);
 assert.equal(close.hoverStyle.bg, t.raised, "as T3's tab close, bg-muted"); assert.equal(calls.pop()[0], "t3-tabs.close-tab:b");
 assert.equal(find(root, "tab-b").style.bg, "#ffffff12", "the tab shown: the text color at 7%, as the panel's tabs");
 tabs.overTab = null;
-assert.equal(find(tabs.render(), "close-b").items.length, 0, "the close icon still hides until the tab is hovered");
+assert.notEqual(find(tabs.render(), "tab-b-close").items[0]?.src, "mods/t3-tabs/icons/x.svg", "× shows only while the tab is hovered");
+// A middle press closes the tab through the same close-tab path as ×, so a running agent still asks first.
+root = tabs.render();
+[].concat(find(root, "tab-b").handlers.middle).forEach(f => f({}, cx));
+assert.equal(calls.pop()[0], "t3-tabs.close-tab:b", "a middle press closes the tab");
 
 const chrome = load(path.join(__dirname, "../t3-chrome"));
 part = { footer: true };

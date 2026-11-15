@@ -25,11 +25,11 @@ const c = vm.createContext({ View: class {}, div: element, h_flex: element, v_fl
   nextCommand: () => new Promise(r => commands.push(r)),
   stopsInit() {}, stopsEnd() {}, setShared() {}, pressed() {}, justClosed: () => false, DISABLED: 0.64,
   tip: (_v, _t, id, label, el) => { tips.push([id, label]); return el; }, stop: (_v, _t, _i, el) => el, focusRoot: (_v, el) => el, within: () => false,
-  glow: () => () => {}, litOnHover: () => () => {},
+  glow: () => () => {}, litOnHover: () => () => {}, keptHover: () => ({ hover() {}, move() {} }),
 });
 const load = f => vm.runInContext(fs.readFileSync(__dirname + '/' + f, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), c);
 ['list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js', 'status-mark.js', 'store.js', 'titlebar.js', 'palette.js'].forEach(load);
-vm.runInContext('(() => {\n' + ['button.js', 'trigger.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.tint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang;\n})();', c);
+vm.runInContext('(() => {\n' + ['button.js', 'trigger.js', 'tab.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.tint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang; globalThis.closableTab = tab; globalThis.ghostTint = tint;\n})();', c);
 load('menu-row.js');
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import [^;]*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
 const t = { foreground: '#ffffff', muted: '#888888', dim: '#777777', selected: '#333333', chrome: '#111111', hover: '#222222', popover: '#000000', border: '#444444', raised: '#555555' };

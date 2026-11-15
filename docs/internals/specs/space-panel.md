@@ -11,7 +11,7 @@ The rightmost full-height column: initially hidden, initially equal in weight to
 ## Head
 
 - The head's ends sit 12 inside the column, by `panel-head`'s layout padding (t3-tokens R1): the first tab's box and the last button's box on the same edges as the page header below. The head's mod draws no inset of its own.
-- Tabs: 24 high, at most 144 wide, radius 6, padding 6 left and 8 right, children 2 apart, 12px text. A 16px slot on the left holds the 12px surface icon; on tab hover or keyboard focus it becomes a 12px `×` (radius 4, `tab` surface).
+- Tabs: `shared/tab.js`, the tab bar's. 24 high, at most 144 wide, radius 6, padding 6 left and 8 right, children 2 apart, 12px text. A 16px slot on the left holds the 12px surface icon; on tab hover or keyboard focus it becomes a 12px `×` (radius 4, `tab` surface), a keyboard stop only then. Review's run status sits in a 16px slot at the end and stays while `×` shows. A clipped name says itself whole in a tooltip below; any press hides it.
 - Active and hovered tabs take the `chrome` on and hover fills, as the tab bar's (t3-tokens「按钮」); text `foreground` / `muted`, as the tab strip's unselected tabs.
 - `+` follows the last tab, 4 apart, inside the same scrolled strip: `trigger()`, xs ghost (24 square, 14px icon).
 - Overflow: wheel scrolls; T3's `‹ ›` (xs, 4 apart, P3) sit after the strip, greyed at the ends (`DISABLED`). Both ends of the strip fade over 16px (`shared/scroll-strip.js`, shared with the tab bar). The active tab, and a last tab's `+`, scroll into view.

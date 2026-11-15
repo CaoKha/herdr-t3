@@ -44,7 +44,7 @@ Agents 是 36px 行：程序图标、状态持续时间（`<1m`、`5m`、`3h`、
 
 ### 标签栏
 
-Lists 下标签栏显示当前 space 全部标签：高 24、圆角 6、字号 12，当前为 `foreground` 7%（悬停 4%）；每个标签有图标、名字和状态槽，悬停时状态槽换成 `×`。放不下先收窄，再滚动。
+Lists 下标签栏显示当前 space 全部标签：高 24、圆角 6、字号 12，当前为 `foreground` 7%（悬停 4%）；每个标签有图标、名字和末尾状态槽；悬停时 `×` 盖住图标，状态槽不变（与面板头标签共用一种标签）；中键与 `×` 一样关闭。放不下先收窄，再滚动。
 
 Inbox 下左边是面包屑：space／父级／当前查看的 agent（14px medium），就是侧栏点亮的那个 agent。右边是收紧的工具标签，不显示状态：被 zoom 藏住的 pane、当前 agent 家族的其他标签、不含 agent 的标签。焦点移到程序上时，面包屑保留该 agent 并变暗，点它回去。
 
@@ -64,11 +64,11 @@ Herdr 原生 zoom 中的标签变为虚线分段组，每 pane 一段。标签�
 
 ### Files
 
-Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件后左边是内容，右边可调宽的列里是树。文件头有面包屑（`›` 打开一个目录菜单，照 T3 原地换目录，顶上是 Back）、Open in 分体按钮和 Preview/Code、Wrap、Tree 开关，图标 14px，同 T3 文件工具栏。Open in 照 T3 头部的分体按钮：高 24，图标和箭头外面一圈 `input` 描边，中间一根全高分隔线，静止时没有底，悬停时只有指针下那一半变底；Actions 在栏上的 `▶ | ⌄` 是同一个控件（`shared/button.js` 的 `split()` `xs`），详情里的分体行仍无边框，同 T3 面板。内容区是主题的 `background`，文件头和树所在的列是面板的 `chrome`，交界处一根淡线，同 T3 代码区和文件树。树没有折叠箭头：目录图标开合两态，文件用 Pierre 图标、颜色取主题，忽略项变暗。搜索过滤同一棵树。内容是 Markdown 预览、原生只读 `Editor` 或图片。规格：[files](docs/internals/specs/files.md)。
+Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件后左边是内容，右边可调宽的列里是树。文件头有面包屑（`›` 打开一个目录菜单，照 T3 原地换目录，顶上是 Back）、Open in 分体按钮和 Preview/Code、Wrap、Tree 开关，图标 14px，同 T3 文件工具栏。Open in 照 T3 头部的分体按钮：高 24，图标和箭头外面一圈 `input` 描边，中间一根全高分隔线，静止时没有底，悬停时只有指针下那一半变底；Actions 在栏上的 `▶ | ⌄` 是同一个控件（`shared/button.js` 的 `split()` `xs`），详情里的分体行仍无边框，同 T3 面板。内容区是主题的 `background`，文件头和树所在的列是面板的 `chrome`，交界处一根淡线，同 T3 代码区和文件树。树没有折叠箭头：目录图标开合两态，文件用 Pierre 图标、颜色取主题，忽略项变暗。搜索过滤同一棵树。内容是 Markdown 预览、原生只读 `Editor` 或图片。Herdr 在界面线程上给代码着色，每 KB 约 1.5ms，新建的编辑器又从顶部开始，所以 256KB 以内的文件打开时直接着色；超过 16KB 时，显示中被改写的文本先以纯文本换上，内容保持 10s 不变后再着色，切换 Wrap 后 300ms 再着色，纯文本期间滚动过就不再自动着色，直到再次打开；超过 256KB 不自动着色，代码上方一条琥珀色提示带 **Highlight anyway**。规格：[files](docs/internals/specs/files.md)。
 
 ### 可选 Review
 
-Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)（CLI `jin.review`），只支持本机仓库，读标签工作处的仓库。40px 工具栏有范围菜单（带数量的 Changes、Uncommitted、Outgoing、Incoming，再是 Commits）、分支比较目标或 commit 的 SHA 加 `‹ ›`、Analyze、折叠菜单、设置和导航开关。按钮图标 14px；diff 在 `background` 上，工具栏和导航列在 `chrome` 上，同 Files；页面里不画线、不描边：工具栏、文件头和组说明下都没有分隔线，hunk 行底是 `foreground` 5%，注释卡是 4%。有两个及以上组时，工具栏下是一行组页签，当前组照面板标签点亮；导航列用 Files 的树行列出当前组的文件，带已看框。非仓库或远程时只写 `Review`，范围无变化写 `No changes`。规格：[review](docs/internals/specs/review.md)。
+Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/tree/multi-repo)（CLI `jin.review`），只支持本机仓库，读标签工作处的仓库。32px 工具栏（同 Files 文件头，中心与工作列窗格头同高）有范围菜单（带数量的 Changes、Uncommitted、Outgoing、Incoming，再是 Commits）、分支比较目标或 commit 的 SHA 加 `‹ ›`、Analyze、折叠菜单、设置和导航开关。按钮图标 14px；diff 在 `background` 上，工具栏和导航列在 `chrome` 上，同 Files；页面里不画线、不描边：工具栏、文件头和组说明下都没有分隔线，hunk 行底是 `foreground` 5%，注释卡是 4%。有两个及以上组时，工具栏下是一行组页签，当前组照面板标签点亮；导航列用 Files 的树行列出当前组的文件，带已看框。非仓库或远程时只写 `Review`，范围无变化写 `No changes`。规格：[review](docs/internals/specs/review.md)。
 
 ### 弹层、对话框与 Home
 

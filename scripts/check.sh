@@ -47,6 +47,16 @@ done
 for f in $(grep -rl --include='*.svg' 'stroke="currentColor"' shared/icons mods extras/mods | grep -vE '/icons/(pierre|cat)/|/win-[a-z]+\.svg$'); do
   [ "$(grep -o 'stroke-width="[^"]*"' "$f" | sort -u)" = 'stroke-width="1.75"' ] || { echo "FAIL $f: a UI icon's stroke is 1.75"; fail=1; }
 done
+# The same for what a mod borrows from Herdr's shipped workspace-chrome: read where Herdr ships it. Exempt: spinner, a progress
+# ring drawn at its own weight, not a Lucide UI icon. A borrowed path built at runtime would escape this, so it fails too.
+grep -rnE --include='*.js' --exclude=gpui-kit.d.ts 'mods/workspace-chrome/\$\{' shared mods extras/mods && { echo "FAIL a borrowed icon's path is built at runtime (above): name it whole, or use the mod's own"; fail=1; }
+for p in $(grep -rhoE --include='*.js' --exclude=gpui-kit.d.ts 'mods/workspace-chrome/[a-z0-9-]+\.svg' shared mods extras/mods | sort -u); do
+  [ "$p" = mods/workspace-chrome/spinner.svg ] && continue
+  f=$app/$p
+  [ -f "$f" ] || { echo "FAIL no such shipped icon: $p"; fail=1; continue; }
+  ! grep -q 'stroke="currentColor"' "$f" || [ "$(grep -o 'stroke-width="[^"]*"' "$f" | sort -u)" = 'stroke-width="1.75"' ] \
+    || { echo "FAIL $p is borrowed at Herdr's stroke, not 1.75 (t3-tokens P4): give the mod its own copy"; fail=1; }
+done
 
 # accent is the focus ring's and emphasis's color, never a button's fill (docs/internals/t3-tokens.md「按钮」): its foreground
 # only goes on the few non-buttons filled with it, listed here.

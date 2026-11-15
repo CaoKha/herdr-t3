@@ -167,7 +167,7 @@ export function menuView(view) {
   subGone(view, SUB_CLOSED);
   const list = items(view), o = list[0]?.id === ".." ? 1 : 0;
   const row = (i) => { const it = list[i]; return menuRow(view, t, `files-menu-${it.id}`, { at: [view, "at", i], label: it.label, open: i === view.sub?.row,
-    icon: it.glyph ?? (it.icon ? `${ICONS}/icons/${it.icon}.svg` : null), sub: Boolean(it.sub || (it.into !== undefined && it.id !== "..")), disabled: it.disabled, hint: it.hint || "Not available",
+    icon: it.glyph ?? (it.icon ? `${ICONS}/icons/${it.icon}.svg` : null), sub: Boolean(it.sub || (it.into !== undefined && it.id !== "..")) && `${ICONS}/icons`, disabled: it.disabled, hint: it.hint || "Not available",
     trail: it.checked ? svg(`${ICONS}/icons/check.svg`).size(14).flex_none().text_color(t.foreground) : null, pick: (cx) => choose(view, i, cx),
     also: (el) => el.on_mouse_move((e, cx) => {
       view.rowsAt[i] = e.bounds;

@@ -144,7 +144,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
     const up = view.details === key || view.detailsOut === key;
     return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
       .when(up, (pop) => pop.content(detailsCard(view, t, key, name, [
-        a.space_name && detailsLine(t, projectMark(spaces().find((s) => s.id === a.space) ?? { name: a.space_name }, 12, t, ps, true), a.space_name),
+        a.space_name && detailsLine(t, projectMark("mods/t3-agents", spaces().find((s) => s.id === a.space) ?? { name: a.space_name }, 12, t, ps, true), a.space_name),
         machine && detailsLine(t, svg("mods/t3-agents/icons/server.svg").size(12).flex_none().text_color(t.muted), machine),
         branch && detailsLine(t, svg("mods/t3-agents/icons/git-branch.svg").size(12).flex_none().text_color(t.muted), branch),
         pic && detailsLine(t, div().flex_none().opacity(0.6).child(pic), a.program.name),
@@ -278,7 +278,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
       .gap(10)
       .items_center()
       .rounded(8)
-      .child(projectMark(space, 16, t, ps, true))
+      .child(projectMark("mods/t3-agents", space, 16, t, ps, true))
       .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.foreground + "e6").child(g.label))
       .when(Boolean(dot), (el) => el.child(div().size(6).flex_none().rounded_full().bg(t[top]).role("status").accessibility_label(SECTION[RANK[top]])))
       .when(hiding.length > 0, (el) => el.child(div().flex_none().text_size(12).text_color(t.dim).child(String(hiding.length))))

@@ -6,6 +6,17 @@ const os = require("node:os");
 const path = require("node:path");
 const vm = require("node:vm");
 const { execFileSync } = require("node:child_process");
+// Where the work column's pane header has its centre, from the layout: the tab row, the pane's border, half its header. The
+// space panel's page headers put their row there too (docs/internals/specs/files.md), so the two read as one line.
+const paneHeadCentre = (() => {
+  const root = JSON.parse(fs.readFileSync(path.join(__dirname, "../../layouts/herdr-t3.json"), "utf8"));
+  const node = (n, id) => n?.id === id ? n : (n?.children ?? []).map(c => node(c, id)).find(Boolean);
+  const pane = node(root, "main").content.pane;
+  // The panel head's first tab's box: the panel's padding and the head's (t3-chrome check-surfaces holds that the head draws none).
+  const panelNode = node(root, "panel"), side = (n) => [].concat(n?.padding ?? 0).at(-1);
+  return { left: node(root, "tabs-row").size.px + pane.border.width + pane.header.height / 2, head: node(root, "panel-head").size.px,
+    tabEdge: side(panelNode) + side(node(root, "panel-head")) };
+})();
 
 const load = (file) => fs.readFileSync(path.join(__dirname, file), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (async function|function|const) /gm, "$1 ").replace(/^export \{[\s\S]*?\};?\s*$/m, "");
@@ -80,13 +91,13 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element,
     Input: { new: element }, Editor: { new: element }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v, set_value(x) { v = x; }, focus() { events.focus?.({}, cx); } }; } },
-    EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
+    EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
     spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
     theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
     props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
-    readTextFile: async (p) => { w.read.push(p); return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : "const a = 1;\n"; },
+    readTextFile: async (p) => { w.read.push(p); return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : w.texts?.[p] ?? "const a = 1;\n"; },
     watchFolder: (p) => new Promise((resolve, reject) => w.watchers.push({ path: p, task: running, resolve, reject })),
     nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise((r) => { wake = r; }),
     fs: { unlink: async () => {}, mkdir: async () => {}, writeFile: async () => {} },
@@ -130,8 +141,19 @@ async function page() {
   await settle(); view.render(cx); await fire(0); await settle();
   root = view.render(cx);
   assert.ok(find(root, "t3-files-code"), "the file shows");
-  // Its header is Review's 40 bar, controls centred: the Tree switch stays put between the pages (R1).
-  assert.ok(find(root, "t3-files-toolbar").calls.h[0] === 40 && !find(root, "t3-files-toolbar").calls.mb, "Review's 40 bar, nothing under it");
+  // Its header is Review's bar, controls centred: the Tree switch stays put between the pages (R1). Its centre is the work
+  // column's pane header's, so the two rows read as one line across the window.
+  const bar = find(root, "t3-files-toolbar").calls.h[0];
+  assert.ok(bar === 32 && !find(root, "t3-files-toolbar").calls.mb, "Review's 32 bar, nothing under it");
+  assert.equal(paneHeadCentre.head + bar / 2, paneHeadCentre.left, "its row's centre on the pane header's");
+  // Its first crumb's box at 12, under the panel head's first tab's box; its words a sm button's 10 in, where Review's scope
+  // button has its words (check-pane.cjs), so switching pages doesn't move the first letter.
+  {
+    const first = find(root, "crumb-").calls, crumbs = find(root, "t3-files-breadcrumbs").calls, box = find(root, "t3-files-toolbar").calls.px[0] + (crumbs.pl?.[0] ?? 0) + (first.ml?.[0] ?? 0);
+    assert.equal(box, paneHeadCentre.tabEdge, "the first crumb's box on the panel head's first tab's");
+    assert.equal(box, 12);
+    assert.equal(box + (first.pl ?? first.px)[0], 12 + 10, "its words 10 in, as a sm button's");
+  }
   // Its icons 14 in their 28 buttons, as T3's file toolbar (the panel head's stay 16).
   assert.equal(find(root, "t3-files-switches").calls.gap[0], 4, "Preview, Wrap and Tree 4 apart (P3), each its own fill");
   for (const id of ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"]) assert.deepEqual(find(root, id).items.map((n) => n.calls.size?.[0]), [14], `${id}: a 14 icon`);
@@ -288,6 +310,70 @@ async function menus() {
   keys(row, "down"); keys(row, "down"); keys(row, "down"); keys(row, "right");
   assert.deepEqual(plain([w.overlays.at(-1).props.files, w.overlays.at(-1).props.editors]), ["editors", ["Zed"]]);
   w.props = null;
+}
+
+// Herdr colors a file on the UI thread, ~1.5 ms a KB (large-file-highlight.md), and a new editor starts at the top. Opened,
+// a file up to 256 KB is colored at once: a stall, never a jump. Where the text goes back to the top anyway (rewritten, Wrap
+// switched), one over 16 KB shows plain and is colored once left alone: 10 s unchanged, 300 ms; not once scrolled, until
+// opened again; a smaller one is colored at once, as it costs a few ms.
+// Past 256 KB, only when asked.
+async function largeFiles() {
+  const big = "let x = 1;\n".repeat(20000), huge = "y".repeat(1024 * 1024);
+  const { view, cx, w, settle, fire, show } = makePage();
+  const small = "let x = 1;\n".repeat(800);
+  w.texts = { "/r/big.js": big, "/r/huge.js": huge, "/r/small.js": small };
+  const open = async (path) => { view.pick(view.current(), path, cx); await settle(); view.render(cx); };
+  const code = () => view.current().view.code, colored = () => w.made.filter((e) => e.language === "js" && e.text.length > 50000);
+  const wheel = () => find(view.render(cx), "t3-files-code").handlers.on_scroll_wheel({}, cx);
+  view.render(cx); await settle();
+  await open("small.js");
+  w.texts["/r/small.js"] = small + "// 1\n"; view.recheck(view.current(), cx); await settle(); view.render(cx);
+  assert.deepEqual([code().language, code().text.length], ["js", small.length + 5], "8 KB rewritten: colored at once");
+  find(view.render(cx), "t3-files-wrap").handlers.on_click({}, cx); view.render(cx); await fire(0);
+  assert.deepEqual([code().wrap, code().language], [true, "js"], "8 KB, Wrap switched: colored at once");
+  find(view.render(cx), "t3-files-wrap").handlers.on_click({}, cx); view.render(cx); await fire(0);
+  await open("big.js");
+  assert.deepEqual([code().language, code().text.length], ["js", big.length], "opened, 200 KB: colored at once");
+  view.recheck(view.current(), cx); await settle();
+  assert.equal(colored().length, 1, "read again unchanged: left as it is");
+  // Rewritten while it shows: the new text at once, plain; colored once it has held 10 s, here once it shows again.
+  w.texts["/r/big.js"] = big + "// 1\n"; view.recheck(view.current(), cx); await settle(); view.render(cx);
+  assert.deepEqual([code().language, code().text.length], [undefined, big.length + 5], "rewritten: plain at once");
+  await fire(300);
+  assert.equal(code().language, undefined, "not colored while it may still be being written");
+  w.texts["/r/big.js"] = big + "// 2\n"; view.recheck(view.current(), cx); await settle(); view.render(cx);
+  const before = colored().length;
+  show("review");
+  await fire(10000);
+  assert.equal(code().language, undefined, "not while hidden");
+  show("files"); view.render(cx); await fire(300);
+  assert.deepEqual([code().language, colored().length - before], ["js", 1], "held 10 s, shown again: colored once");
+  // Scrolled while plain: left plain, without the notice, until it's opened again.
+  w.texts["/r/big.js"] = big + "// 3\n"; view.recheck(view.current(), cx); await settle(); view.render(cx);
+  wheel(); await fire(10000); view.render(cx); await fire(300);
+  assert.equal(code().language, undefined, "scrolled while plain: not swapped under the reader");
+  assert.equal(find(view.render(cx), "t3-files-highlight"), null, "no notice: it's under the limit");
+  w.texts["/r/big.js"] = big + "// 4\n"; view.recheck(view.current(), cx); await settle(); view.render(cx); await fire(10000);
+  assert.equal(code().language, undefined, "rewritten again: still left plain");
+  await open("a.js"); await open("big.js");
+  assert.equal(code().language, "js", "switched back to: colored at once");
+  wheel();
+  // Lines changed: the plain text at once, the colors 300 ms later.
+  find(view.render(cx), "t3-files-wrap").handlers.on_click({}, cx);
+  view.render(cx); await fire(0);
+  assert.deepEqual([code().wrap, code().language], [true, undefined], "wrapped at once, plain");
+  view.render(cx); await fire(299);
+  assert.equal(code().language, undefined);
+  await fire(300);
+  assert.equal(code().language, "js", "then colored: a scroll while colored doesn't count");
+  // Past the automatic limit: plain, with a way to color it.
+  await open("huge.js"); await fire(300); await fire(10000); view.render(cx);
+  assert.equal(code().language, undefined, "a file past the limit stays plain");
+  const ask = find(view.render(cx), "t3-files-highlight-anyway");
+  assert.ok(ask, "and says how to color it");
+  ask.handlers.on_click({}, cx);
+  assert.equal(code().language, "js", "colored when asked");
+  assert.equal(find(view.render(cx), "t3-files-highlight"), null, "the bar goes");
 }
 
 async function collapseDuringExpansion() {
@@ -618,6 +704,7 @@ async function surfaceCache() {
     assert.deepEqual(search("pkg"), ["node_modules/pkg/i.js"], "outside Git: find");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   await collapseDuringExpansion();
+  await largeFiles();
   await page();
   await resources();
   await surfaceCache();
