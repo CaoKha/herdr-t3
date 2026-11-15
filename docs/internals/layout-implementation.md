@@ -48,7 +48,9 @@ Herdr 自 0.1.14 起自动处理绑定 `tab.close`/`pane.close` 的关闭键，�
 
 Herdr 普通 scroll area 不能脚本移动。标签条由 `tab-scroll` 裁切、`tab-strip.ml()` 偏移；零高全名副本量完整宽，只有 active/room 改变才修正。侧栏普通列表不能代码 scroll-to-current；搜索/树用可控虚拟列表。Agents 列表超过 50 行时改为窗口化（`mods/t3-agents/main.js`）：行高取自 `planMotion` 已有的条目高度和 y，只画视口内的行及上下各两行，滚轮自己移动，`leavingRows(view, top)` 跟着偏移；首次测量前按 800 高画。宿主的 `v_virtual_list` 行里不能挂处理函数，所以没用它。代价：窗口化时 Tab 只走到已画出的行。200 个 agent、5000 终端时一帧元素从 13,219 降到 427（2026-11-14 实测）。
 
-导航列不用宿主 `h_resizable`：它按 id 留各块大小并随页面等比缩放，面板变宽时会先错误缩放一帧再弹回。共用 `shared/nav-column.js` 自绘边缘，拖动只改本页、释放才保存。`holdWidth` 共用算法但每页独立状态：宽稳定 300ms 后重排；Files 在此之前固定旧 Editor 宽并裁切，Review 保留旧折行列数。Editor 的 soft wrap 配置创建时取，切换后绘制外重建。Files 超过 16KB 的文件被改写或切换 Wrap 时先建纯文本 Editor，着色由 `colorLater` 的 `cx.timer.after` 换上：每次推迟换一个 stamp，旧计时器到点即作废；到点时文件不在显示就不换，等 render 看到仍未着色再排一次，所以隐藏的页面不着色。Files/Review 刷新与缓存生命周期由 storage 定义；不调用不可可靠取消订阅的递归 `watchFolder`。
+导航列不用宿主 `h_resizable`：它按 id 留各块大小并随页面等比缩放，面板变宽时会先错误缩放一帧再弹回。共用 `shared/nav-column.js` 自绘边缘，拖动只改本页、释放才保存。`holdWidth` 共用算法但每页独立状态：宽稳定 300ms 后重排；Files 在此之前固定旧 Editor 宽并裁切，Review 保留旧折行列数。Editor 的 soft wrap 配置创建时取，切换后绘制外重建。Files 超过 16KB 的文件被改写或切换 Wrap 时先建纯文本 Editor，着色由 `colorLater` 的 `cx.timer.after` 换上：每次推迟换一个 stamp，旧计时器到点即作废；到点时文件不在显示就不换，等 render 看到仍未着色再排一次，所以隐藏的页面不着色。Files/Review 刷新与缓存生命周期由 storage 定义；本轮仍保留它们的轮询，不改 ADR 0015 的方案。
+
+Herdr 0.1.16 的 `watchFolder()` 返回可取消的 Promise（`FolderWatch.cancel()`）：取消以空数组结束本次等待，只释放这个调用，不影响同目录的其他订阅者。Spaces 为每个本地仓库保留 token 和当前未决等待；仓库无人使用或视图关闭时移除 token 并取消，迟到 Git 读取不发布已离开的仓库。独立 Review 栏在当前目录变化或关闭时同样释放；旧事件即使正在 `check-ignore` 里等待，也不能修改新 token 的状态。保留 Spaces 的 60 秒前台补偿和独立 Review 栏的 10 秒补偿；T3 的 toggle 模式不启动计数监听。Files / Review 面板改为事件刷新另行验证，不把旧版「不能取消」当成当前 API 限制。
 
 ## 外部关闭与未读补偿
 

@@ -17,6 +17,7 @@
 
 - **终端标签**只经 `shared/labels.js` 的 `writeLabel` 写：它统一报错（`Couldn't update the agent`），返回是否写成；`quiet` 用于会重试的写入，只在第一次失败时提示。
 - **内存**里的记忆在代码注释里写明「只记本次运行」，必要时附 `shortcut:` 说明何时改为持久。
+- Spaces 和独立 Review 栏的目录监听 token、未决 `FolderWatch`、关闭标记只留本次运行的内存；取消后先移走 token，迟到结果只认仍属自己的 token，不重建已释放的监听。
 - **用户文件夹**放在 `<appHome>/<用途>/`，不放进 mod 文件夹：`scripts/update.sh` 用 `rsync --delete` 更新 mod，会把它冲掉。生成的缓存放在其中的隐藏子目录（`asciicn-wallpaper/.tiles/`、`.builtin/`），以源文件的 `cksum` 加生成代码的版本号为键，最后写完成标记，所以源文件改了、生成中断、或生成代码换了，都会重新生成；源文件没了，缓存一起删。
 - 检查模式不触碰这些文件、Files 图片缓存或主题导出，也不占用本次运行的壁纸 `previewsReady`；只有真实窗口初始化才清理遗留缓存和草稿。隔离入口见 [layout-implementation](layout-implementation.md)。
 - **布局文件**只用 `writeTextFile` 带 `expected` 写，在文本里只替换那一个字段，替换后和解析结果核对。`layout.set` 会清空 Herdr 记的点击状态（侧栏宽度、当前 stack、选过的主题），不用于外观字段（[ADR 0009](../adr/0009-settings-hold-real-preferences.md)）。

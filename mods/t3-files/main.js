@@ -29,7 +29,7 @@ const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
 // shortcut: a folder past it stays closed; list more in batches if a big repo wants it all.
 const EXPAND_MAX = 200;
 // Asked again while it shows: here every 5 s, another machine every 10; a refresh that took long, 10 times as long, a minute at
-// most. Nothing is watched: Herdr's folder watch can't be stopped once asked, and a hidden page runs nothing.
+// most. Event-driven refresh is a separate change; a hidden page runs nothing.
 const LOCAL_EVERY = 5000, REMOTE_EVERY = 10000, SLOWEST = 60000;
 // Herdr runs each exec as a process with two pipes and doesn't raise a GUI app's 256 open files (launchd's soft limit): a refresh
 // listing every folder Expand all opened, all at once, had dozens fail to start ("Too many open files"). Listing reads go

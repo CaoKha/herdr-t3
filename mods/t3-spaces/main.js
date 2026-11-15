@@ -29,7 +29,7 @@ const listInView = (root = layout()) => {
 };
 
 export default class Spaces extends View {
-  async close() { stopsEnd(this); }
+  async close() { this.repos?.close(); stopsEnd(this); }
 
   init(_props, cx) {
     stopsInit(this, cx);
