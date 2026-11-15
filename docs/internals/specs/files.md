@@ -28,9 +28,9 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ## Tree header
 
-- 36 high, 4 below, 12 horizontal; buttons and the field 8 apart.
+- `shared/nav-column.js` `treeHead`, one for generic Files and every navigation column: 32 high, 8 below, 12 horizontal; buttons and the field 8 apart. 32, not T3's 36: on generic Files it is the page's first row, and its centre (40 + 16 = 56) is the work column's pane header's, as Review's toolbar's and a file's header's; under those 32 bars a column's head shares its centre with Review's 32 file header beside it. 8 below keeps the tree 40 under the head's top, where it always was. `check-files.cjs` and Review's `check-pane.cjs` hold both.
 - The search field is T3's compact input: 28 high, 9 horizontal padding, 12px text, radius 6. Transparent at rest and hovered (T3's ghost input is 1.2%, unseen). Focused: `background`, a 1px `accent` border and an inner 3px `accent` 24% ring (`ui/input-group.tsx`), with no layout change. No clear slot: Escape clears and leaves the field. It is a Tab stop.
-- Navigation column heads, Review's too, are this one: 36 high, 4 below, 12 horizontal, no rule under them (T3's subheaders in the panel). The column's left rule is `border` at 60% (T3's `border-border/60`), drawn as its own element so a theme's translucent border keeps its alpha; it sits where the content's `background` meets the column's `chrome`.
+- Navigation column heads, Review's too, are this one, with no rule under them (T3's subheaders in the panel). The column's left rule is `border` at 60% (T3's `border-border/60`), drawn as its own element so a theme's translucent border keeps its alpha; it sits where the content's `background` meets the column's `chrome`.
 
 ## Tree rows
 
@@ -53,6 +53,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 - One selection. Arrows, Home, End, Enter, Space and Shift+F10 work.
 - Only moves started from the tree or the breadcrumbs focus the tree. Tab switches, commands and other reveals only scroll and select, never taking the terminal's keyboard.
 - Rows are virtual: only visible rows are drawn. The focus index and folder counts are built once per tree rebuild.
+- A folder that can't be listed says so at its own row's end: `Can't list · Retry`, 12px `ansi1` (the destructive color is words only), what the shell or Herdr said on hover; a click reads it again without opening or closing it. Only the top folder's error stands in for the tree, with nothing else to draw.
 
 ## Folders from the breadcrumbs
 
@@ -72,10 +73,11 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ## Reading and refresh
 
-- Read only while the panel shows Files and the window is in front. Returning reads at once; then every 5s locally, 10s remote, backing off when reads are slow. No recursive watcher; refreshes never race and do no synchronous disk IO.
+- Read only while the panel shows Files and the window is in front (`shown()`: a window behind, such as the demo's, never focused, stays on Loading files…). Returning reads at once; then every 5s locally, 10s remote, backing off when reads are slow. No recursive watcher; refreshes never race and do no synchronous disk IO.
 - Text changes update in place; images reselect.
 - Text up to 1MB; remote images up to 512KB. Binary, missing and non-UTF-8 files say why. A read error offers Try again beside Locate.
-- Expand all skips ignored folders, at most 200 folders with four reads at a time. Collapsing, a manual toggle or a search cancels a pending expansion, checked again after each await.
+- Folder reads (a listing and its Git ignore check, each a process with two pipes) go at most 8 at a time across the page (`READ_AT_ONCE`): Herdr doesn't raise a GUI app's 256 open files, and a refresh listing every folder Expand all opened, all at once, had dozens fail to start ("Too many open files").
+- Expand all skips ignored folders, as T3's `FileBrowserPanel`: each folder asks the repository it's in (`git check-ignore` run in that folder), so a clone inside a space's folder that isn't a repository has its `node_modules` left closed too; folders in no repository open (user's choice, 2026-11-15). At most 200 folders, four reads at a time; an ignored folder still opens by hand. Collapsing, a manual toggle or a search cancels a pending expansion, checked again after each await.
 - Full data for the last three shown spaces; eviction releases it and late answers can't refill it.
 - Thousands of rows stay smooth.
 

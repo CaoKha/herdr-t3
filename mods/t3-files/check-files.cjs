@@ -61,12 +61,16 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     w.ran.push({ line, cwd, on: o.on ?? null });
     if (cmd === "open" && args[0] === "-Ra") return { code: args[1] === "Zed" ? 0 : 1, stdout: "" };
     if (w.stall?.(line)) await new Promise((r) => w.stalled.push(r));
+    // As Herdr's exec when the process can't start (its run_blocking's spawn error).
+    if (w.fail?.(line)) throw new Error("cannot run sh: Too many open files (os error 24)");
     if (line.includes("rev-parse")) return cwd.startsWith("/n") ? { code: 128, stdout: "" } : { code: 0, stdout: `${cwd}\n\n` };
     if (cmd === "pwd") return { code: 0, stdout: `${cwd}\n` };
     if (line.includes(" status ")) return { code: 0, stdout: "1 .M N... 100644 100644 100644 h1 h2 a.js\0" };
     if (line.includes("ls-files")) return { code: 0, stdout: w.files.map((f) => `${f}\0`).join("") };
     if (cmd === "sh" && args[1] === m.LIST) return { code: 0, stdout: listing ? (listing.get(cwd) ?? "") : cwd.endsWith("/src") ? "d\0d\0" : "f\0a.js\0f\0b.js\0" };
     if (cmd === "sh" && args[1] === m.PROBE) return { code: 0, stdout: "12 0\n" };
+    // Git's answer for the repository the folder (its cwd) is in: what `w.ignores` says it ignores there, as names.
+    if (cmd === "sh" && args[1] === m.IGNORED) return { code: 0, stdout: w.ignores?.get(cwd) ?? "" };
     return { code: 0, stdout: "" };
   };
   const task = () => ({ cancelled: false, done: false, cancel() { this.cancelled = true; }, is_done() { return this.done || this.cancelled; } });
@@ -129,6 +133,14 @@ async function page() {
   root = view.render(cx);
   assert.ok(find(root, "row-a.js") && find(root, "row-b.js"), "the folder's files in the tree");
   assert.equal(find(root, "t3-files-toolbar"), null, "generic Files starts directly at the tree search, with no root-name toolbar");
+  // Its search row is the page's first, under the panel head: its centre on the work column's pane header's, as Review's and a
+  // file's 32 bars; the tree still starts 40 under the row's top, where it did and where it does under a nav column's head.
+  {
+    const holds = (n, id) => n && typeof n === "object" && n.items && (n.key === id || n.items.some((c) => holds(c, id)));
+    const head = walk(root).filter((n) => n.calls.h && holds(n, "t3-files-search-field") && n.key !== "t3-files-search-field").pop().calls;
+    assert.equal(paneHeadCentre.head + head.h[0] / 2, paneHeadCentre.left, "the search row's centre on the pane header's");
+    assert.equal(head.h[0] + (head.mb?.[0] ?? 0), 40, "the tree where it was");
+  }
   assert.ok(!w.ran.some(r => r.line.includes(" status ")), "Files reads ignored paths, not Review's change statuses");
   assert.equal(find(root, "row-a.js").calls.tooltip, undefined, "tree rows have no path tooltip, including truncated names");
   find(root, "row-a.js").handlers.on_click({ modifiers: {} }, cx); await settle();
@@ -411,6 +423,53 @@ async function collapseDuringExpansion() {
   }
   view.render(cx);
   assert.ok(visited < 1000, `a warm render must only inspect visible rows, not scan all ${rows.length}: visited ${visited}`);
+}
+
+// Expand all on a big folder, then the page's refresh, which lists every open folder again. Herdr runs each exec as a process
+// with two pipes, under a GUI app's 256 open files: dozens at once failed to start (Too many open files) and every folder said
+// it couldn't be listed. Reads go a few at a time. One that fails says so on its folder's row; the tree stays.
+async function manyFolders() {
+  const listing = new Map(), names = Array.from({ length: 60 }, (_, i) => `f${i}`);
+  listing.set("/r", names.map((n) => `d\0${n}\0`).join(""));
+  for (const n of names) listing.set(`/r/${n}`, "f\0a.js\0");
+  const { view, cx, w, settle } = makePage({ listing });
+  view.render(cx); await settle();
+  view.foldAll(view.current(), cx); await settle();
+  assert.equal(view.current().expanded.size, 60, "all open");
+  w.stall = (line) => line.includes(m.LIST);
+  view.recheck(view.current(), cx); await settle();
+  let most = w.stalled.length;
+  while (w.stalled.length) { w.stalled.splice(0).forEach((go) => go()); await settle(); most = Math.max(most, w.stalled.length); }
+  w.stall = null;
+  assert.ok(most > 0 && most <= 8, `a refresh lists a few folders at a time, not every open one at once: ${most}`);
+  // A folder that can't be listed: its row says so and retries; the rest of the tree is drawn.
+  w.fail = (line) => line.includes(m.LIST) && line.endsWith("/f3");
+  view.recheck(view.current(), cx); await settle();
+  let root = view.render(cx);
+  const row = find(root, "row-f3"), retry = find(root, "t3-files-retry-f3");
+  assert.ok(row && retry && walk(row).includes(retry), "the error on its folder's own row");
+  assert.ok(find(root, "row-f2") && find(root, "row-f40"), "the other folders still drawn");
+  assert.equal(walk(root).filter((n) => String(n.key).startsWith("t3-files-retry-")).length, 1, "no list of errors over the tree");
+  w.fail = null;
+  retry.handlers.on_click({}, cx); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "t3-files-retry-f3"), null, "retried: listed");
+  assert.ok(find(root, "row-f3/a.js"), "and its file shows");
+}
+
+// Expand all's reach, as T3's: each folder asks the repository it's in (a clone inside the space's folder too) which of its
+// entries are ignored, and those stay closed; folders in no repository open as any. Here the space's folder isn't one.
+async function expandReach() {
+  const listing = new Map([["/n", "d\0repo\0d\0notes\0"], ["/n/repo", "d\0node_modules\0d\0src\0"], ["/n/repo/src", "f\0a.ts\0"],
+    ["/n/repo/node_modules", "d\0pkg\0"], ["/n/notes", "f\0n.md\0"]]);
+  const { view, cx, w, settle } = makePage({ listing, spaces: [space("s1", "/n", true)] });
+  w.ignores = new Map([["/n/repo", "node_modules/\0"]]);
+  view.render(cx); await settle();
+  assert.equal(view.current().git, null, "the space's folder isn't a repository");
+  view.foldAll(view.current(), cx); await settle();
+  const open = [...view.current().expanded].sort();
+  assert.deepEqual(open, ["notes", "repo", "repo/src"], "the clone's ignored node_modules stays closed; folders in no repository open");
+  assert.ok(view.rows(view.current()).find((r) => r.path === "repo/node_modules")?.ignored, "and it's dimmed as ignored");
 }
 
 // It works only for what shows: the Files page, open, in the window in front, for the active space; nothing is watched, so
@@ -704,6 +763,8 @@ async function surfaceCache() {
     assert.deepEqual(search("pkg"), ["node_modules/pkg/i.js"], "outside Git: find");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   await collapseDuringExpansion();
+  await manyFolders();
+  await expandReach();
   await largeFiles();
   await page();
   await resources();

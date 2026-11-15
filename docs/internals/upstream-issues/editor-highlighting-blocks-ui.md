@@ -4,7 +4,7 @@ A custom Files mod uses `EditorState.new({ language: "rust", value, readonly: tr
 
 The file preview needs to refresh as an agent writes the file. Even when the old and new content differ by only one line, the current highlighter does not use the supplied edit range: `SyntectHighlighter::update` ignores `_edit`, creates a new parser state, clears the highlights, and traverses the entire document again.
 
-Our workaround in Herdr T3 is to show rewritten larger files as plain text first, then create a highlighted editor once their content has settled. Files over 256 KB require an explicit request to highlight. This reduces repeated stalls during continuous updates, but the eventual highlighting still blocks the window synchronously.
+Our workaround in Herdr T3 is to show files over about 16K characters as plain text first, both when opened and when rewritten, then create a highlighted editor once the file is left alone or its content has settled. Files over 256K characters are highlighted only on explicit request. This reduces repeated stalls during continuous updates, but the eventual highlighting still blocks the window synchronously.
 
 ### What did you expect?
 

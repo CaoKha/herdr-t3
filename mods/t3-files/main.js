@@ -8,7 +8,7 @@ import * as fs from "fs/promises";
 import { panelState, surfacesFor, closeSurface, openFile, navigateFolder } from "./panel.js";
 import { terminalFor } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
-import { withNav, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
+import { withNav, treeHead, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
 import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
 import { KEY, migratePagePrefs, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
@@ -24,12 +24,24 @@ import { alpha } from "./color.js";
 
 const MOD = "mods/t3-files";
 const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
-// Expand all lists at most this many folders, Git-ignored ones left closed, as T3's.
+// Expand all lists at most this many folders, Git-ignored ones left closed, as T3's: ignored by the repository each folder is in,
+// a clone inside a space's folder that isn't one too; folders in no repository open.
 // shortcut: a folder past it stays closed; list more in batches if a big repo wants it all.
 const EXPAND_MAX = 200;
 // Asked again while it shows: here every 5 s, another machine every 10; a refresh that took long, 10 times as long, a minute at
 // most. Nothing is watched: Herdr's folder watch can't be stopped once asked, and a hidden page runs nothing.
 const LOCAL_EVERY = 5000, REMOTE_EVERY = 10000, SLOWEST = 60000;
+// Herdr runs each exec as a process with two pipes and doesn't raise a GUI app's 256 open files (launchd's soft limit): a refresh
+// listing every folder Expand all opened, all at once, had dozens fail to start ("Too many open files"). Listing reads go
+// READ_AT_ONCE at a time, across every space this copy reads.
+const READ_AT_ONCE = 8;
+let reading = 0;
+const waiting = [];
+const limited = async (read) => {
+  while (reading >= READ_AT_ONCE) await new Promise((go) => waiting.push(go));
+  reading++;
+  try { return await read(); } finally { reading--; waiting.shift()?.(); }
+};
 // Herdr colors code on the UI thread, the whole file each time, ~1.5 ms a KB (research large-file-highlight.md), and a new
 // editor starts at the top. Opened, a file up to AUTO_MAX is colored at once: a stall, not a jump. Where it's back at the top
 // anyway, a file over SYNC_MAX (~25 ms) shows plain first and is colored once left alone: rewritten text once it has held
@@ -223,18 +235,21 @@ export default class Files extends View {
     st.loading.add(rel);
     const inIgnored = [rel, ...ancestors(rel)].some((p) => p && st.ignored.has(p));
     const [r, ig] = await Promise.all([
-      exec("sh", ["-c", LIST, "files", dir], { on: st.on }).catch((e) => ({ code: 1, stdout: "", stderr: String(e) })),
-      st.git && !inIgnored ? exec("sh", ["-c", IGNORED, "files", dir, rel ? `${rel}/` : ""], { cwd: st.root, on: st.on }).catch(() => null) : null,
+      limited(() => exec("sh", ["-c", LIST, "files", dir], { on: st.on })).catch((e) => ({ code: 1, stdout: "", stderr: String(e?.message ?? e) })),
+      // Asked in the folder itself, so Git answers for the repository it's in, a clone inside the space's folder too, as T3's;
+      // in none, it says nothing is ignored.
+      !inIgnored ? limited(() => exec("sh", ["-c", IGNORED, "files", dir, ""], { cwd: dir, on: st.on })).catch(() => null) : null,
     ]);
     if (!fresh()) return;
     if (r.code !== 0) {
-      st.errors.set(rel, "This folder can't be listed. Click to retry.");
+      // Why, for the folder's row to say on hover: what the shell or the host said.
+      st.errors.set(rel, r.stderr?.trim() || `Listing it ended with code ${r.code}.`);
     } else {
       const entries = parseListing(r.stdout);
       st.entries.set(rel, entries);
       st.errors.delete(rel);
       if (ig) {
-        markIgnored(st.ignored, rel, entries, parseIgnored(ig.stdout));
+        markIgnored(st.ignored, rel, entries, new Set([...parseIgnored(ig.stdout)].map((name) => join(rel, name))));
       }
     }
     st.loading.delete(rel);
@@ -562,7 +577,7 @@ export default class Files extends View {
       .on_size_change((size, cx) => { this.size = { width: size.width / zoom(), height: size.height / zoom() }; cx.notify(); })
       .when(Boolean(st.file) || st.folder !== null, el => el.child(this.toolbar(st, t)))
       .child(div().flex_1().min_h(0).child(st.file ? withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: this.tree(st, t), open: this.navOpen, handle: this.navHandle })
-        : v_flex().size_full().min_h(0).child(div().h(36).mb(4).px(12).flex_none().child(this.searchHead(st, t))).child(div().flex_1().min_h(0).child(this.tree(st, t))))));
+        : v_flex().size_full().min_h(0).child(treeHead("t3-files-head", this.searchHead(st, t))).child(div().flex_1().min_h(0).child(this.tree(st, t))))));
   }
 
   // Only a file has a subheader; Markdown uses one icon toggle, not a segmented text control. 12 in, as the panel head above
@@ -714,17 +729,27 @@ export default class Files extends View {
     });
   }
 
+  // A folder that couldn't be listed, at its row's end: `ansi1` words (t3-tokens: the destructive color is text only), the reason
+  // on hover; a click reads it again, and doesn't open or close it.
+  retryMark(st, t, path, retry) {
+    const id = `t3-files-retry-${path}`;
+    return tip(this, t, id, st.errors.get(path), div().id(id).flex_none().text_size(12).text_color(t.ansi1).cursor_pointer().role("button")
+      .accessibility_label("Can't list this folder. Retry").child("Can't list · Retry").on_hover(glow(this, id))
+      .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); retry(path, cx); }), { below: true });
+  }
+
   // The folder's tree, as T3's: a click opens a file or a folder; the keys move a ring, ↵ opens what it's on. The ring shows
   // only once the keys move in it (focus-visible), not for a click.
   tree(st, t) {
     if (!st.root) return div().p(8).text_size(12).text_color(t.dim).child("This space has no folder.");
-    const errors = () => v_flex().p(16).gap(4).children([...st.errors].map(([path, message]) => div().id(`t3-files-retry-${path}`).text_size(12).text_color(t.ansi1).cursor_pointer().child(`${path ? `${path}: ` : ""}${message}`).on_click((_e, cx) => cx.spawn(async cx => { await this.list(st, path); cx.notify(); }))));
-    if (st.errors.size && !st.entries.has("")) return errors();
+    const retry = (path, cx) => cx.spawn(async (cx) => { await this.list(st, path); cx.notify(); });
+    // The top folder unread: nothing else to draw, so its error is the page's. Any other says so on its own row (draw).
+    if (st.errors.has("") && !st.entries.has("")) return div().id("t3-files-retry-").p(16).text_size(12).text_color(t.ansi1).cursor_pointer()
+      .child("This folder can't be listed. Click to retry.").on_click((_e, cx) => retry("", cx));
     const found = this.found(st);
     if (found?.error) return div().p(16).text_size(12).text_color(t.ansi1).cursor_pointer().on_click((_e, cx) => this.find(st, st.query, cx)).child(found.error);
     if (!st.entries.has("") || st.query.trim() && !found) return div().id("t3-files-tree-loading").px(12).py(4).text_size(12).text_color(t.dim).child("Loading files…");
     const rows = this.rows(st);
-    if (st.errors.size && !rows.length) return errors();
     if (!rows.length) return st.query.trim() ? div().id("t3-files-no-matches").px(12).py(16).text_size(12).text_color(t.dim).child("No matching files.") : div();
     const ringed = this.treeHandle.is_focused() && this.treeKeys ? st.index.at.get(st.focus ?? st.file) ?? -1 : -1, selected = st.index.at.get(st.selected) ?? -1;
     const draw = (r, i) => {
@@ -739,7 +764,8 @@ export default class Files extends View {
       }
       return treeRow(t, MOD, { ...r, label }, `row-${r.path}`, { selected: i === selected, focused: i === ringed, context: popupOpen(this, `row:${r.path}`, MENU_CLOSED), dim: r.ignored,
         guides: this.treeHot === "tree",
-        trailing: r.dir && r.open && st.loading.has(r.path) ? svg("mods/workspace-chrome/spinner.svg").size(14).text_color(t.dim).spin(900) : null })
+        trailing: r.dir && st.errors.has(r.path) ? this.retryMark(st, t, r.path, retry)
+          : r.dir && r.open && st.loading.has(r.path) ? svg("mods/workspace-chrome/spinner.svg").size(14).text_color(t.dim).spin(900) : null })
         .on_click((_e, cx) => this.chooseRow(st, r, cx))
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.rowMenu(st, r.path); cx.notify(); });
     };
@@ -759,7 +785,6 @@ export default class Files extends View {
         cx.notify();
       })
       .child(v_flex().size_full().min_h(0)
-        .when(Boolean(st.errors.size), el => el.child(errors()))
         .when(Boolean(found && (found.more || found.total > found.results.length)), el => el.child(div().px(12).py(4).text_size(12).text_color(t.dim).child("More matches available. Refine your search.")))
         .child(div().flex_1().min_h(0).child(treeList(this, `t3-files-tree-${st.id}`, rows, draw)))));
   }

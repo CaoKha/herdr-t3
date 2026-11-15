@@ -126,6 +126,7 @@
 - 侧栏卡片和 slim 行横向内边距 8，T3 是 10（R3）。
 - ghost 按钮和分段切换悬停时指针不变，T3 的 `Button` 一律 `cursor-pointer`：规则见「按钮」的指针一条。
 - Files 和 Review 的内容区（导航列左边那块）一律 `background`，导航列和页头是面板的 `chrome`：T3 只有代码和 diff 用 `--code-background`，Markdown 预览和图片在 `bg-background` 上；布局让 Files 的 Markdown、图片也在 `background` 上，换文件类型时内容区和树的分界不变（2026-11-15 用户要求按底色分界）。
+- 树头（通用 Files 的搜索行、两页导航列头，`nav-column.js` 的 `treeHead`）高 32、下方 8，T3 是 36、下方 4：通用 Files 上它是页面第一行，中心同样落在 56；树的第一行位置不变（2026-11-15 用户决定）。
 - Files 文件头和 Review 顶栏高 32，T3 是 40：这一行的中心（40 + 16 = 56）落在工作列窗格头的中心（标签栏 40、窗格边框 2、28 的一半），左右两侧读作一条线（2026-11-15 用户决定）。
 - 面板页的边一律12（R1）：树行不取 Pierre 的16，Markdown 预览不取 T3 的 `px-6`，Review 文件头不取 T3 的左8。
 - 文件树没有折叠箭头，目录图标开合两态表示展开；T3 的 Pierre 树是 chevron。Files 与 Review 两棵树是同一种行（用户决定统一）。

@@ -1,14 +1,18 @@
 # 中文工单草稿：mod 的 exec 超过 8 MiB 后静默截断输出，调用方无法判断结果是否完整
 
-状态：用户审阅后，已于 2026-11-15 翻译并发布为 [herdrdev/herdr-app#1080](https://github.com/herdrdev/herdr-app/issues/1080)。[英文正文](exec-output-truncation.md)与提交内容一致；下文保留审阅时的中文草稿。
+状态：用户审阅后，已于 2026-11-15 翻译并发布为 [herdrdev/herdr-app#1080](https://github.com/herdrdev/herdr-app/issues/1080)，同日修订：限定为本机执行，补充文档已写上限与远程路径。[英文正文](exec-output-truncation.md)与线上内容一致；下文为对应的中文稿。
 
 ## 发生了什么？
 
-`herdr.exec()` 对 stdout、stderr 分别只保留前 8 MiB，继续读取并丢弃后续输出。命令正常退出时，调用仍返回 `code: 0`；返回对象只有 `code`、`stdout`、`stderr`，没有标明输出被截断。
+本机执行（不带 `on`）时，`herdr.exec()` 对 stdout、stderr 分别只保留前 8 MiB，继续读取并丢弃后续输出。命令正常退出时，调用仍返回 `code: 0`；返回对象只有 `code`、`stdout`、`stderr`，没有标明输出被截断。
+
+`herdr.d.ts` 写了上限（「8 MiB output.」），但没有说明超出部分会被静默丢弃，调用方也无从得知是否发生了截断。
 
 这使 mod 无法区分「成功取得完整输出」与「命令成功，但输出只取得一部分」。例如，用 stdout 传递 JSON、文件列表或 base64 图片数据时，调用方可能将不完整内容当作完整结果处理。
 
 本项目在图片导入中遇到了这个限制，目前先把图片缩成小采样图再读回，避免触及上限。通用的 `exec()` 调用仍存在这个问题。
+
+带 `on` 时，本机 `hc exec --json` 包装命令的 stdout 同样受此上限约束。按源码推断，远程结果过大时 JSON 会被截断，调用以 `hc exec:` 解析错误拒绝，而不是返回部分文本；这条路径未实测。本工单其余内容只讨论本机执行。
 
 ## 期望什么？
 
@@ -69,4 +73,6 @@ for (const size of [8388607, 8388608, 8388609]) {
 
 - [输出上限与收集逻辑](https://github.com/herdrdev/herdr-app/blob/5216e6f9f8c0c281a65e09816c66e4319e671784/src/mods.rs#L831-L881)：`take(EXEC_OUTPUT)` 之后，余下内容被读入 `sink()`。
 - [返回对象](https://github.com/herdrdev/herdr-app/blob/5216e6f9f8c0c281a65e09816c66e4319e671784/src/mods.rs#L951-L969)：只有 `code`、`stdout`、`stderr`。
+- [文档中的上限](https://github.com/herdrdev/herdr-app/blob/5216e6f9f8c0c281a65e09816c66e4319e671784/defaults/herdr.d.ts#L10)：「8 MiB output.」，未提截断。
+- [远程路径](https://github.com/herdrdev/herdr-app/blob/5216e6f9f8c0c281a65e09816c66e4319e671784/src/mods.rs#L899-L900)：`hc exec --json` 的输出先经过同一 `run_blocking` 上限再解析。
 - [PR #446](https://github.com/herdrdev/herdr-app/pull/446) 修复收集输出时超时失效的问题，并保留既有 8 MiB 上限。本工单关注调用方如何得知截断，是独立诉求。
