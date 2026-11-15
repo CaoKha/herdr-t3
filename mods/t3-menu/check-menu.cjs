@@ -30,6 +30,7 @@ const tipScope = vm.createContext({ window: () => ({ platform: "macos" }), keys:
 vm.runInContext(fs.readFileSync(path.join(__dirname, "tip.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.keyLabel = keyLabel;", tipScope);
 // closeOverlay runs what a closed t3-menu's close() does with the registry (popup-menu.js menuClosed), as Herdr calls close().
 const context = vm.createContext({
+  checking: () => false,
   // menu-row.js's: button.js's and tip.js's (no row here is disabled).
   DISABLED: 0.64, glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
   View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,

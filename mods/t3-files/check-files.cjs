@@ -65,7 +65,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   const tick = async () => { for (const [, f] of everies) f(cx); await settle(); await fire(0); };
   const body = { id: "panel-body", active: page, children: [{ id: "files" }, { id: "review" }, { id: "panel-empty" }] };
   const layout = { id: "root", children: [{ id: "work" }, { id: "panel", children: [body] }] };
-  const ctx = vm.createContext({
+  const ctx = vm.createContext({ checking: () => false,
     View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element,
     Input: { new: element }, Editor: { new: element }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v, set_value(x) { v = x; }, focus() { events.focus?.({}, cx); } }; } },

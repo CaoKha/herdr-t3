@@ -8,6 +8,10 @@ Herdr 在绘制中拒绝会再请求绘制的操作：`cx.notify()`、`cx.new()`
 
 `scripts/render-guard.cjs` 在假的 Herdr 中预加载这些约束。`scripts/check.sh` 还在已装 app home 中运行检查，因为有测试查官方图标；类型检查用脚本里的 `tsc --noEmit` 参数，不用 git 忽略的 `jsconfig.json`，官方 check 新生成的默认配置不适合这些 mod。
 
+Herdr 0.1.16 的 `checking()` 在整个检查期间为真；检查仍执行 `init()` 和首次绘制，`exec`、`hc`、`writeTextFile` 也照常执行，不能依赖宿主拦截。保留输入、焦点、列表等内存初始化与完整 render，只在外部工作入口跳过：Files 缓存清理／首次同步／文件夹菜单读取、壁纸草稿目录清理／扫描／合成／屏幕查询、主题导出、Spaces 机器／仓库探测、Chrome 的窗口按钮对齐及 Review 探测、Details 的机器名／Review 预读、Open in 的应用探测、Review 的首次仓库读取、独立 Review 栏的计数读取和 overlay 启动。`shared/check-checking.cjs` 记录启动及首次读取入口的命令和写入，检查模式必须为空，真实模式仍清理和导出；真实 `herdr-app check` 再覆盖绘制。其余 mod 的初始化只有内存／检查内共享状态和等待命令；实际用户动作不由检查触发。
+
+各列表首次绘制中的项目 favicon 读取也由 `shared/project.js` 隔离；检查只用已知图标或 monogram，不探测项目文件、不写图标缓存。Space 右键菜单的 checkout 探测和 Details 范围菜单的初始化读取同样跳过，菜单内存状态照常建立。首次行计算可能结束 Settle / Snooze，`shared/labels.js` 在检查模式直接返回未写入，不向 core 发标签命令。
+
 原生 popup 的自动高度不能直接套 `overflow_y_scrollbar()`：只有 `max_h`、没有确定高度的根滚动容器会被测成0，overlay虽已注册却看不见。详情用不收缩的内容层在 `on_size_change` 量高度，再给外层滚动视口明确高度（至少一行控件，最多420）；只在高度变化时notify，0测量不覆盖有效值。`herdr-app check` 和 `status.errors=[]` 都不验证实际布局，整窗截图与非零布局尺寸仍是必需证据。
 
 ## 隐藏副本与常驻入口

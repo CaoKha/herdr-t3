@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
+import { checking, theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
 import { tip, glow } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
@@ -60,6 +60,7 @@ export default class WorkspaceChrome extends View {
   }
 
   alignLights(cx) {
+    if (checking()) return;
     if (shared("layout") !== "herdr-t3") return;
     const root = /** @type {any} */ (layout()), w = window(), zoom = Number(settings().zoom) || 1;
     if (w?.platform !== "macos" || w.fullscreen || root?.titlebar !== "none" || !root.traffic_lights || this.lightsWriting) return;
@@ -169,6 +170,7 @@ export default class WorkspaceChrome extends View {
   // Whether Review can read the active space where its tab works, asked again only when that changes. Until Git answers it
   // stays as it was (offered at first) rather than greying out for a frame.
   probeReview(cx) {
+    if (checking()) return;
     const sp = spaces().find(s => s.active), key = `${sp?.id}:${sp && workFolder(sp.id)}:${sp?.machine}`;
     if (this.reviewKey === key) return;
     this.reviewKey = key;

@@ -31,6 +31,8 @@
 
 ## 安装
 
+需要 Herdr 0.1.16 或更新版本。
+
 让你的 Herdr agent 添加 `herdr.dev/layouts/JinJieBeWater/herdr-t3`。手动安装：把 `layouts/herdr-t3.json`、`layouts/herdr-t3.svg` 和所有 `mods/t3-*` 复制进 `~/.config/herdr-app/`，再把 `keys.json` 合并进你自己的。
 
 只想要 Inbox？它也单独发布了一份：[herdr-t3-inbox](https://github.com/JinJieBeWater/herdr-t3-inbox)。

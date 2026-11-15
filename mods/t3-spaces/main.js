@@ -6,7 +6,7 @@
 import { View, div, svg } from "gpui-kit";
 import { foldArrow, planMotion, flying, leavingRows } from "./motion.js";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, focused, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, props, layout, nextCommand } from "herdr";
+import { checking, spaces, machines, panes, focused, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, props, layout, nextCommand } from "herdr";
 import { projectMark, tint } from "./project.js";
 import { repoFacts } from "./repos.js";
 import { dragGone, glow, hoverKept, tip, tipMark, POINTER_WATCH, pointerMoved } from "./tip.js";
@@ -71,6 +71,7 @@ export default class Spaces extends View {
   }
 
   checkNew(cx) {
+    if (checking()) return;
     const now = Date.now();
     const sp = spaces();
     // A machine came or went: its heading needn't wait for the next poll.
@@ -84,6 +85,7 @@ export default class Spaces extends View {
   }
 
   refreshMachines(cx) {
+    if (checking()) return;
     cx.spawn(async cx => {
       try {
         const r = await hc(["machine", "ls", "--json"]);

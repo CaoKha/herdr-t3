@@ -19,7 +19,7 @@
 // through sips (macOS) or ImageMagick (Linux); on Windows the menu offers no file dialog, until Herdr gives mods a file picker.
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
-import { appHome, closeOverlay, exec, nextCommand, notify, openOverlay, props, run, settings, setShared, shared, theme, themes, watchFolder, window } from "herdr";
+import { checking, appHome, closeOverlay, exec, nextCommand, notify, openOverlay, props, run, settings, setShared, shared, theme, themes, watchFolder, window } from "herdr";
 import { SCENES } from "./scenes.js";
 import { imageAns, sampleImage } from "./ascii-art.js";
 import { KEY, Library, MOD, finish, isLight, madePicture, makePicture, pictureKey, pictureSide, placement, tick } from "./library.js";
@@ -96,7 +96,7 @@ export default class Wallpaper extends View {
       this.zoomFocus.focus();
       this.zoomBy(d, z / d.placement.zoom, null, cx);
     });
-    cx.spawn(async (cx) => {
+    if (!checking()) cx.spawn(async (cx) => {
       await this.lib.ready;
       await this.lib.refresh(cx);
       // Our own cache writes land here too: only an .ans file, or a batch that means everything, is news.
@@ -370,6 +370,7 @@ export default class Wallpaper extends View {
    * stacked there, and asked again only for a place no screen known covers; upgrade once mods can read Window::scale_factor.
    */
   screenScale(cx) {
+    if (checking()) return 2;
     if (window()?.platform !== "macos") return 2;
     const b = /** @type {any} */ (globalThis).window?.bounds?.(), x = b ? b.x + b.width / 2 : 0;
     const on = (screens ?? []).filter(([left, , width]) => x >= left && x < left + width);

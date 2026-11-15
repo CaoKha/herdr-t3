@@ -4,7 +4,7 @@
 // from the uncoloured one kept beside it (templateOf).
 // Module state is shared by every copy of the mod: two Homes don't convert one file twice, and a confirmed deletion stops
 // another Home's conversion or Apply of that file.
-import { appHome, exec, notify, readTextFile, setShared, settings, shared, theme, writeTextFile } from "herdr";
+import { checking, appHome, exec, notify, readTextFile, setShared, settings, shared, theme, writeTextFile } from "herdr";
 import { VERSION, convert, picture, pictureSize } from "./ascii-art.js";
 
 export const MOD = "asciicn-wallpaper";
@@ -85,6 +85,7 @@ const hex = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(c ?? "") ? c : null);
  * again); rejects if it fails.
  */
 export function makePicture(scene, t, light, fit, cx, current = () => true) {
+  if (checking()) return Promise.resolve(null);
   const key = pictureKey(scene, t, light), had = pictures.get(key);
   if (had?.promise) return had.promise;
   if (had?.path && (had.error || had.px >= fit(had.width, had.height))) return Promise.resolve(had);
@@ -206,7 +207,7 @@ export class Library {
     this.closed = false;
     // The px a newly imported file's picture is made at (makePicture's `fit`); its Home sets it.
     this.fit = (_width, _height) => MAX;
-    this.ready = previewsReady ??= exec("rm", ["-rf", `${dir}/.preview`]).then(() => exec("mkdir", ["-p", `${dir}/.tiles`, `${dir}/.preview`]));
+    this.ready = checking() ? Promise.resolve() : previewsReady ??= exec("rm", ["-rf", `${dir}/.preview`]).then(() => exec("mkdir", ["-p", `${dir}/.tiles`, `${dir}/.preview`]));
   }
 
   sceneOf(name, kept) {
@@ -231,6 +232,7 @@ export class Library {
 
   // Each file shown once converted, converted when it isn't yet or changed since; a removed one's cache and framing go.
   async refresh(cx, retryName = null) {
+    if (checking()) return;
     const version = placementsVersion, placed = Object.keys(shared(KEY.placements) ?? {});
     const files = await this.sourceFiles();
     if (this.closed) return;

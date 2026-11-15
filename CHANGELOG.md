@@ -2,6 +2,10 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-16
+
+- Checking the layout no longer clears Files' image cache or wallpaper drafts, exports the theme, or starts the layout's startup probes and file writes. The check still initializes and renders the mods. Requires Herdr 0.1.16.
+
 ## 2026-11-15
 
 - Home no longer draws the space panel's toggle in its folded tab row, where only its bottom edge showed and could still be hovered and clicked. `⌥⌘B` still opens the panel at Home.

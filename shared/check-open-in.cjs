@@ -5,6 +5,7 @@ const vm = require("node:vm");
 const source = fs.readFileSync(`${__dirname}/open-in.js`, "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
 function load(installed, previous) {
   const calls = [], context = vm.createContext({
+    checking: () => false,
     t3OpenInTargets: previous,
     exec: async (command, args) => {
       calls.push([command, args]);

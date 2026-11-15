@@ -3,7 +3,7 @@
 // One copy serves every space, here or on another machine: what each one shows is kept by its id.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from "gpui-base";
-import { spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
+import { checking, spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
 import * as fs from "fs/promises";
 import { panelState, surfacesFor, closeSurface, openFile, navigateFolder } from "./panel.js";
 import { terminalFor } from "./terminal-context.js";
@@ -91,7 +91,7 @@ export default class Files extends View {
     this.cached = new Set();
     // The state being worked for, and a count that moves each time that changes (going).
     this.awake = null; this.gen = 0;
-    cx.spawn(async () => { await exec("rm", ["-rf", `${appHome()}/${CACHE}`]).catch(() => null); });
+    if (!checking()) cx.spawn(async () => { await exec("rm", ["-rf", `${appHome()}/${CACHE}`]).catch(() => null); });
     // A hidden copy isn't drawn, so this is what sees it go out of view.
     cx.timer.every(1000, (cx) => { this.sync(cx); this.poll(cx); });
     // `t3-files.open:<path from the space's folder>` and `t3-files.search:<words>`, for keys and scripts (the demo's);
@@ -151,6 +151,7 @@ export default class Files extends View {
   // It works only while it shows: the page in the open panel, the window in front, for the active space. Shown, it reads at
   // once; hidden, answers still under way are dropped and nothing more is asked. A closed space's state goes.
   sync(cx) {
+    if (checking()) return;
     const all = spaces(), sp = all.find((s) => s.active);
     for (const [id, st] of this.states) {
       if (!all.some((s) => s.id === id)) { this.drop(st); this.states.delete(id); continue; }

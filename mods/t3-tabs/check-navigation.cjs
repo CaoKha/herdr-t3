@@ -23,6 +23,7 @@ function fixture() {
   let now = 1000000, hcAnswer = () => ({ code: 0 });
   const cx = { notify() {}, timer: { after(ms, fn) { const t = { ms, fn }; timers.push(t); return t; } } };
   const core = {
+    checking: () => false,
     spaces: () => spaces, agents: () => agents, terminals: () => terminals, panes: () => panes, machines: () => machines,
     focused: () => shown, shared: key => state[key], setShared: (key, value) => { state[key] = value; },
     layout: () => ({ children: Object.values(slots) }), home: () => "/home/test", window: () => ({ active: true }),

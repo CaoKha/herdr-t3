@@ -31,6 +31,8 @@ Each in detail: [the guide](docs/user/guide.md).
 
 ## Install
 
+Requires Herdr 0.1.16 or newer.
+
 Ask your Herdr agent to add `herdr.dev/layouts/JinJieBeWater/herdr-t3`. By hand: copy `layouts/herdr-t3.json`, `layouts/herdr-t3.svg` and every `mods/t3-*` into `~/.config/herdr-app/`, and merge `keys.json` into yours.
 
 Only want the Inbox? It is also published alone: [herdr-t3-inbox](https://github.com/JinJieBeWater/herdr-t3-inbox).

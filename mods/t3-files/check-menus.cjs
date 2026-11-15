@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const src = ["store.js", "menus.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.menu = { rowItems, mention };";
 const calls = [], notices = [], jobs = []; let clipboard = "original";
-const context = vm.createContext({ run: (c, a) => calls.push([c, a]), notify: n => notices.push(n), MENU_ROW: 28 });
+const context = vm.createContext({ checking: () => false, run: (c, a) => calls.push([c, a]), notify: n => notices.push(n), MENU_ROW: 28 });
 vm.runInContext(src, context);
 const ids = (o) => [...context.menu.rowItems(o).map((it) => it.id)];
 const agent = { terminal: "t1" };

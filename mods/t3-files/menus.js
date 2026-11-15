@@ -4,7 +4,7 @@
 // through folders in place, Back on top. Each acts only while the space and tab it was opened on still show (`source`).
 import { svg } from "gpui-kit";
 import { v_flex } from "gpui-base";
-import { props, closeOverlay, theme, shared, setShared, spaces, exec, run, notify, window } from "herdr";
+import { checking, props, closeOverlay, theme, shared, setShared, spaces, exec, run, notify, window } from "herdr";
 import { focusRoot, stopsInit, stopsEnd } from "./focus.js";
 import { menuKeys, scrollList, propsLit } from "./list.js";
 import { menuRow, menuRule, MENU_ROW } from "./menu-row.js";
@@ -93,6 +93,7 @@ export function initMenu(view, cx) {
 function readFolder(view, cx) {
   const p = props(), dir = view.dir;
   view.entries = null;
+  if (checking()) return;
   cx.spawn(async (cx) => {
     const r = await exec("sh", ["-c", LIST, "files", join(p.source.root, dir)], { on: p.source.on }).catch(() => null);
     if (view.dir !== dir) return;

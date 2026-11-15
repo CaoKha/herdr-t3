@@ -35,6 +35,7 @@ function fixture(width) {
   let hcAnswer = () => ({ code: 0 });
   const theme = new Proxy({ selected: "#2c2c2f", hover: "#202024", working: "#6b93ff", blocked: "#f0a33a", done: "#ececf0", muted: "#a9a9b4", foreground: "#f4f4f6", dim: "#77777f", ansi3: "#c8a84b", ansi4: "#5f8fe0", ansi11: "#e8cf7a", ansi12: "#8fb4f2" }, { get: (t, k) => t[k] ?? "#a9a9b4" });
   const env = {
+    checking: () => false,
     View: class {}, div: () => element(), h_flex: () => element("h"), v_flex: () => element("v"),
     Button: { new: id => element("button").id(id) },
     Popover: { new: id => element("popover").id(id) }, HoverCard: { new: id => element("hovercard").id(id) }, Popup: { new: (id, trigger) => element("popup").id(id).child(trigger) }, Input: { new: () => element("input") },

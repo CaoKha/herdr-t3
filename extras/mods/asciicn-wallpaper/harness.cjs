@@ -56,6 +56,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   const state = {}, messages = [], overlays = [], runs = [], hooks = {}, view = { props: null },
     look = { dark: true, colours: { foreground: "#dddddd", ansi1: "#cd3131" }, themes: null, now() { return { ...(this.themes?.[this.dark ? "dark" : "light"] ?? this.colours) }; } };
   const env = {
+    checking: () => false,
     View: class {}, div: () => element("div"), svg: (p) => Object.assign(element("svg"), { path: p }), image: (p) => { const e = element("image"); e.props.path = p; return e; },
     h_flex: () => element("div"), v_flex: () => element("div"),
     SliderState: { new: () => ({ current: 1, handlers: {}, value() { return this.current; }, on(k, f) { this.handlers[k] = f; }, set_value(n) { this.current = n; }, release() {} }) },

@@ -11,7 +11,7 @@
 
 import { View } from "gpui-kit";
 import { v_flex } from "gpui-base";
-import { run, props, openOverlay, theme, keys, terminals, agents, spaces, panes, exec, setShared, layout } from "herdr";
+import { checking, run, props, openOverlay, theme, keys, terminals, agents, spaces, panes, exec, setShared, layout } from "herdr";
 import { menuKeys, propsLit } from "./list.js";
 import { menuRow, menuRule, menuHint } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
@@ -205,7 +205,7 @@ export default class Menu extends View {
     this.keys.focus();
     const space = p?.tab === "space" && spaces().find((s) => s.id === p.target?.id);
     const folder = space && place(space);
-    if (folder)
+    if (!checking() && folder)
       cx.spawn(async (cx) => {
         this.git = await checkout(folder, space.machine).catch(() => null);
         cx.notify();
