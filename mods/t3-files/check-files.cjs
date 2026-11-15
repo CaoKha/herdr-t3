@@ -96,6 +96,28 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   return { view, cx, w, settle, fire, tick, send, shared, wrote, store, show, activate, ctx, menu };
 }
 
+async function dragRows() {
+  for (const on of [null, "vps"]) {
+    const root = "/work root/项目's", names = ["a '中文.txt", "line\nbreak.txt", "literal\\backslash.txt"];
+    const { view, cx, w, settle, ctx } = makePage({ spaces: [space("drag", root, true, on)] });
+    view.render(cx); await settle();
+    const st = view.current();
+    st.entries = new Map([["", [...names.map(name => ({ name, dir: false })), { name: "folder", dir: true }]],
+      ["folder", [{ name: "child", dir: true }]], ["folder/child", [{ name: "x.txt", dir: false }]]]);
+    st.expanded = new Set(["folder", "folder/child"]); st.rows = null;
+    const reads = w.read.length, tree = view.tree(st, ctx.theme());
+    for (const name of names) assert.deepEqual(plain(find(tree, `row-${name}`).style.drag_paths ?? null), [[`${root}/${name}`], { on }], "native drag receives the absolute path unchanged and its source machine");
+    assert.deepEqual(plain(find(tree, "row-folder/child").style.drag_paths), [[`${root}/folder`], { on }], "a compact folder chain drags its outermost path");
+    assert.equal(ctx.treeRow(ctx.theme(), "mods/review", { path: "x.txt", name: "x.txt", depth: 0 }, "review-row").style.drag_paths, undefined, "Review rows gain no drag source");
+    assert.equal(st.file, null, "configuring a drag source does not open a file");
+    assert.equal(w.read.length, reads);
+    find(tree, `row-${names[0]}`).handlers.on_click({}, cx); await settle();
+    assert.equal(st.file, names[0], "ordinary file clicks still open the file");
+    find(tree, "row-folder/child").handlers.on_click({}, cx);
+    assert.equal(st.expanded.has("folder/child"), false, "ordinary folder clicks still collapse it");
+  }
+}
+
 async function page() {
   const { view, cx, w, settle, fire, send, shared, wrote, store, ctx } = makePage();
   assert.equal(w.inputEvents.submit, undefined, "hierarchical search is not a flat picker that opens on input submit");
@@ -737,6 +759,7 @@ async function surfaceCache() {
   await expandReach();
   await largeFiles();
   await page();
+  await dragRows();
   await resources();
   await surfaceCache();
   await searchMatchesWords();

@@ -10,4 +10,4 @@ Files 的结构和交互照 T3 Code 的 Files 面板，尺寸、边距、颜色�
 - 目录面包屑从文件旁边打开目录 surface，保留原文件和 trail；目录之间继续导航原位替换。目录不当文本读取。
 - 只在面板显示 Files、窗口在前时读取；全部展开最多200目录、4路读取，折叠、单目录操作和搜索使旧展开失效。
 
-保留只读、每 space 共用树和有界预览缓存，不加入编辑/保存。T3 的 Web 文档/媒体预览与拖进 composer 无对应 GPUI/终端接口；Insert 是安全的终端映射。源码和 Markdown 内容区阻断冒泡的左键按下，避免根元素夺走原生选择焦点；`EditorState` 只暴露语言、文本、字体、字号、行号／折叠开关、readonly、soft_wrap 和语法色，没有 gutter 底色或高度，整窗 `set_theme` 会波及其他控件，所以 gutter 无法完全照 T3；自绘 HTML 原型在 4 万行文件上卡在绘制，不进产品。用户选择保留原生 readonly Editor，gutter 列为已知缺口。2026-11-14 审查后用户拍板：搜索用子串过滤加排序（文件名命中、路径短的优先），删除多选，只在用户从树或面包屑发起时聚焦树，Review 树也改用 Pierre 图标。逐项规格见 [specs/files](../internals/specs/files.md)。
+保留只读、每 space 共用树和有界预览缓存，不加入编辑/保存。T3 的 Web 文档/媒体预览仍无对应 GPUI 接口。2026-11-16 修订拖拽的技术依据：Herdr 0.1.16 已有原生 drag_paths，Files 树可拖进终端，由宿主处理路径与跨机器规则；Insert 作为独立的剪贴板入口保留。源码和 Markdown 内容区阻断冒泡的左键按下，避免根元素夺走原生选择焦点；`EditorState` 只暴露语言、文本、字体、字号、行号／折叠开关、readonly、soft_wrap 和语法色，没有 gutter 底色或高度，整窗 `set_theme` 会波及其他控件，所以 gutter 无法完全照 T3；自绘 HTML 原型在 4 万行文件上卡在绘制，不进产品。用户选择保留原生 readonly Editor，gutter 列为已知缺口。2026-11-14 审查后用户拍板：搜索用子串过滤加排序（文件名命中、路径短的优先），删除多选，只在用户从树或面包屑发起时聚焦树，Review 树也改用 Pierre 图标。逐项规格见 [specs/files](../internals/specs/files.md)。

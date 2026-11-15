@@ -47,6 +47,8 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ## Tree behaviour
 
+- Files rows are native drag sources (`treeRow`'s `drag` option), carrying `[join(st.root, row.top)]` and `{ on: st.on }` to `.drag_paths()`. A compact folder chain carries its outermost path, not its last segment. Review rows do not opt in. Normal clicks still open files or expand/collapse folders; starting a drag must not choose a row. Insert into terminal remains a separate menu action.
+- Herdr 0.1.16 owns delivery: quote and paste without Enter; local files may copy into a remote terminal, local folders cannot upload; remote paths only drop on their own machine. It rejects control-character paths. Dropping outside a terminal cancels. Do not reimplement quoting, copying or validation in the mod. These real gestures require user verification; an element-tree check proves only the path/machine payload and unchanged clicks.
 - Loaded single-folder chains stay compact when closed.
 - Order: folders first, natural order (a small ASCII digit-run comparer: QuickJS has no `Intl`, and `localeCompare` puts `file2` after `file10`). Dotfiles shown except `.git`. Ignored entries dim.
 - No Git badges, no deleted ghosts, no row or crumb tooltips (the user removed them, clipped names included).

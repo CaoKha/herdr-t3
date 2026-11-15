@@ -763,6 +763,7 @@ export default class Files extends View {
         }));
       }
       return treeRow(t, MOD, { ...r, label }, `row-${r.path}`, { selected: i === selected, focused: i === ringed, context: popupOpen(this, `row:${r.path}`, MENU_CLOSED), dim: r.ignored,
+        drag: { path: join(st.root, r.top), on: st.on },
         guides: this.treeHot === "tree",
         trailing: r.dir && st.errors.has(r.path) ? this.retryMark(st, t, r.path, retry)
           : r.dir && r.open && st.loading.has(r.path) ? svg("mods/workspace-chrome/spinner.svg").size(14).text_color(t.dim).spin(900) : null })
