@@ -13,7 +13,7 @@ Geometry, constants and edge rules of the 40px tab row (`t3-tabs`, plus the `act
 ## Inbox bar
 
 - Left, a breadcrumb: space / relevant parent / viewed agent. 14px medium, 12 apart, dim slashes; the space `muted`, the viewed agent `foreground`. A sub-agent split with its parent follows it after another slash. Peers in the same tab get no switcher: their cards and panes reach them.
-- Right, tool tabs: the same tab (`shared/tab.js`), sized to content, no minimum width and no state slot; hover `×` covers the icon.
+- Right, tool tabs: the same tab (`shared/tab.js`), sized to content, no minimum width and no state slot. The `×` stays over the icon as the pointer moves between the icon and the name or rests anywhere on the tab.
 - Tool order: non-agent panes hidden by zoom, the current family's other tabs, then tabs with no agent. 16px-high rules between non-empty groups. Tabs already in the breadcrumb (current, parent) aren't repeated.
 
 ### Room

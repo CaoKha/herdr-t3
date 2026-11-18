@@ -426,7 +426,17 @@ export default class Tabs extends View {
       // A Lists tab keeps its end slot for its status, so its width doesn't move with it; the Inbox's tools have none (docs/adr/0002).
       return tab(this, t, `tab-${c.id}`, { mod: "mods/t3-tabs", label: name, icon: glyph, active: c.active, width: widths.get(c.id), mark: status && statusMark(t, status, 14),
         slot: !ctx, closeLabel: "Close tab", closeAction: c.active ? "t3-tabs.close-tab" : undefined, quiet: this.pressed !== null,
-        close: () => run(`t3-tabs.close-tab:${c.id}`), menu: (cx) => openMenu(this, "tab", { id: c.id, space: space.id }, cx), enter: () => run("tab.select", { id: c.id }) }, el => el
+        close: () => run(`t3-tabs.close-tab:${c.id}`), menu: (cx) => openMenu(this, "tab", { id: c.id, space: space.id }, cx), enter: () => run("tab.select", { id: c.id }),
+        dragMove: (e, cx) => {
+          if (this.pressed === null || this.over === c.id) return;
+          const held = strip.find(x => x.id === this.pressed);
+          if (!held || !loose(held) || !loose(c)) return;
+          // As T3's tabs: a drag starts 6px from the press, so a click's wobble only selects.
+          if (this.over === null && Math.hypot(e.position.x - this.dragFrom.x, e.position.y - this.dragFrom.y) < 6 * settings().zoom) return;
+          if (this.over === null) this.dragKeys.focus();
+          this.over = c.id;
+          cx.notify();
+        } }, el => el
         // Dragged as a space is: the source fades, a line shows where it lands. `over` is null until the drag starts.
         .when(pressedAt === i && this.over !== null && this.over !== c.id, el => el.opacity(0.5))
         .when(pressedAt >= 0 && this.over === c.id && pressedAt !== i, el => el.child(
@@ -435,15 +445,6 @@ export default class Tabs extends View {
             .when(pressedAt > i, line => line.left(0)),
         ))
         .on_mouse_down("left", (e, cx) => { this.pressed = c.id; this.over = null; this.dragFrom = e.position; if (e.click_count === 2) run("tab.rename", { id: c.id }); cx.notify(); })
-        .on_mouse_move((e, cx) => {
-          const held = strip.find(x => x.id === this.pressed);
-          if (!held || this.over === c.id || !loose(held) || !loose(c)) return;
-          // As T3's tabs: a drag starts 6px from the press, so a click's wobble only selects.
-          if (this.over === null && Math.hypot(e.position.x - this.dragFrom.x, e.position.y - this.dragFrom.y) < 6 * settings().zoom) return;
-          if (this.over === null) this.dragKeys.focus();
-          this.over = c.id;
-          cx.notify();
-        })
         .on_mouse_up("left", (_e, cx) => {
           const from = this.pressed, to = this.over;
           if (from === null) return;

@@ -15,11 +15,13 @@ import { nameText, measuredTooltip } from "./measured-text.js";
  * says itself whole in a label below (t3-tokens P5); any press hides it, `quiet` keeps it down (a drag). `mod` is the mod's
  * folder, holding icons/x.svg. `extend(el)` adds what only one bar does (a size, a drag, a click) before the wrappers.
  * @param {any} view @param {any} t @param {string} id
- * @param {{ mod: string, label: string, icon: any, active?: boolean, width?: number, maxW?: number, mark?: any, slot?: boolean, close: () => void, menu: (cx: any) => void, closeLabel?: string, closeAction?: string, quiet?: boolean, enter?: () => void }} o
+ * @param {{ mod: string, label: string, icon: any, active?: boolean, width?: number, maxW?: number, mark?: any, slot?: boolean, close: () => void, menu: (cx: any) => void, closeLabel?: string, closeAction?: string, quiet?: boolean, enter?: () => void, dragMove?: (event: any, cx: any) => void }} o
  * @param {(el: any) => any} [extend]
  */
-export function tab(view, t, id, { mod, label, icon, active = false, width, maxW, mark, slot = false, close, menu, closeLabel = `Close ${label}`, closeAction, quiet = false, enter }, extend = (el) => el) {
-  const closeId = `${id}-close`, over = view.overTab === id || within(view, [id, closeId]), kept = keptHover(view, "overTab", id);
+export function tab(view, t, id, { mod, label, icon, active = false, width, maxW, mark, slot = false, close, menu, closeLabel = `Close ${label}`, closeAction, quiet = false, enter, dragMove }, extend = (el) => el) {
+  const closeId = `${id}-close`, over = view.overTab === id || within(view, [id, closeId]);
+  // A fast move ending inside a top-row tab can point straight past the window edge.
+  const kept = keptHover(view, "overTab", id, { predictExit: false });
   const hush = (_e, cx) => { cx.stop_propagation(); if (view.hot === id) view.hot = null; };
   // A keyboard stop only while it shows, with the keyboard on the tab. Its label waits longer than the name's 150ms, so a
   // straight click never meets it.
@@ -35,7 +37,8 @@ export function tab(view, t, id, { mod, label, icon, active = false, width, maxW
     .role("tab").accessibility_label(label)
     // The name's label goes by view.hot, × by overTab, which outlasts a leave Herdr never reports (tip.js keptHover).
     .on_hover((on, cx) => { glow(view, id)(on, cx); kept.hover(on, cx); })
-    .on_mouse_move(kept.move)
+    // Herdr keeps one move handler per element. A drag and the hover watch need the same sample.
+    .on_mouse_move((event, cx) => { kept.move(event); dragMove?.(event, cx); })
     .on_mouse_down("left", hush)
     .on_mouse_down("middle", (e, cx) => { hush(e, cx); close(); })
     .on_mouse_down("right", (e, cx) => { hush(e, cx); menu(cx); })

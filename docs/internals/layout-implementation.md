@@ -28,6 +28,8 @@ Home 的 layout select/row 高度和目标 panel restore 与 tab select 同次�
 
 ## Hover 和失踪的离开事件
 
+标签的 `×` 以实际指针位置判断。顶栏紧邻窗沿，向上快速移入再停住时，按速度外推会误判离开。Herdr 每个元素只保留最后一个 `on_mouse_move` 回调，`shared/tab.js` 在同一回调里记录标签边界并派发拖动排序。
+
 Herdr 在最后已知鼠标仍落在元素上一帧范围时可能丢 leave，而 GPUI 已记为离开：按键后第一次移出行、按住拖出再松开、离开窗口都能留下 hover。`shared/tip.js` 的 `pointerGone` 在提示/详情显示期间每 100ms 用 `mouse_position()` 对比元素 box；没有卡片、仅 hover 点亮的控件用 `hoverKept`。macOS 指针出窗口后不再送 move；指针停住且沿最后一步再走两步会越窗口边，则视为已经离开。拖动在窗口失活也结束，不能只等永远不来的 release。
 
 Tooltip 用自己管理时序的 `Popup`：`HoverCard` 会因指针停在卡片上继续开，透明 popup 仍挡住下面输入。每次打开换 id，尺寸只在一个 id 首次布局时上报；布局完再淡入。`Popup` 不自动翻转，顶栏等位置明确传 `below`。官方 `.tooltip()` 只有字符串和宿主样式，无法提供这套外观。

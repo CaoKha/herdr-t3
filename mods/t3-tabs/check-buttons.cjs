@@ -18,7 +18,7 @@ const env = {
   sidebarParts: () => ({ stack: { active: "lists" } }), panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
   glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
-  keptHover: (view, key, id) => ({ hover: on => { view[key] = on ? id : null; }, move() {} }), tipCard: (_t, id) => element().id(id), FADE: {},
+  tipCard: (_t, id) => element().id(id), FADE: {},
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {}, REVIEW_STATUS: "review.status",
   navigation: () => ({ get atHome() { return home; }, frame: () => ({ tabs: [tab], context: null }) }),
@@ -29,6 +29,7 @@ const env = {
 function load(dir) {
   const scope = vm.createContext({ ...env });
   const { strip } = kit;
+  vm.runInContext(`(() => { ${strip(fs.readFileSync(path.join(__dirname, "../../shared/tip.js"), "utf8"))}; globalThis.keptHover = keptHover; })()`, scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/measured-text.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/details.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/scroll-strip.js"), "utf8")), scope);
@@ -129,6 +130,31 @@ assert.equal(close.hoverStyle.bg, t.raised, "as T3's tab close, bg-muted"); asse
 assert.equal(find(root, "tab-b").style.bg, "#ffffff12", "the tab shown: the text color at 7%, as the panel's tabs");
 tabs.overTab = null;
 assert.notEqual(find(tabs.render(), "tab-b-close").items[0]?.src, "mods/t3-tabs/icons/x.svg", "× shows only while the tab is hovered");
+// Move from the name to the icon, rest through the hover watch, then leave without a host leave event.
+{
+  const bounds = { x: 400, y: 8, width: 150, height: 24 };
+  let position = { x: 465, y: 20 }, watch;
+  env.window.mouse_position = () => position;
+  env.window.viewport_size = () => ({ width: 1000, height: 700 });
+  const eventCx = { ...cx, timer: { every(_ms, tick) { watch = tick; return { cancel() {} }; } } };
+  const row = () => find(tabs.render(), "tab-b");
+  const glyph = () => find(tabs.render(), "tab-b-close").items[0].src;
+  row().handlers.on_hover(true, eventCx);
+  row().handlers.on_mouse_move({ bounds, position }, eventCx);
+  position = { x: 413, y: 20 };
+  row().handlers.on_mouse_move({ bounds, position }, eventCx);
+  watch(eventCx);
+  assert.equal(glyph(), "mods/t3-tabs/icons/x.svg", "moving within a draggable tab keeps × after the watch ticks");
+  for (const y of [30, 10]) {
+    position = { x: 413, y };
+    row().handlers.on_mouse_move({ bounds, position }, eventCx);
+  }
+  watch(eventCx);
+  assert.equal(glyph(), "mods/t3-tabs/icons/x.svg", "stopping near the window edge still inside the tab keeps ×");
+  position = { x: 413, y: 40 };
+  watch(eventCx);
+  assert.notEqual(glyph(), "mods/t3-tabs/icons/x.svg", "leaving restores the glyph even if the host missed leave");
+}
 // A middle press closes the tab through the same close-tab path as ×, so a running agent still asks first.
 root = tabs.render();
 [].concat(find(root, "tab-b").handlers["on_mouse_down:middle"]).forEach(f => f({}, cx));

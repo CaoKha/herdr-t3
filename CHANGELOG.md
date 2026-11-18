@@ -4,6 +4,7 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-18
 
+- The close button stays visible as the pointer moves across a terminal tab or rests on its name.
 - Inbox Clear closes only terminals included in the confirmation that are still eligible. Custom Snooze leaves an agent in view if it needs you before you confirm.
 - Files coalesces slow directory refreshes, reloads an image when you select it again and previews images from remote Macs.
 - The space menu keeps agents with panes in their own space and avoids rebuilding the terminal index for each row.
