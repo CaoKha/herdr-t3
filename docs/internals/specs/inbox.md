@@ -14,6 +14,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - Header: 32px, 2px further out than the rows, padding 8, a dim 12px label, a normal-weight count and a 12px chevron. Shelf chevrons switch direction directly (no cross-fade).
 - A folded shelf still shows the row in view, and leaves it out of the hidden count. The row in view also stays visible beyond the Settled page.
 - Settled pages with Show more, and offers Clear when it holds terminals Clear can close. A Settle can appear on the shelf immediately. Clear requires the core's current `settled` label with no pending Settle change. Clear records the eligible terminals when the dialog opens. Confirmation closes only members of that set still eligible and outside the tab in view.
+  The Inbox owns this workflow in `mods/t3-inbox/clear-settled.js`, including the confirmation used by the standalone mod.
 
 ## Cards
 
