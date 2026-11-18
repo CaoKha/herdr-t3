@@ -4,6 +4,11 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-18
 
+- Closing a tab asks again if the action would now affect additional terminals or close its space. Inbox Clear waits for the core to confirm Settle. Creating Home matches the explicitly named space on this machine.
+- Files follows the most recent selection when directory reads finish out of order. Review defers full refreshes while hidden. The space menu offers Close for a child agent as soon as it has a pane.
+- Updating checks configuration and mod entries before copying. If the layout or key bindings change during the copy, the updater preserves the edit and reports how to resume.
+- Home now picks up wallpapers added during its first conversion. Several changes during one conversion trigger a single follow-up scan.
+- In Files and Review, `cmd-shift-w` and `ctrl-alt-x` dismiss the open menu and keep both the surface tab and the terminal pane open.
 - The close button stays visible as the pointer moves across a terminal tab or rests on its name.
 - Inbox Clear closes only terminals included in the confirmation that are still eligible. Custom Snooze leaves an agent in view if it needs you before you confirm.
 - Files coalesces slow directory refreshes, reloads an image when you select it again and previews images from remote Macs.

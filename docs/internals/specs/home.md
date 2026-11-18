@@ -14,6 +14,7 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 
 - One local hidden space, shared across projects and machines, created on demand.
 - Claimed only by its remembered id (`t3-tabs.home`), or by the strict local explicit name `Home\u200b`; never by plain `Home` or by its contents.
+- When waiting for a newly created Home, use the same local explicit-name check. A remote namesake can appear first without being claimed. Add the Home tab before closing the starter tab, and check that both still belong to the local Home before closing.
 - Hidden from Spaces, New, the Inbox filter, Go to and space navigation.
 - Holds one selected mod (`t3-home` by default) or, for Terminal, a shell in the home folder.
 

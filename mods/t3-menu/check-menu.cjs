@@ -30,7 +30,7 @@ const theme = { selected: "#selected", hover: "#hover", foreground: "#fg", muted
 let target = {}, calls = [], closed = [], state = {}, list = "inbox", opened = 0, zoom = 1, view = { width: 1200, height: 800 }, mouse = { x: 0, y: 0 };
 let terms = [{ address: "t1", labels: {} }], agentList = [], keyList = [];
 let spaceList = [{ id: "s1", active: true, folder: "/work/p1", tabs: [{ id: "b1" }] }];
-let paneList = [{ pane: "p1", tab: "b1", cwd: "/work/s1" }];
+let paneList = [{ pane: "p1", tab: "b1", terminal: "t1", cwd: "/work/s1" }];
 let focusState = {};
 let now = Date.now();
 // tip.js's keyLabel, as on a Mac: what every key hint in the layout is written with.
@@ -150,8 +150,10 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   list = "inbox";
   // A sub-agent kept in the tab beside its parent: no pin or rename of its own, and it can go back.
   agentList = [{ address: "t1", pane: "p1", tab: "b1", status: "working" }, { address: "t2", pane: "p2", tab: "b1", status: "done", focused: true }];
+  paneList.push({ pane: "p2", tab: "b1", terminal: "t2" });
   terms = [{ address: "t1", name: "lead", state: "live", labels: {} }, { address: "t2", parent: "t1", state: "live", labels: {} }];
   assert.deepEqual(JSON.parse(JSON.stringify(items({ tab: "agent", target: { address: "t2" } }, null).map((it) => it[0]))), ["Settle", "Snooze", "Copy address", "Send back to lead", "Close"]);
+  paneList.pop();
   // One with no pane (a sub-agent the parent still holds): only its address.
   terms = [{ address: "t1", state: "live", labels: {} }, { address: "t3", parent: "t1", state: "live", labels: {} }];
   assert.deepEqual(JSON.parse(JSON.stringify(items({ tab: "agent", target: { address: "t3" } }, null).map((it) => it[0]))), ["Copy address", "Send back to t1"]);
@@ -576,13 +578,40 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   agentList = agentList.filter((a) => a.address !== "t9");
   foreign.status = undefined;
   pickRow(sm.render(), "space-item-t9", "pane.focus", { pane: "p9" });
+
+  const contextMenuFor = id => {
+    closed = []; calls = [];
+    find(sm.render(), `space-item-${id}`).handlers["on_mouse_down:right"]({}, cx);
+    assert.deepEqual(closed, ["space-root"]);
+    const spec = calls[0][1];
+    assert.deepEqual(plain(spec.props), { tab: "agent", target: { address: id } });
+    return { ...spec.props, overlay: "agent-root" };
+  };
+  const parkedContext = contextMenuFor("t9a"), paneContext = contextMenuFor("t9"), spaceTarget = target;
+  const items = vm.runInContext("items", context);
+  assert.deepEqual(plain(items(parkedContext, null).map(it => it[0])), ["Copy address", "Send back to t9"], "a pane-less child gets no Close");
+  target = paneContext;
+  const actionMenu = new context.Menu(); actionMenu.init(target, cx);
+  const menuTree = actionMenu.render();
+  const closeRow = find(menuTree, `mi-${items(target, null).findIndex(it => it[0] === "Close")}`);
+  assert.ok(closeRow, "a child with a pane gets Close before its first report");
+  calls = []; closed = [];
+  closeRow.handlers.on_click({}, cx);
+  assert.deepEqual(plain([closed, calls]), [["agent-root"], [["t3-tabs.close-pane:p9"]]], "Close goes through the pane confirmation entry point");
+  target = spaceTarget;
+
+  const beforeKeep = sm.render();
+  paneList.push({ pane: "p9a", tab: "b9", terminal: "t9a" });
+  pickRow(beforeKeep, "space-item-t9a", "pane.focus", { pane: "p9a" });
+  paneList.pop();
+
   target = { ...target, target: { id: "s0" } };
   assert.ok(!find(sm.render(), "space-item-t9"), "global pane data excludes a foreign child even before its first report");
 
   // Restore globals for anything after.
   keyList = []; agentList = []; terms = [{ address: "t1", labels: {} }];
   spaceList = [{ id: "s1", folder: "/work/p1", tabs: [{ id: "b1" }] }];
-  paneList = [{ pane: "p1", tab: "b1", cwd: "/work/s1" }];
+  paneList = [{ pane: "p1", tab: "b1", terminal: "t1", cwd: "/work/s1" }];
   focusState = {};
 }
 console.log("ok menu");

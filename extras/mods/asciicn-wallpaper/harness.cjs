@@ -43,7 +43,8 @@ const texts = (n) => typeof n === "string" ? [n] : !n || typeof n !== "object" ?
 /**
  * A Home in a temporary app home under `base` (another runtime on the same `base` is a later app run). `hooks` can hold up a
  * step: `afterRead(file)`, `beforeWrite(file, body)`, `beforeExec(cmd, args)`, `afterExec(cmd, args, result)`; `picked`, what
- * the file dialog returns. `runs`: the commands run(). `view.props`: what props() returns. `stubs` replace modules.
+ * the file dialog returns, and `watchFolder(dir)`, the folder watch behind a live Home. `runs`: the commands run().
+ * `view.props`: what props() returns. `stubs` replace modules.
  */
 async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   const app = path.join(base, "app 'quoted"), dir = path.join(app, "asciicn-wallpaper");
@@ -67,7 +68,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
     shared: k => state[k], setShared: (k, v) => { state[k] = v; },
     notify: v => messages.push(v), openOverlay: v => overlays.push(v), closeOverlay: () => null, run: (name, args) => { runs.push([name, args]); return null; },
     props: () => view.props,
-    nextCommand: () => new Promise(() => {}), watchFolder: () => new Promise(() => {}),
+    nextCommand: () => new Promise(() => {}), watchFolder: dir => hooks.watchFolder?.(dir) ?? new Promise(() => {}),
     readTextFile: async file => {
       try {
         const body = await fs.readFile(file, "utf8");
@@ -114,13 +115,13 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   const cx = { notify() {}, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => setImmediate(() => fn(cx)),
     every: (_ms, fn) => { const t = { fn, cancel() { every.splice(every.indexOf(t) >>> 0, 1); } }; every.push(t); return t; } },
     focus_handle: () => { const h = { focus: () => { focused = h; }, is_focused: () => focused === h }; return h; } };
-  // A Home as Herdr lays it out: sized, its files scanned.
-  const home = async ({ width = 1000, height = 800 } = {}) => {
+  // A sized Home. Most checks drive scans directly; a live Home starts its own background tasks.
+  const home = async ({ width = 1000, height = 800, live = false } = {}) => {
     const h = new Mod();
-    h.init({}, { ...cx, spawn() {} });
+    h.init({}, live ? cx : { ...cx, spawn() {} });
     Object.assign(h, { width, height });
     await h.lib.ready;
-    await h.lib.refresh(cx);
+    if (!live) await h.lib.refresh(cx);
     return h;
   };
   // Lets queued steps run, real files and processes included: until `done()` holds, or a quiet `ms` without one.

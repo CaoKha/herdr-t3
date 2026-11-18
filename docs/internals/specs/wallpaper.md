@@ -87,6 +87,7 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 ## Files
 
 - Each added picture is a `.ans` file in `<appHome>/asciicn-wallpaper/`, starting with the header only this mod writes ([storage](../storage.md)「壁纸草稿」). One copied in appears without preview, covering Home; edits redraw it. Any other `.ans` (asciicn Studio's, a hand-made one) fails once with a notice and isn't listed. While the picture shown is drawn again, Home keeps it under its name and the crop button is disabled until it's done; deleted meanwhile, from any Home, it leaves every list.
+- Home starts listening before its first scan and keeps listening while it draws. Changes received during a scan queue one follow-up scan, so a file copied in during another picture's conversion appears without a further folder edit. Closing Home cancels its pending watch.
 - Unicode, leading-dash and hidden names work; `.ans`, `..ans`, `...ans` are refused.
 - Updates keep user files outside the mod folder.
 

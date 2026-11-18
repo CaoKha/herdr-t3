@@ -543,7 +543,7 @@ for (const width of [208, 256]) {
   f.agents().push(...stayed);
   assert.equal(find(ag.render(cx), "sp-s2").items.at(-1).style.text_color, f.theme().dim);
 }
-{
+async function checkInbox() {
   // The inbox: Working holds busy trees; Settle is by hand, undone by new work, never by looking.
   const f = fixture(256), inbox = f.load("t3-inbox"), run = { ...cx, spawn: fn => { fn(run); } };
   const remote = f.agents()[1], k = f.terminals().find(k => k.address === "vps/t2"), child = f.terminals().find(c => c.address === "child");
@@ -566,6 +566,7 @@ for (const width of [208, 256]) {
   const [, , value] = f.labelled.pop();
   assert.match(value, /^settled=\d+:4$/, "the label keeps when and the turn it was settled at");
   k.labels = { settled: value.slice(8) };
+  await new Promise(setImmediate);
   const at = inbox.render(run);
   assert.ok(!find(at, "card-vps/t2") && strings(find(at, "settled-header")).includes("1"), "settled leaves the cards for the tail");
   {
@@ -576,10 +577,13 @@ for (const width of [208, 256]) {
     t0.focused = false; remote.focused = true;
     inbox.render(run); inbox.settleKey(run);
     assert.deepEqual(f.labelled.pop(), ["label", "vps/t2", "settled="], "on a settled agent the key brings it back");
+    k.labels = {};
+    await new Promise(setImmediate);
     inbox.render(run); inbox.settleKey(run);
     const [, , again] = f.labelled.pop();
     assert.match(again, /^settled=\d+:4$/, "and settles it again");
     k.labels = { settled: again.slice(8) };
+    await new Promise(setImmediate);
     t0.focused = true; remote.focused = false;
   }
   {
@@ -1566,6 +1570,7 @@ for (const width of [208, 256]) {
   }
 }
 (async () => {
+  await checkInbox();
   {
     // A rebuilt machine: one click forgets it and pairs again, and a failed pairing can be retried without forgetting twice.
     const f = fixture(256);
@@ -2042,6 +2047,14 @@ for (const width of [208, 256]) {
     assert.deepEqual([view.overTab, view.hot, view.details], [null, null, null], "cmd-w over a hovered tab takes its card too");
     assert.equal(f.overlays.length, 1);
     assert.deepEqual(f.calls, [], "the command listener waits for confirmation");
+    const answer = () => f.overlays.pop().props.command.name.slice("t3-tabs.".length);
+    const first = answer();
+    f.spaces()[0].tabs.pop();
+    await view.navigation.handle(first, cx);
+    assert.deepEqual(f.calls, [], "the original answer doesn't close a space made last while the dialog was open");
+    assert.match(f.overlays.at(-1).props.detail, /space closes too/);
+    await view.navigation.handle(answer(), cx);
+    assert.deepEqual(f.calls, [["tab.close", { id: "b0", confirmed: true }]], "the updated dialog's command confirms the space consequence");
   }
   {
     // Both modes walk their drawn rows and stop at either end, including while hidden.
@@ -2572,7 +2585,7 @@ for (const width of [208, 256]) {
     fire(undo, "on_click", {}, cx);
     assert.deepEqual(f.calls.pop(), ["t3-tabs.undo", {}]);
     f.spaces()[0].active = false;
-    f.spaces().push({ id: "h", name: "Home", active: true, tabs: [{ id: "home" }] });
+    f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, tabs: [{ id: "home" }] });
     f.state["t3-tabs.home"] = "h"; f.state["t3.pins"] = ["new", "head", "tail"];
     await tabs.undo();
     assert.deepEqual(plain([k.labels.settled, k.labels.snoozed, f.state["t3.pins"]]), ["", until, ["new", "head", "t0", "tail"]]);
@@ -2609,7 +2622,7 @@ for (const width of [208, 256]) {
     assert.equal(k.labels.snoozed, String(at));
     assert.deepEqual(plain(f.calls.splice(0)), [["t3-tabs.home", {}]], "the agent in view snoozed: Home, as Settle");
     assert.equal(f.state["t3.notice"].action, "Snoozed");
-    f.spaces()[0].active = false; f.spaces().push({ id: "h", name: "Home", active: true, tabs: [{ id: "home" }] }); f.state["t3-tabs.home"] = "h";
+    f.spaces()[0].active = false; f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, tabs: [{ id: "home" }] }); f.state["t3-tabs.home"] = "h";
     await tabs.undo();
     assert.equal(k.labels.snoozed, "", "Undo wakes it");
     assert.deepEqual(plain(f.calls.splice(0)), [["agent.focus", { terminal: "t0" }]], "and brings it back from Home");
@@ -2649,7 +2662,7 @@ for (const width of [208, 256]) {
     for (const timer of cx.timers.slice(timers).filter(t => t.ms === 16)) timer.fn(cx);
     assert.ok(strings(f.load("t3-chrome", { footer: true }).render(cx)).includes("Unpinned,"));
     f.state["t3.pins"] = ["new", "head", "tail"];
-    f.state["t3-tabs.home"] = "h"; f.spaces()[0].active = false; f.spaces().push({ id: "h", active: true, tabs: [] });
+    f.state["t3-tabs.home"] = "h"; f.spaces()[0].active = false; f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, tabs: [] });
     await tabs.undo();
     assert.deepEqual(plain(f.state["t3.pins"]), ["new", "head", "t0", "tail"]);
     assert.deepEqual([f.labelled, f.calls], [[], []], "unpin Undo changes neither labels nor the place being viewed");
@@ -2673,7 +2686,7 @@ for (const width of [208, 256]) {
     await f.load("t3-tabs").settle(cx);
     assert.deepEqual([f.calls, f.state["t3.pins"], f.state["t3.notice"]], [[], ["t0"], undefined]);
     assert.equal(f.notifications.at(-1).body, "offline");
-    f.spaces()[0].active = false; f.spaces().push({ id: "h", active: true, tabs: [] }); f.state["t3-tabs.home"] = "h";
+    f.spaces()[0].active = false; f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, tabs: [] }); f.state["t3-tabs.home"] = "h";
     f.state["t3.notice"] = { owner: "tabs", live: true, at: Date.now(), undos: [{ address: "t0", pins: [] }] };
     await f.load("t3-tabs").undo();
     assert.deepEqual(f.calls, [], "failed Undo does not jump to an agent it could not restore");
@@ -2751,7 +2764,7 @@ for (const width of [208, 256]) {
     const neighbour = { ...f.agents()[0], address: "N", pane: "pn", focused: false, status: "done" };
     f.agents().push(neighbour); f.panes().push({ ...neighbour, terminal: "N" });
     const k = { ...neighbour, turn: 1, labels: { "herdr.seen": "0" } }; f.terminals().push(k);
-    f.state["t3-tabs.home"] = "h"; f.spaces().push({ id: "h", name: "Home", active: false, tabs: [] });
+    f.state["t3-tabs.home"] = "h"; f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: false, machine: null, tabs: [] });
     const view = f.load("t3-tabs"); view.render(cx); f.calls.length = 0;
     await view.navigation.handle("close-pane-now:p0", cx);
     assert.deepEqual(plain(f.calls.splice(0)), [["pane.close", { pane: "p0" }]], "the surviving pane stays in view");

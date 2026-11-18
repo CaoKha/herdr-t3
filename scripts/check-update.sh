@@ -23,18 +23,20 @@ is() {
   fi
 }
 update() { HERDR_APP_HOME="$app" "$src/scripts/update.sh"; }
-reject_missing() {
+reject_preflight() {
+  fixture=$1
+  expected=$2
   before=$(mktemp -d "$tmp/before.XXXXXX")
-  cp -R "$app/." "$before"
-  if out=$(update 2>&1); then
-    echo "FAIL check-update: missing mod $1 didn't stop the update"
+  cp -R "$fixture/." "$before"
+  if out=$(HERDR_APP_HOME="$fixture" "${4:-$src/scripts/update.sh}" 2>&1); then
+    echo "FAIL check-update: $3 didn't stop the update"
     fail=1
-  elif ! printf '%s\n' "$out" | grep -F "$1" >/dev/null; then
-    echo "FAIL check-update: missing mod $1 wasn't reported: $out"
+  elif ! printf '%s\n' "$out" | grep -F "$expected" >/dev/null; then
+    echo "FAIL check-update: $3 wasn't reported: $out"
     fail=1
   fi
-  if ! diff -qr "$before" "$app"; then
-    echo "FAIL check-update: the install changed despite missing mod $1"
+  if ! diff -qr "$before" "$fixture" >/dev/null; then
+    echo "FAIL check-update: the install changed despite $3"
     fail=1
   fi
 }
@@ -43,23 +45,41 @@ mkdir -p "$app/mods/t3-tabs" "$app/mods/mine" "$app/mods/pulls-review" "$app/lay
 touch "$app/mods/t3-tabs/stale.js" "$app/mods/t3-tabs/check-old.cjs" "$app/mods/t3-tabs/jsconfig.json" "$app/mods/mine/main.js" "$app/themes/t3-code-dark.json"
 echo '{"open":"herdr"}' > "$app/mods/pulls-review/config.json"
 echo '{"global":{"a":"b"},"layout:herdr-t3":{"cmd-p":"old","cmd-x":"mine"}}' > "$app/keys.json"
+chmod 640 "$app/keys.json"
 review='{"id":"my-review","type":"block","size":{"px":0},"window_drag":true,"content":{"mod":"pulls-review","props":{"block":"my-review","toggle":false}}}'
 jq --argjson review "$review" '.theme = "win98" | (.. | objects | .focus? | objects | .color) = "accent"
   | (.. | objects | select(.id? == "tabs-row") | .children) |= (. + [$review])' "$src/layouts/herdr-t3.json" > "$layout"
+chmod 644 "$layout"
+mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 
 # Stops first: the mods stay as they were.
 # A mod the layout names that's neither here nor in the app: Herdr would start on its own layout instead.
-reject_missing workspace-status
+reject_preflight "$app" workspace-status 'missing workspace-status'
+empty_mod="$tmp/empty-mod"
+mkdir -p "$empty_mod/mods/workspace-status"
+reject_preflight "$empty_mod" workspace-status 'empty workspace-status'
 mkdir "$app/mods/workspace-status"
+touch "$app/mods/workspace-status/main.js"
 
-cp "$app/keys.json" "$app/keys.good"
-echo '{' > "$app/keys.json"
-if update 2>/dev/null; then echo "FAIL check-update: broken keys.json didn't stop it"; exit 1; fi
-ok test -f "$app/mods/t3-tabs/stale.js"
-ok test ! -e "$app/mods/t3-home"
-mv "$app/keys.good" "$app/keys.json"
+for bad in broken empty multi wrong-root bad-section; do
+  bad_home="$tmp/keys-$bad"
+  mkdir "$bad_home"
+  cp -R "$app/." "$bad_home"
+  case "$bad" in
+    (broken) printf '%s\n' '{' ;;
+    (empty) : ;;
+    (multi) printf '%s\n' '{}' '{}' ;;
+    (wrong-root) printf '%s\n' '[]' ;;
+    (bad-section) printf '%s\n' '{"layout:herdr-t3":"mine"}' ;;
+  esac > "$bad_home/keys.json"
+  reject_preflight "$bad_home" keys.json "$bad keys.json"
+done
 
 out=$(update)
+if [ "$(mode "$layout")" != 644 ] || [ "$(mode "$app/keys.json")" != 640 ]; then
+  echo 'FAIL check-update: update changed layout or keys permissions'
+  fail=1
+fi
 ok test ! -e "$app/mods/t3-tabs/stale.js"
 ok test -f "$app/mods/t3-home/main.js"
 # The checks stay in the repo, and an older update's copies go; gpui-shell's jsconfig.json stays.
@@ -90,6 +110,17 @@ unique='[.. | objects | .id? | strings] | length == (unique | length)'
 is "$pages" "$layout" files,panel-empty,review
 is "$unique" "$layout" true
 
+# rsync --delete would remove the installed entry, so the copied source must have one too.
+bad_src="$tmp/bad-source"
+bad_src_home="$tmp/bad-source-home"
+mkdir -p "$bad_src/scripts" "$bad_src_home"
+cp "$src/scripts/update.sh" "$bad_src/scripts/"
+cp -R "$src/layouts" "$src/mods" "$src/extras" "$bad_src/"
+cp "$src/keys.json" "$bad_src/"
+cp -R "$app/." "$bad_src_home"
+rm "$bad_src/mods/t3-tabs/main.js"
+reject_preflight "$bad_src_home" t3-tabs 'missing t3-tabs entry in the copied source' "$bad_src/scripts/update.sh"
+
 # Run with a legacy toggle block instead: it keeps its own props, independently of the count bar.
 legacy=$(printf '%s\n' "$review" | jq -c '.content.props.toggle = true')
 export_block='{"id":"theme-export","type":"block","size":{"px":0},"content":{"mod":"t3-theme-export"}}'
@@ -119,20 +150,27 @@ ok test ! -e "$app/mods/t3-theme-export"
 
 # Herdr checks nested mod references too. This one is only in the carried-over block.
 mkdir "$app/mods/pulls-review"
+touch "$app/mods/pulls-review/main.js"
 touch "$app/mods/t3-tabs/stale.js"
 jq --argjson review "$review" '
   (.. | objects | select(.id? == "tabs-row") | .children) += [$review | .content.props.popover.mod = "absent-popover"]
 ' "$layout" > "$tmp/layout.json"
 mv "$tmp/layout.json" "$layout"
-reject_missing absent-popover
+reject_preflight "$app" absent-popover 'missing nested popover'
 
 # Pause the first update at its first copy while testing a competing one and an independent home.
 held="$tmp/overlap-home"
 other="$tmp/other-home"
 mkdir -p "$held/mods/workspace-status" "$other/mods/workspace-status" "$tmp/bin"
+touch "$held/mods/workspace-status/main.js" "$other/mods/workspace-status/main.js"
+mkdir "$held/layouts"
+cp "$src/layouts/herdr-t3.json" "$held/layouts/"
+echo '{}' > "$held/keys.json"
+echo '{}' > "$other/keys.json"
 CHECK_UPDATE_REAL_RSYNC=$(command -v rsync)
+CHECK_UPDATE_REAL_MV=$(command -v mv)
 CHECK_UPDATE_GATE=$tmp
-export CHECK_UPDATE_REAL_RSYNC CHECK_UPDATE_GATE
+export CHECK_UPDATE_REAL_RSYNC CHECK_UPDATE_REAL_MV CHECK_UPDATE_GATE
 cat > "$tmp/bin/rsync" <<'EOF'
 #!/bin/sh
 set -eu
@@ -149,19 +187,50 @@ fi
 if [ "${CHECK_UPDATE_ROLE:-}" = compete ]; then touch "$gate/competed"; fi
 exec "$CHECK_UPDATE_REAL_RSYNC" "$@"
 EOF
-chmod +x "$tmp/bin/rsync"
-PATH="$tmp/bin:$PATH" CHECK_UPDATE_ROLE=hold HERDR_APP_HOME="$held" "$src/scripts/update.sh" > "$tmp/held.out" 2>&1 &
-worker=$!
-attempt=0
-while [ ! -e "$tmp/ready" ]; do
-  if [ "$attempt" -ge 100 ] || ! kill -0 "$worker" 2>/dev/null; then
-    cat "$tmp/held.out"
-    echo "FAIL check-update: first update never reached its first copy"
-    exit 1
+cat > "$tmp/bin/mv" <<'EOF'
+#!/bin/sh
+set -eu
+"$CHECK_UPDATE_REAL_MV" "$@"
+case "${CHECK_UPDATE_ROLE:-}:$2" in
+  (late:*/layouts/herdr-t3.json) cp "$CHECK_UPDATE_GATE/saved-keys.json" "$HERDR_APP_HOME/keys.json" ;;
+esac
+EOF
+chmod +x "$tmp/bin/rsync" "$tmp/bin/mv"
+hold_update() {
+  rm -f "$tmp/ready" "$tmp/release"
+  PATH="$tmp/bin:$PATH" CHECK_UPDATE_ROLE=hold HERDR_APP_HOME="$held" "$src/scripts/update.sh" > "$tmp/held.out" 2>&1 &
+  worker=$!
+  attempt=0
+  while [ ! -e "$tmp/ready" ]; do
+    if [ "$attempt" -ge 100 ] || ! kill -0 "$worker" 2>/dev/null; then
+      cat "$tmp/held.out"
+      echo "FAIL check-update: update never reached its first copy"
+      exit 1
+    fi
+    attempt=$((attempt + 1))
+    sleep 0.05
+  done
+}
+expect_conflict() {
+  touch "$tmp/release"
+  if wait "$worker"; then
+    echo "FAIL check-update: update succeeded despite a concurrent save to $1"
+    fail=1
+  else
+    if ! grep -F "$1" "$tmp/held.out" >/dev/null || ! grep -F 'already updated' "$tmp/held.out" >/dev/null ||
+      ! grep -F "$3" "$tmp/held.out" >/dev/null; then
+      echo "FAIL check-update: conflict with $1 did not name the file and report partial updates"
+      cat "$tmp/held.out"
+      fail=1
+    fi
   fi
-  attempt=$((attempt + 1))
-  sleep 0.05
-done
+  worker=
+  if ! cmp -s "$2" "$held/$1"; then
+    echo "FAIL check-update: update overwrote a concurrent save to $1"
+    fail=1
+  fi
+}
+hold_update
 if out=$(PATH="$tmp/bin:$PATH" CHECK_UPDATE_ROLE=compete HERDR_APP_HOME="$held/." "$src/scripts/update.sh" 2>&1); then
   echo "FAIL check-update: a concurrent update to the same home succeeded"
   fail=1
@@ -175,9 +244,29 @@ if [ -e "$tmp/competed" ]; then
 fi
 HERDR_APP_HOME="$other" "$src/scripts/update.sh" >/dev/null
 ok test -f "$other/layouts/herdr-t3.json"
-touch "$tmp/release"
-if ! wait "$worker"; then cat "$tmp/held.out"; exit 1; fi
-worker=
-ok test -f "$held/layouts/herdr-t3.json"
+is '.["layout:herdr-t3"]["cmd-p"]' "$other/keys.json" mod.open:t3-picker
+jq '.theme = "win98" | (.. | objects | .focus? | objects | .color) = "accent"' "$held/layouts/herdr-t3.json" > "$tmp/saved-layout.json"
+cp "$tmp/saved-layout.json" "$held/layouts/herdr-t3.json"
+expect_conflict layouts/herdr-t3.json "$tmp/saved-layout.json" 'Layout and keys were not replaced.'
+ok test -f "$held/mods/t3-home/main.js"
+is 'length' "$held/keys.json" 0
+
+hold_update
+echo '{"global":{"new":"binding"}}' > "$tmp/saved-keys.json"
+cp "$tmp/saved-keys.json" "$held/keys.json"
+expect_conflict keys.json "$tmp/saved-keys.json" 'Layout and keys were not replaced.'
+ok cmp -s "$tmp/saved-layout.json" "$held/layouts/herdr-t3.json"
+
+# A save after the layout rename still wins, and the error names the already-published layout.
+echo '{"global":{"new":"late binding"}}' > "$tmp/saved-keys.json"
+PATH="$tmp/bin:$PATH" CHECK_UPDATE_ROLE=late HERDR_APP_HOME="$held" "$src/scripts/update.sh" > "$tmp/held.out" 2>&1 &
+worker=$!
+expect_conflict keys.json "$tmp/saved-keys.json" 'The layout JSON was also updated. Keys were not replaced.'
+
+# The next run takes fresh snapshots and retains both saves while updating normally.
 HERDR_APP_HOME="$held" "$src/scripts/update.sh" >/dev/null
+is .theme "$held/layouts/herdr-t3.json" win98
+is '[.. | objects | .focus? | objects | .color][0]' "$held/layouts/herdr-t3.json" accent
+is .global.new "$held/keys.json" 'late binding'
+is '.["layout:herdr-t3"]["cmd-p"]' "$held/keys.json" mod.open:t3-picker
 exit "$fail"

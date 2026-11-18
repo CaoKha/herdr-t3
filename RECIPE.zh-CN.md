@@ -132,6 +132,8 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 上／下 agent 按所选模式的行走，不循环；上／下标签在显示的标签间循环。关闭当前 agent 整标签或最后 pane，Inbox 回 Home，Lists 回该 space 最近看的标签；后台关闭不跳。布局发起的每次关闭都先问 `hc get`：只剩自己的 shell 时立即关，否则询问 `Close terminal "<名字>"?`（`This stops the running process and clears its history.`）。
 
+关闭确认覆盖提示中的终端和对 space 的影响。如果确认前范围扩大，就重新询问。Clear 只计入 core 已确认 Settle 的终端。
+
 右键不选中、不切换被点的东西；做不了的项不显示；分组顺序是去处、状态、命名与复制、worktree、结束：
 
 | 对象 | 可用动作 |
@@ -195,6 +197,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 | `cmd-shift-]`／`[`、`ctrl-tab/ctrl-shift-tab`、`ctrl-alt-]`／`[` | `t3-tabs.tab-next/tab-prev`，循环 |
 
 按 Herdr 平台显示键名，非 macOS 的 cmd 是 Super。`cmd-d` 留给 Herdr 分屏。在 Files 或 Review 里，`cmd-t` 打开面板的 `+` 菜单，`cmd-w` 关当前面板标签而不关终端。popup 或对话框持有键盘时，四个关闭键只关这个弹层。
+焦点在 Files 或 Review 时，两个关闭窗格的键只用来收起菜单。要用它们关闭终端窗格，需把焦点移回终端。
 
 ## 由什么构成
 

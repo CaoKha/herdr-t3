@@ -50,6 +50,58 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
     } finally { clearTimeout(timer); }
   };
   try {
+    await test("watch-during-first-conversion", async record => {
+      const r = await runtime(path.join(root, "watch"));
+      await fs.mkdir(r.dir);
+      await fs.writeFile(path.join(r.dir, "A.ans"), FRAME);
+      const reading = pending(), release = pending();
+      let scans = 0;
+      r.hooks.beforeExec = async (cmd, args) => {
+        if (cmd === "sh" && args[1].startsWith("for f in .ans ")) scans++;
+        if (cmd === "cat" && args[0] === path.join(r.dir, "A.ans")) {
+          reading.resolve();
+          await release.promise;
+        }
+      };
+      // Herdr 0.1.16 buffers changes once a directory has a watch, including between two calls.
+      let started = false, waiter = null;
+      const backlog = [];
+      r.hooks.watchFolder = () => {
+        started = true;
+        const w = pending();
+        if (backlog.length) w.resolve(backlog.splice(0));
+        else waiter = w;
+        return Object.assign(w.promise, { cancel() { if (waiter === w) waiter = null; w.resolve([]); } });
+      };
+      const change = file => {
+        if (waiter) {
+          const w = waiter;
+          waiter = null;
+          w.resolve([file]);
+        } else if (started) backlog.push(file);
+      };
+      const h = await r.home({ live: true });
+      try {
+        await reading.promise;
+        for (const name of ["B", "C"]) {
+          const file = path.join(r.dir, `${name}.ans`);
+          await fs.writeFile(file, FRAME);
+          change(file);
+          await new Promise(setImmediate);
+        }
+        assert.equal(scans, 1, "a pending drawing keeps directory scans serial");
+        release.resolve();
+        const listed = await r.settle(() => waiter && h.lib.imported.length === 3, 3000).then(() => true, () => false);
+        const names = Array.from(h.lib.imported, s => s.name);
+        record({ names, scans });
+        assert.deepEqual(names, ["A", "B", "C"], "files copied after enumeration appear without another write");
+        assert.ok(listed, "Home keeps waiting for changes once all files appear");
+        assert.equal(scans, 2, "changes during a scan coalesce into one follow-up scan");
+      } finally { release.resolve(); h.close(); }
+      assert.equal(waiter, null, "closing Home cancels its pending folder watch");
+      await r.settle();
+      assert.equal(waiter, null, "closed Home does not subscribe again");
+    });
     for (const [label, stem] of [["plain", "Plain"], ["unicode", "图片"], ["option", "-option"], ["hidden", ".hidden"], ["spaces", " spaced "]]) {
       await test(`file-name:${label}`, async record => {
         const r = await runtime(path.join(root, label), { stubs }), h = await r.home();

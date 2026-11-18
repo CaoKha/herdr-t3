@@ -82,6 +82,8 @@ export default class Files extends View {
     this.fs = /** @type {any} */ (null);
     this.treeHot = null;
     this.listHeight = {};
+    /** @type {Record<string, string | undefined>} */
+    this.treeReveal = {};
     stopsInit(this, cx);
     this.fs.hold = () => this.searchFocused || this.treeHandle.is_focused() || this.navHandle.is_focused();
     this.search.on("focus", (_e, cx) => { this.searchFocused = true; cx.notify(); });
@@ -104,8 +106,12 @@ export default class Files extends View {
     cx.spawn(async (cx) => {
       for (;;) {
         const c = await nextCommand(), st = this.current(), at = c.indexOf(":"), [what, arg] = [c.slice(0, at), c.slice(at + 1)];
-        // Over its menus, cmd-w closes them, not the surface under them.
-        if (c === "close") { if (!closeMenus()) closeSurface(); cx.notify(); }
+        // The terminal's pane-close keys only dismiss menus while Files has the keyboard.
+        if (c === "close" || c === "close:menu") {
+          if (!closeMenus() && c === "close") closeSurface();
+          cx.notify();
+          continue;
+        }
         if (c === "focus") { enter(this, cx, "t3-files-refresh"); this.search.focus(); }
         if (!st || at < 0) continue;
         if (what === "open") this.pick(st, arg, cx);
@@ -155,7 +161,7 @@ export default class Files extends View {
 
   // It works only while it shows: the page in the open panel, the window in front, for the active space. Shown, it reads at
   // once; hidden, answers still under way are dropped and nothing more is asked. A closed space's state goes.
-  sync(cx) {
+  sync(cx, focus = false) {
     if (checking()) return;
     const all = spaces(), sp = all.find((s) => s.active);
     for (const [id, st] of this.states) {
@@ -167,15 +173,18 @@ export default class Files extends View {
     const st = sp && this.shown() ? this.stateFor(sp) : null;
     if (st) {
       // A tab picked (its reveal moved), or another tab: shown, its search cleared, the tree on it (T3's revealRequestId). The
-      // tree takes the keyboard only when the person went there from it or the breadcrumbs (`userNav`), never for a tab
+      // tree takes the keyboard only when the person went there from it or the breadcrumbs, never for a tab
       // picked elsewhere: the terminal they type in keeps it.
-      const tab = activeTab(sp.id), key = tabKey(tab);
-      if (st.seen !== key || st.file !== (tab?.folder ? null : tab?.path ?? null) || st.folder !== (tab?.folder ? tab.path ?? "" : null)) {
+      const tab = activeTab(sp.id), key = tabKey(tab), picked = st.seen !== key;
+      const matches = () => st.file === (tab?.folder ? null : tab?.path ?? null) && st.folder === (tab?.folder ? tab.path ?? "" : null);
+      if (picked || !matches()) {
+        if (picked) this.supersedeReveal(st);
         st.seen = key;
         cx.timer.after(0, (cx) => {
           // Moved on meanwhile (another pick, or Files opened one itself): that one's what shows.
           if (!this.shown() || spaces().find(p => p.active)?.id !== st.id || st.seen !== key || tabKey(activeTab(st.id)) !== key) return;
-          const focus = this.userNav; this.userNav = false;
+          // A redraw may have queued this before the breadcrumb's timer applied the same tab.
+          if (!picked && matches()) return;
           if (tab?.folder) {
             st.file = null; st.view = null; st.folder = tab.path ?? ""; st.trail = tab.trail ?? st.folder;
             this.find(st, "", cx); this.search.set_value(""); this.reveal(st, st.folder, cx, focus);
@@ -276,6 +285,7 @@ export default class Files extends View {
   }
 
   toggle(st, path, cx) {
+    this.supersedeReveal(st);
     ticket(st, "expand"); st.expanding = false; st.expandAll = false;
     const row = this.rows(st).find(r => r.path === path), top = row?.top ?? path;
     const chain = [...new Set([top, ...ancestors(path).filter(p => p.startsWith(`${top}/`)), path])];
@@ -308,14 +318,20 @@ export default class Files extends View {
   // Opens the folders down to `path` (a file's, or a folder lit until the next click) and brings its row into view; `focus`,
   // the person went there from the tree or the breadcrumbs, so the tree takes the keyboard.
   reveal(st, path, cx, focus = false) {
-    for (const p of ancestors(path)) st.expanded.add(p);
-    this.select(st, path || null);
+    const parents = ancestors(path), latest = this.select(st, path || null);
     st.focus = path || null;
     this.changed(st);
-    const go = this.going(st);
+    const visible = this.going(st), tab = tabKey(activeTab(st.id));
+    // The tab can change before Files is drawn again. The ticket also covers moves within the same tab.
+    const go = () => latest() && visible() && tabKey(activeTab(st.id)) === tab;
     cx.spawn(async (cx) => {
-      for (const p of ancestors(path)) if (go() && !st.entries.has(p)) await this.list(st, p);
+      for (const p of parents) {
+        if (!go()) return;
+        if (!st.entries.has(p)) await this.list(st, p);
+      }
       if (!go()) return;
+      for (const p of parents) st.expanded.add(p);
+      this.changed(st);
       // The space's folder is the tree's top.
       const id = `t3-files-tree-${st.id}`;
       if (path) revealRow(this, id, path); else this.scrollTop = { ...this.scrollTop, [id]: 0 };
@@ -462,7 +478,7 @@ export default class Files extends View {
   // and are once the page shows again (recheck).
   find(st, query, cx) {
     query = query.slice(0, 256);
-    if (st.query !== query) { st.searchClosed = new Set(); ticket(st, "expand"); st.expanding = false; st.expandAll = false; }
+    if (st.query !== query) { this.supersedeReveal(st); st.searchClosed = new Set(); ticket(st, "expand"); st.expanding = false; st.expandAll = false; }
     st.query = query;
     const words = terms(query), fresh = this.fresh(st, "search");
     this.changed(st); cx.notify();
@@ -518,9 +534,8 @@ export default class Files extends View {
   // A breadcrumb: the person's own move, so the tree takes the keyboard once it's there.
   navigate(st, path, cx) {
     if (path && path === st.trail && path !== st.folder) { this.pick(st, path, cx, false, true); return; }
-    this.userNav = true;
     navigateFolder(path, st.trail ?? st.file ?? path, Boolean(st.file));
-    this.sync(cx);
+    this.sync(cx, true);
   }
 
   rows(st) {
@@ -536,7 +551,14 @@ export default class Files extends View {
     return st.rows = rows;
   }
 
-  select(st, path) { st.selected = path; }
+  // This space's reveal ticket and queued scroll live only for this run.
+  supersedeReveal(st) {
+    const id = `t3-files-tree-${st.id}`;
+    if (this.treeReveal[id] !== undefined) revealRow(this, id, undefined);
+    return ticket(st, "reveal");
+  }
+
+  select(st, path) { st.selected = path; return this.supersedeReveal(st); }
 
   /** @param {any} state */
   control(t, id, icon, label, press, state = {}) {
@@ -699,6 +721,7 @@ export default class Files extends View {
   allExpanded(st) { this.rows(st); return Boolean(st.expandAll || st.index.allExpanded); }
 
   foldAll(st, cx) {
+    this.supersedeReveal(st);
     const collapse = this.allExpanded(st);
     st.expandAll = !collapse;
     const go = this.fresh(st, "expand"); // Collapse invalidates the in-flight expansion before any awaited read can reopen a folder.
@@ -777,7 +800,7 @@ export default class Files extends View {
         const k = treeKey(e.key, rows, at);
         if (!k) return;
         this.treeKeys = true;
-        if (k.at !== undefined) { st.focus = rows[k.at].path; revealRow(this, `t3-files-tree-${st.id}`, st.focus); }
+        if (k.at !== undefined) { this.supersedeReveal(st); st.focus = rows[k.at].path; revealRow(this, `t3-files-tree-${st.id}`, st.focus); }
         else if (k.pick) this.chooseRow(st, k.pick, cx);
         else { st.focus = k.toggle.path; this.toggle(st, k.toggle.path, cx); }
         cx.stop_propagation();

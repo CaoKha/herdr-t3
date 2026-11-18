@@ -26,7 +26,7 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
 function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null, appDir = null, clock = Date } = {}) {
   const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
-    props: null, overlays: [], closed: [], commands: [] };
+    props: null, overlays: [], closed: [], commands: [], focusCalls: 0 };
   const shared = {}, wrote = [], store = new Map([["lines.wrap", "false"], ["nav.width", "300"]]), timers = [], everies = [], failed = [];
   const commands = [];
   let wake = null, running = null;
@@ -52,7 +52,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   const task = () => ({ cancelled: false, done: false, cancel() { this.cancelled = true; }, is_done() { return this.done || this.cancelled; } });
   // As Herdr's: cancelling a task stops nothing already awaited (a watch, an exec); it only says it's done.
   const cx = {
-    notify() { w.notified++; }, stop_propagation() { cx.stopped = true; }, write_to_clipboard() {}, focus_handle: () => { const h = { focus() { w.focused = h; }, is_focused: () => w.focused === h }; return h; },
+    notify() { w.notified++; }, stop_propagation() { cx.stopped = true; }, write_to_clipboard() {}, focus_handle: () => { const h = { focus() { w.focusCalls++; w.focused = h; }, is_focused: () => w.focused === h }; return h; },
     spawn(f) {
       const t = task();
       Promise.resolve().then(() => { running = t; try { return f(cx); } finally { running = null; } }).then(() => { t.done = true; }, (e) => failed.push(e));
@@ -248,7 +248,9 @@ async function page() {
   send("open:README.md"); await settle();
   // A breadcrumb is the person's own move: the tree takes the keyboard once it's there.
   w.focused = "terminal";
-  find(view.render(cx), "crumb-").handlers.on_click({}, cx); await fire(0); await settle();
+  find(view.render(cx), "crumb-").handlers.on_click({}, cx);
+  view.render(cx); // Files may draw again before applying the breadcrumb's tab.
+  await fire(0); await settle();
   root = view.render(cx);
   assert.equal(find(root, "t3-files-code"), null, "a directory surface has no file preview");
   assert.ok(find(root, "crumb-README.md"), "directory navigation retains the source trail");
@@ -277,6 +279,39 @@ async function page() {
   assert.ok(find(view.render(cx), "crumb-b.js"), "the picked file opens");
   assert.equal(w.focused, view.treeHandle);
   assert.deepEqual(wrote.filter((k) => /reveal/.test(k)), [], "no cross-page request");
+}
+
+async function lateReveal() {
+  const listing = new Map([["/r", "d\0src\0f\0b.js\0"], ["/r/src", "d\0deep\0f\0x.js\0"], ["/r/src/deep", "f\0a.js\0"]]);
+  for (const move of ["tab", "tab before redraw", "folder row", "arrow key"]) {
+    const { view, cx, w, settle, fire, send, ctx } = makePage({ listing });
+    view.render(cx); await settle();
+    send("open:b.js"); await settle();
+    const root = () => view.render(cx);
+    find(root(), "t3-files-tree-s1").handlers.on_size_change({ height: 48 }, cx);
+    root();
+
+    w.stall = line => line.includes(m.LIST) && line.endsWith("/r/src");
+    send("pick:src/deep/a.js"); await settle();
+    assert.equal(w.stalled.length, 1, "the breadcrumb menu's pick is waiting for A's ancestor");
+
+    if (move === "folder row") find(root(), "row-src").handlers.on_click({}, cx);
+    else if (move === "arrow key") find(root(), "t3-files-tree").handlers.on_key_down({ key: "end" }, cx);
+    else vm.runInContext('activateSurface("file:b.js")', ctx);
+    if (move !== "tab before redraw") { root(); await fire(0); root(); }
+    w.focused = "terminal";
+    const focusCalls = w.focusCalls;
+    w.stall = null; w.stalled.splice(0).forEach(release => release()); await settle();
+    assert.equal(w.focusCalls, focusCalls, `${move}: A's late reveal did not request focus`);
+    assert.equal(w.focused, "terminal", `${move}: focus stays on the terminal`);
+    assert.ok(!w.ran.some(r => r.line.includes(m.LIST) && r.cwd === "/r/src/deep"), `${move}: the stale reveal did not read the next ancestor`);
+    root(); await fire(0);
+    const after = root();
+    if (move.startsWith("tab")) {
+      assert.equal(find(after, "row-b.js")?.style.bg?.[0], "#ffffff1f", `${move}: B is visible and selected`);
+      assert.equal(find(after, "row-src/deep/a.js"), null, `${move}: the tree did not jump to A`);
+    }
+  }
 }
 
 // The menus are popups of their own (menus.js): a breadcrumb's folder read as it opens, a folder in it shown in place; a file
@@ -738,6 +773,36 @@ async function searchMatchesWords() {
   assert.equal(find(root, "row-a.js"), null, "from no search: not the whole tree under the words");
 }
 
+async function closeKeys() {
+  const { view, cx, w, send, settle, shared, ctx } = makePage();
+  const keys = require("../../keys.json"), bindings = keys["mod:t3-files"];
+  for (const key of ["cmd-w", "ctrl-alt-shift-x", "cmd-shift-w", "ctrl-alt-x"]) {
+    assert.equal(keys["mod:review"][key], bindings[key]?.replace(/^t3-files\./, "review."), `${key} routes to the same close action in Files and Review`);
+  }
+  shared["t3.panels"] = { s1: { open: true, tabs: [{ id: "files", born: 1 }], active: "files" } };
+  view.render(cx); await settle();
+  const press = async (key) => {
+    const action = bindings[key];
+    assert.ok(action?.startsWith("t3-files."), `${key} is handled by Files when it has the keyboard`);
+    send(action.slice("t3-files.".length)); await settle();
+  };
+  for (const key of ["cmd-shift-w", "ctrl-alt-x", "cmd-w", "ctrl-alt-shift-x"]) {
+    const tree = view.tree(view.current(), ctx.theme());
+    find(tree, "row-a.js").handlers["on_mouse_down:right"]({}, cx);
+    const id = `o${w.overlays.length}`;
+    await press(key);
+    assert.equal(w.closed.at(-1), id, `${key} dismisses the open tree menu`);
+    assert.equal(shared["t3.panels"].s1.active, "files", `${key} keeps the tab when a menu is open`);
+    ctx.menuClosed(id);
+  }
+  for (const key of ["cmd-shift-w", "ctrl-alt-x"]) {
+    await press(key);
+    assert.equal(shared["t3.panels"].s1.active, "files", `${key} leaves the tab alone without a menu`);
+  }
+  await press("cmd-w");
+  assert.equal(shared["t3.panels"].s1.active, null, "the tab close key still closes the surface with no menu");
+}
+
 async function surfaceCache() {
   const { view, cx, settle, fire, send, tick } = makePage();
   view.render(cx); await settle(); await fire(0);
@@ -862,8 +927,10 @@ async function surfaceCache() {
   await expandReach();
   await largeFiles();
   await page();
+  await lateReveal();
   await dragRows();
   await resources();
+  await closeKeys();
   await surfaceCache();
   await searchMatchesWords();
   await menus();

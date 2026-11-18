@@ -96,13 +96,40 @@ export default class Wallpaper extends View {
       this.zoomFocus.focus();
       this.zoomBy(d, z / d.placement.zoom, null, cx);
     });
-    if (!checking()) cx.spawn(async (cx) => {
-      await this.lib.ready;
-      await this.lib.refresh(cx);
-      // Our own cache writes land here too: only an .ans file, or a batch that means everything, is news.
-      for (;;) if ((await watchFolder(this.dir)).some((p) => p === this.dir || p.endsWith(".ans"))) await this.lib.refresh(cx);
-    });
+    if (!checking()) cx.spawn((cx) => this.watchLibrary(cx));
     cx.spawn(async (cx) => { for (;;) this.command(await nextCommand(), cx); });
+  }
+
+  async watchLibrary(cx) {
+    await this.lib.ready;
+    let scan = true;
+    try {
+      while (!this.closed) {
+        // Arm before the first scan and rearm before acting on each batch.
+        const watch = this.folderWatch = watchFolder(this.dir);
+        if (scan) this.queueLibraryScan(cx);
+        // Cache writes land here too. Only an .ans path or a root invalidation is news.
+        scan = (await watch).some((p) => p === this.dir || p.endsWith(".ans"));
+      }
+    } finally { this.folderWatch = null; }
+  }
+
+  queueLibraryScan(cx) {
+    // Memory for this Home only. Many batches during one conversion need just one more scan.
+    this.scanQueued = true;
+    if (this.scanning) return;
+    this.scanning = true;
+    cx.spawn(async (cx) => {
+      try {
+        while (!this.closed && this.scanQueued) {
+          this.scanQueued = false;
+          await this.lib.refresh(cx);
+        }
+      } finally {
+        this.scanning = false;
+        if (!this.closed && this.scanQueued) this.queueLibraryScan(cx);
+      }
+    });
   }
 
   // A command for this mod: Herdr's "focus", a confirmed deletion, or a pick from the menu this Home opened.
@@ -124,6 +151,7 @@ export default class Wallpaper extends View {
     if (props()?.menu === "add") { setShared(MENU_CLOSED, Date.now()); return; }
     stopsEnd(this);
     this.closed = this.lib.closed = true;
+    this.folderWatch?.cancel();
     this.previewRequest = null;
     this.drag = null;
     this.scale.release();

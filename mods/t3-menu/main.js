@@ -70,6 +70,8 @@ function paneAncestors(byAddress, byAgent) {
   };
 }
 
+const terminalPane = (address) => panes().find((p) => p.terminal === address);
+
 // An agent's menu, wherever it's right-clicked (an Inbox card, an Agents row, the tab bar's title): what it can do now, as
 // T3's thread actions. Settle and Snooze are the Inbox's (docs/adr/0002): with Lists chosen they aren't offered.
 function agentItems(address) {
@@ -77,6 +79,7 @@ function agentItems(address) {
   const byAddress = new Map(all.map((k) => [k.address, k])), byAgent = new Map(every.map((a) => [a.address, a]));
   const k = byAddress.get(address), a = byAgent.get(address), above = paneAncestors(byAddress, byAgent);
   if (!k) return [];
+  const pane = terminalPane(address);
   const inbox = sidebarParts(layout()).stack?.active !== "lists";
   const kids = subAgents(every, all)(address), own = ownStatus(a?.status, address, all);
   const busy = [own, ...kids].some((s) => s === "working" || s === "blocked");
@@ -99,7 +102,7 @@ function agentItems(address) {
       ["Copy address", "copy", { text: address }],
       ...(parent ? [[`Send back to ${parent.name || parent.address}`, "terminal.park", { terminal: address }]] : []),
     ],
-    a ? [["Close", "pane.close", { pane: a.pane }]] : [],
+    pane ? [["Close", "pane.close", { pane: pane.pane }]] : [],
   );
 }
 
@@ -270,7 +273,7 @@ function spaceSwitchEntries(spaceId, now) {
     const done = st === "done" && (!a || !stillSettled(k, a.status, kids));
     const snoozed = root && inbox && napping && st !== "working" && st !== "blocked";
     entries.push({
-      kind: "agent", id: `space-item-${address}`, address, pane: a?.pane, listed: listed.has(address), depth,
+      kind: "agent", id: `space-item-${address}`, address, listed: listed.has(address), depth,
       label: a ? name(a) : (k.name || k.template || k.program?.name || address), program: a?.program ?? k?.program,
       status: st, newsDone: done && !(a && napping), snoozed,
       snoozedUntil: snoozed || (a && done && napping) ? snoozedUntil : Infinity,
@@ -375,9 +378,10 @@ export default class Menu extends View {
       const entry = entries[i - 1];
       if (!entry) return;
       if (entry.kind === "agent") {
-        if (!entry.pane) run("terminal.peek", { terminal: entry.address });
+        const pane = terminalPane(entry.address);
+        if (!pane) run("terminal.peek", { terminal: entry.address });
         else if (entry.listed) focusAgent(entry.address);
-        else focusPane(entry.pane);
+        else focusPane(pane.pane);
       } else {
         focusPane(entry.pane);
       }

@@ -132,6 +132,8 @@ Clicking a tab selects it, double-click renames, right-click opens its menu, dra
 
 Agent next/previous walks the selected mode's rows without wrapping; tab next/previous wraps through the displayed tabs. Closing the viewed agent's whole tab or last pane lands on Home in Inbox, on the space's last-viewed tab in Lists; background closes never navigate. Every layout close asks `hc get` first and closes at once only when the terminal holds its own shell; otherwise it asks `Close terminal "<name>"?` (`This stops the running process and clears its history.`).
 
+The close confirmation covers the terminals and space consequence shown. Ask again if that scope grows before the user confirms. Clear counts only Settle labels confirmed by the core.
+
 Context menus don't select or switch what was right-clicked; impossible items are left out, and groups go destination, state, names and copies, worktrees, ending:
 
 | Target | Available actions |
@@ -195,6 +197,7 @@ Every control is a Tab stop clicked by Enter or Space, with a 2px inset `accent`
 | `cmd-shift-]` / `[`, `ctrl-tab` / `ctrl-shift-tab`, `ctrl-alt-]` / `[` | `t3-tabs.tab-next` / `tab-prev`, wrap |
 
 Key labels follow Herdr's platform (`cmd` is Super off macOS). `cmd-d` stays Herdr's split. In Files or Review, `cmd-t` opens the panel's `+` menu and `cmd-w` closes the active surface tab, never the terminal. With a popup or dialog owning the keyboard, the four close keys close the overlay instead.
+While Files or Review has keyboard focus, the two pane-close keys only dismiss menus. Closing a terminal pane with these keys requires returning focus to the terminal.
 
 ## Built from
 

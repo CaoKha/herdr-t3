@@ -18,6 +18,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   // Spaces that were Home until an agent started there: their rename may not have shown yet.
   const released = new Set();
   let renaming = false, going, homing, inView, wasHome, unread, focusWas, zoomOff, asking, settingsOpen;
+  let tabAnswer, tabAskSerial = 0;
   const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
   // The Inbox's ways with attention hold unless Lists is the mode (docs/adr/0002).
   const listsShown = () => sidebarParts(layout()).stack?.active === "lists";
@@ -29,17 +30,20 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   const homeId = () => shared(KEY.home);
   // Reads "Home", with a zero-width space nobody types: a space someone else calls Home is never taken for it, and being wrong would hide theirs.
   const HOME_NAME = "Home\u200b";
+  const local = (s) => s.machine === null;
+  const namedHome = (s) => local(s) && s.named && s.name === HOME_NAME && !released.has(s.id);
+  const knownHome = (all = spaces()) => all.find(s => s.id === homeId() && local(s));
 
   // The id is this computer's (shared.json) and the space the core's, so another window on that core finds Home by its name.
   function knowHome() {
-    const all = spaces(), known = all.find(s => s.id === homeId());
+    const all = spaces(), known = knownHome(all);
     // A Home made before it had a name of its own.
     if (known?.name === "Home" && !renaming) { renaming = true; run("space.rename", { id: known.id, name: HOME_NAME }); }
     if (known) return;
-    const found = all.find(s => s.machine === null && s.named && s.name === HOME_NAME && !released.has(s.id));
+    const found = all.find(namedHome);
     if (found) setShared(KEY.home, found.id);
   }
-  const atHome = () => Boolean(homeId()) && spaces().some(s => s.active && s.id === homeId());
+  const atHome = () => Boolean(knownHome()?.active);
   // Home's tab is selected but spaces() hasn't caught up: the layout already takes Home's shape, so Home's first frame isn't
   // the 60px shorter one under `main`'s header and the unfolded row. 1s at most, for a select that didn't land.
   // Arrived, it's over: leaving straight after isn't taken for still coming.
@@ -62,18 +66,21 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     const here = machines().find(m => m.name === null);
     if (here && here.layout !== "ready") return;
     knowHome();
-    if (spaces().some(s => s.id === homeId())) return refitHome(true);
+    if (knownHome()) return refitHome(true);
     const before = new Set(spaces().map(s => s.id));
     run("space.new", { name: HOME_NAME, machine: "", folder: home() });
-    const made = await seen(cx, () => spaces().find(s => !before.has(s.id) && s.name === HOME_NAME));
+    const found = await seen(cx, () => spaces().find(s => !before.has(s.id) && namedHome(s))?.id);
+    const made = spaces().find(s => s.id === found && namedHome(s));
     if (!made) return;
     setShared(KEY.home, made.id);
     // A new space comes with a shell: Home as a terminal, that's it. Else, as a space can't lose its last tab, the mod goes in first.
     if (!homeMod()) return;
     const shell = made.tabs[0]?.id;
     run("tab.new", { space: made.id, name: "Home", mod: homeMod() });
-    const page = await seen(cx, () => spaces().find(s => s.id === made.id)?.tabs.find(c => c.id !== shell)?.id);
-    if (page && shell) run("tab.close", { id: shell, confirmed: true });
+    const sameHome = () => spaces().find(s => s.id === made.id && namedHome(s));
+    const page = await seen(cx, () => sameHome()?.tabs.find(c => c.id !== shell)?.id);
+    const tabs = sameHome()?.tabs ?? [];
+    if (tabs.some(c => c.id === page) && tabs.some(c => c.id === shell)) run("tab.close", { id: shell, confirmed: true });
   }
   // The selected sidebar's rows, shown or hidden, stopping at either end.
   function step(command) {
@@ -117,6 +124,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     // The dialog covers it, nothing reports the leaving until the pointer moves, and the × stops the press that would close the card.
     beforeAsk(cx);
     if (asking) closeOverlay(asking);
+    tabAnswer = null;
     const [title, detail] = names.length === 1
       ? [`Close terminal "${names[0]}"?`, "This stops the running process and clears its history."]
       : [`Close ${names.length} terminals?`, `This stops their running processes and clears their histories: ${names.map(n => `"${n}"`).join(", ")}.`];
@@ -124,23 +132,48 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     asking = openOverlay({ mod: "t3-actions", kind: "dialog", frame: "none", width: 512, props: { actions: "confirm", title, detail: detail + more, yes: "Close", command: { name: command } } });
   }
 
-  // Ending a program asks first; empty panes have none to lose, and Herdr still asks if it's the space's last tab.
-  async function closeTab(id, cx) {
+  function tabCloseScope(id) {
     const space = spaces().find(s => s.tabs.some(c => c.id === id));
     // A key pressed out of habit doesn't take Home and what's there with it.
-    if (!space || space.id === homeId()) return;
-    const c = space.tabs.find(c => c.id === id), mine = panes().filter(p => p.tab === id);
-    const live = mine.filter(p => p.terminal), empty = await Promise.all(live.map(p => atPrompt(p.terminal)));
-    // A lone pane goes by its tab's name, as the tab shows it.
-    const name = namer();
-    const names = live.filter((_, k) => !empty[k]).map(p => mine.length === 1 ? nameOf(c, p, name) : name(p));
-    if (names.length === 0) return closeTabNow(id, {}, cx);
-    ask(names, space.tabs.length === 1 ? " It's the space's last tab, so the space closes too." : "", `t3-tabs.close-tab-now:${id}`, cx);
+    if (!space || space.id === homeId()) return null;
+    const tab = space.tabs.find(c => c.id === id), mine = panes().filter(p => p.tab === id);
+    const live = mine.filter(p => p.terminal), terminals = new Set(live.map(p => p.terminal));
+    return { space: space.id, tab, mine, live, terminals, closesSpace: space.tabs.length === 1 };
   }
 
-  async function closeTabNow(id, args, cx) {
+  function askTabClose(scope, idle, cx) {
+    const busy = scope.live.filter(p => !idle.has(p.terminal));
+    if (!busy.length) return false;
+    // A lone pane goes by its tab's name, as the tab shows it.
+    const name = namer();
+    const names = busy.map(p => scope.mine.length === 1 ? nameOf(scope.tab, p, name) : name(p));
+    const command = `close-tab-now:${++tabAskSerial}`;
+    ask(names, scope.closesSpace ? " It's the space's last tab, so the space closes too." : "", `t3-tabs.${command}`, cx);
+    tabAnswer = { command, id: scope.tab.id, space: scope.space, closesSpace: scope.closesSpace, terminals: scope.terminals, idle };
+    return true;
+  }
+
+  // Ending a program asks first. Empty panes have none to lose, and an unconfirmed close leaves the space question to Herdr.
+  async function closeTab(id, cx, answer = null) {
+    const start = tabCloseScope(id);
+    if (!start || (answer && start.space !== answer.space)) return;
+    const covers = (scope) => answer && (answer.closesSpace || !scope.closesSpace) &&
+      [...scope.terminals].every(address => answer.terminals.has(address));
+    const idle = answer?.idle ?? new Set();
+    if (!answer) {
+      await Promise.all([...start.terminals].map(async address => {
+        if (await atPrompt(address)) idle.add(address);
+      }));
+    }
+    const before = tabCloseScope(id);
+    if (!before || before.space !== start.space) return;
+    if (!covers(before) && askTabClose(before, idle, cx)) return;
     await leave(id, cx);
-    run("tab.close", { id, ...args });
+    // Home can take several frames to arrive. Recheck in the same turn as the destructive command.
+    const now = tabCloseScope(id);
+    if (!now || now.space !== start.space) return;
+    if (covers(now)) run("tab.close", { id, confirmed: true });
+    else if (!askTabClose(now, idle, cx)) run("tab.close", { id });
   }
 
   async function closePaneNow(pane, cx) {
@@ -157,14 +190,17 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   // there, or an idle shell when a mod is wanted, gives way to it; a shell busy with something else keeps its tab, and Home
   // gets a new one.
   async function refitHome(go) {
-    const homeTabs = () => spaces().find(s => s.id === homeId())?.tabs.map(c => c.id) ?? [];
-    const ps = panes(), mine = ps.filter(p => homeTabs().includes(p.tab));
+    const space = knownHome();
+    if (!space) return;
+    const tabs = new Set(space.tabs.map(c => c.id));
+    const ps = panes(), mine = ps.filter(p => tabs.has(p.tab));
     // panes() hasn't caught up with Home yet: showing it is all there is to do.
-    if (!mine.length) return go && run("space.select", { id: homeId() });
+    if (!mine.length) return go && run("space.select", { id: space.id });
     const fits = (p) => homeMod() ? p.mod === homeMod() : Boolean(p.terminal);
     const owns = mine.filter(p => ps.filter(q => q.tab === p.tab).length === 1);
     let own = owns.find(fits) ?? owns.find(p => p.mod);
     for (const p of own ? [] : owns.filter(p => p.terminal)) if (await atPrompt(p.terminal)) { own = p; break; }
+    if (knownHome()?.id !== space.id) return;
     if (own && !fits(own)) {
       run("pane.split", { direction: "right", pane: own.pane, ...fill() });
       run("pane.close", { pane: own.pane });
@@ -173,10 +209,10 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     // tab.select brings the space along, so nothing else there shows on the way.
     if (own) {
       homing = Date.now();
-      api.arrive?.(homeId());
+      api.arrive?.(space.id);
       return run("tab.select", { id: own.tab });
     }
-    run("tab.new", { space: homeId(), name: "Home", folder: home(), ...fill() });
+    run("tab.new", { space: space.id, name: "Home", folder: home(), ...fill() });
   }
 
   // The Inbox breadcrumb's space: a tab to work in. One already waiting (a shell alone in its tab, at its prompt), the latest
@@ -245,7 +281,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     knowHome();
     // An agent started in Home (in its shell) makes that space an ordinary one, named for its folder, where it is: nothing
     // moves, so nothing flickers. Going Home next makes a new Home (docs/adr/0005).
-    const homeSpace = spaces().find(s => s.id === homeId());
+    const homeSpace = knownHome();
     if (homeSpace && agents().some(a => homeSpace.tabs.some(c => c.id === a.tab))) {
       released.add(homeSpace.id);
       setShared(KEY.home, null);
@@ -449,7 +485,13 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
       else if (command.startsWith("close-tab:")) await closeTab(command.slice("close-tab:".length), cx);
       else if (command.startsWith("close-pane:")) await closePane(command.slice("close-pane:".length), cx);
       // What a close's dialog runs, once the person has said yes.
-      else if (command.startsWith("close-tab-now:")) await closeTabNow(command.slice("close-tab-now:".length), { confirmed: true }, cx);
+      else if (command.startsWith("close-tab-now:")) {
+        const answer = tabAnswer;
+        if (answer?.command === command) {
+          tabAnswer = null;
+          await closeTab(answer.id, cx, answer);
+        }
+      }
       else if (command.startsWith("close-pane-now:")) await closePaneNow(command.slice("close-pane-now:".length), cx);
       else if (command === "home") await goHome(cx);
       else if (command === "home-mod") await refitHome(false);

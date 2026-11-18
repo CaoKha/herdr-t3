@@ -54,6 +54,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 - No Git badges, no deleted ghosts, no row or crumb tooltips (the user removed them, clipped names included).
 - One selection. Arrows, Home, End, Enter, Space and Shift+F10 work.
 - Only moves started from the tree or the breadcrumbs focus the tree. Tab switches, commands and other reveals only scroll and select, never taking the terminal's keyboard.
+- If a reveal is waiting for ancestor folders, a newer selection or keyboard move owns the tree. The earlier reveal can no longer open its ancestors, scroll to its row or focus the tree.
 - Rows are virtual: only visible rows are drawn. The focus index and folder counts are built once per tree rebuild.
 - A folder that can't be listed says so at its own row's end: `Can't list · Retry`, 12px `ansi1` (the destructive color is words only), what the shell or Herdr said on hover; a click reads it again without opening or closing it. Only the top folder's error stands in for the tree, with nothing else to draw.
 

@@ -6,6 +6,7 @@ const vm = require("node:vm");
 const kit = require("./check-kit.js"), { plain } = kit;
 const source = kit.bundle((file) => fs.readFileSync(path.join(__dirname, file), "utf8"), "navigation.js");
 const flush = () => new Promise(setImmediate);
+const closeAnswer = overlay => overlay.props.command.name.slice("t3-tabs.".length);
 
 // twice: every frame() runs twice, as the tab strip and the keys copy both track one navigation each frame (main.js).
 let twice = false;
@@ -48,6 +49,85 @@ function fixture() {
 }
 
 async function check() {
+  // The first confirmation covers the terminals and space consequence the person saw. The same scope can close after the
+  // Home landing, even if a terminal has gone away. A larger scope needs a fresh answer.
+  const closeRaces = [];
+  for (const when of ["dialog", "landing"]) {
+    for (const change of ["terminal", "last tab"]) {
+      const f = fixture(), space = f.spaces()[0], view = f.navigation();
+      space.tabs[0].active = true;
+      space.tabs.push({ id: "spare" });
+      const home = { id: "h", machine: null, named: true, name: "Home\u200b", tabs: [{ id: "shell" }] };
+      if (when === "dialog") f.spaces().push(home);
+      const say = command => view.handle(command, f.cx);
+      const closed = () => f.calls.filter(([name, args]) => name === "tab.close" && args.id === "b0");
+      const changeScope = () => change === "terminal"
+        ? f.panes().push({ pane: "late", tab: "b0", terminal: "late-terminal", title: "Late" })
+        : space.tabs.pop();
+      await say("close-tab:b0");
+      const original = closeAnswer(f.overlays.pop());
+      if (when === "dialog") changeScope();
+      let closedOrAsked = false;
+      const closing = say(original).then(() => { closedOrAsked = true; });
+      await flush();
+      if (when === "landing") changeScope();
+      // Complete Home if asked for, while the source tab is still waiting to close.
+      if (f.calls.some(([name]) => name === "space.new")) {
+        f.state["t3.settings"] = { homeMod: null };
+        f.spaces().push(home);
+        await f.tick();
+      }
+      try {
+        assert.ok(closedOrAsked, `${when}: the answer was handled once Home was ready`);
+        await closing;
+        assert.deepEqual(closed(), [], `${when}: a new ${change} must not close on the old answer`);
+        const updated = f.overlays.pop();
+        assert.ok(updated, `${when}: show the new scope`);
+        if (change === "terminal") assert.equal(updated.props.title, "Close 2 terminals?");
+        else assert.match(updated.props.detail, /space closes too/);
+        await say(original);
+        assert.deepEqual(closed(), [], "the old answer cannot confirm the replacement dialog");
+        const calls = f.labelled.length;
+        await say(closeAnswer(updated));
+        assert.equal(f.labelled.length, calls, "an unchanged scope needs no additional process checks");
+        assert.deepEqual(closed(), [["tab.close", { id: "b0", confirmed: true }]]);
+      } catch (e) { closeRaces.push(e); }
+    }
+  }
+  {
+    const f = fixture(), view = f.navigation();
+    f.panes().push({ pane: "later-exits", tab: "b0", terminal: "other-terminal" });
+    await view.handle("close-tab:b0", f.cx);
+    const answer = closeAnswer(f.overlays.pop()), probes = f.labelled.length;
+    f.panes().pop();
+    f.spaces()[0].tabs.push({ id: "spare" });
+    await view.handle(answer, f.cx);
+    assert.deepEqual(f.calls, [["tab.close", { id: "b0", confirmed: true }]], "fewer terminals and no space closure need no new answer");
+    assert.deepEqual([f.overlays.length, f.labelled.length], [0, probes]);
+  }
+
+  // A same-named remote Home can appear before the local space creation is reflected in spaces().
+  {
+    const f = fixture(), view = f.navigation(), spaces = f.spaces();
+    const pending = view.handle("home", f.cx);
+    await flush();
+    const reserved = "Home\u200b";
+    spaces.push({ id: "remote-home", machine: "vps", named: true, name: reserved, tabs: [{ id: "remote-shell" }, { id: "remote-page" }] });
+    await f.tick();
+    try {
+      assert.deepEqual([f.state["t3-tabs.home"], f.calls],
+        [undefined, [["space.new", { name: reserved, machine: "", folder: "/home/test" }]]], "the remote Home remains untouched");
+      const local = { id: "local-home", machine: null, named: true, name: reserved, tabs: [{ id: "local-shell" }] };
+      spaces.push(local);
+      await f.tick();
+      assert.equal(f.state["t3-tabs.home"], local.id);
+      local.tabs.push({ id: "local-page" });
+      await f.tick(); await pending;
+      assert.deepEqual(f.calls.slice(1), [["tab.new", { space: "local-home", name: "Home", mod: "t3-home" }], ["tab.close", { id: "local-shell", confirmed: true }]]);
+    } catch (e) { closeRaces.push(e); }
+  }
+  if (closeRaces.length) throw new AggregateError(closeRaces, "destructive navigation races");
+
   // Closing one split keeps the surviving panes in view, both through T3 and when a program ends itself.
   for (const external of [false, true]) {
     for (const kind of ["shell", "agent", "mod"]) {
@@ -367,8 +447,7 @@ async function check() {
     assert.deepEqual([asked.mod, asked.frame, asked.props.actions, asked.props.title, asked.props.yes], ["t3-actions", "none", "confirm", "Close 2 terminals?", "Close"], "as T3's: what ends, counted; the button says it");
     assert.match(asked.props.detail, /^This stops their running processes and clears their histories: ".+", ".+"\.$/);
     assert.doesNotMatch(asked.props.detail, /space closes/);
-    assert.deepEqual(plain(asked.props.command), { name: "t3-tabs.close-tab-now:a" });
-    await say("close-tab-now:a");
+    await say(closeAnswer(asked));
     assert.deepEqual(f.calls.pop(), ["tab.close", { id: "a", confirmed: true }], "so the space's own ask can't follow");
     await say("close-pane");
     assert.deepEqual(f.closed.length, 1, "a second ask replaces the first");
@@ -605,13 +684,15 @@ async function check() {
       see("prog"); taken();
       await say("close-tab:new");
       assert.deepEqual(taken(), [["tab.close", { id: "new" }]], "out of view, closing it moves nothing");
-      f.state["t3-tabs.home"] = "h"; f.spaces().push({ id: "h", name: "Home", active: false, tabs: [{ id: "hp", name: "Home" }] });
+      f.state["t3-tabs.home"] = "h"; f.spaces().push({ id: "h", name: "Home\u200b", machine: null, active: false, tabs: [{ id: "hp", name: "Home" }] });
       see("mine", "A"); taken();
-      await say("close-tab-now:mine");
+      await say("close-tab:mine");
+      await say(closeAnswer(f.overlays.pop()));
       assert.deepEqual(taken(), [["space.select", { id: "h" }], ["tab.close", { id: "mine", confirmed: true }]], "the agent in view: Home first, then the close");
       see("mine", "A"); taken();
       const all = tabs.splice(0, tabs.length, ...tabs.filter(c => c.id === "mine"));
-      await say("close-tab-now:mine");
+      await say("close-tab:mine");
+      await say(closeAnswer(f.overlays.pop()));
       assert.deepEqual(taken(), [["space.select", { id: "h" }], ["tab.close", { id: "mine", confirmed: true }]], "its space's last tab too: Herdr would show another space's");
       tabs.splice(0, tabs.length, ...all);
       // Herdr moved the space's own active tab to the closed one's neighbour, out of sight: a key back mustn't show it, which would cost it its unread done.
@@ -673,7 +754,8 @@ async function check() {
       pick("next", "N");
       assert.deepEqual(plain(f.calls.splice(0)), [["tab.select", { id: "was" }]], "Lists: a program ending goes back, not Home");
     } else {
-      await view.handle("close-tab-now:mine", f.cx);
+      await view.handle("close-tab:mine", f.cx);
+      await view.handle(closeAnswer(f.overlays.pop()), f.cx);
       assert.deepEqual(plain(f.calls.splice(0)), [["tab.select", { id: "was" }], ["tab.close", { id: "mine", confirmed: true }]], "Lists: back first, then the close");
     }
   }

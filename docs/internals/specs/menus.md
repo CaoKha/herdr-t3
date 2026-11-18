@@ -25,7 +25,7 @@ Context menus (`t3-menu`, opened through `shared/menu.js`), submenus (`shared/su
 - Snooze: hidden for blocked agents and mod cards (as the card's clock); a snoozed agent shows Wake (`t3-tabs.wake:<address>`).
 - Rename: the agent is its tab's only top-level agent and the tab name isn't Pi's.
 - Send back: a sub-agent split out on its own whose parent still lives.
-- Close: the agent has a pane; runs `t3-tabs.close-pane` and confirms and leaves first, as ×.
+- Close: the terminal address has a live pane, including a sub-agent before its first status report. Runs `t3-tabs.close-pane`, which confirms and leaves first as × does.
 - Copy address: terminals and pane headers; a click copies the address (such as `t2`), which the row doesn't show; never mod panes.
 - Machine heading: New space here and Connect, only when connected or its core was rebuilt.
 

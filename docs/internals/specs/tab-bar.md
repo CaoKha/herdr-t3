@@ -85,6 +85,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 - Every layout ×, a tab's middle-click, close key, context-menu Close and Go to's `ctrl-d` asks `hc get <terminal> --json` first. Only the terminal's own shell: close at once. A running program, or no answer: ask.
 - `Close terminal "<name>"?` with `This stops the running process and clears its history.` Several programs: a plural title and a list of names. A tab's lone pane uses the tab's name.
+- A tab close covers the terminal identities in that tab and whether closing it also closes its space. Check that scope when accepting the answer and again after any wait to land elsewhere. A new terminal or a newly last tab needs a fresh answer, with the space consequence shown if it applies. The same or smaller scope can close on the existing answer.
 - Enter confirms, Esc cancels. The space's last pane uses Herdr's own Close space. Direct `tab.close` / `pane.close`, palette included, stay native.
 
 ## t3-tabs commands

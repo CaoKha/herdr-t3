@@ -55,7 +55,8 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Refresh and memory
 
-- While visible, refresh every 15s; catch up on return. Hiding or switching stops refresh and invalidates in-flight reads.
+- While visible in the active window and space, refresh every 15s. When Review is hidden, page and row responses cannot replace the diff or rebuild its list. Pending refreshes merge into one catch-up read on return.
+- A running analysis still reports progress and completion while Review is hidden. Its completion or start acknowledgement defers the page refresh until Review returns.
 - Full data, rows and layout caches only for the last three shown spaces; eviction releases them and late reads can't refill them. Analysis status stays light, per space.
 - The layout has no Review bar by default (one can be added as the RECIPE says), and nothing analyses on opening a surface: pick a range and Analyze on the page.
 

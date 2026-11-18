@@ -69,7 +69,7 @@ All of them: [Keys](docs/user/guide.md#keys).
 git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/scripts/update.sh
 ```
 
-It overwrites the layout and its mods and merges `keys.json`; your pins, settled agents, actions, theme, focus ring and installed Review bar settings stay. Uninstalled extras lose their layout blocks. What it keeps and what it doesn't: [Update](docs/user/guide.md#update).
+It checks your configuration and required mod entry points before copying files. It updates the layout and its mods and merges `keys.json`. Your pins, settled agents, actions, theme, focus ring and installed Review bar settings stay. Uninstalled extras lose their layout blocks. See [Update](docs/user/guide.md#update).
 
 ## What it runs
 
