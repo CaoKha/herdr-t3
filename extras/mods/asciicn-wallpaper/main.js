@@ -253,12 +253,10 @@ export default class Wallpaper extends View {
     }
   }
 
-  // Makes the draft's picture for the theme now; the draft shows it once made.
-  async showDraft(d, scene, cx, current) {
+  // Makes the picture for the theme now without changing the draft. Only its current frame can advance it.
+  async drawDraft(d, scene, cx, current) {
     const made = await makePicture(scene, theme(), isLight(), (w, h) => this.need(w, h, d.placement, this.scaleNow ?? 2), cx, current);
-    if (!made || !current()) return false;
-    d.scene = { ...scene, width: made.width, height: made.height, ...(made.paper ? { paper: true } : {}) };
-    return true;
+    return made && { ...scene, width: made.width, height: made.height, ...(made.paper ? { paper: true } : {}) };
   }
 
   async setStyle(style, cx) {
@@ -275,10 +273,7 @@ export default class Wallpaper extends View {
     const style = d.style, kept = d.frames[style];
     if (kept) {
       d.job = null;
-      Object.assign(d, { scene: kept.scene, text: kept.text, drawn: style, phase: 'ready', message: null });
-      cx.notify();
-      if (d.waiting) await this.applyPreview(cx);
-      return;
+      return this.frameReady(d, style, kept, cx);
     }
     const n = d.generation = (d.generation ?? 0) + 1, job = d.job = { cancelled: false }, dir = `${d.dir}/frame-${n}`;
     const current = () => this.draft === d && d.job === job && !job.cancelled;
@@ -286,7 +281,7 @@ export default class Wallpaper extends View {
     d.message = null;
     this.drag = null;
     cx.notify();
-    let done = false;
+    let frame = null;
     try {
       // The first drawing carries on the reading's progress; Home shows it once loaded.
       const step = (f) => { if (!d.drawn && d.progress != null) { d.progress = f; cx.notify(); } };
@@ -297,25 +292,33 @@ export default class Wallpaper extends View {
       const text = await finish(imageAns(sampled, style), cx, current);
       if (!current()) return;
       step(0.7);
-      if (!(await this.showDraft(d, { id: `preview:${d.id}:${n}`, name: d.name, dir, text, focus: 0.5 }, cx, current))) return;
+      const scene = await this.drawDraft(d, { id: `preview:${d.id}:${n}`, name: d.name, dir, text, focus: 0.5 }, cx, current);
+      if (!scene || !current()) return;
       step(0.9);
-      d.text = text;
-      d.frames[style] = { scene: d.scene, text };
-      d.drawn = style;
-      d.phase = 'ready';
-      done = true;
+      frame = { scene, text };
     } catch (e) {
       if (current()) {
         d.message = `${e?.message ?? e}`;
-        d.waiting = false;
+        d.applyQueued = false;
         if (d.drawn) { d.style = d.drawn; d.phase = 'ready'; } else d.phase = 'broken';
       }
     } finally {
       if (this.draft !== d) await exec('rm', ['-rf', d.dir]);
-      else if (!done && d.frames[style]?.scene.dir !== dir) await exec('rm', ['-rf', dir]);
-      if (!this.closed) cx.notify();
+      else if (!frame) await exec('rm', ['-rf', dir]);
+      if (!frame && !this.closed) cx.notify();
     }
-    if (done && d.waiting && this.draft === d) await this.applyPreview(cx);
+    if (frame && current()) {
+      d.job = null;
+      return this.frameReady(d, style, frame, cx);
+    }
+  }
+
+  // Cached and newly drawn modes become ready here. Only the current generation reaches this point.
+  frameReady(d, style, frame, cx) {
+    d.frames[style] = frame;
+    Object.assign(d, { scene: frame.scene, text: frame.text, drawn: style, phase: 'ready', message: null });
+    if (d.applyQueued) return this.commitDraft(d, cx);
+    cx.notify();
   }
 
   async cancelPreview(cx) {
@@ -331,20 +334,25 @@ export default class Wallpaper extends View {
     if (!this.closed) cx.notify();
   }
 
-  // A picture already there saves only its framing; a new one its drawing too, its preview picture kept (library.js
-  // publish). While a mode is drawing, Apply waits for it. Done, the switcher shows the name for a moment.
-  async applyPreview(cx) {
-    const d = this.draft;
-    if (d?.phase === 'converting' && d.scene) { d.waiting = true; cx.notify(); return; }
+  // Remember the request on this draft only. While a mode draws, its eventual ready frame takes the request.
+  async applyPreview(cx, d = this.draft) {
+    if (this.draft !== d) return;
+    if (d?.phase === 'converting' && d.scene) { d.applyQueued = true; cx.notify(); return; }
     if (d?.phase !== 'ready') return;
+    return this.commitDraft(d, cx);
+  }
+
+  // A saved picture writes only its framing; a new one its drawing too, keeping its preview picture (Library.publish).
+  async commitDraft(d, cx) {
     this.drag = null;
     d.phase = 'applying';
-    d.waiting = false;
+    d.applyQueued = false;
     d.message = null;
     cx.notify();
     try {
       if (d.saved) this.lib.frame(d.saved.id, d.placement);
       else if (!(await this.lib.publish(d, cx, () => this.draft === d && !this.closed))) return;
+      if (this.draft !== d || this.closed) return;
       await this.cancelPreview(cx);
       this.shownUntil = Date.now() + 1500;
       cx.timer.after(1500, (cx) => cx.notify());
@@ -609,7 +617,7 @@ export default class Wallpaper extends View {
         if (!active() || !plainKey(e)) return;
         /** @type {any} */ (this).fs.keyboard = true;
         const delta = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[e.key];
-        if (e.key === "enter") cx.spawn((cx) => this.applyPreview(cx));
+        if (e.key === "enter") cx.spawn((cx) => this.applyPreview(cx, d));
         else if (e.key === "escape") cx.spawn((cx) => this.cancelPreview(cx));
         else if (e.key === "-" || e.key === "=") this.zoomBy(d, nextPreset(d.placement.zoom, e.key === "=" ? 1 : -1) / d.placement.zoom, null, cx);
         else if (e.key === "0") this.setPlacement(d, this.resetOf(d), cx);
@@ -686,8 +694,8 @@ export default class Wallpaper extends View {
       .child(broken ? this.action(t, "wallpaper-close", "Close", cx => cx.spawn(cx => this.cancelPreview(cx)))
         : this.action(t, "wallpaper-cancel", "Cancel", cx => { if (!busy) cx.spawn(cx => this.cancelPreview(cx)); }, { disabled: busy }))
       .child((broken ? this.action(t, "wallpaper-choose-another", "Choose another…", cx => cx.spawn(cx => this.choose(cx)), { variant: "primary", disabled: window()?.platform === "windows" })
-        : this.action(t, "wallpaper-apply", waits.apply || (d.waiting && waits.draw) ? "Applying…" : "Apply", cx => cx.spawn(cx => this.applyPreview(cx)),
-          { variant: "primary", disabled: !open || busy || (!!d.waiting && waits.draw) })).min_w(72));
+        : this.action(t, "wallpaper-apply", waits.apply || (d.applyQueued && waits.draw) ? "Applying…" : "Apply", cx => cx.spawn(cx => this.applyPreview(cx, d)),
+          { variant: "primary", disabled: !open || busy || (!!d.applyQueued && waits.draw) })).min_w(72));
     return v_flex().id("wallpaper-card").absolute().right(12).bottom(12).w(this.cardWidth()).p(16).gap(12)
       .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(12).text_color(t.muted)
       // The canvas lies under it: a press or scroll here is the card's.

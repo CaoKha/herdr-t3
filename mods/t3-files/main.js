@@ -355,14 +355,20 @@ export default class Files extends View {
     if (!again) {
       if (!selected) openFile(rel);
       // Opened here: what the panel shows now is this, not a pick to answer.
-      const tab = surfacesFor(st.id).tabs.find(t => t.path === rel && !t.folder), kept = st.previews.get(rel);
-      st.seen = tabKey(activeTab(st.id));
+      const tab = activeTab(st.id), kept = st.previews.get(rel);
+      st.seen = tabKey(tab);
       st.file = rel; st.fileBorn = tab?.born;
-      st.view = kept?.born === tab?.born ? kept.view : { loading: true };
+      st.view = kept && kept.born === tab?.born ? kept.view : { loading: true };
       this.changed(st);
       cx.notify();
     }
-    const fresh = this.fresh(st, "file"), abs = join(st.root, rel), kind = kindOf(rel);
+    const pending = this.fresh(st, "file"), id = `file:${rel}`, born = st.fileBorn, abs = join(st.root, rel), kind = kindOf(rel);
+    // A close or tab switch can reach the panel before Files syncs. Polling still reads for the instance Files was showing.
+    const fresh = () => {
+      if (!pending() || st.file !== rel) return false;
+      const tab = activeTab(st.id);
+      return tab?.id === id && tab.born === born && !tab.folder;
+    };
     if (!fresh()) return;
     if (!again && kind !== "image" && !st.view.loading) {
       if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(st.view, rel, this.fits(st.view));
@@ -375,7 +381,7 @@ export default class Files extends View {
       const view = await this.read(st, abs, rel, kind, fresh).catch(() => ({ problem: "This file can't be read." }));
       if (view?.problem) view.failed = failedRead(view.problem);
       if (!view) return;
-      if (!fresh() || st.file !== rel) { this.releasePreview(view); return; }
+      if (!fresh()) { this.releasePreview(view); return; }
       const old = st.view;
       if (again && old && view.text !== undefined && view.text === old.text) return;
       if (old?.image && old.image !== view.image) this.uncache(old.image);

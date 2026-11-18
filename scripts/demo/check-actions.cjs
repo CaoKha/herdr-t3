@@ -4,39 +4,50 @@ const { join } = require("node:path");
 const vm = require("node:vm");
 
 const [src, app] = process.argv.slice(2);
-const { elements, find } = require(join(src, "mods/t3-actions/check-kit.js"));
+const { bundle, elements, find, fire, plain, strings } = require(join(src, "mods/t3-actions/check-kit.js"));
 const element = elements(), overlays = [];
 const state = JSON.parse(readFileSync(join(app, "shared.json"), "utf8"));
+const settings = JSON.parse(readFileSync(join(app, "settings.json"), "utf8"));
 const env = {
-  View: class {}, div: element, v_flex: element, svg: element,
+  View: class {}, div: element, h_flex: element, v_flex: element, svg: element,
   shared: key => state[key], setShared: (key, value) => { state[key] = value; },
-  openOverlay: overlay => overlays.push(overlay), settings: () => ({ zoom: 1 }),
-  theme: () => ({}), focusRoot: (_view, root) => root, menuKeys: () => () => {}, onStop: () => null,
-  menuRow: (_view, _t, id, { label }) => element().id(id).child(label),
-  scrollList: (_view, id, { count, draw }) => {
-    const list = element().id(id);
-    for (let at = 0; at < count; at++) list.child(draw(at));
-    return list;
-  },
+  openOverlay: overlay => overlays.push(overlay), settings: () => settings,
+  theme: () => ({ foreground: "#ffffff" }), spaces: () => [],
 };
-const script = file => readFileSync(file, "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export (?:default )?/gm, "");
-const context = vm.createContext(env);
-vm.runInContext(script(join(src, "shared/store.js")), context);
-const [productKey, actionsMenu] = vm.runInContext(`${script(join(src, "mods/t3-actions/actions.js"))}\n[KEY.actions, actionsMenu]`, context);
+const cx = { spawn: fn => fn(cx), notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }) };
+function start(mod, props, host = {}) {
+  const context = vm.createContext({ ...env, props: () => props, nextCommand: () => new Promise(() => {}), ...host });
+  vm.runInContext(bundle(file => readFileSync(join(app, "mods", mod, file), "utf8")), context);
+  const view = new context.Mod();
+  view.init(props, cx);
+  return view;
+}
 
 async function check() {
-  const row = find(actionsMenu({ at: -1 }), "action-retro");
-  assert.equal(row?.items[0], "Retro", "the product Actions menu renders Retro from the demo seed");
+  const bounds = { x: 700, y: 6, width: 26.4, height: 26.4 };
+  const bar = start("t3-actions", {});
+  const chevron = find(bar.render(), "action-more");
+  fire(chevron, "on_mouse_down:left", { bounds }, cx);
+  fire(chevron, "on_click", {}, cx);
+  const fromClick = plain(overlays.pop());
 
-  const commands = ["actions-last:retro", "actions-menu:1620"];
-  context.nextCommand = () => commands.length ? Promise.resolve(commands.shift()) : new Promise(() => {});
-  const Stage = vm.runInContext(`(${script(join(app, "mods/demo-stage/main.js"))}\n)`, context);
-  new Stage().init({}, { spawn: fn => fn() });
+  let deliver;
+  start("t3-actions", { details: true }, { nextCommand: () => new Promise(resolve => { deliver = resolve; }) });
+  const commands = ["actions-last:retro", `actions-menu:${JSON.stringify(bounds)}`];
+  start("demo-stage", {}, {
+    nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise(() => {}),
+    run: name => {
+      if (name.startsWith("t3-actions.")) deliver(name.slice("t3-actions.".length));
+    },
+  });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(state[productKey]?.last, "retro", "the stagehand sets the product's selected Action");
-  assert.equal(overlays[0]?.props.actions, "menu", "the stagehand opens the product Actions menu");
-  assert.ok(overlays[0].height >= (state[productKey].list.length + 1) * 28, "the menu fits the seeded Actions and Add action");
-  console.log("demo seed renders Retro in the product Actions menu, and the stagehand selects Retro");
+  assert.equal(state["t3-actions.actions"]?.last, "retro", "the stagehand sets the product's selected Action");
+  assert.equal(overlays.length, 1, "one popup, not the Details chain");
+  assert.deepEqual(plain(overlays[0]), fromClick, "the demo and the bar chevron open the same popup at the same bounds");
+  const menu = start("t3-actions", { ...overlays[0].props, overlay: "demo-actions" }).render();
+  assert.ok(strings(find(menu, "action-retro")).includes("Retro"), "the product Actions menu renders Retro from the demo seed");
+  assert.ok(strings(find(menu, "action-new")).includes("Add action"), "the product Actions menu renders Add action");
+  console.log("demo and bar open the same standalone Actions popup; Retro and Add action render");
 }
 
 check().catch(error => { console.error(error); process.exitCode = 1; });

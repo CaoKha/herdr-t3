@@ -15,10 +15,12 @@ share program mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-pic
 share tree mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu
 share status-mark mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review
 share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu
+share new-space mods/t3-inbox mods/t3-spaces mods/t3-new-menu
 share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share details mods/t3-inbox mods/t3-agents mods/t3-tabs extras/mods/pulls-review
 share measured-text mods/t3-actions mods/t3-chrome mods/t3-tabs
 share tab mods/t3-tabs mods/t3-chrome
+share agent-step mods/t3-home mods/t3-tabs
 share motion mods/t3-inbox mods/t3-agents mods/t3-spaces
 share focus extras/mods/review mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
 share list mods/t3-chrome mods/t3-tabs mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper

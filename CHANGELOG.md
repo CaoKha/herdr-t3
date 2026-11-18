@@ -4,6 +4,9 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-18
 
+- A context menu keeps the command you picked when rows move. Go to and the child-agent menu follow the selected pane or terminal. Reopening a file tab retires its previous tab menu and preview reads.
+- In standalone Inbox, Settle acts on the agent in focus when you press the shortcut. Home enables Next agent when the selected sidebar has somewhere to go. New space offers the same machines from Inbox, Spaces and the New menu.
+- Review opens the range you picked for its original space and repository. A full-file read interrupted by hiding Review resumes when you return.
 - Closing a tab asks again if the action would now affect additional terminals or close its space. Inbox Clear waits for the core to confirm Settle. Creating Home matches the explicitly named space on this machine.
 - Files follows the most recent selection when directory reads finish out of order. Review defers full refreshes while hidden. The space menu offers Close for a child agent as soon as it has a pane.
 - Updating checks configuration and mod entries before copying. If the layout or key bindings change during the copy, the updater preserves the edit and reports how to resume.

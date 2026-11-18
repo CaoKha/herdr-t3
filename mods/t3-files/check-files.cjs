@@ -804,16 +804,63 @@ async function closeKeys() {
 }
 
 async function surfaceCache() {
-  const { view, cx, settle, fire, send, tick } = makePage();
+  const { view, cx, w, settle, fire, send, tick } = makePage();
   view.render(cx); await settle(); await fire(0);
   const st = view.current();
   const editors = [];
   for (const file of ["a.js", "b.js", "c.js", "d.js"]) { view.open(st, file, cx); await settle(); editors.push(st.view.code); }
   assert.equal(st.previews.size, 3); assert.equal(editors[0].released, true, "fourth file evicts oldest Editor");
   view.open(st, "b.js", cx); await settle(); assert.equal(st.view.code, editors[1], "recent file retains its native reading state");
+  w.windowActive = false; await tick();
+  w.windowActive = true; await tick();
+  assert.equal(st.view.code, editors[1], "hiding a surviving tab retains its native reading state");
   send("close"); await settle(); await tick();
   assert.equal(editors[1].released, true, "closed file releases its Editor");
   view.open(st, "b.js", cx); await settle(); assert.notEqual(st.view.code, editors[1], "re-add starts with a new Editor");
+}
+
+async function latePreview() {
+  const appDir = fs.mkdtempSync(path.join(os.tmpdir(), "t3-files-late-preview-"));
+  try {
+    const { view, cx, w, ctx, send, settle, tick } = makePage({ appDir });
+    view.render(cx); await tick();
+    send("open:b.js"); await settle(); // keep the Files page open when the other tab closes
+    const replace = (file) => {
+      ctx.closeSurface(`file:${file}`); ctx.openFile(file);
+      // The panel updated its tabs; Files hasn't rendered or run its timer yet.
+    };
+
+    w.hold = "/r/a.js";
+    send("open:a.js"); await settle();
+    assert.equal(w.held.length, 1, "the original file is still being read");
+    replace("a.js");
+    const made = w.made.length;
+    w.hold = null; w.held.pop()(); await settle();
+    const staleEditors = w.made.length - made;
+    w.texts = { "/r/a.js": "const newVersion = 1;\n" };
+    await tick();
+    assert.equal(w.made.at(-1)?.text, w.texts["/r/a.js"], "the new tab reads the new text");
+
+    const cache = path.join(appDir, "cache/t3-files");
+    let bytes = "old image";
+    w.runExec = (cmd, args) => {
+      if (cmd !== "cp") return;
+      fs.writeFileSync(args[1], bytes);
+      return { code: 0, stdout: "" };
+    };
+    w.stall = (line) => line.startsWith("cp /r/p.png ");
+    send("open:p.png"); await settle();
+    assert.equal(w.stalled.length, 1, "the original image is still being copied");
+    replace("p.png");
+    w.stall = null; w.stalled.pop()(); await settle();
+    const staleImages = fs.readdirSync(cache).length;
+    bytes = "new image";
+    await tick();
+    const image = walk(find(view.render(cx), "t3-files-content")).find(n => n.kind === "image");
+    assert.ok(image, "the new tab draws its image");
+    assert.equal(fs.readFileSync(path.join(appDir, image.source), "utf8"), bytes);
+    assert.deepEqual({ staleEditors, staleImages }, { staleEditors: 0, staleImages: 0 }, "closing a tab invalidates its pending text and image before Files syncs");
+  } finally { fs.rmSync(appDir, { recursive: true, force: true }); }
 }
 
 (async () => {
@@ -932,6 +979,7 @@ async function surfaceCache() {
   await resources();
   await closeKeys();
   await surfaceCache();
+  await latePreview();
   await searchMatchesWords();
   await menus();
   console.log("t3-files checks passed");

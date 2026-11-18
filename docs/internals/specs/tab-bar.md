@@ -72,6 +72,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 - Agent next/previous (`cmd-]` / `cmd-[`) walks the selected mode's rows without wrapping, including mod cards, not pane-less sub-agents. From Home, next takes the first row and previous the last.
 - Tab next/previous wraps through the displayed tabs; `cmd-1…9` numbering follows them too.
+- The floating keys block can advance navigation with no strip present. The strip and the tab-number / tab-cycle commands advance from the current Herdr observation before using the same tab order, regardless of which block drew first. Repeating an unchanged observation does not repeat a zoom, end a Snooze twice, or record a temporary close neighbour as a visit.
 - Space keys follow sidebar order, folded worktrees included, skipping Home and synthetic checkout rows; project numbers stay stable.
 
 ## Close landing

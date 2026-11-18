@@ -8,7 +8,9 @@ import { foldArrow, planMotion, flying, leavingRows } from "./motion.js";
 import { v_flex, h_flex } from "gpui-base";
 import { checking, spaces, machines, panes, focused, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, props, layout, nextCommand } from "herdr";
 import { projectMark, tint } from "./project.js";
+import { newSpaceButton } from "./new-space.js";
 import { repoFacts } from "./repos.js";
+import { spaceOrdering } from "./ordering.js";
 import { dragGone, glow, hoverKept, tip, tipMark, POINTER_WATCH, pointerMoved } from "./tip.js";
 import { openMenu } from "./menu.js";
 import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
@@ -18,8 +20,6 @@ import { KEY, closedKey } from "./store.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
 
-// How long a checkout being opened may take to show up before it's asked for again.
-const OPENING = 5000;
 // T3's project row, and its list's 1px between items (gap-px). A drag's math goes by the pitch.
 const ROW = 32, STACK = 1, PITCH = ROW + STACK;
 // Docked alone there's no Inbox to be behind.
@@ -47,17 +47,17 @@ export default class Spaces extends View {
       }
     });
     this.repos = repoFacts({ exec, watchFolder, cx });
-    this.opening = new Map(); // repo -> when its checkout was opened from its dim row
     // Spaces made while this runs wait (at most a moment) for their git, so a
     // worktree appears under its repo instead of jumping there.
     this.shown = new Set(spaces().map((s) => s.id));
-    this.born = {};
-    this.drag = null; // { id, key, at, top, moved, dy, y, slot, drawn }: a pressed row, lifted once it moves 6px
+    this.drag = null; // Pressed row, lifted once it moves 6px; edge names the gap actually drawn.
     this.machines = [];
     this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
     for (const state of Object.values(this.reconnecting)) state.busy = false;
     this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
     this.foldedRepos = new Set(JSON.parse(localStorage.getItem("repos.folded") ?? "[]"));
+    this.order = spaceOrdering({ spaces, panes, machines, run, home: () => shared(KEY.home), facts: (w, ps) => this.repos.forSpace(w, ps),
+      shown: this.shown, foldedRepos: this.foldedRepos, row: ROW, pitch: PITCH });
     this.machinesSeen = this.machinesNow();
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
@@ -81,7 +81,7 @@ export default class Spaces extends View {
       this.refreshMachines(cx);
     }
     this.repos.update({ spaces: sp, panes: panes(), machines: machines(), active: window().active, visible: listInView(), folded: this.folded }, now);
-    if (sp.some((s) => !this.shown.has(s.id)) || this.orderingDue(now)) cx.notify();
+    if (sp.some((s) => !this.shown.has(s.id)) || this.order.due(now)) cx.notify();
   }
 
   refreshMachines(cx) {
@@ -148,83 +148,6 @@ export default class Spaces extends View {
     });
   }
 
-  orderingDue(now) {
-    return this.ordering && now - this.ordering.at >= 1000
-      && this.ordering.machines.every(name => machines().some(m => m.name === name && m.layout === "ready"));
-  }
-
-  // Spaces in order, each worktree space moved under its main checkout's.
-  ordered() {
-    const sp = spaces(), ps = panes();
-    const ready = (w) => this.shown.has(w.id) || this.repos.forSpace(w, ps).answered || Date.now() - (this.born[w.id] ??= Date.now()) > 1500;
-    for (const w of sp) if (!this.shown.has(w.id) && ready(w)) this.shown.add(w.id);
-    // Home stays in the model's order below, so the moves count it, but it's no one's checkout and has no row.
-    const homeId = shared(KEY.home);
-    const list = sp.map((w, i) => ({ w, i, g: w.id === homeId ? null : this.repos.forSpace(w, ps).git }));
-    const mains = new Set(list.filter((r) => r.g && !r.g.linked).map((r) => r.g.repo));
-    const worktrees = (repo) => list.filter((k) => k.g?.linked && k.g.repo === repo);
-    // A checkout just opened from its dim row arrives last: it takes that row's place, so the group doesn't jump to the list's end.
-    for (const [repo, at] of this.opening) {
-      const main = list.findIndex((r) => r.g && !r.g.linked && r.g.repo === repo);
-      const first = list.findIndex((r) => r.g?.linked && r.g.repo === repo);
-      if (main >= 0 && first >= 0 && main > first) list.splice(first, 0, list.splice(main, 1)[0]);
-      else if (main >= 0 || Date.now() - at > OPENING) this.opening.delete(repo);
-    }
-    // Grouped by repo, as T3's projects, so closing a checkout doesn't scatter its worktrees. One alone isn't worth a row over it.
-    const nested = (r) => r.g?.linked && (mains.has(r.g.repo) || worktrees(r.g.repo).length > 1);
-    const out = /** @type {any[]} */ ([]);
-    const placed = new Set(); // repos whose worktrees are listed (under the first of its spaces)
-    const hang = (top) => {
-      const kids = worktrees(top.g.repo), folded = this.foldedRepos.has(top.g.repo);
-      // Closed, the one you're on still shows, as T3's route row, and the count leaves it out.
-      const keep = (k) => folded && k.w.active;
-      top.kids = kids.length;
-      top.members = kids.map((k) => k.w.id); // folded ones too: a drop's index counts them
-      top.hiding = kids.filter((k) => !keep(k)).length;
-      kids.forEach((k, n) => out.push({ ...k, folded: folded && !keep(k), tree: folded || n === kids.length - 1 ? "└─" : "├─" }));
-    };
-    for (const r of list) {
-      if (nested(r)) {
-        if (mains.has(r.g.repo) || placed.has(r.g.repo)) continue;
-        placed.add(r.g.repo);
-        // Its checkout isn't a space: a row stands for it, where its first worktree was. No .git folder (a bare repo): nothing to open.
-        const [, common] = JSON.parse(r.g.repo);
-        const head = { head: true, g: r.g, w: { id: `repo-${r.g.repo}`, name: r.g.name, machine: r.w.machine ?? null, folder: common.endsWith("/.git") ? common.slice(0, -5) : null } };
-        out.push(head);
-        hang(head);
-        continue;
-      }
-      const top = { ...r, tree: null, kids: 0 };
-      out.push(top);
-      if (!r.g || r.g.linked || placed.has(r.g.repo)) continue;
-      placed.add(r.g.repo);
-      hang(top);
-    }
-    // space.next/prev and ctrl-N follow the model, so it keeps the rows' order, folded rows included: folding moves nothing. A row with no space isn't in it.
-    // Simulate the batch so later indexes include earlier moves. An attempted write can lose a sync conflict: let its echo settle before retrying.
-    // By machine too, as grouped() draws them: this computer's, then each machine's by name. sort() keeps the order within one.
-    const machine = (r) => r.w.machine ?? "";
-    const real = out.filter((r) => !r.head).sort((a, b) => machine(a) < machine(b) ? -1 : machine(a) > machine(b) ? 1 : 0);
-    const order = sp.map(w => w.id);
-    const target = real.map(r => r.w.id);
-    const key = JSON.stringify([order, target, machines()]);
-    if (order.every((id, i) => id === target[i])) {
-      this.ordering = null;
-    } else if (this.ordering?.key !== key || this.orderingDue(Date.now())) {
-      const moved = new Set();
-      this.ordering = { key, at: Date.now(), machines: [] };
-      for (let i = 0; i < real.length; i++) {
-        const from = order.indexOf(real[i].w.id);
-        if (from === i) continue;
-        run("space.move", { id: real[i].w.id, index: i + 1 });
-        moved.add(real[i].w.machine ?? null);
-        order.splice(i, 0, order.splice(from, 1)[0]);
-      }
-      this.ordering.machines = [...moved];
-    }
-    return out.filter(r => (r.head || this.shown.has(r.w.id)) && !r.folded && r.w.id !== homeId);
-  }
-
   toggleRepo(repo, cx) {
     this.foldedRepos.has(repo) ? this.foldedRepos.delete(repo) : this.foldedRepos.add(repo);
     localStorage.setItem("repos.folded", JSON.stringify([...this.foldedRepos]));
@@ -235,7 +158,7 @@ export default class Spaces extends View {
   // The list's rows, each { key, h, el, ghost, m (its machine), r (a space's or repo's row) }; ghost() draws one
   // without the ids, handlers and labels the list uses.
   grouped(t) {
-    const rows = this.ordered(), ps = panes(), lifting = Boolean(this.drag?.moved);
+    const rows = this.order.rows(), ps = panes(), lifting = Boolean(this.drag?.moved);
     const draw = (r, ghost) => r.head ? this.repoHead(r, t, ps, ghost) : this.row(r, t, ps, ghost);
     const entry = (r) => ({ key: r.head ? r.w.id : `space-${r.w.id}`, h: PITCH, m: r.w.machine ?? null, r, el: draw(r), ghost: () => draw(r, true) });
     const plain = (key, m, draw) => ({ key, h: PITCH, m, el: draw(false), ghost: () => draw(true) });
@@ -357,13 +280,6 @@ export default class Spaces extends View {
       .on_click((_e, cx) => { cx.stop_propagation(); this.toggleRepo(repo, cx); }), radiusOf("micro")));
   }
 
-  // Once, however often it's pressed: the new space takes a moment to show.
-  openCheckout({ w, g }) {
-    if (Date.now() - (this.opening.get(g.repo) ?? -Infinity) < OPENING) return;
-    this.opening.set(g.repo, Date.now());
-    run("space.new", { folder: w.folder, machine: w.machine ?? "" });
-  }
-
   // A repo's worktrees with its checkout not open: the checkout's row, dimmed, with its fold arrow. It has no tab to go to,
   // so a click opens it, and it becomes the checkout's own row. A bare repo has nothing to open: there the click folds.
   repoHead(r, t, ps, ghost) {
@@ -375,7 +291,7 @@ export default class Spaces extends View {
     return ghost ? el : stop(this, t, rowId, el.id(rowId)
       .when(!this.drag?.moved, el => el.hover(s => s.bg(t.hover)).active(s => s.bg(t.selected)))
       .role("button").accessibility_label(w.folder ? `Open ${w.name}` : `${this.foldedRepos.has(g.repo) ? "Expand" : "Collapse"} ${w.name}`)
-      .on_click((_e, cx) => { if (w.folder) this.openCheckout(r); else this.toggleRepo(g.repo, cx); cx.notify(); })
+      .on_click((_e, cx) => { if (w.folder) this.order.openCheckout(r); else this.toggleRepo(g.repo, cx); cx.notify(); })
       // A bare repo has nothing to open or copy.
       .when(Boolean(w.folder), el => el.on_mouse_down("right", (_e, cx) => openMenu(this, "checkout", { folder: w.folder, machine: w.machine ?? null }, cx))), 8);
   }
@@ -457,51 +373,6 @@ export default class Spaces extends View {
     cx.notify();
   }
 
-  // The lifted rows (a checkout takes its worktrees along) and the list without them.
-  lift(rows, key) {
-    const at = rows.findIndex((e) => e.key === key);
-    if (at < 0) return null;
-    let end = at + 1;
-    if (!rows[at].r.tree) while (rows[end]?.r?.tree) end++;
-    return { at, block: rows.slice(at, end), rest: [...rows.slice(0, at), ...rows.slice(end)] };
-  }
-
-  // Where they'd land, as an index into the rest, from the lifted top `y` and the rest's fixed pitch (never from
-  // the rows the gap is moving): the nearest boundary its kind may take, a group between its machine's groups or a
-  // worktree among its own. Half a row into another machine's rows, where it came from.
-  slot({ at, block, rest }, y) {
-    const lead = block[0], kid = Boolean(lead.r.tree);
-    const under = rest[Math.min(rest.length - 1, Math.floor((y - ROW / 2) / PITCH))];
-    if (under && under.m !== lead.m) return at;
-    let from = at, to = at;
-    if (kid) { while (rest[from - 1]?.r?.tree) from--; while (rest[to]?.r?.tree) to++; }
-    else { from = 0; to = rest.length; }
-    const starts = (e) => e?.r && !e.r.tree && e.m === lead.m;
-    let best = at;
-    for (let j = from; j <= to; j++) {
-      const ok = kid || starts(rest[j]) || (rest[j - 1]?.r && rest[j - 1].m === lead.m && rest[j]?.m !== lead.m);
-      if (ok && Math.abs(j * PITCH - y) < Math.abs(best * PITCH - y)) best = j;
-    }
-    return best;
-  }
-
-  // space.move's index for landing at the slot: before the next group (worktree) there, else after the one above.
-  // Read from the model as it is now, folded worktrees included.
-  dest({ at, block, rest }, { id, slot }) {
-    if (slot === at) return null;
-    const kid = Boolean(block[0].r.tree), order = spaces().map((s) => s.id), from = order.indexOf(id);
-    const unit = (r) => [...(r.head ? [] : [r.w.id]), ...(r.members ?? [])].map((x) => order.indexOf(x)).filter((i) => i >= 0);
-    const next = rest[slot];
-    if (next?.r && Boolean(next.r.tree) === kid && next.m === block[0].m) {
-      const u = Math.min(...unit(next.r));
-      return from < 0 || u === Infinity ? null : from > u ? u + 1 : u;
-    }
-    let k = slot - 1;
-    while (!kid && rest[k]?.r?.tree) k--;
-    const p = rest[k]?.r ? Math.max(...unit(rest[k].r)) : -Infinity;
-    return from < 0 || p === -Infinity ? null : from < p ? p + 1 : p + 2;
-  }
-
   // Let go: it lands where the gap is (with `back`, where it came from), sliding there from where it was let go.
   letGo(cx, back) {
     const d = this.drag;
@@ -514,12 +385,7 @@ export default class Spaces extends View {
     }
     if (d?.drawn) {
       this.landed = { key: d.key, y: d.y };
-      const l = this.lift(this.rows, d.key), index = back || !l ? null : this.dest(l, /** @type {any} */ (d));
-      if (index) {
-        run("space.move", { id: d.id, index });
-        this.landing = { key: d.key, slot: d.slot, at: Date.now() };
-        cx.timer.after(1000, (cx) => cx.notify());
-      }
+      if (!back && d.edge) this.order.place(d.id, d.edge);
     }
     cx.notify();
   }
@@ -539,25 +405,18 @@ export default class Spaces extends View {
     let d = this.drag, shown = rows, lifted = null;
     if (d && !rows.some((e) => e.key === d.key)) d = this.drag = null;
     if (d?.moved) {
-      const l = this.lift(rows, d.key), h = l.block.length * PITCH;
-      d.y = Math.max(0, Math.min(d.top + d.dy, l.rest.length * PITCH));
       // The first frame lifted keeps the gap where the row was, so a quick first move still slides the rows it passes.
-      d.slot = d.drawn ? this.slot(l, d.y) : l.at;
-      shown = [...l.rest.slice(0, d.slot), { key: "space-gap", h, el: div().h(h - STACK), ghost: () => div().h(h - STACK) }, ...l.rest.slice(d.slot)];
+      const { block, rest, slot, y, edge } = this.order.preview(rows, d.key, d.top + d.dy, d.drawn), h = block.length * PITCH;
+      d.y = y; d.edge = edge;
+      shown = [...rest.slice(0, slot), { key: "space-gap", h, el: div().h(h - STACK), ghost: () => div().h(h - STACK) }, ...rest.slice(slot)];
       lifted = v_flex().id("space-lifted").absolute().left(0).right(0).top(d.y).gap(STACK).rounded(8).bg(t.selected).shadow_lg()
-        .children(l.block.map((e) => e.ghost()));
-    } else if (this.landing) {
-      // Until the model's echo of the move arrives, the rows stay where they were let go.
-      const l = this.lift(rows, this.landing.key), slot = this.landing.slot;
-      if (!l || l.at === slot || Date.now() - this.landing.at >= 1000) this.landing = null;
-      else shown = [...l.rest.slice(0, slot), ...l.block, ...l.rest.slice(slot)];
+        .children(block.map((e) => e.ghost()));
     }
     // The first frame lifted is the list as it was, the gap where the row was: nothing to play.
     planMotion(this, shown, cx, { freeze: d?.moved && !d.drawn, from: this.landed });
     if (d?.moved) d.drawn = true;
     this.landed = null;
-    const asks = props()?.newMenu && machines().length > 1;
-    const tool = (id, label, icon, closed, onOpen, action = undefined) => trigger(this, t, id, { icon: `mods/t3-spaces/icons/${icon}.svg`, label, closed, onOpen, action });
+    const tool = (id, label, icon, options) => trigger(this, t, id, { icon: `mods/t3-spaces/icons/${icon}.svg`, label, ...options });
     return focusRoot(this, v_flex().size_full().min_h(0).bg(t.chrome).text_size(14)
       .when(this.dragFocus, el => el.track_focus(this.dragKeys).on_key_down((e, cx) => {
         if (e.keystroke !== "escape" || !this.dragFocus) return;
@@ -569,12 +428,8 @@ export default class Spaces extends View {
         .child(div().text_color(t.muted).child("Spaces"))
         // The same two as Inbox's top row, so switching modes moves nothing.
         .child(h_flex().flex_none().items_center()
-          // The layout's menu asks which machine, as its mod.json places it; the shipped one can't, so docked alone it's the active space's.
-          .child(tool("space-new", "New space", "folder-plus", closedKey(props()?.newMenu, "pick"), () => {
-            if (!asks) { run("space.new"); return false; }
-            openOverlay({ mod: props().newMenu, kind: "popup", frame: "none", at: /** @type {any} */ ("top"), offset: 96, width: 576, height: 420, props: { pick: true } });
-          }, asks ? null : "space.new"))
-          .child(tool("space-new-tab", "New tab", "square-pen", closedKey(props()?.newMenu ?? "new-menu"), () => run("mod.open", { name: props()?.newMenu ?? "new-menu" })))))
+          .child(tool("space-new", "New space", "folder-plus", newSpaceButton(props()?.newMenu)))
+          .child(tool("space-new-tab", "New tab", "square-pen", { closed: closedKey(props()?.newMenu ?? "new-menu"), onOpen: () => run("mod.open", { name: props()?.newMenu ?? "new-menu" }) }))))
       .child(v_flex().id("space-list").flex_1().min_h(0).overflow_y_scroll()
         .on_mouse_move((e, cx) => this.dragTo(e, cx))
         // Released anywhere in the list, it lands where the gap is.

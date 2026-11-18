@@ -15,7 +15,7 @@ import { programIcon } from "./program.js";
 import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
-import { menuKeys, scrollList, litProp, propsLit } from "./list.js";
+import { menuJump, scrollList, litProp, propsLit } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
@@ -50,7 +50,7 @@ export default class Pane extends View {
   init(_props, cx) {
     if (props()?.kids) {
       // Take the keyboard; a row lights only after a key or the pointer arrives.
-      this.at = propsLit();
+      this.kidLit = propsLit() >= 0 ? undefined : null;
       this.keys = cx.focus_handle();
       this.keys.focus();
       // A working one's time runs on, as the Inbox's pill. With all of them ended, the list goes.
@@ -77,9 +77,28 @@ export default class Pane extends View {
   // Everything the agent started, a step in for each level, as the agents list nests them, each with its own status:
   // one waiting on a stuck one under it is still at work, and that one says it's stuck.
   kidsMenu(t) {
-    const listed = new Map(agents().map((a) => [a.address, a.status]));
-    const rows = kidTree(terminals(), props().kids), now = Date.now();
-    const peek = (i) => { closeOverlay(props().overlay); run("terminal.peek", { terminal: rows[i].k.address }); };
+    const { kids, overlay } = props(), listed = new Map(agents().map((a) => [a.address, a.status]));
+    const rows = kidTree(terminals(), kids), now = Date.now();
+    if (this.kidLit === undefined) this.kidLit = rows[0]?.k.address ?? null;
+    const view = this;
+    // The menu helpers speak in row indices; only the address survives a draw.
+    const cursor = {
+      get at() { return rows.findIndex(({ k }) => k.address === view.kidLit); },
+      set at(i) { view.kidLit = rows[i]?.k.address ?? null; },
+    };
+    if (cursor.at < 0) this.kidLit = null;
+    const labels = rows.map(({ k }) => kidName(k));
+    const pick = (address, cx, menu = false) => {
+      if (!address) return;
+      if (!kidTree(terminals(), kids).some(({ k }) => k.address === address)) {
+        if (this.kidLit === address) this.kidLit = null;
+        cx.notify();
+        return;
+      }
+      closeOverlay(overlay);
+      if (menu) openMenu(this, "agent", { address }, cx);
+      else run("terminal.peek", { terminal: address });
+    };
     // T3's text-2xs with tabular figures: the time in monospace children, one per part, as the Inbox's pill.
     const mono = settings()?.font_family ?? "JetBrains Mono";
     // No status_ms means unchanged since creation, for working and idle alike.
@@ -92,17 +111,26 @@ export default class Pane extends View {
       .when((st === "working" || st === "idle") && since(k) > 0, (el) => el.children(took(since(k), now).split(" ").map((part) => menuHint(t, part).font_family(mono))));
     // As tall as it is: the popup opens with no height, so it grows and shrinks as sub-agents come and go.
     return v_flex().id("pane-kids").w_full().min_h(0).p(4).bg(t.popover)
-      .track_focus(this.keys).on_key_down(menuKeys(this, rows.map(({ k }) => kidName(k)), peek))
-      .child(scrollList(this, "pane-kids-list", { count: rows.length, row: MENU_ROW, height: Math.min(rows.length, KIDS_SHOWN) * MENU_ROW, at: this.at,
-        wheeled: (keep) => { if (keep >= 0) this.at = keep; },
+      .track_focus(this.keys).on_key_down((e, cx) => {
+        if (e.key === "escape") closeOverlay(overlay);
+        else if (e.key === "enter" || e.key === "space") pick(this.kidLit, cx);
+        else {
+          const next = labels.length ? menuJump(this, e, labels, cursor.at) : -1;
+          if (next < 0) return;
+          cursor.at = next;
+        }
+        cx.stop_propagation(); cx.notify();
+      })
+      .child(scrollList(this, "pane-kids-list", { count: rows.length, row: MENU_ROW, height: Math.min(rows.length, KIDS_SHOWN) * MENU_ROW, at: cursor.at,
+        wheeled: (keep) => { if (keep >= 0) cursor.at = keep; },
         draw: (i) => {
           const { k, depth } = rows[i];
           // A level steps in by the icon's 16: the spacer and the row's gap.
-          return menuRow(this, t, `kid-${k.address}`, { at: [this, "at", i], label: kidName(k), pick: () => peek(i),
+          return menuRow(this, t, `kid-${k.address}`, { at: [cursor, "at", i], label: labels[i], pick: (cx) => pick(k.address, cx),
             lead: depth > 0 ? div().w(depth * 16 - 8).flex_none() : undefined,
             icon: programIcon(k.program, 16, t.muted) ?? "mods/t3-pane/icons/terminal.svg",
             trail: trail(k, kidStatus(k, listed)),
-            also: (row) => row.on_mouse_down("right", (_e, cx) => { closeOverlay(props().overlay); openMenu(this, "agent", { address: k.address }, cx); }) });
+            also: (row) => row.on_mouse_down("right", (_e, cx) => pick(k.address, cx, true)) });
         } }));
   }
 

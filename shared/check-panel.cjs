@@ -17,7 +17,7 @@ const context = vm.createContext({ KEY: { panels: 't3.panels' }, GROUP_GAP: 4, l
 // shows the change has Details and the toggle where they end up. Checked at every step below.
 const endFits = () => assert.equal(ui.end, ui.open ? 0 : 4 + 28 + (ui.buttons ? 8 + 3 * 28 : 0), `window-end for a panel ${ui.open ? 'open' : 'closed'}`);
 for (const f of ['terminal-context.js', 'surfaces.js', 'panel.js']) vm.runInContext(fs.readFileSync(`${__dirname}/${f}`, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), context);
-const p = vm.runInContext('({ panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel, activateSurface, reviewRepo, reviewRequest, reviewShown })', context);
+const p = vm.runInContext('({ panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel, activateSurface, reviewRepo, openReview, reviewShown })', context);
 for (const k of ['showPage', 'openFile', 'closeSurface', 'togglePanel', 'toggleWide', 'restorePanel', 'syncPanel', 'activateSurface']) { const f = p[k]; p[k] = (...a) => { const r = f(...a); endFits(); return r; }; }
 const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active ? '*' : '') + t.id).join(' ');
 
@@ -55,13 +55,21 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   cwd = {}; assert.match((await p.reviewRepo()).problem, /not in a Git repository/);
   repos = { '/space': true }; assert.equal((await p.reviewRepo()).root, '/space', 'no terminal: the space folder');
   assert.match((await p.reviewRepo('far')).problem, /remote/);
-  // A request names the Review tab it's for, its number past the last one's.
-  ui.space = 'a'; p.showPage('review');
+  // An outside pick opens Review for its source only, then names the live tab in the request.
+  const pick = { space: 'a', root: '/work/repo', page: '/worktree', analyze: true };
+  const prior = saved.review = { n: Date.now() + 5000 }, laid = () => JSON.stringify([ui, saved['t3.panels']]);
+  ui.space = 'b'; const other = laid();
+  assert.equal(p.openReview(pick), 'stale');
+  assert.deepEqual([laid(), saved.review], [other, prior]);
+  ui.space = 'a'; ui.slots = ['files', 'panel-empty']; const unavailable = laid();
+  assert.equal(p.openReview(pick), 'unavailable');
+  assert.deepEqual([laid(), saved.review], [unavailable, prior]);
+  ui.slots.push('review');
+  assert.equal(p.openReview(pick), 'opened');
+  assert.deepEqual([ui.open, ui.page], [true, 'review']); endFits();
   const born = p.panelState().tabs.find(t => t.id === 'review').born;
-  saved.review = { n: Date.now() + 5000 };
-  p.reviewRequest('a', '/work/repo', '/worktree', { analyze: true });
   assert.deepEqual({ ...saved.review }, { space: 'a', root: '/work/repo', page: '/worktree', n: saved.review.n, analyze: true, born });
-  assert.ok(saved.review.n > Date.now() + 4000);
+  assert.ok(saved.review.n > prior.n);
   // What Review showed counts only while the tab that showed it is there: closed and added again, it's gone.
   saved['review.shown'] = { a: { root: '/work/repo', page: '/worktree', born } };
   assert.equal(p.reviewShown('a')?.page, '/worktree');
@@ -72,7 +80,8 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   ui.buttons = true; p.togglePanel(); p.togglePanel(); ui.buttons = false; p.togglePanel(); p.togglePanel();
   // Herdr's own layout docks Review in its stack: a page shown, the panel put away; no tabs kept.
   ui.slots = ['review']; ui.open = false; ui.space = 'b'; const before = JSON.stringify(saved['t3.panels'].b);
-  p.showPage('review'); assert.deepEqual([ui.open, ui.page], [true, 'review']);
+  assert.equal(p.openReview({ ...pick, space: 'b' }), 'opened');
+  assert.deepEqual([ui.open, ui.page, saved.review.space, 'born' in saved.review], [true, 'review', 'b', false]);
   p.togglePanel('review'); assert.equal(ui.open, false);
   p.showPage('review'); p.closeSurface(); assert.equal(ui.open, false);
   assert.equal(JSON.stringify(saved['t3.panels'].b), before);

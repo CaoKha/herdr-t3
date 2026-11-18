@@ -22,6 +22,8 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 
 - Drag 6px to reorder within the space's machine. A checkout moves with its expanded worktrees; a worktree moves only among its siblings.
 - The lifted row is `selected` with a shadow, with an insertion gap. Release commits with `space.move`, holding the intent until the model echoes it. Esc or leaving cancels.
+- The gap names a side of a group (or a sibling), not a model index. A checkout opening at a synthetic row keeps that gap meaningful; a vanished or no longer legal boundary cancels the drop. Release counts current folded members and Home, not synthetic rows.
+- Drops wait for pending automatic moves to echo or time out before translating the gap into a host index. Both types of move use the same current order; once settled, number and previous/next space keys follow the full row order, including folded worktrees but not Home.
 
 ## Agents
 
@@ -35,6 +37,8 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 - Sort by space or by priority. Pinned is a shared group in either sort.
 - Priority headers use the Inbox shelves' 32px form. Space headers use T3's project-folder form: 8 above, a 16px mark, the medium name, and a right-click space menu.
 - A closed group shows its hidden count and urgency mark, and keeps the viewed row outside the fold.
+- Each draw or one-second tick observes the current agents, terminals, focus and pins. It updates history and drops fold choices and pins for ended agents on machines it has heard from, before grouping. The same group member order feeds both `setAgentOrder` and `t3-agents.rows`, even with the sidebar hidden. Lists publishes only when selected or when Agents is docked alone.
+- Next and Previous include members of closed groups. A sub-agent without a top-level row is represented by its listed ancestor. If focus reports a terminal but no agent, use that terminal to find its ancestor.
 - The sort menu hangs right-aligned 4px below its button, fades in over 150ms, 28px rows; the same button closes it.
 - Motion is the Inbox's ([inbox](inbox.md#motion)) for sorting and folding; fold chevrons cross-fade their direction.
 
@@ -45,7 +49,7 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 - Tree lines are 1.5 wide and run down the parent icon's centre, 15.25 from the row's edge (a level down, 35.25). A middle child's line runs on; a last child's turns in: 9.75 long, 6 radius, ending 4 before the child's icon. Worktrees under a checkout use the same lines, their icon 20 in, level with a sub-agent's.
 - Blocked or errored sub-agents still show one step in while folded.
 - A sub-agent with its own pane appears once, under its parent, unless pinned.
-- A folded sub-agent in view lights its parent. The viewed done agent stays Done until left.
+- A folded sub-agent in view lights its parent. Reading a viewed done agent changes its mark to Idle but keeps it in Done until left.
 - Fold state of ended agents is dropped.
 
 ### Clicks and pins

@@ -40,6 +40,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 
 ## Settle details
 
+- The standalone `t3-inbox.settle` command reads the current Inbox model when it arrives, even before the first draw. It targets the card in view then: Un-settle if settled, Settle if finished, no Settle while busy. Button and drag actions still target their own rows. The layout's key stays with `t3-tabs` so it also works with the sidebar hidden.
 - Settle is offered on hover of any finished card, pinned ones too. It removes the pin, writes the terminal label (`settled=<ms>:<turn>`, see [storage](../storage.md)) and moves the agent into Settled.
 - A Settle waiting for the core's echo can't be lifted or settled again.
 - Explicit returns go to the top of Active: the Settle key on a settled viewed agent, the Un-settle arrow, dragging it out. Clearing the label any other way keeps its place.

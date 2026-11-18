@@ -1,8 +1,9 @@
 // New: pick the space and open a terminal tab there, or start a new space, on a machine picked as T3 picks an environment.
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
-import { theme, spaces, machines, panes, run, closeOverlay, props, home, shared, setShared } from "herdr";
+import { theme, spaces, panes, run, closeOverlay, props, home, shared, setShared } from "herdr";
 import { projectMark, placeOf, newTab } from "./project.js";
+import { newSpacePlan } from "./new-space.js";
 import { step, scrollList } from "./list.js";
 import { keyOf, keyLabel } from "./tip.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
@@ -35,20 +36,12 @@ export default class NewMenu extends View {
   // For the buttons that open this: see justClosed in focus.js. New space's and New tab's apart, as each opens the other's step.
   close() { setShared(closedKey("t3-new-menu", this.picking ? "pick" : undefined), Date.now()); }
 
-  // The active space's machine first, as ⌘N would use it.
-  machineRows() {
-    const here = spaces().find(s => s.active)?.machine ?? null;
-    const others = [...machines().map(k => k.name), ...spaces().map(s => s.machine)].filter(Boolean).sort();
-    return [...new Set([here, null, ...others])].map(m => {
-      const layout = m ? machines().find(k => k.name === m)?.layout ?? "unavailable" : "ready";
-      return { key: `machine:${m ?? ""}`, machine: m, name: m ?? "This computer", sub: m ? STATE[layout] : "Local", off: layout !== "ready" };
-    });
-  }
-
   // The current space first, then its machine's, so a machine's spaces stay together.
-  items() {
+  items(plan = undefined) {
     const q = this.filter.toLowerCase();
-    if (this.picking) return this.machineRows().filter(m => m.name.toLowerCase().includes(q));
+    if (this.picking) return (plan ?? newSpacePlan()).candidates.map(({ machine, layout }) => ({
+      key: `machine:${machine ?? ""}`, machine, name: machine ?? "This computer", sub: machine ? STATE[layout] : "Local", off: layout !== "ready",
+    })).filter((m) => m.name.toLowerCase().includes(q));
     const ps = panes(), here = spaces().find(s => s.active)?.machine ?? null;
     const rank = (s) => (s.active ? 0 : (s.machine ?? null) === here ? 1 : 2);
     return spaces().filter(s => s.id !== shared(KEY.home) && `${s.name} ${s.machine ?? ""} ${placeOf(s, ps)}`.toLowerCase().includes(q))
@@ -71,13 +64,6 @@ export default class NewMenu extends View {
     input.set_value("");
     input.focus();
     cx.notify();
-  }
-
-  // As T3's Add project: a machine to pick only when there is more than one.
-  newSpace(cx) {
-    const rows = this.machineRows();
-    if (rows.length > 1) this.showMachines(true, cx);
-    else this.choose(rows[0]);
   }
 
   row(item, i, ps) {
@@ -106,9 +92,9 @@ export default class NewMenu extends View {
   }
 
   render() {
-    const t = theme(), ps = panes(), items = this.items();
+    const t = theme(), ps = panes(), plan = newSpacePlan(), items = this.items(plan);
     // ⌘N doesn't ask: it only names what this button does when there's nothing to ask.
-    const newKey = this.machineRows().length > 1 ? "" : keyOf("space.new");
+    const newKey = plan.ask ? "" : keyOf("space.new");
     return focusRoot(this, v_flex().id("new-menu").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
@@ -129,7 +115,7 @@ export default class NewMenu extends View {
         .when(items.length === 0, el => el.child(div().py(40).text_center().text_color(t.dim).child(this.picking ? "No matching machines." : "No matching spaces."))))
       .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", this.picking ? "New space" : "New tab"], ["Esc", "Close"]], this.picking
         ? stop(this, t, "new-back", footAction(t, "new-back", "Back to spaces").on_click((_e, cx) => this.showMachines(false, cx)).child("← Spaces"), 8)
-        : stop(this, t, "space-new", footAction(t, "space-new", "New space").on_click((_e, cx) => this.newSpace(cx))
+        : stop(this, t, "space-new", footAction(t, "space-new", "New space").on_click((_e, cx) => plan.ask ? this.showMachines(true, cx) : this.choose(plan.candidates[0]))
           .child(svg("mods/t3-new-menu/icons/folder-plus.svg").size(14).text_color(t.muted))
           .child("New space")
           .when(Boolean(newKey), row => row.child(keycap(t, newKey))), 8))));

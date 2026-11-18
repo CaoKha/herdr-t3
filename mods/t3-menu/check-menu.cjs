@@ -26,6 +26,9 @@ function el() {
   return proxy;
 }
 const find = (node, id) => !node || typeof node !== "object" ? null : node.key === id ? node : node.items.map((c) => find(c, id)).find(Boolean) ?? null;
+const rowAt = (tree, i) => tree.items[i]?.items.at(-1);
+const rowNamed = (node, label) => !node || typeof node !== "object" ? null
+  : node.style.accessibility_label === label ? node : node.items.map((n) => rowNamed(n, label)).find(Boolean) ?? null;
 const theme = { selected: "#selected", hover: "#hover", foreground: "#fg", muted: "#muted", dim: "#dim", border: "#border", popover: "#pop", working: "#blue", blocked: "#amber", done: "#green", accent: "#accent", ansi1: "#red" };
 let target = {}, calls = [], closed = [], state = {}, list = "inbox", opened = 0, zoom = 1, view = { width: 1200, height: 800 }, mouse = { x: 0, y: 0 };
 let terms = [{ address: "t1", labels: {} }], agentList = [], keyList = [];
@@ -71,12 +74,10 @@ const elapse = (ms) => {
     t.f(cx);
   }
 };
-const menu = new context.Menu();
-menu.init({}, cx);
 const choose = (props, label) => {
   target = props; calls = [];
-  const i = vm.runInContext("items", context)(props, null).findIndex((it) => it[0] === label);
-  menu.choose(i, { ...cx, write_to_clipboard: (text) => calls.push(["clipboard", text]) });
+  const menu = new context.Menu(); menu.init(props, cx);
+  rowNamed(menu.render(), label)?.handlers.on_click({}, { ...cx, write_to_clipboard: (text) => calls.push(["clipboard", text]) });
   return JSON.parse(JSON.stringify(calls));
 };
 
@@ -97,7 +98,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   target = { tab: "pane", target: { pane: "p1", terminal: "t1" } };
   const m = new context.Menu(); m.init({}, cx);
   const rows = vm.runInContext("items", context)(target, null).map((it, i) => {
-    const row = find(m.render(), `mi-${i}`), walk = (n) => !n || typeof n !== "object" ? [] : [n, ...n.items.flatMap(walk)];
+    const row = rowAt(m.render(), i), walk = (n) => !n || typeof n !== "object" ? [] : [n, ...n.items.flatMap(walk)];
     const icon = walk(row).find((n) => typeof n.style.path === "string")?.style.path, words = walk(row).flatMap((n) => n.items.filter((x) => typeof x === "string"));
     return { label: it[0], icon, hint: words.filter((w) => w && w !== it[0]) };
   });
@@ -166,7 +167,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   // Soonest first, so from 5 to 6 pm This evening leads: compare with the presets at this time, not a fixed label.
   assert.equal(times[0][0], vm.runInContext("presets", context)(Date.now())[0].label);
   assert.ok(times.some((t) => t[0] === "In 1 hour"));
-  assert.match(times[0][1], /^t3-tabs\.snooze:t1:\d+$/);
+  assert.match(choose({ tab: "snooze", target: { address: "t1" } }, times[0][0])[0][0], /^t3-tabs\.snooze:t1:\d+$/);
   assert.ok(times[0][3], "the time it wakes, on the right");
   assert.deepEqual(choose({ tab: "snooze", target: { address: "t1" } }, "Custom…").map((c) => [c[1].mod, c[1].props]), [["t3-inbox", { customSnooze: "t1", answer: "t3-tabs.snooze" }]], "Custom is the Inbox's dialog, answering the tab bar");
   terms = [{ address: "t1", labels: {} }]; agentList = [];
@@ -186,7 +187,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   assert.deepEqual(labels({ tab: "global" }), [], "no menu for nothing in particular");
   // Drawn: a rule between groups only, and only Remove worktree in red.
   const m = new context.Menu();
-  m.git = "linked";
+  m.git = { folder: "/work/s1", machine: undefined, kind: "linked" };
   target = { tab: "space", target: { id: "s1" } };
   const tree = m.render(), rows = tree.items;
   assert.deepEqual(rows.map((r) => r.items.length), [1, 2, 1, 2, 1, 2, 1], "a rule before Rename, New worktree and Remove worktree");
@@ -198,16 +199,16 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   target = { tab: "tab", target: { id: "b1", space: "s1" } };
   const m = new context.Menu();
   m.init(target, cx);
-  const lit = () => [0, 1, 2].filter((i) => find(m.render(), `mi-${i}`).style.bg === theme.selected);
+  const lit = () => [0, 1, 2].filter((i) => rowAt(m.render(), i).style.bg === theme.selected);
   const key = (e) => { calls = []; find(m.render(), "menu").handlers.on_key_down(e, cx); return JSON.parse(JSON.stringify(calls)); };
   assert.deepEqual(lit(), [], "as T3's, nothing lit until a key or the pointer gets there");
   assert.deepEqual(key({ key: "enter" }), [], "so Enter runs nothing");
   // The pointer on Close lights Close alone, and Enter runs what's lit.
-  find(m.render(), "mi-2").handlers.on_hover(true, cx);
+  rowAt(m.render(), 2).handlers.on_hover(true, cx);
   assert.deepEqual(lit(), [2], "one row lit, the pointer's");
-  assert.equal(find(m.render(), "mi-2").style.hover, undefined, "no second light of its own");
+  assert.equal(rowAt(m.render(), 2).style.hover, undefined, "no second light of its own");
   assert.deepEqual(key({ key: "enter" }), [["t3-tabs.close-tab:b1"]]);
-  find(m.render(), "mi-2").handlers.on_hover(false, cx);
+  rowAt(m.render(), 2).handlers.on_hover(false, cx);
   assert.deepEqual(lit(), [], "leaving the row clears it, as the Snooze menu's");
   key({ key: "end" });
   assert.deepEqual(lit(), [2]);
@@ -233,7 +234,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
     m.init(target, cx);
     return m;
   };
-  const row = (m, i) => find(m.render(), `mi-${i}`);
+  const row = (m, i) => rowAt(m.render(), i);
   const opens = () => calls.filter((c) => c[0] === "overlay").map((c) => plain({ mod: c[1].mod, kind: c[1].kind, at: c[1].at, width: c[1].width, props: c[1].props }));
   const box = { x: 100, y: 200, width: 212, height: 28 };
   const move = (m, i, position, bounds = box) => { calls = []; closed = []; row(m, i).handlers.on_mouse_move({ position, bounds }, cx); };
@@ -307,7 +308,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   target = { tab: "snooze", target: { address: "t1" }, parents: ["root"], lit: 0, overlay: sub };
   let s = new context.Menu();
   s.init(target, cx);
-  assert.equal(find(s.render(), "mi-0").style.bg, theme.selected, "its first time lit");
+  assert.equal(rowAt(s.render(), 0).style.bg, theme.selected, "its first time lit");
   const focused = m.keys.focused;
   key(s, { key: "left" });
   assert.deepEqual(closed, [sub], "←: it alone closes");
@@ -336,6 +337,87 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   key(s, { key: "end" });
   key(s, { key: "enter" });
   assert.deepEqual([closed, opens().map((o) => o.mod)], [[again, "root"], ["t3-inbox"]], "Custom…: both close, its dialog opens");
+  agentList = []; terms = [{ address: "t1", labels: {} }];
+}
+
+// Live rows can change between the frame that received input and dispatch.
+{
+  const row = rowNamed;
+  const key = (tree, name, eventCx = cx) => tree.handlers.on_key_down({ key: name }, eventCx);
+  const open = (p = { tab: "agent", target: { address: "t1" }, overlay: "live-root" }) => {
+    target = p;
+    agentList = [{ address: "t1", pane: "p1", tab: "b1", status: "done" }];
+    terms = [{ address: "t1", state: "live", labels: {} }];
+    calls = []; closed = [];
+    const m = new context.Menu(); m.init(target, cx);
+    return m;
+  };
+  const clipboard = { ...cx, write_to_clipboard: (text) => calls.push(["clipboard", text]) };
+  const trace = () => JSON.parse(JSON.stringify([closed, calls]));
+  const copy = [["live-root"], [["clipboard", "t1"]]];
+
+  let m = open(), tree = m.render();
+  agentList[0].status = "working";
+  row(tree, "Copy address").handlers.on_click({}, clipboard);
+  const clickTrace = trace();
+
+  m = open(); tree = m.render();
+  key(tree, "end"); key(tree, "up"); // Copy address, the row before Close.
+  agentList[0].status = "working";
+  key(tree, "enter", clipboard);
+  const enterTrace = trace();
+
+  m = open(); tree = m.render();
+  key(tree, "end"); key(tree, "up");
+  agentList[0].status = "working";
+  tree = m.render();
+  const stillLit = row(tree, "Copy address").style.bg;
+  key(tree, "enter", clipboard);
+  const redrawTrace = trace();
+
+  const box = { x: 100, y: 200, width: 212, height: 28 };
+  const hoverSnooze = (tree) => row(tree, "Snooze").handlers.on_mouse_move({ position: { x: 150, y: 210 }, bounds: box }, cx);
+  m = open(); tree = m.render();
+  hoverSnooze(tree);
+  agentList[0].status = "blocked";
+  elapse(100);
+  const blockedTrace = trace();
+
+  m = open(); tree = m.render();
+  hoverSnooze(tree);
+  agentList[0].status = "working"; // Settle disappears, but Snooze remains.
+  elapse(100);
+  const snoozeTarget = calls[0]?.[1]?.props?.target;
+  m.close();
+
+  const savedNow = now;
+  now = new Date(2026, 10, 18, 12, 15).getTime();
+  m = open({ tab: "snooze", target: { address: "t1" }, parents: ["live-root"], overlay: "live-snooze" });
+  tree = m.render();
+  elapse(1000);
+  const durationWake = now + 3_600_000;
+  row(tree, "In 1 hour").handlers.on_click({}, cx);
+  const timeTrace = trace();
+
+  m = open({ tab: "snooze", target: { address: "t1" }, parents: ["live-root"], overlay: "live-snooze" });
+  tree = m.render();
+  agentList[0].status = "blocked";
+  row(tree, "In 1 hour").handlers.on_click({}, cx);
+  const obsoleteTimeTrace = trace();
+
+  now = new Date(2026, 10, 18, 17, 30).getTime();
+  m = open({ tab: "snooze", target: { address: "t1" }, parents: ["live-root"], overlay: "live-snooze" });
+  tree = m.render();
+  elapse(30 * 60_000 + 1);
+  row(tree, "This evening").handlers.on_click({}, cx);
+  const expiredTimeTrace = trace();
+  now = savedNow;
+
+  assert.deepEqual({ clickTrace, enterTrace, stillLit, redrawTrace, blockedTrace, snoozeTarget: JSON.parse(JSON.stringify(snoozeTarget ?? null)), timeTrace, obsoleteTimeTrace, expiredTimeTrace }, {
+    clickTrace: copy, enterTrace: copy, stillLit: theme.selected, redrawTrace: copy,
+    blockedTrace: [[], []], snoozeTarget: { address: "t1" },
+    timeTrace: [["live-snooze", "live-root"], [[`t3-tabs.snooze:t1:${durationWake}`, {}]]], obsoleteTimeTrace: [[], []], expiredTimeTrace: [[], []],
+  });
   agentList = []; terms = [{ address: "t1", labels: {} }];
 }
 
@@ -593,7 +675,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   target = paneContext;
   const actionMenu = new context.Menu(); actionMenu.init(target, cx);
   const menuTree = actionMenu.render();
-  const closeRow = find(menuTree, `mi-${items(target, null).findIndex(it => it[0] === "Close")}`);
+  const closeRow = rowNamed(menuTree, "Close");
   assert.ok(closeRow, "a child with a pane gets Close before its first report");
   calls = []; closed = [];
   closeRow.handlers.on_click({}, cx);

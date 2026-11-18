@@ -93,6 +93,106 @@ function repoResults(view, fixture) {
   return (folder, git, on = null) => results.set(JSON.stringify([on, folder]), git);
 }
 
+function echoSpaceMoves(list, writes) {
+  for (const [name, { id, index }] of writes) if (name === "space.move") list.splice(index - 1, 0, list.splice(list.findIndex(s => s.id === id), 1)[0]);
+}
+
+// Mouse release runs against a newer host state than the frame which drew the gap.
+async function lateSpaceDrop(pendingAuto) {
+  const f = fixture(256), list = f.spaces(), view = f.load("t3-spaces"), result = repoResults(view, f);
+  const repo = JSON.stringify([null, "/work/repo/.git"]);
+  const git = { repo, name: "repo", linked: true, ahead: 0, behind: 0 };
+  list[2].machine = null;
+  result("/work/p1", git); result("/work/s2", git);
+  f.state["t3-tabs.home"] = "h";
+  list.splice(1, 0, { id: "h", name: "Home\u200b", named: true, machine: null, tabs: [] });
+  const root = () => view.render(cx), row = id => find(root(), id), moves = () => f.calls.filter(([name]) => name === "space.move");
+  const echo = () => echoSpaceMoves(list, f.calls.splice(0));
+  // Fold the worktrees, open the checkout from its synthetic row, then lift s0 below the group before creation echoes.
+  fire(row(`repo-${repo}-fold`), "on_click", {}, cx);
+  fire(row(`repo-${repo}`), "on_click", {}, cx);
+  fire(row("space-s0"), "on_mouse_down:left", { position: { x: 0, y: 0 } }, cx);
+  for (const y of [8, 50]) fire(row("space-list"), "on_mouse_move", { position: { x: 0, y } }, cx);
+  const before = root(), gap = find(before, "space-rows").items.filter(n => n.key?.startsWith("fly-")).at(-1);
+  assert.ok(gap.key.startsWith("fly-space-gap-"), "the visible gap is after the folded synthetic group");
+  list.push({ id: "checkout", name: "repo", folder: "/work/repo", machine: null, tabs: [] });
+  result("/work/repo", { ...git, linked: false });
+  if (pendingAuto) {
+    // Checkout arrival was rendered and automatic placement is still pending at release.
+    root();
+    const writes = moves();
+    assert.ok(writes.some(([, a]) => a.id === "checkout"));
+    fire(find(before, "space-list"), "on_mouse_up:left", {}, cx);
+    assert.deepEqual(moves(), writes, "release must not race the pending automatic batch");
+    echo(); root();
+  } else {
+    fire(find(before, "space-list"), "on_mouse_up:left", {}, cx);
+    assert.deepEqual(moves()[0], ["space.move", { id: "s0", index: 5 }], "the not-yet-drawn checkout already belongs to the drop's anchor");
+  }
+  for (let i = 0; i < 3; i++) { echo(); root(); }
+  assert.deepEqual(list.map(w => w.id), ["h", "checkout", "s1", "s2", "s0"], "the latest checkout and hidden worktrees land before the dragged space");
+  const tabs = f.load("t3-tabs");
+  const press = async (command, from) => {
+    list.forEach(w => { w.active = w.id === from; });
+    await tabs.navigation.handle(command, cx);
+    return f.calls.pop();
+  };
+  assert.deepEqual(await press("space:1", "h"), ["space.select", { id: "checkout" }], "the real checkout is first; Home has no number");
+  assert.deepEqual(await press("space:2", "h"), ["space.select", { id: "s1" }], "folded worktrees keep their numbers");
+  assert.deepEqual(await press("space-next", "s2"), ["space.select", { id: "s0" }]);
+  assert.deepEqual(await press("space-prev", "s0"), ["space.select", { id: "s2" }]);
+}
+
+function removedSpaceDropAnchor() {
+  const f = fixture(256), view = f.load("t3-spaces");
+  f.spaces()[2].machine = null;
+  const root = () => view.render(cx), at = id => find(root(), id);
+  fire(at("space-s0"), "on_mouse_down:left", { position: { x: 0, y: 0 } }, cx);
+  for (const y of [8, 110]) fire(at("space-list"), "on_mouse_move", { position: { x: 0, y } }, cx);
+  const before = root();
+  assert.match(find(before, "space-rows").items.filter(n => n.key?.startsWith("fly-")).at(-1).key, /^fly-space-gap-/, "the rendered gap is after s2");
+  f.spaces().pop();
+  fire(find(before, "space-list"), "on_mouse_up:left", {}, cx);
+  assert.ok(!f.calls.some(([name]) => name === "space.move"), "when the anchor no longer exists, drop must not fall back to another gap");
+}
+
+// Home's button is loaded in the ordinary fixture, with a queued command consumed by the floating Tabs copy.
+async function homeNextTiming() {
+  const f = fixture(256), sp = f.spaces()[0];
+  f.state["t3-tabs.home"] = "h";
+  f.slots.sidebar.hidden = true;
+  f.slots.lists = { id: "sidebar-lists", active: "inbox" };
+  const page = f.load("t3-home"), next = () => find(page.render(cx), "home-next");
+  const spawns = [], spawn = cx.spawn;
+  cx.spawn = fn => spawns.push(fn);
+  try { f.load("t3-tabs", { part: "keys" }); } finally { cx.spawn = spawn; }
+  const key = async (command = "next") => {
+    f.commands.push(command); spawns.at(-1)(cx); await new Promise(setImmediate);
+  };
+  f.state["t3-inbox.rows"] = { order: ["t0"], view: "t0" };
+  assert.equal(next().handlers.on_click, undefined, "a nonempty queue at its end has no Next target");
+  await key(); assert.deepEqual(f.calls.splice(0), []);
+  sp.active = false;
+  f.spaces().push({ id: "h", name: "Home\u200b", named: true, machine: null, active: true, tabs: [{ id: "home", active: true }] });
+  assert.ok(next().handlers.on_click, "Home can start at the first row before the sidebar's view echo");
+  fire(next(), "on_click", {}, cx);
+  const [click] = f.calls.splice(0);
+  assert.deepEqual(click, ["t3-tabs.next", {}]);
+  await key(click[0].slice("t3-tabs.".length));
+  assert.deepEqual(f.calls.splice(0), [["agent.focus", { terminal: "t0" }]]);
+  await key(); assert.deepEqual(f.calls.splice(0), [["agent.focus", { terminal: "t0" }]]);
+  const old = next();
+  f.state["t3-inbox.rows"] = { order: [] };
+  fire(old, "on_click", {}, cx);
+  await key(f.calls.pop()[0].slice("t3-tabs.".length));
+  assert.deepEqual(f.calls.splice(0), [], "an enabled button's command rechecks the latest queue");
+  f.spaces().pop(); sp.active = true;
+  f.slots.lists.active = "lists";
+  f.state["t3-agents.rows"] = { order: ["pane:card"] };
+  assert.ok(next().handlers.on_click, "an omitted view starts at the beginning of the selected Lists snapshot");
+  await key(); assert.deepEqual(f.calls.splice(0), [["pane.focus", { pane: "card" }]]);
+}
+
 {
   const f = fixture(256);
   const roots = ["t3-tabs", "t3-spaces"].map(name => f.load(name).render(cx));
@@ -913,8 +1013,8 @@ async function checkInbox() {
   assert.ok(!find(root, "space-rows").items.some(n => keyOf(n)?.startsWith("leaving-")), "nothing leaves: the lifted row is still there");
   root = sp.render(cx);
   assert.deepEqual([rows(root)[2], fly(root, "space-s1").style.top], ["gap-32", 33], "then the rows make way, sliding");
-  release();
-  f.calls.splice(0); sp.landing = null;
+  fire(find(root, "space-list"), "on_hover", false, cx);
+  f.calls.splice(0);
   press("space-s0"); move(10);
   root = sp.render(cx);
   assert.deepEqual(rows(root), ["machine-local", "gap-32", "space-s1", "machine-vps", "space-s2"], "lifted, its place holds a gap");
@@ -946,7 +1046,7 @@ async function checkInbox() {
   assert.deepEqual([fly(root, "space-s0").style.top, fly(root, "space-s0").style.opacity], [57 - 66, 1], "it slides from where it was let go to its place");
   f.spaces().splice(1, 0, f.spaces().shift()); // The move's echo.
   assert.deepEqual(rows(sp.render(cx)), ["machine-local", "space-s1", "space-s0", "machine-vps", "space-s2"]);
-  assert.equal(sp.landing, null, "once it's arrived the model's order is the list's");
+  assert.equal(moves().length, 1, "echoing the move needs no further write");
   f.spaces().splice(0, 0, f.spaces().splice(1, 1)[0]);
   sp.render(cx);
   // vps's one space has nowhere to go in its machine; pulled up into this computer's rows, it stays.
@@ -992,7 +1092,6 @@ async function checkInbox() {
   scope.window.mouse_position = () => ({ x: 10, y: 40 });
   lift();
   release();
-  sp.landing = null;
   watches.at(-1).fn(cx);
   assert.ok(watches.at(-1).gone, "released in the list, the watch stops too");
   cx.timer.every = every;
@@ -1010,9 +1109,11 @@ async function checkInbox() {
   assert.deepEqual([fly(tree, "space-s1").style.opacity, fly(tree, "space-s1").style.top], [1, 0], "the first frame plays nothing");
   // A new space joins when it's shown (its git known, or a moment gone), and its fade starts then.
   list.splice(2, 0, { id: "s3", name: "project 3", active: false, folder: "/work/p3", machine: null, tabs: [] });
+  let now = Date.now();
+  f.scopes.get("t3-spaces").Date = { now: () => now };
   tree = sp.render(cx);
   assert.equal(fly(tree, "space-s3"), undefined, "waiting for its git, it isn't drawn");
-  sp.born.s3 = Date.now() - 2000;
+  now += 2000;
   tree = sp.render(cx);
   assert.deepEqual([fly(tree, "space-s3").style.opacity, fly(tree, "space-s3").style.top], [0, 0], "shown, it starts clear, riding s1 (still)");
   assert.equal(fly(tree, "machine-vps").style.top, -33, "the rows below make room");
@@ -1083,7 +1184,7 @@ async function checkInbox() {
     const result = repoResults(sp, f);
     result("/work/s0", g);
     result("/work/p1", { ...g, linked: true, branch: "x" });
-    const ids = () => [...sp.ordered().map(r => r.w.id)];
+    const ids = () => [...sp.order.rows().map(r => r.w.id)];
     assert.deepEqual(ids(), ["s0", "s1", "s2"]);
     const arrow = find(sp.render(cx), "space-fold-s0");
     assert.equal(arrow.style.mr + arrow.style.px, -2, "past its padding, its 12px chevron ends 2 past the row's content, as a folder's: its middle 22px from the sidebar's edge");
@@ -1117,9 +1218,9 @@ async function checkInbox() {
     const result = repoResults(view, o), set = (id, g) => result(`/work/${id}`, g);
     const tree = { repo, linked: true, name: "Engineer", branch: "x", ahead: 0, behind: 0 };
     set("p1", tree); set("s2", { ...tree, branch: "y" });
-    const headId = `repo-${repo}`, rows = () => [...view.ordered().map(r => r.w.id)];
+    const headId = `repo-${repo}`, rows = () => [...view.order.rows().map(r => r.w.id)];
     assert.deepEqual(rows(), ["s0", headId, "s1", "s2"], "the head takes its first worktree's place");
-    assert.deepEqual([...view.ordered().map(r => r.tree ?? null)], [null, null, "├─", "└─"]);
+    assert.deepEqual([...view.order.rows().map(r => r.tree ?? null)], [null, null, "├─", "└─"]);
     const moves = () => o.calls.filter(([name]) => name === "space.move");
     assert.deepEqual(moves(), [], "a row with no space never reaches the model's order");
     // Dragged past it, a space goes past the whole group: its worktrees count, though the head isn't a space.
@@ -1128,7 +1229,9 @@ async function checkInbox() {
     view.render(cx);
     fire(find(view.render(cx), "space-list"), "on_mouse_up:left", {}, cx);
     assert.deepEqual(moves(), [["space.move", { id: "s0", index: 3 }]], "after the group's last worktree");
-    view.landing = null;
+    echoSpaceMoves(list, moves());
+    view.render(cx);
+    list.unshift(list.pop()); // Reset the fake client's order for the checkout-opening scenario.
     let root = view.render(cx), head = find(root, headId);
     fire(head, "on_mouse_down:right", {}, cx);
     assert.deepEqual(plain(o.overlays.pop().props).tab, "checkout", "its menu opens it or copies its path, as T3's project folder");
@@ -1148,7 +1251,7 @@ async function checkInbox() {
     // Closed, the worktree you're on still shows, last in the tree, and isn't counted.
     list.forEach(s => { s.active = s.id === "s2"; });
     assert.deepEqual(rows(), ["s0", headId, "s2"], "the worktree in view stays");
-    assert.equal(view.ordered().at(-1).tree, "└─");
+    assert.equal(view.order.rows().at(-1).tree, "└─");
     assert.ok(strings(find(view.render(cx), headId)).includes("1"));
     list.forEach(s => { s.active = s.id === "s0"; });
     fire(find(view.render(cx), foldId), "on_click", {}, cx);
@@ -1168,7 +1271,7 @@ async function checkInbox() {
     assert.deepEqual(moves().at(-1), ["space.move", { id: "s9", index: 2 }], "the checkout moves to where the head was");
     list.splice(1, 0, list.pop());
     assert.deepEqual(rows(), ["s0", "s9"]);
-    assert.equal(view.opening.size, 0, "in place, it's done");
+    assert.equal(moves().length, 2, "in place, no further move");
     fire(find(view.render(cx), "space-fold-s9"), "on_click", {}, cx);
     assert.deepEqual(rows(), ["s0", "s9", "s1", "s2"]);
     list.splice(1, 1);
@@ -1176,7 +1279,7 @@ async function checkInbox() {
     set("s0", null);
     set("s2", null);
     assert.deepEqual(rows(), ["s0", "s1", "s2"], "one alone gets no row over it");
-    assert.equal(view.ordered()[1].tree, null);
+    assert.equal(view.order.rows()[1].tree, null);
     // No .git folder (a bare repo): nothing to open, so no pen.
     const bare = JSON.stringify([null, "/w/bare.git"]);
     set("p1", { ...tree, repo: bare }); set("s2", { ...tree, repo: bare });
@@ -1200,7 +1303,7 @@ async function checkInbox() {
     for (const repo of ["ra", "rb"]) fire(find(view.render(cx), `repo-${JSON.stringify([null, `/${repo}/.git`])}`), "on_click", {}, cx);
     add("ma", "/ra", "ra", false); add("mb", "/rb", "rb", false);
     for (let i = 0; i < 3; i++) {
-      view.ordered();
+      view.order.rows();
       for (const [name, a] of o.calls.splice(0)) if (name === "space.move") list.splice(a.index - 1, 0, list.splice(list.findIndex(s => s.id === a.id), 1)[0]);
     }
     assert.deepEqual(list.map(s => s.id), ["ma", "a1", "a2", "mb", "b1", "b2", "x"]);
@@ -1213,7 +1316,7 @@ async function checkInbox() {
     list.splice(1, 0, list.splice(2, 1)[0]);
     assert.deepEqual(list.map(s => s.id), ["s0", "s2", "s1"]);
     for (let i = 0; i < 2; i++) {
-      view.ordered();
+      view.order.rows();
       for (const [name, a] of o.calls.splice(0)) if (name === "space.move") list.splice(a.index - 1, 0, list.splice(list.findIndex(s => s.id === a.id), 1)[0]);
     }
     assert.deepEqual(list.map(s => s.id), ["s0", "s1", "s2"]);
@@ -1227,17 +1330,20 @@ async function checkInbox() {
     result("/work/s0", g);
     result("/work/s2", { ...g, linked: true, branch: "x" });
     const moves = () => o.calls.filter(([name]) => name === "space.move");
-    const ids = () => [...view.ordered().map(r => r.w.id)];
+    let now = Date.now();
+    o.scopes.get("t3-spaces").Date = { now: () => now };
+    const ids = () => [...view.order.rows().map(r => r.w.id)];
     assert.deepEqual(ids(), ["s0", "s2", "s1"]);
     assert.deepEqual(moves(), [["space.move", { id: "s2", index: 2 }]], "the worktree moves under its checkout");
     ids();
     assert.equal(moves().length, 1, "a move is queued once");
-    view.ordering.at -= 1000;
+    now += 1000;
     ids();
     assert.equal(moves().length, 2, "a write that lost a sync conflict is retried");
     list.splice(1, 0, list.splice(2, 1)[0]); // The move's echo.
     ids();
-    assert.equal(view.ordering, null, "in order, nothing is pending");
+    now += 1000; ids();
+    assert.equal(moves().length, 2, "echoed, the move is not retried");
     view.foldedRepos.add("/r");
     assert.deepEqual(ids(), ["s0", "s1"], "folding hides the worktree");
     assert.equal(moves().length, 2, "folding moves nothing");
@@ -1265,30 +1371,33 @@ async function checkInbox() {
     const up = find(view.render(cx), "space-list");
     list.unshift(list.pop());
     fire(up, "on_mouse_up:left", {}, cx);
-    assert.deepEqual(moves().pop(), ["space.move", { id: "s0", index: 2 }], "after s1, in the model as it is when let go");
+    assert.equal(moves().length, 3, "already after s1 when released; no redundant write");
     list.splice(0, Infinity, ...["s0", "s2", "s1"].map(id => list.find(s => s.id === id)));
-    view.landing = null;
     tree = lift("space-s1", -40);
     assert.deepEqual(order(tree), ["gap-32", "space-s0", "space-s2"], "a space goes over a group, not into it");
     drop();
-    assert.deepEqual(moves().pop(), ["space.move", { id: "s1", index: 1 }]);
-    view.landing = null;
+    const moved = (id, index) => {
+      assert.deepEqual(moves().at(-1), ["space.move", { id, index }]);
+      echoSpaceMoves(list, moves().slice(-1)); view.order.rows();
+    };
+    moved("s1", 1);
+    list.push(list.shift()); // Reset between independent pointer gestures, after echoing the first drop.
     tree = lift("space-s1", -20);
     assert.deepEqual(order(tree), ["space-s0", "space-s2", "gap-32"], "halfway into a group it stays below it");
     drop();
-    // A worktree moves among its own: past the group's ends it stops at them, as ordered() would put it back there.
+    // A worktree moves among its own: past the group's ends it stops at them.
     result("/work/p1", { ...g, linked: true, branch: "y" });
     assert.deepEqual(ids(), ["s0", "s2", "s1"]);
     tree = lift("space-s2", 60);
     assert.deepEqual(order(tree), ["space-s0", "space-s1", "gap-32"], "below its last sibling");
     drop();
-    assert.deepEqual(moves().pop(), ["space.move", { id: "s2", index: 3 }]);
-    view.landing = null;
+    moved("s2", 3);
+    list.splice(1, 0, list.pop());
     tree = lift("space-s1", -90);
     assert.deepEqual(order(tree), ["space-s0", "gap-32", "space-s2"], "never above its checkout");
     drop();
-    assert.deepEqual(moves().pop(), ["space.move", { id: "s1", index: 2 }]);
-    view.landing = null;
+    moved("s1", 2);
+    list.push(list.splice(1, 1)[0]);
     result("/work/p1", null);
     tree = lift("space-s2", 60);
     assert.deepEqual(order(tree), ["space-s0", "gap-32", "space-s1"], "a lone worktree has nowhere else to go");
@@ -1300,7 +1409,7 @@ async function checkInbox() {
     tree = lift("space-s0", 40);
     assert.deepEqual(order(tree), ["space-s2", "gap-32", "space-s1"]);
     drop();
-    assert.deepEqual(moves().pop(), ["space.move", { id: "s0", index: 2 }]);
+    moved("s0", 2);
     // Folded, a group's hidden worktrees still count: a space dropped after it goes after them all.
     const s3 = { id: "s3", name: "project 3", active: false, folder: "/work/p3", machine: null, tabs: [] };
     list.splice(0, Infinity, s3, ...["s0", "s2", "s1"].map(id => list.find(s => s.id === id)));
@@ -1309,7 +1418,6 @@ async function checkInbox() {
     for (const k of ["/work/s2", "/work/p1"]) result(k, { ...g, linked: true });
     view.foldedRepos.add("/r");
     list.forEach(s => { s.active = s.id === "s2"; });
-    view.landing = null;
     assert.deepEqual(ids(), ["s3", "s0", "s2"]);
     tree = lift("space-s3", 70);
     assert.deepEqual(order(tree), ["space-s0", "space-s2", "gap-32"]);
@@ -1570,6 +1678,9 @@ async function checkInbox() {
   }
 }
 (async () => {
+  for (const pendingAuto of [false, true]) await lateSpaceDrop(pendingAuto);
+  removedSpaceDropAnchor();
+  await homeNextTiming();
   await checkInbox();
   {
     // A rebuilt machine: one click forgets it and pairs again, and a failed pairing can be retried without forgetting twice.
@@ -1683,7 +1794,7 @@ async function checkInbox() {
         await flush();
       };
       await look();
-      const shape = () => plain(view.ordered().map(r => [r.w.id, r.tree ?? null])), moves = () => o.calls.filter(([name]) => name === "space.move");
+      const shape = () => plain(view.order.rows().map(r => [r.w.id, r.tree ?? null])), moves = () => o.calls.filter(([name]) => name === "space.move");
       const grouped = [["s0", null], ["s1", "├─"], ["s2", "└─"]];
       assert.deepEqual(shape(), grouped);
       k1.cwd = "/work/p1/src";
@@ -1817,6 +1928,56 @@ async function checkInbox() {
       fire(find(view.render(cx), tab), "on_click", {}, cx);
       assert.deepEqual(f.calls.splice(0), [["mod.open", { name: "t3-new-menu" }]], "New tab over New space's step changes step");
       delete f.state["t3-new-menu.closed"]; delete f.state["t3-new-menu.pickClosed"];
+      fire(find(view.render(cx), space), "on_mouse_down:left", {}, cx);
+      f.state["t3-new-menu.closed"] = Date.now();
+      fire(find(view.render(cx), space), "on_click", {}, cx);
+      assert.deepEqual(f.overlays.splice(0).map((o) => plain(o.props)), [{ pick: true }], "New space over New tab's step changes step once");
+      delete f.state["t3-new-menu.closed"];
+    }
+    {
+      // A remote space can outlive the machine's entry. Each entry must offer the same choice.
+      const f = fixture(256), local = () => [{ name: null, layout: "ready" }];
+      const load = (name, props) => {
+        const view = f.load(name, props);
+        f.scopes.get(name).machines = local;
+        return view;
+      };
+      const header = [[load("t3-spaces", menu), "space-new"], [load("t3-inbox", menu), "inbox-new-space"]];
+      const menuFooter = () => [load("t3-new-menu"), "space-new"];
+      const click = ([view, id]) => fire(find(view.render(cx), id), "on_click", {}, cx);
+      const tipLabel = ([view, id]) => {
+        view.hot = id;
+        fire(find(view.render(cx), `tip-over-${id}`), "on_hover", true, cx);
+        while (cx.timers.length) { const t = cx.timers.shift(); if (!t.gone) t.fn(cx); }
+        return strings(find(view.render(cx), `tip-${id}`).style.content);
+      };
+      const pickAway = (view) => {
+        const row = () => find(view.render(cx), "machine:vps");
+        assert.match(strings(row()).join(" "), /vps.*Unavailable/, "an unreported machine with a space stays listed");
+        fire(row(), "on_click", {}, cx);
+        assert.deepEqual(f.calls.splice(0), [], "an unavailable machine cannot create a space");
+      };
+      for (const control of header) {
+        assert.deepEqual(tipLabel(control), ["New space"], "the header does not advertise a key that makes a different choice");
+        click(control);
+        assert.deepEqual(f.calls.splice(0), [], `${control[1]} still asks about the unreported machine`);
+        const [popup] = f.overlays.splice(0);
+        assert.deepEqual(plain(popup.props), { pick: true });
+        const picker = load("t3-new-menu", popup.props);
+        pickAway(picker);
+        picker.close();
+      }
+      const footer = menuFooter();
+      assert.ok(!strings(find(footer[0].render(cx), footer[1])).includes("⌘N"), "neither does the footer");
+      click(footer);
+      pickAway(footer[0]);
+      f.spaces().pop();
+      for (const control of header) assert.deepEqual(tipLabel(control), ["New space (⌘N)"], "the key now makes the same choice as the header");
+      for (const control of [...header, menuFooter()]) {
+        click(control);
+        assert.deepEqual(f.calls.splice(0), [["space.new", { machine: "" }]], `${control[1]} creates directly with only this computer`);
+        assert.deepEqual(f.overlays, [], "a direct create doesn't open an overlay");
+      }
     }
     {
       const inbox = f.load("t3-inbox", { picker: "t3-picker" }), search = () => find(inbox.render(cx), "inbox-search");
@@ -2345,6 +2506,11 @@ async function checkInbox() {
     assert.deepEqual(taken(), [["t3-tabs.home", {}]], "the agent in view closing goes Home, past Herdr's neighbour");
     view.render(cx);
     assert.deepEqual(taken(), [], "once");
+    // Observe the Home landing, then return to the program tab in Lists before testing a later, independent close.
+    const home = { id: "h", machine: null, named: true, name: "Home\u200b", active: true, tabs: [{ id: "page", active: true }] };
+    f.spaces()[0].active = false; f.spaces().push(home); view.render(cx); taken();
+    home.active = false; f.spaces()[0].active = true;
+    pick("prog"); view.render(cx);
     inbox(false); pick("kid", "K"); view.render(cx); close("kid"); pick("prog"); view.render(cx);
     assert.deepEqual(taken(), [["tab.select", { id: "prog" }]], "in Lists, back to the tab last shown: Home is the Inbox's");
   }
@@ -2535,7 +2701,7 @@ async function checkInbox() {
     assert.deepEqual(f.labelled.map(a => a.join(" ")), ["label N herdr.seen=0"], mode + ": the unread turn comes back");
   }
 
-  // Lists publish only rows their folds draw, even hidden; the inactive copy cannot reset the order.
+  // Lists publish the full group order, even hidden; the inactive copy cannot reset the order.
   {
     const f = fixture(256), firstWatch = cx.watches.length;
     f.slots.lists = { id: "sidebar-lists", active: "lists" }; f.slots.sidebar.hidden = true;
@@ -2555,6 +2721,40 @@ async function checkInbox() {
     assert.deepEqual([f.orderWrites.length, f.sharedWrites.length], before, "inactive Lists own neither navigation nor rows");
     f.slots.lists.active = "lists"; tick();
     assert.deepEqual(plain(f.state["t3-agents.rows"].order), ["t0", "vps/t2"]);
+  }
+
+  {
+    const f = fixture(256), firstWatch = cx.watches.length, [parent, remote] = f.agents();
+    f.slots.lists = { id: "sidebar-lists", active: "lists" };
+    const ag = f.load("t3-agents");
+    ag.folded["sp-s2"] = true;
+    ag.render(cx);
+    f.slots.sidebar.hidden = true;
+    const tick = () => cx.watches.slice(firstWatch).find(t => t.ms === 1000).fn(cx);
+    const jobs = [], spawn = cx.spawn;
+    cx.spawn = job => jobs.push(job);
+    try { f.load("t3-tabs", { part: "keys" }); } finally { cx.spawn = spawn; }
+    const press = async (command) => {
+      f.calls.length = 0; f.commands.push(command);
+      jobs[0](cx); await new Promise(setImmediate);
+      return plain(f.calls);
+    };
+    parent.focused = false;
+    Object.assign(f.shown, { space: "s0", tab: "b0", pane: null, terminal: "child", agent: null });
+    tick(); // No Lists redraw: the terminal now in view is a child without a pane.
+    assert.deepEqual(await press("next"), [["agent.focus", { terminal: "vps/t2" }]], "next starts at the child's ancestor and walks into the folded space");
+    remote.focused = true;
+    Object.assign(f.shown, { space: "s2", tab: "b2", pane: "p2", terminal: "vps/t2", agent: "vps/t2" });
+    tick();
+    assert.deepEqual(await press("prev"), [["agent.focus", { terminal: "t0" }]], "previous returns from that group");
+
+    f.slots.lists.active = "inbox";
+    f.state["t3-inbox.rows"] = { order: ["vps/t2", "t0"], view: "vps/t2" };
+    f.state["t3.agentOrder"] = "inbox";
+    const writes = f.orderWrites.length;
+    tick();
+    assert.equal(f.orderWrites.length, writes, "a hidden Lists tick can't take Inbox's order");
+    assert.deepEqual(await press("next"), [["agent.focus", { terminal: "t0" }]]);
   }
 
   // Settle needs no Inbox copy: the key works with the Inbox shown or hidden, with the same Undo. In Lists it does nothing.
@@ -2732,6 +2932,27 @@ async function checkInbox() {
     a.status = "done"; k.status = "error"; k.labels = { settled: "1:1", snoozed: String(Date.now() + 60000) };
     assert.ok(find(tabs.render(cx), "agents-blocked"), "a failure overrides both quiet labels");
     assert.equal(find(ag.render(cx), "status-t0").style.accessibility_label, "Needs you");
+  }
+
+  {
+    const f = fixture(256), [viewed, other] = f.agents();
+    f.slots.lists = { id: "sidebar-lists", active: "lists" };
+    f.terminals().splice(2);
+    f.state["agents.sort"] = "priority";
+    viewed.status = "done"; other.status = "working";
+    const ag = f.load("t3-agents");
+    Object.assign(f.shown, { pane: "p0", terminal: "t0", agent: "t0" });
+    assert.equal(find(ag.render(cx), "status-t0").style.accessibility_label, "Done");
+    viewed.status = "idle";
+    const read = ag.render(cx);
+    assert.equal(find(read, "status-t0").style.accessibility_label, "Idle");
+    assert.ok(find(read, "sec-3"), "still in Done while viewed");
+    assert.deepEqual(plain(f.state["t3-agents.rows"].order), ["t0", "vps/t2"]);
+    viewed.focused = false; other.focused = true;
+    Object.assign(f.shown, { pane: "p2", terminal: "vps/t2", agent: "vps/t2" });
+    const left = ag.render(cx);
+    assert.ok(find(left, "sec-1"), "moves to Idle only after leaving");
+    assert.deepEqual(plain(f.state["t3-agents.rows"].order), ["vps/t2", "t0"]);
   }
 
   // Review is the sole Settle exception: its tab goes back, a split stays with its agent. × does the same in both modes.

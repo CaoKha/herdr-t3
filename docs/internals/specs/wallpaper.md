@@ -79,9 +79,10 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 
 ## Apply, Cancel, Delete
 
-- Apply waits for a drawing mode, saves the `.ans` reusing the preview's picture, then writes framing and selection. Failure keeps the draft with a retryable footer error and reuses only its own identical file.
+- Apply belongs to the draft where it was pressed. While another mode is drawing, the draft queues one Apply; it uses the last mode picked, even when that mode is already cached. A superseded drawing cannot consume that request. A failed drawing clears the request and returns to the previous mode for an explicit retry.
+- Apply saves the `.ans` reusing the preview's picture, then writes framing and selection. Failure keeps the draft with a retryable footer error and reuses only its own identical file.
 - Pictures already there (built-ins too) frame without modes or conversion; Apply saves only the framing.
-- Cancel keeps the previous choice. Late work never changes the choice.
+- Cancel keeps the previous choice. Cancelling or replacing a draft discards its queued Apply, including an Apply event not yet dispatched; late work never changes the choice.
 - Delete (added pictures only) confirms by name, then removes the file, its cache and framing, stops its conversion or Apply, and selects the previous picture. Nothing comes back late. Originals are never changed.
 
 ## Files

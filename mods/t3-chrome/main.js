@@ -214,7 +214,7 @@ export default class WorkspaceChrome extends View {
         : svg(`mods/t3-chrome/icons/${art}.svg`).size(12).text_color(t.dim);
       // As T3's: same names aren't told apart. Shared with the tab bar's (tab.js); selecting and the measured width are the head's own.
       return closableTab(this, t, key, { mod: "mods/t3-chrome", label, icon, active: on, maxW: 144, mark: id === "review" ? mark : null, close: () => closeSurface(id),
-        menu: () => openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(tab.path ? 5 : 4), props: { part: "surface-context", target: id, space: space?.id } }) }, el => el
+        menu: () => openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(tab.path ? 5 : 4), props: { part: "surface-context", space: space?.id, target: id, born: tab.born } }) }, el => el
         .on_click(() => activateSurface(id))
         .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (widths[id] !== w) { widths[id] = w; cx.notify(); } }));
     };
@@ -264,7 +264,12 @@ export default class WorkspaceChrome extends View {
       { label: "Files", key: "f", icon: "mods/t3-chrome/icons/folder-tree.svg", act: () => showPage("files") },
       ...(s.pages.includes("review") ? [{ label: "Review", key: "r", icon: image("mods/t3-chrome/icons/pulls-review.svg").size(16), disabled: Boolean(this.reviewReason), reason: this.reviewReason, act: () => showPage("review") }] : []),
     ];
-    const choose = (i, cx) => { const it = items[i]; if (!it || it.disabled) return; if (context && p.space !== spaces().find(sp => sp.active)?.id) return finish(); finish(); it.act(cx); };
+    const choose = (i, cx) => {
+      // The popup's tab can disappear or be reopened before a repaint; its path isn't its instance.
+      if (context && (p.space !== spaces().find(sp => sp.active)?.id || !panelState().tabs.some(tab => tab.id === p.target && tab.born === p.born))) return finish();
+      const it = items[i]; if (!it || it.disabled) return;
+      finish(); it.act(cx);
+    };
     // menu-row.js's rows. The docked empty page's are T3's RightPanelEmptyState list, as Home's: 32 tall, 10 in and apart,
     // radius 8, the key in a keycap.
     const list = v_flex().id("surface-list").w_full().max_w(empty ? 320 : MENU_W).p(4).gap(0).children(items.map((it, i) => menuRow(this, t, `surface-option-${i}`, {

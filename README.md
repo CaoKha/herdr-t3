@@ -19,7 +19,7 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 - **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention with Settle and Snooze; Lists shows spaces and agents by project.
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
-- **Go to** (`cmd-p`): jump to any pane, agent or program, by its name.
+- **Go to** (`cmd-p`): jump to any pane, agent or program, by its name. When recent panes change order, Enter follows the pane you selected.
 - **Details** (`cmd-shift-b`): locked computer/directory, Open in and global Actions, then Review: one click shows Review, its arrow picks the range. Installed T3 editors, including VSCodium and JetBrains, share one preference with Files; choosing only remembers it, and the main button opens it. Right-click the card to choose what to show.
 - **Slim tabs and framed panes**, in T3 Code's look. In Inbox, clicking the space name in the tab bar breadcrumb opens a menu with New tab and all agents, sub-agents and terminal programs in that space.
 - **Sub-agent menu**: a descendant count opens only the tree, in its original order. Click a row or use arrows and Enter to peek; right-click for the same agent menu as the sidebar, including Send back and Copy address. Each row has the mark an Agents row uses: idle shows elapsed time, Failed is red, and a done dot goes once you've seen it.

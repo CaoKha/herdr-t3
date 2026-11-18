@@ -2,20 +2,16 @@
 // t3-tabs owns the place itself (a space of its own); this is only what it shows until someone arranges something else there.
 import { View } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { layout, run, shared, theme } from "herdr";
+import { layout, run, shared, spaces, theme } from "herdr";
 import { keyOf } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, pressed, justClosed } from "./focus.js";
-import { sidebarParts } from "./sidebar.js";
-import { KEY, closedKey } from "./store.js";
+import { agentStep } from "./agent-step.js";
+import { closedKey } from "./store.js";
 import { keycap } from "./palette.js";
 import { alpha } from "./color.js";
 
-// The selected sidebar keeps its rows current while hidden too.
-function hasNext() {
-  return shared(sidebarParts(layout()).stack?.active === "inbox" ? KEY.inboxRows : KEY.agentsRows)?.order?.length > 0;
-}
 const ACTIONS = [
-  { id: "next", word: "Next agent", action: "t3-tabs.next", go: () => run("t3-tabs.next"), ready: hasNext },
+  { id: "next", word: "Next agent", action: "t3-tabs.next", go: () => run("t3-tabs.next"), ready: () => agentStep(layout(), shared, spaces(), 1) !== null },
   { id: "goto", word: "Go to", action: "mod.open:t3-picker", go: () => run("mod.open", { name: "t3-picker" }), pops: closedKey("t3-picker") },
   { id: "new", word: "New tab", action: "t3-tabs.new", go: () => run("t3-tabs.new"), pops: closedKey("t3-new-menu") },
 ];

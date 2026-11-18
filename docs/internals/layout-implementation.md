@@ -22,7 +22,7 @@ Herdr 0.1.16 的 `checking()` 在整个检查期间为真；检查仍执行 `ini
 
 面板的 `surface-*` 副本在 render 里判断 Review 能否读取（`probeReview`，key 不变即返回），不开周期定时器：隐藏副本的 timer 不停，250ms 轮询会在窗口空闲时一直读宿主列表。
 
-`t3-tabs/main.js` 的 `nav()` 给 strip/keys 共用同一导航；strip 绘制前也 track，避免晚一帧。同一帧 track 两次必须幂等，`check-navigation.cjs` 按此回放。`shared/sidebar.js` 查 `sidebar`、`sidebar-lists`；缺 stack 不当作 Lists，独立发布 mod 未必有整个布局。
+`t3-tabs/main.js` 的 `nav()` 给 strip/keys 共用同一导航。keys 可单独推进；strip 取模型和标签快捷键取顺序时，`navigation.js` 自己先推进，不依赖绘制顺序。`check-navigation.cjs` 用同一观测交错回放。`shared/sidebar.js` 查 `sidebar`、`sidebar-lists`；缺 stack 不当作 Lists，独立发布 mod 未必有整个布局。
 
 Home 的 layout select/row 高度和目标 panel restore 与 tab select 同次发出；在 `spaces()` 回传前暂认已到达，不能把 Home 面板写回来源 space。命令后的模型晚一帧左右，不从调用成功推断所有结构已回传。新 space 自带 shell、不能失最后 tab，替换 Home 内容先加入再关闭。Home 的识别/名称契约见 ADR 0005/0006，键和保存归属见 storage。
 

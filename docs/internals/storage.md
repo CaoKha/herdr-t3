@@ -51,6 +51,10 @@ Apply 保存时，在独占的 `.preview/save-<unique-id>` 写入文本（不超
 
 确认删除先等待同名、已启动的源发布收口再删文件，避免发布落在删除之后；等待中的重试收到删除取消标记后不能再发布源文件。发布 promise 和 Apply 取消标记都只留本次运行的内存，任务结束即释放。
 
+### 主题导出
+
+`t3-theme-export` 从一个显示的零高 block 启动，文件 `~/.cache/herdr-app-theme.json` 是给 Pi 等消费者的接口：`{name, colors}` 来自当前 `settings().theme` 和实际生效的 `theme()`。同一副本只运行一条写入循环；先读旧文本，内容不同才带着期望值写入。成功后重新取色，慢写期间的变化合并到最新快照；冲突或失败等下一次刷新重试。`checking()` 不读写这个文件。
+
 ## 共享状态的键名
 
 布局 mod（`mods/`）带数据的键都列在 `shared/store.js` 的 `KEY` 里，代码只写 `KEY.<名字>`，不写字面量；`extras/` 里的 mod 按同一取名规则管理自己的键；布局也要读的 `review.shown`、`review.status` 只在 `shared/panel.js` 命名一次（`REVIEW_SHOWN`、`REVIEW_STATUS`）。取名按写入方：
@@ -74,7 +78,11 @@ Review 的树菜单也是本 mod 的原生 popup，复用 `shared/menus.js`：�
 
 `t3.openTarget` 在Files／详情之间全局只保存一个目标名，不保留本轮旧键迁移；本机每次运行共用 `globalThis.t3OpenInTargets` 的 `{version:3,promise,names}` 并行应用检测，名单版本变化即替换旧缓存，目标卸载时失效并回退Finder。已完成名单可经knownTargets只读访问，避免热加载时旧init任务丢失使Files永久只留Finder；绘制不等待promise或扫描应用。候选仅取T3完整编辑器表，以macOS LaunchServices查安装（GUI进程PATH可能没有CLI）；绘制和打开菜单不扫描。最后一个非 null 的活动终端（space/tab → terminal/cwd/pane）只保留在本次运行的 `globalThis.t3TerminalContext`，与 focus.js 一样依赖宿主当前共用 JS context；终端关闭即移除。Insert 短暂借用文本剪贴板，粘贴后恢复；图片剪贴板不覆盖，用户在延时内新复制的内容优先。
 
-Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。`review.shown[space]` 存 `{ root, page, base, label, born? }`，`label` 是 Review 范围按钮的字（提交读到后为标题），供详情的 Review 行照写；`born` 是写它的 Review 标签实例（`panel.js` 的 `surfaceBorn`，Herdr 自带 stack 里没有）。读的一方（Review、详情、Review 栏）都经 `panel.js` 的 `reviewShown(space)`，只认 `born` 与当前 Review 标签相同的记录，所以关闭再加的 Review 从默认范围开始。`review` 请求 `{ space, root, page, base?, n, analyze, born? }` 只由 `panel.js` 的 `reviewRequest` 写（Review 页自己的范围菜单、Review 栏和详情共用），同样带 `born`：先 `showPage("review")` 再写请求，Review 不接手发给已关闭标签的请求。Review 的内存副本按实例号驱逐，迟到读取失效。范围菜单的读数（`review-scope.js` 的 `scopeCache`，按「仓库根 + 对比基准」）和详情记的各 space 仓库根（`review-details.js` 的 `roots`）只记本次运行，各 mod 副本各一份：新开的菜单先画它，后台照常重读，迟到读取照 `live()` 丢弃。详情来源和弹层 id 只通过 popup props 传递，不写持久状态；本机机器名在弹层启动时读取。
+Files 的树按 space 共用，文件阅读位置按标签实例只记本次运行；每个 space 仅最近显示的三个文件标签保留预览和 Editor，更早标签从顶部重读；关闭立即释放。页级最近三个 space 的边界照旧，因此最多九个文件 Editor。
+
+`review.shown[space]` 存 `{ root, page, base, label, born? }`，`label` 是 Review 范围按钮的字（提交读到后为标题），供详情的 Review 行照写；`born` 是写它的 Review 标签实例（`panel.js` 的 `surfaceBorn`，Herdr 自带 stack 里没有）。Review、详情、Review 栏经 `reviewShown(space)` 只认当前标签的记录。`review` 请求 `{ space, root, page, base?, n, analyze, born? }` 只由 `panel.js` 的 `reviewRequest` 写，同样只会被对应的标签接手；详情与独立栏经 [`openReview`](specs/space-panel.md#which-repository-review-reads) 先显示、再发请求。Review 的内存副本按实例号驱逐，迟到读取失效。
+
+详情记的各 space 仓库根（`review-details.js` 的 `roots`）只留本次运行，供新菜单确认仓库前显示。详情与独立 Review 栏的来源只随任务和 popup props 传递，不持久化；本机机器名在详情弹层启动时读取。
 
 `globalThis.t3Titlebar` 只记本次运行测到的面板宽度（t3-chrome 的面板头），供键盘打开详情时锚定到同一入口；面板关着时详情的位置由 `panel.js` `windowEndPx` 和布局的 `tabs-end-inset` 算出，不靠测量。读写都经 `shared/titlebar.js`（`notePanelWidth`、`detailsAnchor`）；不写共享状态或磁盘。Files 的 Insert 借剪贴板粘贴路径，进行中只记本次运行的 `globalThis.t3PastePending`，防止连按把剪贴板换成半截；约 150ms 后放回原剪贴板并清掉。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
 
@@ -82,7 +90,7 @@ Files 的树按 space 共用，文件阅读位置按标签实例只记本次运�
 
 `t3-actions.detailsItems` 保存详情中可用项目的显隐偏好：`environment`、`openIn`、`scripts`、`review`。默认全开，只存与默认不同的 `false`；Reset 清空。卡片右键与所有详情副本共用这一份，不存未知项目或缺少后端的T3功能。全隐藏仍显示 Choose what to show 入口，不改变Actions数据、面板标签或Git仓库。
 
-详情的 Review 行与 Review 页共用`shared/review-scope.js`（读取、行、Commits 子菜单的内容与按键；Review 页的标题、base 选择和页内菜单在它自己的 `scope-header.js`）：范围菜单每次打开都重读计数、提交和refs，不缓存；迟到结果只在读取凭据、root、space和所选base都没变时生效，菜单关闭或驱逐即作废。范围选择继续写既有`review`请求和`review.bases`；不新增持久范围。详情的范围菜单没有base选择；选范围收起详情。
+详情的 Review 行与 Review 页共用`shared/review-scope.js`（读取、行、Commits 子菜单的内容与按键；Review 页的标题、base 选择和页内菜单在它自己的 `scope-header.js`）：范围菜单每次打开都重读计数、提交和 refs。`scopeCache` 只在本次运行的内存中，以仓库根目录和 base 取上次的结果供重读期间显示。迟到结果只在读取凭据、root、space和所选base都没变时生效，菜单关闭或驱逐即作废。范围选择继续写既有`review`请求和`review.bases`；不新增持久范围。详情的范围菜单没有base选择；选范围收起详情。
 
 
 - 几个 mod 都要读写的数据，经 `shared/` 里的一个模块读写，默认值也写在那里：置顶经 `shared/pins.js`（`pinList`、`pin`、`unpin`、`putBack`），布局设置经 `shared/layout-settings.js`。所以 Pin 不管从哪里点，都会结束 Snooze；Undo 不管从哪里点，都会把置顶放回原位。

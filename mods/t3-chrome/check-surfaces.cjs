@@ -25,7 +25,8 @@ load('menu-row.js');
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import [^;]*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
 const t = { foreground: '#ffffff', muted: '#888888', dim: '#777777', selected: '#333333', chrome: '#111111', hover: '#222222', popover: '#000000', border: '#444444', raised: '#555555' };
 c.theme = () => t;
-const cx = { notify() {}, stop_propagation() {}, spawn: f => f(cx), timer: { every() {}, after() {} }, focus_handle: () => ({ focus() {} }) };
+const cx = { notify() {}, stop_propagation() {}, spawn: f => f(cx), timer: { every() {}, after() {} }, focus_handle: () => ({ focus() {} }),
+  write_to_clipboard: path => calls.push(['copy', path]) };
 const flush = () => new Promise(r => setTimeout(r, 0));
 const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v; };
 
@@ -58,7 +59,7 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   }
 
   // The head: many tabs overflow. T3's arrows sit together after the tabs, before the panel's buttons; at the start only › works.
-  s.tabs = Array.from({ length: 12 }, (_, i) => ({ id: `file:f${i}.js`, path: `f${i}.js` })); s.active = s.tabs[0].id;
+  s.tabs = Array.from({ length: 12 }, (_, i) => ({ id: `file:f${i}.js`, path: `f${i}.js`, born: i + 1 })); s.active = s.tabs[0].id;
   const head = mod({ part: 'panel' });
   const measure = (root) => {
     for (const tab of s.tabs) find(root, `surface-${tab.id}`).handlers.on_size_change({ width: 200 }, cx);
@@ -112,19 +113,48 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   assert.deepEqual({ ...calls.find(([k]) => k === 'overlay')[1].at }, { x: 500, y: 70 });
   // A middle press closes its tab; a right press opens its menu, as tall as its rows: a file's has Copy path, Review's not.
   find(root, 'surface-file:f0.js').handlers["on_mouse_down:middle"]({}, cx); assert.deepEqual(calls.at(-1), ['close', 'file:f0.js', undefined]);
-  s.tabs.push({ id: 'review' });
+  s.tabs.push({ id: 'review', born: 13 });
+  const openTabMenu = id => {
+    props = { part: 'panel' }; calls.length = 0;
+    find(head.render(cx), `surface-${id}`).handlers['on_mouse_down:right']({}, cx);
+    return calls.find(([k]) => k === 'overlay')[1];
+  };
   for (const [id, rows] of [['file:f0.js', 5], ['review', 4]]) {
-    calls.length = 0; find(head.panelHead(t), `surface-${id}`).handlers["on_mouse_down:right"]({}, cx);
-    assert.equal(calls.find(([k]) => k === 'overlay')[1].height, rows * 28 + 8, `${id}: ${rows} rows`);
+    assert.equal(openTabMenu(id).height, rows * 28 + 8, `${id}: ${rows} rows`);
   }
   // Its menu: the rightmost can't close to its right; Close others closes the rest.
-  props = { part: 'surface-context', space: 's', target: 'review' }; view = mod(props);
-  assert.equal(find(view.surfaceView(t), 'surface-option-2').style.opacity, 0.64);
-  find(view.surfaceView(t), 'surface-option-1').handlers.on_click({}, cx); assert.deepEqual(calls.at(-1), ['close', 'review', 'others']);
+  const tabMenu = id => mod({ ...openTabMenu(id).props, overlay: 'context' });
+  const option = (root, label) => kit.walk(root).find(n => n.style.accessibility_label === label);
+  view = tabMenu('review');
+  assert.equal(option(view.render(cx), 'Close to the right').style.opacity, 0.64);
+  option(view.render(cx), 'Close others').handlers.on_click({}, cx); assert.deepEqual(calls.at(-1), ['close', 'review', 'others']);
+
+  // Pick an old row with the pointer before repaint, or press Enter after repaint. Neither opens a new target by path.
+  const stale = {};
+  for (const how of ['click', 'enter', 'copy']) {
+    view = tabMenu('file:f0.js');
+    const before = view.render(cx), type = (root, key) => root.handlers.on_key_down({ key, keystroke: key }, cx);
+    if (how === 'enter') for (let i = 0; i < 3; i++) type(view.render(cx), 'down'); // Copy path, Close, Close others
+    const old = s.tabs[0];
+    s.tabs = s.tabs.slice(1); // close, then open the same file in this space
+    s.tabs = [{ ...old, born: old.born + 20 }, ...s.tabs];
+    calls.length = 0;
+    if (how === 'enter') type(view.render(cx), 'enter');
+    else option(before, how === 'copy' ? 'Copy path' : 'Close others').handlers.on_click({}, cx);
+    stale[how] = calls.splice(0);
+  }
+  assert.deepEqual(stale, { click: [['dismiss']], enter: [['dismiss']], copy: [['dismiss']] }, 'a closed tab instance only dismisses its old menu');
+
+  // The same instance has moved, so Close to the right now applies to the tabs in the current order.
+  view = tabMenu('review');
+  assert.equal(option(view.render(cx), 'Close to the right').style.opacity, 0.64);
+  s.tabs = [s.tabs.at(-1), ...s.tabs.slice(0, -1)];
+  option(view.render(cx), 'Close to the right').handlers.on_click({}, cx);
+  assert.deepEqual(calls.at(-1), ['close', 'review', 'right']);
   // A tab's name: a tooltip only when cut, and then its name, as T3's file tabs don't tell same names apart.
   s.tabs = [{ id: 'file:src/app.js', path: 'src/app.js' }]; s.active = s.tabs[0].id; props = { part: 'panel' };
   const named = (width) => { tips.length = 0; let r = head.panelHead(t); find(r, 'text-name-surface-file:src/app.js').handlers.on_size_change({ width }, cx); find(r, 'text-measure-surface-file:src/app.js').handlers.on_size_change({ width: 72 }, cx); tips.length = 0; head.panelHead(t); return tips.find(([id]) => id === 'surface-file:src/app.js'); };
   assert.equal(named(72), undefined, 'a whole name has no tooltip');
   assert.deepEqual(named(40), ['surface-file:src/app.js', 'app.js'], 'cut, its name');
-  console.log('ok: panel head arrows, + and cmd-t menus under +, tab menus fit their rows, Review offered where the tab works');
+  console.log('ok: panel head arrows, + and cmd-t menus under +, tab instance menus, Review offered where the tab works');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -37,6 +37,7 @@ The rightmost full-height column: initially hidden, initially equal in weight to
 - All file tabs share one tree. Selecting a tab bumps its `reveal`: Files clears the search and reveals the file. Opening a file from the tree or search results isn't a selection and keeps the search.
 - Close with `×` or a middle click. Closing the active tab picks the right neighbour, else the left; closing another keeps the active one. Closing the last hides the panel; reopening shows the empty page.
 - Tab menu: Copy path (file or folder), Close, Close others, Close to the right, Close all; impossible items greyed; bulk closes in one step.
+- A tab menu belongs to the space and tab instance (`id` and `born`) it was opened for. If the active space changes or the instance is gone, picking an item only dismisses the menu, even if that path was opened again. A surviving instance uses the current tab order for Close to the right.
 - Hiding or switching keeps everything; closing lets go: each mod drops what a gone tab instance (`born`) held. Review re-added starts at its default range and ignores requests sent to the closed one.
 - Per space, the three most recently shown file tabs keep their preview, Editor and position; older ones reload at the top.
 - A deleted or renamed file keeps its tab, showing the path and root, with Locate and Try again.
@@ -46,3 +47,5 @@ The rightmost full-height column: initially hidden, initially equal in weight to
 ## Which repository Review reads
 
 The repository where the tab works: its last active terminal's cwd, else the space folder (as T3's diff follows its thread). Remote, or not a repository, greys Review with the reason, in `+` too. `panel.js` `reviewRepo` decides it once for the menu, the empty page, `cmd-shift-g` and Review itself.
+
+Details and the standalone Review bar pass the source space and the selected repository and range to `panel.js` `openReview`. It rejects a different active space or a missing Review slot without changing the panel or the request, otherwise shows Review and publishes the request for the tab it showed. The native Herdr stack still takes a request without `born` and keeps no T3 tabs. Review's own range choices only publish to its current tab, without showing it again or taking focus.

@@ -452,6 +452,81 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     await settle(() => h.draft?.name === "Broken" && h.draft.phase === "ready");
     await h.cancelPreview(cx);
 
+    // A queued Apply uses the cached mode picked last. Hold the earlier renderer at a real file write so its result
+    // arrives after the save; neither a second Apply press nor that late completion may publish again.
+    hooks.picked = "/photos/Cached.png";
+    await h.choose(cx);
+    await h.setStyle("braille", cx);
+    await shown();
+    let resumeFrame, frameBlocked = false;
+    const frameGate = new Promise(resolve => { resumeFrame = resolve; });
+    const publishedFrames = [];
+    hooks.beforeWrite = async (file) => {
+      if (file.includes("/.preview/") && file.includes("/frame-")) { frameBlocked = true; await frameGate; }
+    };
+    hooks.beforeExec = (cmd, args) => {
+      if (cmd === "link" && args[1].endsWith(".ans")) publishedFrames.push(path.basename(args[1]));
+    };
+    const earlierFrame = h.setStyle("blocks", cx);
+    try {
+      await settle(() => frameBlocked);
+      canvas().handlers.on_key_down({ key: "enter", modifiers: {} }, cx);
+      canvas().handlers.on_key_down({ key: "enter", modifiers: {} }, cx);
+      assert.deepEqual(publishedFrames, [], "Apply does not publish the previous mode while a new one is drawing");
+      click("wallpaper-style-dots");
+      await settle(() => at("wallpaper-card") === undefined);
+    } finally {
+      resumeFrame();
+      await earlierFrame;
+      hooks.beforeWrite = (file) => { io++; writes.push(file); };
+      hooks.beforeExec = null;
+    }
+    assert.match(await fs.readFile(path.join(dir, "Cached.ans"), "utf8"), /image-v4;dots/);
+    assert.equal(state[KEY], "file:Cached");
+    assert.deepEqual(publishedFrames, ["Cached.ans"], "the cached mode consumes Apply exactly once");
+
+    // A click belongs to the draft that drew its button, even if its spawned work starts after another drop is ready.
+    await h.open("/photos/Discarded.png", cx);
+    await shown();
+    const deferred = [];
+    at("wallpaper-apply").handlers.on_click({}, { ...cx, spawn: fn => deferred.push(fn) });
+    assert.equal(deferred.length, 1);
+    at("wallpaper").handlers.on_drop({ paths: ["/photos/Replacement.png"] }, cx);
+    await settle(() => texts(at("wallpaper-card-name")).includes("Replacement") && !!at("wallpaper-apply").handlers.on_click);
+    await deferred[0](cx);
+    assert.ok(texts(at("wallpaper-card-name")).includes("Replacement"), "the old Apply must leave the new draft open");
+    assert.equal(state[KEY], "file:Cached");
+    assert.ok(!(await ans()).includes("Replacement.ans"), "the replacement was not applied");
+    await h.cancelPreview(cx);
+
+    // A failed mode draw takes its pending Apply with it. A later good mode is a preview until explicitly applied.
+    await h.open("/photos/FailedMode.png", cx);
+    await shown();
+    frameBlocked = false;
+    const failFrame = new Promise(resolve => { resumeFrame = resolve; });
+    hooks.beforeWrite = async (file) => {
+      if (file.includes("/.preview/") && file.includes("/frame-")) {
+        frameBlocked = true;
+        await failFrame;
+        throw new Error("Cannot draw this mode");
+      }
+    };
+    const failedFrame = h.setStyle("blocks", cx);
+    try {
+      await settle(() => frameBlocked);
+      canvas().handlers.on_key_down({ key: "enter", modifiers: {} }, cx);
+    } finally {
+      resumeFrame();
+      await failedFrame;
+      hooks.beforeWrite = (file) => { io++; writes.push(file); };
+    }
+    assert.match(texts(at("wallpaper-card-status")).join(""), /Cannot draw this mode/);
+    await h.setStyle("braille", cx);
+    assert.ok(at("wallpaper-card"), "switching to a working mode doesn't apply it implicitly");
+    assert.equal(state[KEY], "file:Cached");
+    assert.ok(!(await ans()).includes("FailedMode.ans"));
+    await h.cancelPreview(cx);
+
     // Apply while a mode is drawing waits for it, then saves that mode.
     hooks.picked = "/photos/Wait.png";
     await h.choose(cx);

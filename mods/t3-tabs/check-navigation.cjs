@@ -8,7 +8,7 @@ const source = kit.bundle((file) => fs.readFileSync(path.join(__dirname, file), 
 const flush = () => new Promise(setImmediate);
 const closeAnswer = overlay => overlay.props.command.name.slice("t3-tabs.".length);
 
-// twice: every frame() runs twice, as the tab strip and the keys copy both track one navigation each frame (main.js).
+// Replay with the strip first or with keys on both sides of the strip.
 let twice = false;
 // A fake Herdr core: tests change platform facts, advance time, and observe commands and labels.
 function fixture() {
@@ -40,7 +40,7 @@ function fixture() {
   return { ...core, cx, slots, state, shown, calls, labelled, overlays, closed, notifications, timers, events,
     navigation: (beforeAsk, over = {}) => {
       const view = scope.navigation(beforeAsk, { ...core, ...over }), frame = view.frame;
-      if (twice) view.frame = (track) => { frame(track); return frame(track); };
+      if (twice) view.frame = () => { view.advance(); const model = frame(); view.advance(); return model; };
       return view;
     },
     answerHc: fn => { hcAnswer = fn; }, advance: ms => { now += ms; },
@@ -49,6 +49,15 @@ function fixture() {
 }
 
 async function check() {
+  // A tab command can arrive at a new host observation before either Tabs block draws.
+  {
+    const f = fixture(), view = f.navigation();
+    f.spaces()[0].active = false;
+    f.spaces().push({ id: "h", machine: null, name: "Home\u200b", named: true, active: true, tabs: [{ id: "home-tab", active: true }] });
+    await view.handle("tab:1", f.cx);
+    await view.handle("tab-next", f.cx);
+    assert.deepEqual(f.calls, [], "tab keys must see the same empty order as the first strip frame at Home");
+  }
   // The first confirmation covers the terminals and space consequence the person saw. The same scope can close after the
   // Home landing, even if a terminal has gone away. A larger scope needs a fresh answer.
   const closeRaces = [];
@@ -173,19 +182,18 @@ async function check() {
       : [["tab.select", { id: "b0" }], ["pane.close", { pane: "pr" }]], "Review returns before closing");
     assert.deepEqual(f.labelled, [], "closing Review writes no agent labels");
   }
-  // A second view gets its own history; a non-strip frame only reads the tabs.
+  // A second navigation gets its own history; keys alone keep it current without asking for a strip model.
   {
     const f = fixture(), first = f.navigation(), tabs = f.spaces()[0].tabs;
     tabs.push({ id: "prog", active: false }); tabs[0].active = true; first.frame();
     tabs[0].active = false; tabs[1].active = true; first.frame();
-    const second = f.navigation(); second.frame(false);
+    const second = f.navigation();
     tabs.pop(); tabs[0].active = true; f.calls.length = 0;
     second.frame(); assert.deepEqual(f.calls, [], "another view cannot inherit a close landing");
     first.frame(); assert.deepEqual(plain(f.calls), [["tab.select", { id: "b0" }]], "the first view keeps its own history");
     const h = { id: "h", machine: null, name: "Home\u200b", named: true, tabs: [] };
-    f.spaces().push(h); second.frame(false);
-    assert.equal(f.state["t3-tabs.home"], undefined, "a drawing-only copy does not claim Home");
-    second.frame(); assert.equal(f.state["t3-tabs.home"], "h");
+    f.spaces().push(h); second.advance();
+    assert.equal(f.state["t3-tabs.home"], "h", "the keys-only observation claims Home");
   }
   // Home: a space of its own, in no list, and the keys that walk spaces go around it.
   {
@@ -268,6 +276,7 @@ async function check() {
       assert.deepEqual(made(), [["arrive", true], ["tab.select", { id: "page" }]], "laid out for Home, then shown");
       assert.equal(view.atHome, true, "spaces() hasn't caught up: still Home's shape");
       home.active = true; list[0].active = false;
+      view.advance();
       assert.equal(view.atHome, true);
       home.active = false; list[0].active = true;
       assert.equal(view.atHome, false, "left straight after: not still coming");
@@ -577,6 +586,15 @@ async function check() {
     const exit = (id, to) => { const n = f.agents().find(a => a.tab === to); tabs.splice(tabs.findIndex(c => c.id === id), 1); f.agents().splice(f.agents().findIndex(a => a.tab === id), 1); if (n) { n.status = "idle"; n.labels["herdr.seen"] = "1"; } pick(to, n?.address); };
     const labels = () => f.labelled.map(a => a.join(" "));
     f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
+
+    setup();
+    pick("mine", "A"); exit("mine", "next");
+    tabs.pop(); // The temporary neighbour also closes before Home shows; only the floating keys copy is left.
+    tabs.find(c => c.id === "prog").active = true;
+    f.shown.agent = null;
+    view.advance(); view.advance();
+    assert.deepEqual(f.calls, [["t3-tabs.home", {}]], "the temporary neighbour wasn't a second visit or a second reason to go Home");
+    assert.deepEqual(labels(), ["label N herdr.seen=0"], "keys alone repay the unread turn when the neighbour leaves view");
 
     let [, n] = setup();
     pick("mine", "A"); exit("mine", "next");

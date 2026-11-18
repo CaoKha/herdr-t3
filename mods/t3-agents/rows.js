@@ -1,7 +1,7 @@
 // The agents list's rows and group headers, including their leaving ghosts.
 import { div, svg } from "gpui-kit";
 import { h_flex, Popup } from "gpui-base";
-import { spaces, run } from "herdr";
+import { run } from "herdr";
 import { namer } from "./name.js";
 import { focusAgent } from "./zoom.js";
 import { kidStatus, kidTree } from "./tree.js";
@@ -36,9 +36,8 @@ function duration(ms) {
 // A row's right-click: the agent's menu (t3-menu), its details card taken down first.
 const agentMenu = (view, address) => (_e, cx) => { detailsFor(view, null, cx); openMenu(view, "agent", { address }, cx); };
 
-function agentSubRow(view, t, s, shown, card, ghost) {
+function agentSubRow(view, t, s, st, shown, card, ghost) {
   const k = s.k;
-  const st = kidStatus(k, view.listed);
   const pic = programIcon(k.program, 14, t.foreground);
   const on = k.address === shown;
   const name = k.name || k.template || k.program?.name || k.address;
@@ -97,15 +96,21 @@ export function agentStatus(view, t, a, note = "", id) {
   return id ? tipMark(view, t, `${id}-mark`, label, el.id(id)) : el;
 }
 
-export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPriority, own, shownStatus, groups }) {
+export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriority, facts, listed, groups }) {
+  const viewing = (a) => facts.get(a.address).viewed;
   const withKids = (a) => {
     const subs = kidTree(all, a.address);
     const r = { key: a.address, h: ROW + STACK, el: () => row(a, subs), ghost: () => row(a, subs, true) };
     // A sub-agent with no pane of its own isn't in agents(): it's placed by the agent it hangs from, and has no branch to name, as its folder may be another worktree.
-    const sub = (s) => ({ key: `sub-${s.k.address}`, h: ROW + STACK, el: () => agentSubRow(view, t, s, shown, (name, key) => details(list.find((x) => x.address === s.k.address) ?? { ...s.k, space: a.space, space_name: a.space_name }, name, key)), ghost: () => agentSubRow(view, t, s, shown, null, true) });
+    const sub = (s) => {
+      const st = kidStatus(s.k, listed);
+      return { key: `sub-${s.k.address}`, h: ROW + STACK,
+        el: () => agentSubRow(view, t, s, st, shown, (name, key) => details(list.find((x) => x.address === s.k.address) ?? { ...s.k, space: a.space, space_name: a.space_name }, name, key)),
+        ghost: () => agentSubRow(view, t, s, st, shown, null, true) };
+    };
     if (!view.isFolded(a.address)) return [r, ...subs.map(sub)];
     // Folded, a sub-agent that needs the person still shows, hung straight from its parent.
-    const stuck = subs.filter((s) => ["blocked", "error"].includes(kidStatus(s.k, view.listed)));
+    const stuck = subs.filter((s) => ["blocked", "error"].includes(kidStatus(s.k, listed)));
     return [r, ...stuck.map((s, j) => sub({ k: s.k, depth: 0, lines: [j === stuck.length - 1 ? "└" : "├"] }))];
   };
 
@@ -145,7 +150,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
     const up = view.details === key || view.detailsOut === key;
     return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
       .when(up, (pop) => pop.content(detailsCard(view, t, key, name, [
-        a.space_name && detailsLine(t, projectMark("mods/t3-agents", spaces().find((s) => s.id === a.space) ?? { name: a.space_name }, 12, t, ps, true), a.space_name),
+        a.space_name && detailsLine(t, projectMark("mods/t3-agents", sp.find((s) => s.id === a.space) ?? { name: a.space_name }, 12, t, ps, true), a.space_name),
         machine && detailsLine(t, svg("mods/t3-agents/icons/server.svg").size(12).flex_none().text_color(t.muted), machine),
         branch && detailsLine(t, svg("mods/t3-agents/icons/git-branch.svg").size(12).flex_none().text_color(t.muted), branch),
         pic && detailsLine(t, div().flex_none().opacity(0.6).child(pic), a.program.name),
@@ -155,8 +160,7 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
   const row = (a, subs = [], ghost) => {
     const pic = programIcon(a.program, 16, t.foreground);
     const more = detail.get(a.address);
-    const st = shownStatus(a), on = viewing(a);
-    const isPinned = view.pins.includes(a.address);
+    const { status: st, own, viewed: on, pinned: isPinned, since } = facts.get(a.address);
     const pinId = `pin-${a.address}`, rowId = `ag-${a.address}`, iconId = `agent-fold-${a.address}`;
     // Hovered, or with the keyboard on the row or inside it.
     const offer = !ghost && (view.hovered === a.address || within(view, [rowId, pinId, `fold-${a.address}`]));
@@ -183,11 +187,10 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
     const name = full ? more ?? (a.space_name || label(a)) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
     const where = full && more && a.space_name && a.space_name !== more ? a.space_name : null;
     // Its sub-agents' word, when it isn't its own, is marked as theirs.
-    const fromKid = st !== "idle" && st !== own(a);
-    const when = view.since(a);
+    const fromKid = st !== "idle" && st !== own;
     const lead = (subs.length ? button(t, ghost ? undefined : iconId, { size: "tiny", surface: "row", label: view.isFolded(a.address) ? "Expand sub-agents" : "Collapse sub-agents", hot: !ghost && view.hot === iconId })
       : h_flex().size(16).flex_none().items_center().justify_center()).when(Boolean(pic), el => el.child(pic));
-    const time = div().flex_none().text_size(12).text_color(t.dim).opacity(offer ? 0 : 1).transition("opacity", MOTION).when(Boolean(when), el => el.child(duration(now - when)));
+    const time = div().flex_none().text_size(12).text_color(t.dim).opacity(offer ? 0 : 1).transition("opacity", MOTION).when(Boolean(since), el => el.child(duration(now - since)));
     const base = h_flex()
       .relative()
       .w_full().min_w(0)
@@ -269,9 +272,9 @@ export function agentEntries(view, t, { list, all, shown, ps, now, viewing, byPr
   // Right-click: the space's menu, as in Spaces.
   const folder = (g, open, ghost) => {
     const hiding = open ? [] : g.members.filter((a) => !viewing(a));
-    const top = hiding.map(shownStatus).reduce((m, s) => ((RANK[s] ?? 0) > (RANK[m] ?? 0) ? s : m), null);
+    const top = hiding.map(a => facts.get(a.address).status).reduce((m, s) => ((RANK[s] ?? 0) > (RANK[m] ?? 0) ? s : m), null);
     const dot = top && top !== "idle";
-    const space = spaces().find((s) => s.id === g.space) ?? { name: g.label };
+    const space = sp.find((s) => s.id === g.space) ?? { name: g.label };
     const base = h_flex()
       .px(8)
       .h(HEAD)

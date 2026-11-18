@@ -1,5 +1,5 @@
 // The demo's stagehand, in a 0px block: opens what only a click opens, the way that click does.
-// `herdr-app do demo-stage.actions-menu:<x>` drops the Actions menu from the bar at x (window px);
+// `herdr-app do demo-stage.actions-menu:<bounds>` asks Actions to open its standalone menu at synthetic chevron bounds (window px);
 // `demo-stage.actions-last:<id>` makes that the action the bar's button runs, as running it does.
 // `demo-stage.setting:<key>=<value>` picks that in the layout's settings, as its dialog (t3-chrome/settings.js) does.
 // `demo-stage.menu:{"at":{"x":…,"y":…},"tab":…,"target":…}` opens a right-click menu there, as openMenu (shared/menu.js) does at the pointer.
@@ -17,11 +17,7 @@ export default class Stage extends View {
         const command = await nextCommand(), cut = command.indexOf(":");
         const [name, arg] = cut < 0 ? [command, ""] : [command.slice(0, cut), command.slice(cut + 1)];
         if (name === "overlay") openOverlay(JSON.parse(arg));
-        if (name === "actions-menu") {
-          const n = shared(KEY.actions)?.list.length ?? 0;
-          openOverlay({ mod: "t3-actions", kind: "popup", at: { x: Number(arg) - 8, y: 36 * (Number(settings().zoom) || 1) },
-            width: 280, height: Math.min(420, 45 + n * 28), props: { actions: "menu" } });
-        }
+        if (name === "actions-menu") run(`t3-actions.bar-menu:${arg}`);
         if (name === "menu") { const { at, ...p } = JSON.parse(arg); this.menu = { at, id: openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, at, props: p }) }; }
         if (name === "submenu" && this.menu) {
           const { row, rules = 0, ...p } = JSON.parse(arg), z = Number(settings().zoom) || 1, { at } = this.menu;

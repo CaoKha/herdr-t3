@@ -52,11 +52,6 @@ export default class Agents extends View {
     if (shared(KEY.pins) == null && localStorage.getItem("pins")) setPinned(JSON.parse(localStorage.getItem("pins")));
   }
 
-  // Shared with the inbox (t3-inbox) and the tab bar: one set of pins (pins.js).
-  get pins() {
-    return pinList();
-  }
-
   isFolded(id, initial = true) {
     return this.folded[id] ?? initial;
   }
@@ -69,10 +64,10 @@ export default class Agents extends View {
 
   // Stamps agents whose state changed. Done and idle count as one: looking at a
   // finished agent turns done into idle, and looking isn't the agent doing anything.
-  track(list, now) {
+  track(list, sp, now) {
     let dirty = false;
     // As the tab has it: this list doesn't draw while the Inbox shows, so a frame's time would be when it came back.
-    const changedAt = new Map(spaces().flatMap((s) => s.tabs ?? []).map((c) => [c.id, c.changed_at]));
+    const changedAt = new Map(sp.flatMap((s) => s.tabs ?? []).map((c) => [c.id, c.changed_at]));
     for (const a of list) {
       const s = a.status === "done" ? "idle" : a.status;
       if (this.changed[a.address]?.s === s) continue;
@@ -88,20 +83,17 @@ export default class Agents extends View {
 
   // Drops pins and fold choices of agents that ended. Only for machines the list has heard from:
   // right after a start, or while a machine connects, its agents aren't listed yet.
-  prune(all) {
+  prune(all, pins) {
     const machine = (addr) => (addr.includes("/") ? addr.split("/")[0] : "");
     const heard = new Set(all.map((k) => machine(k.address)));
     const live = new Set(all.filter((k) => k.state === "live").map((k) => k.address));
-    const kept = this.pins.filter((p) => !heard.has(machine(p)) || live.has(p));
-    if (kept.length !== this.pins.length) setPinned(kept);
+    const kept = pins.filter((p) => !heard.has(machine(p)) || live.has(p));
+    if (kept.length !== pins.length) setPinned(kept);
     // Group headers (sp-…, sec-…, pinned) fold under the same store; only agents' entries end.
     const ended = Object.keys(this.folded).filter((k) => !/^(sp-|sec-|pinned$)/.test(k) && heard.has(machine(k)) && !live.has(k));
     for (const k of ended) delete this.folded[k];
     if (ended.length) localStorage.setItem("folded", JSON.stringify(this.folded));
-  }
-
-  since(a) {
-    return this.changed[a.address]?.at ?? 0;
+    return kept;
   }
 
   // Looking at a done agent makes it idle; it stays with Done until you leave
@@ -155,70 +147,64 @@ export default class Agents extends View {
   }
 
   compute() {
-    const sort = sortOf();
-    let list = agents();
-    this.listed = new Map(list.map((a) => [a.address, a.status]));
-    const all = terminals();
+    const sort = sortOf(), every = agents(), all = terminals(), f = focused(), sp = spaces(), ps = panes(), now = Date.now();
+    const pins = this.prune(all, pinList()), pinSet = new Set(pins);
+    this.track(every, sp, now);
+    this.hold(every);
+    const listed = new Map(every.map((a) => [a.address, a.status]));
     // A mod pane has no agent of its own, and Herdr's is then the chosen one, else the first of all: it counts only in that tab, as in the inbox.
-    const f = focused();
-    const shown = f?.pane && !f.terminal && !list.some((a) => a.tab === f.tab && a.address === f.agent) ? null : f?.agent;
-    const ps = panes();
-    const now = Date.now();
+    const shown = f?.pane && !f.terminal && !every.some((a) => a.tab === f.tab && a.address === f.agent) ? null : f?.agent ?? f?.terminal;
     // A kept sub-agent (one with a pane) is in agents() too: under its parent it gets no row of its own, unless pinned, as Herdr's list (#539).
-    const nested = new Set(list.flatMap((a) => descendants(all, a.address).map((k) => k.address)));
-    const pins = this.pins, top = new Set(list.filter((a) => pins.includes(a.address) || !nested.has(a.address)).map((a) => a.address));
+    const nested = new Set(every.flatMap((a) => descendants(all, a.address).map((k) => k.address)));
+    const list = every.filter((a) => pinSet.has(a.address) || !nested.has(a.address));
+    const top = new Set(list.map((a) => a.address)), byAddress = new Map(all.map((k) => [k.address, k]));
     // A sub-agent folded away from view lights its nearest listed ancestor, as T3's resolveSidebarRowThreadId does.
     const ancestor = (() => {
-      const byAddress = new Map(all.map((k) => [k.address, k])), seen = new Set();
-      let k = byAddress.get(shown);
-      while (k && !top.has(k.address) && !seen.has(k.address)) { seen.add(k.address); k = byAddress.get(k.parent); }
-      return k && top.has(k.address) ? k.address : null;
+      const seen = new Set();
+      let address = shown;
+      while (address && !top.has(address) && !seen.has(address)) { seen.add(address); address = byAddress.get(address)?.parent; }
+      return top.has(address) ? address : null;
     })();
-    const viewing = (a) => a.focused || (a.address === ancestor && this.isFolded(a.address));
-    this.track(list, now);
-    this.hold(list);
-    const every = list;
-    list = list.filter((a) => top.has(a.address));
     const byPriority = sort.id === "priority";
     // A kept sub-agent's word is still agents()' for its parent's tree.
     const under = subAgents(every, all);
-    const kidsOf = new Map(list.map((a) => [a.address, under(a.address)]));
-    // As shown: its own word with its sub-agents'. Sorted, a viewed done agent keeps Done.
-    const own = (a) => ownStatus(a.status, a.address, all);
-    // Settled or snoozed only drops the done dot, as tabs and pane headers do: hiding work is the Inbox's (docs/adr/0002).
-    const shownStatus = (a) => {
-      const s = treeStatus(own(a), kidsOf.get(a.address));
-      return s === "done" && notNews(all.find(k => k.address === a.address), own(a), kidsOf.get(a.address)) ? "idle" : s;
-    };
-    const urgency = new Map(list.map((a) => [a.address, RANK[treeStatus(ownStatus(this.word(a), a.address, all), kidsOf.get(a.address))] ?? 0]));
-    const rankOf = (a) => urgency.get(a.address);
-    if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
-    this.prune(all);
-    const pinned = this.pins.map((p) => list.find((a) => a.address === p)).filter(Boolean);
-    const rest = list.filter((a) => !this.pins.includes(a.address));
-    list = [...pinned, ...rest];
-    const groups = /** @type {any[]} */ (pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : []);
+    const facts = new Map(list.map((a) => {
+      const address = a.address, kids = under(address), own = ownStatus(a.status, address, all);
+      const s = treeStatus(own, kids);
+      // Quiet labels drop only the dot. Reading Done does not move this row until you leave it.
+      const status = s === "done" && notNews(byAddress.get(address), own, kids) ? "idle" : s;
+      const rank = RANK[treeStatus(ownStatus(this.word(a), address, all), kids)] ?? 0;
+      return [address, { own, status, rank, since: this.changed[address]?.at ?? 0,
+        pinned: pinSet.has(address), viewed: a.focused || (address === ancestor && this.isFolded(address)) }];
+    }));
+    const pinned = pins.map((p) => list.find((a) => a.address === p)).filter(Boolean);
+    const rest = list.filter((a) => !pinSet.has(a.address));
+    const of = (a) => facts.get(a.address);
+    if (byPriority) rest.sort((x, y) => of(y).rank - of(x).rank || of(y).since - of(x).since || y.seq - x.seq);
+    const groups = /** @type {any[]} */ (pinned.length ? [{ id: "pinned", label: "Pinned", members: pinned }] : []);
     for (const a of rest) {
-      const r = rankOf(a) || RANK.idle;
+      const r = of(a).rank || RANK.idle;
       const id = byPriority ? `sec-${r}` : `sp-${a.space}`;
       if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
       else groups.push({ id, label: byPriority ? SECTION[r] : a.space_name || "", space: byPriority ? null : a.space, members: [a] });
     }
     // Every top-level agent, in its group or not. A sub-agent with no pane can only open as a peek, a popup over the work. A folded group
     // counts: Idle folds by default, and leaving a row there would take it off the walk, with no key back.
-    const order = [...new Set(groups.flatMap(g => g.members.map(a => a.address)))];
-    const view = order.includes(ancestor) ? ancestor : null;
+    const ordered = groups.flatMap(g => g.members), order = [...new Set(ordered.map(a => a.address))];
+    this.publishRows({ order, view: ancestor });
+    return { sort, list: ordered, all, shown, ps, sp, now, byPriority, facts, listed, groups };
+  }
+
+  publishRows(drawn) {
     if (sidebarParts(layout()).stack?.active !== "inbox") {
-      const drawn = { order, view };
       if (JSON.stringify(drawn) !== JSON.stringify(shared(KEY.agentsRows) ?? null)) setShared(KEY.agentsRows, drawn);
-      const addresses = list.map(a => a.address), key = JSON.stringify(addresses);
+      const key = JSON.stringify(drawn.order);
       if (key !== this.agentOrder || shared(KEY.agentOrder) !== "lists") {
         this.agentOrder = key;
-        setAgentOrder(addresses);
+        setAgentOrder(drawn.order);
         if (shared(KEY.agentOrder) !== "lists") setShared(KEY.agentOrder, "lists");
       }
     } else this.agentOrder = null;
-    return { sort, list, all, shown, ps, now, viewing, byPriority, own, shownStatus, pinned, groups };
   }
 
   render(cx) {

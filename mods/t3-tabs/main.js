@@ -80,8 +80,8 @@ function fairCap(wants, room) {
 
 // One navigation for every copy: where the person has been (navigation.js) is one memory, so what the strip draws and what the
 // keys do can't disagree. The `keys` copy, a floating block over the whole window that draws nothing, shows whatever else is
-// hidden (the sidebar, `work` under a wide panel): it answers every t3-tabs command and lays the window out. The strip tracks
-// it too before drawing, so it never draws a frame behind; tracking twice a frame changes nothing (check-navigation.cjs).
+// hidden (the sidebar, `work` under a wide panel): it answers every t3-tabs command and lays the window out. Navigation
+// advances when the strip needs a model too; the two blocks need no draw order (check-navigation.cjs).
 let brain = null;
 const nav = () => brain ??= navigation();
 
@@ -335,10 +335,10 @@ export default class Tabs extends View {
       .on_size_change((size) => setShared(KEY.compact, size.width / (Number(settings()?.zoom) || 1) < 1024));
     const t = theme(), w = window();
     if (props()?.part === "keys") {
+      this.navigation.advance();
       rememberTerminal();
       syncPanel(this);
       keepRecent();
-      this.navigation.frame();
       this.fitRow(w);
       return div();
     }
@@ -370,7 +370,7 @@ export default class Tabs extends View {
           .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close")))))));
     const space = spaces().find(p => p.active);
     // At Home, none: the brand bar's lit mark tells where this is.
-    const { tabs: shown, context: ctx } = this.navigation.frame(!props()?.part), inbox = inboxShown();
+    const { tabs: shown, context: ctx } = this.navigation.frame(), inbox = inboxShown();
     // With the Inbox, the breadcrumb holds the tab in view and the parent's: the strip has the rest.
     const strip = ctx ? [...ctx.kin, ...ctx.programs] : shown;
     // Each agent with its sub-agents (tree.js).

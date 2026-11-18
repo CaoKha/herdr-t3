@@ -16,19 +16,21 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (
 - Row: space mark and shared pane name; beneath, program icon and name, remote machine, space and live sub-agent `+n`; state at the right.
 - Searches space and machine, explicitly named tab, pane name, program name and key, and folder. Pane-name matches rank before metadata-only matches.
 - Enter or click runs `pane.focus`, across spaces. `ctrl-d` closes through the same confirmation as other closes ([tab-bar](tab-bar.md#close-confirmation)).
+- A highlight belongs to a pane, not its row number. Reordering doesn't change the target. If the pane is no longer in the results, clear the highlight and don't go or close. An edited query doesn't accept the old results: the first matching pane is selected when the new results appear.
 - Footer: ↑/↓ Navigate, Enter Go, Ctrl-D Close pane, Esc Close; New tab opens New.
 
 ### New
 
 - Spaces, current first, machines kept together; the second line is the folder, with server or machine for remote spaces.
 - Platform `1…9` pick numbered rows, labelled `⌘1` on macOS and `Super+1` elsewhere.
-- New space in the footer asks which machine when there are several, disabled until ready, with `← Spaces` to go back. `cmd-n` uses the active space's machine directly and is shown in the footer only when no machine question is needed.
-- The sidebar's New space starts at the machine step; with one machine it creates at once.
+- New space in the footer and the Inbox and Spaces headers make the same choice: create immediately with only this computer, otherwise ask which machine. Candidates are this computer, the reported machines, and machines that still have a space. The active space's machine comes first; remote machines that aren't ready (including those no longer reported) are listed but cannot be picked.
+- The footer opens the Machines step in place, with `← Spaces` to go back; a sidebar header opens at that step. Pressing the same header button closes its step; pressing the other switches steps. `cmd-n` creates on the active space's machine directly; New space shows that shortcut only when it creates directly. A sidebar installed without the New menu uses Herdr's native New space command.
 - New tab uses the space's current place (first terminal's folder, else original folder), not always its creation folder.
 
 ## Actions
 
 - Global, not per project. The primary is the last run, else the first. `▶` repeats it; choosing from the menu runs and makes it primary; a row's gear edits; Add action creates. The menu is one, from the bar's `⌄` or Details' row, as T3's `ProjectScriptsControl`: no rule over Add action, a row's gear only while the row is lit or the gear has the keyboard.
+- The standalone bar menu is 220 wide, aligned 1px past the chevron's right edge and 5px below its bounds; 28px rows with 36px for padding and Add action, capped at 420px. With no press bounds it uses the host's placement. The demo passes explicit window-pixel chevron bounds to `t3-actions.bar-menu:<bounds>`; it opens that same standalone popup, not a child of Details or a click on the default layout's Details button.
 - Editor fields: required non-blank Name and Command; optional Folder, icon and place (Tab / Split right / Split down). Save is disabled until valid; Delete asks.
 - Each run opens a new named tab or split: `terminal.open { argv: ["sh", "-c", command], name, place, folder? }`; the shell stays after the command exits.
 - Without a Folder: the focused terminal's cwd, else a same-tab terminal's cwd, else the space folder; `~` expands.

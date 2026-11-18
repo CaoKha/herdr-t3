@@ -55,7 +55,8 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Refresh and memory
 
-- While visible in the active window and space, refresh every 15s. When Review is hidden, page and row responses cannot replace the diff or rebuild its list. Pending refreshes merge into one catch-up read on return.
+- While visible in the active window and space, refresh every 15s. Page, row, base-commit and whole-file reads check the live view before sending and before applying the result, even before the visibility timer sees a hide. Hidden replies do not change the diff, folds, or errors. Pending refreshes merge into one catch-up page read on return.
+- After that page read, resume any pending whole-file opens for the same files and revisions. A rerun need not wait for the old reply. Independent whole-file opens do not supersede each other or a page or row read. Closing the Review tab, evicting the space's data, or changing scope discards unfinished opens; closing and re-adding starts at the default range. In Herdr's own layout there is no tab instance; hiding its Review page still defers reads.
 - A running analysis still reports progress and completion while Review is hidden. Its completion or start acknowledgement defers the page refresh until Review returns.
 - Full data, rows and layout caches only for the last three shown spaces; eviction releases them and late reads can't refill them. Analysis status stays light, per space.
 - The layout has no Review bar by default (one can be added as the RECIPE says), and nothing analyses on opening a surface: pick a range and Analyze on the page.
@@ -63,6 +64,11 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 ## Settings
 
 Language, Agent and Model are settings submenus (Model searchable); a pick closes only that submenu. `review.settings[:language|agent|model]` opens them by command.
+
+## Standalone Review bar
+
+- A count or `mod.open:pulls-review` keeps the space and working directory it was invoked for. The logo's menu opens only if that source is still current after Git returns, and its rows inherit that source. Switching spaces cannot carry an old selection into the new space, even if both show the same working directory.
+- In Herdr mode the count may request analysis; a commit or branch picked from the menu never does. The menu closes after the panel handoff, not before it. PWA, browser and official CLI modes still open outside Herdr with the selected repository and range.
 
 ## Programs
 

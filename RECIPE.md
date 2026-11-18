@@ -134,6 +134,8 @@ Agent next/previous walks the selected mode's rows without wrapping; tab next/pr
 
 The close confirmation covers the terminals and space consequence shown. Ask again if that scope grows before the user confirms. Clear counts only Settle labels confirmed by the core.
 
+Keep menu actions and keyboard selections attached to the command and terminal, pane or tab instance shown. If the target disappears, discard the action. Settle by shortcut reads the agent in focus on that keypress. Open a Review range for the space and repository where it was picked.
+
 Context menus don't select or switch what was right-clicked; impossible items are left out, and groups go destination, state, names and copies, worktrees, ending:
 
 | Target | Available actions |

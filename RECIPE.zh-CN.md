@@ -134,6 +134,8 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 关闭确认覆盖提示中的终端和对 space 的影响。如果确认前范围扩大，就重新询问。Clear 只计入 core 已确认 Settle 的终端。
 
+菜单命令和键盘选择跟随选中时的终端、窗格或标签实例。目标消失时丢弃该动作。Settle 快捷键读取按下时持有焦点的 agent。从外部选择 Review 范围时，在选中时的 space 和仓库打开。
+
 右键不选中、不切换被点的东西；做不了的项不显示；分组顺序是去处、状态、命名与复制、worktree、结束：
 
 | 对象 | 可用动作 |

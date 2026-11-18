@@ -310,6 +310,39 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   props = { pane: "p2" };
 }
 
+// A changing tree doesn't turn an old highlight or a click into a different terminal's action.
+{
+  props = { kids: "t2", overlay: "kid-list" };
+  const kid = (address) => ({ address, parent: "t2", state: "live", status: "idle", labels: {} });
+  terms.push(kid("first"), kid("second"));
+  let menu = load(...parts);
+  const press = (frame, key) => frame.handlers.on_key_down({ key }, cx);
+  press(menu.render(), "down");
+  const first = terms.findIndex(k => k.address === "first");
+  terms.splice(first, 0, kid("inserted"));
+  const inserted = menu.render();
+  press(inserted, "enter");
+  assert.deepEqual(take(), [["close", "kid-list"], ["terminal.peek", { terminal: "first" }]], "insertion keeps the highlighted address");
+
+  menu = load(...parts);
+  const stale = menu.render();
+  press(stale, "down");
+  terms.splice(first, 1);
+  press(stale, "enter");
+  find(stale, "kid-inserted").handlers.on_click({}, cx);
+  find(stale, "kid-inserted").handlers["on_mouse_down:right"]({}, cx);
+  assert.deepEqual(take(), [], "the terminal that left can't be peeked or opened in the agent menu even before redraw");
+  press(menu.render(), "enter");
+  assert.deepEqual(take(), [], "nothing takes over the highlight");
+  // Losing a highlighted agent during a redraw also clears it without a preceding action.
+  press(menu.render(), "down");
+  terms.splice(first, 1);
+  press(menu.render(), "enter");
+  assert.deepEqual(take(), []);
+  terms.splice(first, 1);
+  props = { pane: "p2" };
+}
+
 // Split, the panes beside the focused one recede, as T3's split terminals do, with no ring: their icon, name and folder a step
 // down, back up while hovered. What needs the person (its status mark) and the buttons don't.
 {

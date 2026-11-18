@@ -25,11 +25,11 @@ let terms = [];
 const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }) };
 const context = vm.createContext({
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, Input: { new: element },
-  InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, type(v) { value = v; on.change({}, cx); }, submit() { on.submit(); } }; } },
+  InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, type(v) { value = v; on.change({}, cx); }, submit() { on.submit({}, cx); } }; } },
   settings: () => ({ zoom: 1 }),
   spaces: () => spaces, panes: () => panes, agents: () => [], terminals: () => terms, window: () => ({ platform: "macos" }),
   focused: () => ({ pane: panes.find((p) => p.focused && spaces.find((s) => s.active).tabs.some((c) => c.id === p.tab)).pane }),
-  run: (name, args) => calls.push([name, args]), theme: () => ({ done: "#done" }), props: () => ({ overlay: "o" }), closeOverlay() {},
+  run: (name, args) => calls.push([name, args]), theme: () => ({ done: "#done", selected: "#selected" }), props: () => ({ overlay: "o" }), closeOverlay() {},
   shared: (k) => shared[k], setShared: (k, v) => { shared[k] = v; },
   namer: () => (p) => p.program.name, programOf: (p) => p.program, modStatus: () => null, projectMark: element,
 });
@@ -78,6 +78,40 @@ assert.deepEqual(take(), [["pane.focus", { pane: "p3" }]]);
 // ctrl+d closes the pane through the tab bar, which asks first.
 m = open(); m.input.type("lazygit"); m.render().handlers.on_key_down({ key: "d", modifiers: { control: true } }, cx);
 assert.deepEqual(take(), [["t3-tabs.close-pane:p2", null]]);
+
+const press = (tree, key, modifiers = {}) => tree.handlers.on_key_down({ key, modifiers }, cx);
+for (const action of ["go", "close"]) {
+  shared["t3-tabs.recent"] = ["p1", "p2", "p4"];
+  m = open(); const drawn = m.render();
+  assert.equal(find(drawn, "pane:p2").style.bg, "#selected");
+  shared["t3-tabs.recent"] = ["p1", "p4", "p2"];
+  // Enter can arrive before the new order draws. Ctrl+D can arrive after it.
+  if (action === "go") m.input.submit();
+  else press(m.render(), "d", { control: true });
+  assert.deepEqual(take(), action === "go" ? [["pane.focus", { pane: "p2" }]] : [["t3-tabs.close-pane:p2", null]]);
+}
+delete shared["t3-tabs.recent"];
+
+m = open(); const previous = m.render();
+const [removed] = panes.splice(2, 1);
+m.input.submit();
+press(previous, "d", { control: true });
+find(previous, "pane:p2").handlers.on_click({}, cx);
+assert.deepEqual(take(), [], "a pane gone since the draw can't be focused or closed");
+const remaining = m.render();
+m.input.submit();
+assert.deepEqual(take(), [], "a new frame clears the missing highlight instead of picking its neighbour");
+press(remaining, "down"); m.input.submit();
+assert.deepEqual(take(), [["pane.focus", { pane: "p3" }]], "arrows can start again at the first row");
+panes.splice(2, 0, removed);
+
+m = open(); const oldQuery = m.render();
+m.input.type("vite");
+m.input.submit(); press(oldQuery, "d", { control: true });
+find(oldQuery, "pane:p2").handlers.on_click({}, cx);
+assert.deepEqual(take(), [], "don't accept either query's results until the new ones draw");
+m.render(); m.input.submit();
+assert.deepEqual(take(), [["pane.focus", { pane: "p4" }]], "a new query starts at the first match");
 
 // Home has no row, mod or shell.
 shared["t3-tabs.home"] = "s1";

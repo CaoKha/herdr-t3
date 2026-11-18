@@ -24,11 +24,11 @@ const LIST_MAX = 420 - 2 - 48 - 8 - 8 - 41;
 export default class Picker extends View {
   init(_props, cx) {
     stopsInit(this, cx, "modal");
-    this.at = null;
+    this.selection = null;
     this.filter = "";
     this.input = InputState.new({ placeholder: "Search terminals…" });
-    this.input.on("change", (_e, cx) => { this.filter = this.input.value(); this.at = 0; cx.notify(); });
-    this.input.on("submit", () => this.choose(this.items()[this.at ?? 0]));
+    this.input.on("change", (_e, cx) => { this.filter = this.input.value(); this.selection = null; cx.notify(); });
+    this.input.on("submit", (_e, cx) => this.choose(this.selection, this.selection?.pane, cx));
     this.input.focus();
   }
 
@@ -61,20 +61,27 @@ export default class Picker extends View {
       .map((r, i) => ({ r, i })).sort((a, b) => named(a.r) - named(b.r) || place(a.r) - place(b.r) || a.i - b.i).map(({ r }) => r);
   }
 
-  choose(item) {
-    if (!item) return;
+  choose(selection, pane, cx, closing = false) {
+    if (!pane || this.selection !== selection) return;
+    if (!this.items().some(item => item.p.pane === pane)) {
+      if (selection.pane === pane) selection.pane = null;
+      cx.notify();
+      return;
+    }
     closeOverlay(props().overlay);
-    focusPane(item.p.pane);
+    // The tab bar asks first while a program runs; a tab's last pane closes the tab.
+    if (closing) run(`t3-tabs.close-pane:${pane}`);
+    else focusPane(pane);
   }
 
-  row(item, i, ps) {
-    const t = theme(), on = this.at === i, s = item.s, st = item.status;
+  row(item, selection, ps) {
+    const pane = item.p.pane, t = theme(), on = selection.pane === pane, s = item.s, st = item.status;
     const mark = st === "done" && notNews(terminals().find(k => k.address === item.p.terminal), item.p.status, item.under) ? null : statusMark(t, st, 14);
     return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(item.label)
       .when(on, (el) => el.bg(t.selected))
-      .on_hover((over, cx) => { if (over && this.at !== i) { this.at = i; cx.notify(); } })
-      .on_click(() => this.choose(item))
+      .on_hover((over, cx) => { if (over && this.selection === selection && selection.pane !== pane) { selection.pane = pane; cx.notify(); } })
+      .on_click((_e, cx) => this.choose(selection, pane, cx))
       // As T3's CommandPaletteTitleIcon: level with the title, not the row.
       .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center().child(projectMark("mods/t3-picker", s, 16, t, ps, true)))
       .child(v_flex().flex_1().min_w(0)
@@ -94,18 +101,20 @@ export default class Picker extends View {
   render() {
     const t = theme(), ps = panes(), items = this.items();
     // Opens on the first row: the pane you were in before, or another; never the one you're in, where Enter would go nowhere.
-    if (this.at === null) this.at = 0;
-    this.at = Math.min(this.at, Math.max(0, items.length - 1));
+    // Editing the query replaces this token. A missing pane clears the highlight instead of choosing the new first row.
+    const selection = this.selection ??= { pane: undefined };
+    if (selection.pane === undefined) selection.pane = items[0]?.p.pane;
+    const index = () => items.findIndex(item => item.p.pane === selection.pane);
+    const at = index();
+    if (at < 0 && selection.pane !== undefined) selection.pane = null;
     return focusRoot(this, v_flex().id("picker").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
-        const to = step(e, this.at, items.length);
-        if (to >= 0) this.at = to;
-        else if (e.key === "d" && e.modifiers.control && items[this.at]) {
-          closeOverlay(props().overlay);
-          // The tab bar's close, which asks first while a program runs; a tab's last pane closes the tab.
-          return run(`t3-tabs.close-pane:${items[this.at].p.pane}`);
-        } else return;
+        if (this.selection !== selection) return;
+        const to = step(e, index(), items.length);
+        if (to >= 0) selection.pane = items[to].p.pane;
+        else if (e.key === "d" && e.modifiers.control) this.choose(selection, selection.pane, cx, true);
+        else return;
         cx.stop_propagation();
         cx.notify();
       })
@@ -114,8 +123,8 @@ export default class Picker extends View {
         .child(Input.new(this.input).flex_1().h_full().text_size(14).text_color(t.foreground)))
       // No heading: there is one kind of row, and the room goes to the list.
       .child(div().flex_none().mt(8).mb(8).px(8)
-        .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ROW, at: this.at, height: Math.min(items.length * ROW, LIST_MAX),
-          draw: (i) => this.row(items[i], i, ps), wheeled: (keep) => { this.at = keep; } })))
+        .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ROW, at, height: Math.min(items.length * ROW, LIST_MAX),
+          draw: (i) => this.row(items[i], selection, ps), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
         .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
       // New work goes through New, which picks the space (and for a new space, the machine).
       .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"], ["Esc", "Close"]],
