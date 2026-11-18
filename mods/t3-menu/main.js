@@ -21,7 +21,7 @@ import { presets } from "./snooze-presets.js";
 import { agentKids, kidStatus, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { namer, programOf } from "./name.js";
 import { programIcon } from "./program.js";
-import { statusMark } from "./status-mark.js";
+import { statusMark, took } from "./status-mark.js";
 import { alpha } from "./color.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { prepareSpace } from "./space-arrival.js";
@@ -211,12 +211,6 @@ function shortcut(name, args) {
   // A layout's own keys too: Settle's is the herdr-t3 layout's.
   const k = keys().find((b) => (b.section === "global" || b.section?.startsWith("layout:")) && (b.action === name || b.action === `${name}:${value}`));
   return k ? keyLabel(k.keys) : "";
-}
-
-// How long an agent has been working, as t3-pane's sub-agent menu: 9s, 4m, 1h 5m.
-function took(ms, now) {
-  const s = Math.max(0, Math.floor((now - ms) / 1000)), m = Math.floor(s / 60);
-  return s < 60 ? `${s}s` : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 function groupByTab(list) {

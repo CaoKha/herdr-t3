@@ -10,7 +10,7 @@ import { h_flex, v_flex } from "gpui-base";
 import { panes, terminals, agents, spaces, props, run, theme, home, openOverlay, closeOverlay, settings, shared, setShared, layout } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { kidStatus, kidTree, notNews, ownStatus, subAgents } from "./tree.js";
-import { statusMark, STATUS_WORD } from "./status-mark.js";
+import { statusMark, STATUS_WORD, took } from "./status-mark.js";
 import { programIcon } from "./program.js";
 import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
@@ -26,12 +26,6 @@ import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
 const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = closedKey("t3-pane", "kids");
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const kidName = (k) => k.name || k.template || k.program?.name || k.address;
-
-// How long it's been working, as the Inbox's Working pill: 9s, 4m, 1h 5m.
-function took(ms, now) {
-  const s = Math.max(0, Math.floor((now - ms) / 1000)), m = Math.floor(s / 60);
-  return s < 60 ? `${s}s` : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
-}
 
 // Time left on a snooze, as the Inbox's row says it: 10m, 3h, 2d.
 function left(ms, now) {

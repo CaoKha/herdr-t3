@@ -427,9 +427,10 @@ async function check() {
     assert.equal(at("mine", "p-A"), null);
   }
 
-  // Starting something new in the space (its name in the breadcrumb, cmd-t) leaves the agent behind: tabs with no agent read as the
-  // space alone, gone to by the bar or not, until an agent is looked at again.
-  for (const command of ["open-empty", "new"]) {
+  // Starting something new in the space (cmd-t) leaves the agent behind: tabs with no agent read as the space alone, gone to by
+  // the bar or not, until an agent is looked at again.
+  {
+    const command = "new";
     const f = fixture(), tabs = f.spaces()[0].tabs, view = f.navigation();
     tabs.splice(0, Infinity, ...["mine", "prog", "fresh"].map(id => ({ id, name: id, named: true, active: id === "mine" })));
     f.agents()[0].tab = "mine"; f.panes()[0].tab = "mine";
@@ -443,25 +444,6 @@ async function check() {
     assert.deepEqual([show("fresh").head, show("prog").head], [null, null], `${command}: the space alone, the tools' tabs too`);
     show("mine", "t0");
     assert.equal(show("prog").head, "t0", "looking at an agent again picks it back up");
-  }
-
-  // The breadcrumb's space opens a tab to work in: one already waiting, a shell alone at its prompt, the latest shown first;
-  // else a new one. A press after a press finds the first one's tab, so they don't pile up.
-  {
-    const f = fixture(), tabs = f.spaces()[0].tabs, view = f.navigation(), say = command => view.handle(command, f.cx);
-    tabs.splice(0, Infinity, ...["mine", "busy", "e1", "e2", "pair"].map(id => ({ id, name: id, active: id === "mine" })));
-    f.panes().splice(1, Infinity, ...["busy", "e1", "e2"].map(id => ({ pane: `p-${id}`, tab: id, terminal: `t-${id}` })),
-      { pane: "p-pair1", tab: "pair", terminal: "t-pair1" }, { pane: "p-pair2", tab: "pair", terminal: "t-pair2" });
-    f.panes()[0].tab = f.agents()[0].tab = "mine";
-    const shell = { pid: 1, foreground: { pid: 1, name: "zsh" } }, busy = { pid: 1, foreground: { pid: 2, name: "vite" } };
-    f.answerHc(args => ({ code: 0, stdout: JSON.stringify(args[1] === "t-busy" ? busy : shell) }));
-    const taken = () => plain(f.calls.splice(0)), show = id => { tabs.forEach(c => { c.active = c.id === id; }); view.frame(); };
-    show("e2"); show("mine"); taken();
-    await say("open-empty");
-    assert.deepEqual(taken(), [["tab.select", { id: "e2" }]], "the empty tab last shown; not a busy one, an agent's or a split's");
-    tabs.splice(2, 2);
-    await say("open-empty");
-    assert.deepEqual(taken(), [["tab.new", { space: "s0", folder: "/work/s0" }]], "none waiting: a new one");
   }
 
   {

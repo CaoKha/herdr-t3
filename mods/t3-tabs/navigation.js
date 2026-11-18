@@ -228,21 +228,6 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     run("tab.new", { space: space.id, name: "Home", folder: home(), ...fill() });
   }
 
-  // The Inbox breadcrumb's space: a tab to work in. One already waiting (a shell alone in its tab, at its prompt), the latest
-  // shown first, else a new one, so pressing again doesn't pile up empty tabs.
-  async function openEmpty() {
-    const space = spaces().find(s => s.active);
-    if (!space || atHome()) return;
-    fresh.add(space.id);
-    const ps = panes(), every = agents();
-    const ids = [...new Set([...(trail[space.id] ?? []), ...space.tabs.map(c => c.id)])].filter(id => space.tabs.some(c => c.id === id));
-    for (const id of ids) {
-      const mine = ps.filter(p => p.tab === id);
-      if (mine.length === 1 && mine[0].terminal && !every.some(a => a.tab === id) && await atPrompt(mine[0].terminal)) return run("tab.select", { id });
-    }
-    newTab(space);
-  }
-
   // The Inbox's next card after `from`, going around, when the person chose to go on to it (t3.settings); its rows' first
   // `cards` are the cards. False: the caller goes Home.
   function nextCard(from) {
@@ -521,7 +506,6 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
       }
       else if (command === "next" || command === "prev") step(command);
       // New work doesn't start in Home: New picks its space.
-      else if (command === "open-empty") await openEmpty();
       else if (command === "new") {
         const space = spaces().find(s => s.active);
         if (atHome()) run("mod.open", { name: "t3-new-menu" });

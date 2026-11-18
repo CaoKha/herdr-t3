@@ -66,7 +66,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 - Lists: click selects, double-click renames, right-click opens the tab menu, middle-click closes (the same `t3-tabs.close-tab:<id>` as `×`, so a running program asks first). Drag starts at 6px; Esc or leaving the bar cancels; keyboard focus is held only while dragging. Wheel only scrolls; it never switches tabs.
 - Inbox: only tabs with no agent can be dragged, among themselves.
-- Clicking the breadcrumb's space opens the space menu (`t3-menu` `tab: "space-switch"`, `closedKey("t3-menu", "space")`): New tab (`t3-tabs.new`), then the current space's agents (with nested sub-agents) and non-agent terminal panes. `t3-tabs.open-empty` remains available as a command that reuses a lone prompt-shell tab before creating one.
+- Clicking the breadcrumb's space opens the space menu (`t3-menu` `tab: "space-switch"`, `closedKey("t3-menu", "space")`): New tab (`t3-tabs.new`), then the current space's agents (with nested sub-agents) and non-agent terminal panes.
 
 ## Navigation keys
 
@@ -97,4 +97,4 @@ The floating `tabs-keys` copy handles these even with the sidebar hidden or the 
 - `t3-tabs.{panel,review,files,home,settings,new,next,prev,settle,undo,details}`
 - `t3-tabs.close-tab:<id>`, `t3-tabs.close-pane:<id>`
 - `t3-tabs.pin:<address>`, `unpin:<address>`, `settle:<address>`, `wake:<address>`, `snooze:<address>:<wake-ms>`. Settle and Wake of a background agent don't go Home; the viewed agent leaves as with the key.
-- `t3-tabs.space:<n>`, `space-next`, `space-prev`, `tab:<n>`, `tab-next`, `tab-prev`, `open-empty`
+- `t3-tabs.space:<n>`, `space-next`, `space-prev`, `tab:<n>`, `tab-next`, `tab-prev`
