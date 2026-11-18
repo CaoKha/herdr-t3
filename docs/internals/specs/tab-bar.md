@@ -94,7 +94,8 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 The floating `tabs-keys` copy handles these even with the sidebar hidden or the panel maximized; the keyed ones are in the RECIPE's key table.
 
-- `t3-tabs.{panel,review,files,home,settings,new,next,prev,settle,undo,details}`
-- `t3-tabs.close-tab:<id>`, `t3-tabs.close-pane:<id>`
+- `t3-tabs.{panel,review,files,home,settings,new,next,prev,settle,undo,details,cleanup}`
+- `t3-tabs.close-tab:<id>`, `t3-tabs.close-pane:<id>`, `t3-tabs.cleanup-now:<serial>`
 - `t3-tabs.pin:<address>`, `unpin:<address>`, `settle:<address>`, `wake:<address>`, `snooze:<address>:<wake-ms>`. Settle and Wake of a background agent don't go Home; the viewed agent leaves as with the key.
 - `t3-tabs.space:<n>`, `space-next`, `space-prev`, `tab:<n>`, `tab-next`, `tab-prev`
+- `t3-tabs` (`keys` block) also records live non-Home spaces into `t3.projects` ([storage](../storage.md)) outside `checking()`, and owns the `Clean up` confirmation dialog (`Close <n> idle terminals?`, naming closed empty spaces when every pane of a space is eligible, then rechecking `stillSettled` and `atPrompt` before closing tabs with `confirmed: true` or individual panes).

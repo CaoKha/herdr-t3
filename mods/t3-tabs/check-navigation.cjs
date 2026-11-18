@@ -4,7 +4,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const kit = require("./check-kit.js"), { plain } = kit;
-const source = kit.bundle((file) => fs.readFileSync(path.join(__dirname, file), "utf8"), "navigation.js");
+const read = file => fs.readFileSync(path.join(__dirname, file), "utf8");
+const source = kit.bundle(read, "navigation.js");
 const flush = () => new Promise(setImmediate);
 const closeAnswer = overlay => overlay.props.command.name.slice("t3-tabs.".length);
 
@@ -46,6 +47,178 @@ function fixture() {
     answerHc: fn => { hcAnswer = fn; }, advance: ms => { now += ms; },
     async tick() { assert.equal(timers.at(-1).ms, 25); timers.at(-1).fn(); await flush(); },
   };
+}
+
+function checkBookmarks() {
+  const f = fixture(), view = f.navigation();
+  f.state["t3-tabs.home"] = "known-home";
+  f.spaces().push(
+    { id: "known-home", machine: null, name: "My Home", named: true, folder: "/home/test", tabs: [] },
+    { id: "named-home", machine: null, name: "Home\u200b", named: true, folder: "/private/home", tabs: [] },
+    { id: "unnamed-home-folder", machine: null, name: "~", folder: "/home/test", tabs: [] });
+  f.navigation(undefined, { checking: () => true }).advance();
+  const saved = () => f.state["t3.projects"];
+  assert.equal(saved(), undefined, "checking leaves bookmarks alone");
+
+  view.advance();
+  const first = saved();
+  assert.deepEqual(plain(first ?? null), [
+    { machine: null, folder: "/work/p0", name: "project 0" },
+    { machine: null, folder: "/work/p1", name: "project 1" },
+    { machine: "vps", folder: "/work/p2", name: "project 2" },
+  ], "record open projects, excluding Home and the unnamed local home folder");
+  view.advance();
+  assert.equal(saved(), first, "an unchanged observation does not rewrite bookmarks");
+
+  f.spaces()[0].active = false;
+  f.spaces()[2].active = true;
+  f.spaces().push({ id: "new", machine: null, folder: "/work/new", name: "new", tabs: [] });
+  view.advance();
+  assert.deepEqual(saved().map(p => p.folder).join(","), "/work/p2,/work/new,/work/p0,/work/p1");
+  Object.assign(f.spaces()[0], { name: "renamed", named: true });
+  view.advance();
+  assert.deepEqual(plain(saved()[2]), { machine: null, folder: "/work/p0", name: "renamed", named: true });
+  f.spaces().splice(0, 1);
+  view.advance();
+  assert.equal(saved()[2].name, "renamed", "closing a space preserves its bookmark");
+}
+
+function cleanupFixture() {
+  const f = fixture(), [current, drained, mixed] = f.spaces();
+  current.tabs[0].active = true;
+  f.state["t3-tabs.home"] = "known-home";
+  const home = { id: "known-home", machine: null, tabs: [{ id: "home-id" }] };
+  const namedHome = { id: "named-home", machine: null, named: true, name: "Home\u200b", tabs: [{ id: "home-name" }] };
+  const shell = (pane, tab, extra) => {
+    const p = { pane, tab, terminal: pane + "-term", ...extra };
+    f.panes().push(p);
+    return p;
+  };
+  const agent = (pane, tab, extra = {}) => {
+    const p = shell(pane, tab, { program: f.agents()[0].program });
+    const a = { pane, tab, address: p.terminal, status: "idle", program: p.program };
+    const k = { ...a, state: "live", turn: 2, labels: { settled: "1:2" }, ...extra };
+    f.agents().push(a);
+    f.terminals().push(k);
+    return { p, a, k };
+  };
+  drained.tabs.push({ id: "drained-shell-tab" });
+  mixed.tabs.push({ id: "mixed-shell-tab" }, { id: "quiet-shell-tab" });
+  f.spaces().push(home, namedHome);
+  const settled = agent("settled", "b1");
+  const idle = shell("drained-shell", "drained-shell-tab");
+  const split = shell("split-shell", "mixed-shell-tab");
+  const quiet = shell("quiet", "quiet-shell-tab");
+  shell("active-shell", "b0");
+  shell("known-home-shell", "home-id");
+  shell("named-home-shell", "home-name");
+  shell("vite", "mixed-shell-tab");
+  shell("unresponsive", "mixed-shell-tab");
+  shell("agent-starting", "mixed-shell-tab", { program: f.agents()[0].program });
+  const parent = shell("shell-with-child", "mixed-shell-tab");
+  agent("unsettled", "mixed-shell-tab", { turn: 3 });
+  agent("unconfirmed", "mixed-shell-tab", { labels: {} });
+  const workingTree = agent("working-tree", "mixed-shell-tab");
+  const blockedTree = agent("blocked-tree", "mixed-shell-tab");
+  agent("child", "mixed-shell-tab", { parent: blockedTree.k.address });
+  f.terminals().push(
+    { address: "working-child", parent: workingTree.k.address, state: "live", status: "working" },
+    { address: "blocked-child", parent: blockedTree.k.address, state: "live", status: "blocked" },
+    { address: "shell-child", parent: parent.terminal, state: "live", status: "idle" });
+  const prompt = { code: 0, stdout: JSON.stringify({ pid: 1, foreground: { pid: 1, name: "zsh" } }) };
+  const busy = { code: 0, stdout: JSON.stringify({ pid: 1, foreground: { pid: 2, name: "vite" } }) };
+  const answers = new Map([["vite-term", busy], ["unresponsive-term", { code: 1, stdout: "" }]]);
+  const response = ([_cmd, addr]) => answers.get(addr) ?? prompt;
+  f.answerHc(response);
+  return { f, settled, idle, split, quiet, busy, answers, response };
+}
+
+async function checkCleanup() {
+  {
+    const { f } = cleanupFixture(), view = f.navigation(() => f.events.push("prepare"));
+    const say = command => view.handle(command, f.cx);
+    await say("cleanup");
+    assert.equal(f.overlays.length, 1, "ask before closing any terminal");
+    const dialog = f.overlays[0];
+    assert.equal(dialog.mod, "t3-actions");
+    assert.equal(dialog.kind, "dialog");
+    assert.deepEqual(plain(dialog.props), {
+      actions: "confirm", title: "Close 4 idle terminals?",
+      detail: "This ends settled agents and idle shells, closing 1 empty space. Active work and the tab you're on stay.",
+      yes: "Close", command: { name: "t3-tabs.cleanup-now:1" },
+    });
+    assert.deepEqual(f.calls, [], "the scan leaves all panes open");
+    assert.deepEqual(f.labelled.map(args => args[1]).sort(),
+      ["drained-shell-term", "quiet-term", "split-shell-term", "unresponsive-term", "vite-term"]);
+    await say("cleanup");
+    const replaced = closeAnswer(f.overlays[1]);
+    await say("close-pane:vite");
+    await say(replaced);
+    assert.deepEqual(f.calls, [], "a manual close replaces the cleanup answer");
+    await say("cleanup");
+    assert.deepEqual(f.closed, [1, 2, 3], "cleanup and manual close replace the prior dialog");
+    assert.deepEqual(f.events, ["prepare", "open", "prepare", "close", "open", "prepare", "close", "open", "prepare", "close", "open"]);
+    await say(closeAnswer(dialog));
+    await say(replaced);
+    assert.deepEqual(f.calls, [], "a replaced cleanup answer cannot close anything");
+    const latest = closeAnswer(f.overlays.at(-1));
+    await say(latest);
+    assert.deepEqual(f.calls, [
+      ["tab.close", { id: "b1", confirmed: true }],
+      ["tab.close", { id: "drained-shell-tab", confirmed: true }],
+      ["pane.close", { pane: "split-shell" }],
+      ["tab.close", { id: "quiet-shell-tab", confirmed: true }],
+    ], "close full tabs outright, keep the busy split, and leave no replacement shell");
+    await say(latest);
+    assert.equal(f.calls.length, 4, "an answer can only be applied once");
+  }
+  {
+    const { f, settled, idle, split, quiet, answers, busy } = cleanupFixture(), view = f.navigation();
+    await view.handle("cleanup", f.cx);
+    settled.k.turn++;
+    answers.set(split.terminal, busy);
+    idle.terminal = "replacement";
+    f.shown.tab = quiet.tab;
+    await view.handle(closeAnswer(f.overlays[0]), f.cx);
+    assert.deepEqual(f.calls, [], "spare unsettled, busy, replaced and newly viewed panes");
+  }
+  {
+    const { f, idle, settled, quiet, response } = cleanupFixture();
+    let finish;
+    const view = f.navigation(undefined, {
+      hc: args => finish && args[1] === idle.terminal ? new Promise(resolve => finish = () => resolve(response(args))) : Promise.resolve(response(args)),
+    });
+    await view.handle("cleanup", f.cx);
+    finish = () => {};
+    const confirmation = view.handle(closeAnswer(f.overlays[0]), f.cx);
+    f.shown.tab = idle.tab;
+    settled.a.status = "working";
+    f.panes().push({ pane: "new-mod", tab: quiet.tab, mod: "review" });
+    finish();
+    await confirmation;
+    assert.deepEqual(f.calls, [["pane.close", { pane: "split-shell" }], ["pane.close", { pane: "quiet" }]],
+      "check focus, agent state and tab membership again after slow shell probes");
+  }
+  {
+    const f = fixture(), view = f.navigation();
+    await view.handle("cleanup", f.cx);
+    assert.deepEqual([f.calls, f.overlays], [[], []], "do nothing with no eligible panes");
+  }
+}
+
+async function checkCleanupDispatch() {
+  const { f } = cleanupFixture(), pending = [];
+  const scope = vm.createContext({
+    ...f, View: class {}, props: () => ({ part: "keys" }), registerSpaceArrival() {},
+    nextCommand: () => new Promise(resolve => pending.push(resolve)),
+  });
+  vm.runInContext(source + "\n" + kit.strip(read("main.js")).replace("export default class", "globalThis.Mod = class"), scope);
+  new scope.Mod().init({}, { ...f.cx, focus_handle() {}, spawn: fn => fn(f.cx) });
+  const send = async name => { pending.shift()(name); await flush(); };
+  await send("cleanup");
+  assert.equal(f.overlays.length, 1, "the keys block dispatches cleanup");
+  await send(closeAnswer(f.overlays[0]));
+  assert.equal(f.calls[0]?.[0], "tab.close", "the keys block dispatches the confirmation too");
 }
 
 async function check() {
@@ -928,8 +1101,11 @@ async function check() {
 }
 
 (async () => {
+  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch };
+  if (process.argv[2]) { await additions[process.argv[2]](); return; }
+  for (const verify of Object.values(additions)) await verify();
   await check();
   twice = true;
   await check();
-  console.log("ok: navigation Home, close order, history, visible tabs, zoom, unread repayment and retries; the same tracked twice a frame.");
+  console.log("ok: navigation, project bookmarks and cleanup; the navigation history checks also tracked twice a frame.");
 })().catch(e => { console.error(e); process.exit(1); });

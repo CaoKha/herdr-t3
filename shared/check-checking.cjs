@@ -23,7 +23,7 @@ async function check(checking) {
     setShared() {},
     workFolder: () => "/repo", spaces: () => [{ id: "s", active: true }],
     stopsInit(v) { v.fs = {}; }, navOpen: () => true, nextCommand: () => new Promise(() => {}),
-    InputState: { new: () => ({ on() {} }) },
+    InputState: { new: () => ({ on() {}, focus() {} }) },
     KEY: {}, MENU_ROW: 28, propsLit: () => -1, knownTargets: () => null, installedTargets: async () => ["Finder"],
     prefetchRange: () => effects.push(["prefetch"]),
     LIST: "list", join: (root, rel) => `${root}/${rel}`, parseListing: () => [],
@@ -51,6 +51,10 @@ async function check(checking) {
   chromeView.alignLights(cx); chromeView.probeReview(cx);
   const spaces = load("mods/t3-spaces/main.js"), spacesView = new spaces.Mod();
   spacesView.reconnecting = {}; spacesView.refreshMachines(cx);
+  const running = load("mods/t3-running/main.js");
+  running.subAgents = () => () => []; running.agents = () => []; running.terminals = () => []; running.programOf = () => null;
+  running.panes = () => [{ pane: "p", tab: "c", terminal: "t1" }]; running.spaces = () => [{ id: "s", active: true, tabs: [{ id: "c" }] }];
+  new running.Mod().init({}, cx);
   const targets = load("shared/open-in.js");
   await vm.runInContext("installedTargets()", targets);
   if (checking) {

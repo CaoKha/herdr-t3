@@ -18,7 +18,7 @@ What the [RECIPE](../../../RECIPE.md) leaves out of the sidebar's frame: exact g
 
 ## Footer
 
-- 44px high. 32px icon buttons 4 apart (t3-tokens P3; radius 8, 16px icons), 8 in from the side and 4 from the top: Herdr Settings, then the layout's sliders button (Layout Settings).
+- 44px high. 32px buttons 4 apart (t3-tokens P3; radius 8, 16px icons), 8 in from the side and 4 from the top: Herdr Settings, the layout's sliders button (Layout Settings), then Running (`layers` icon, `trigger()` opening `t3-running` with `closedKey("t3-running")`). With no non-Home spaces open, Running is a 32px icon button; with spaces open, it reads `1 space` / `<n> spaces`, collapsing to `<n>` when an Undo notice or `Update` pill shows or the footer is under 220px wide, never truncating mid-word. Its tooltip names `Running` with `<n> spaces, <m> terminals` as the hint and its shortcut.
 - The free space between them and the edge holds the Undo notice ([inbox](inbox.md#undo-notice)).
 - When an update has downloaded: a right-aligned 32px `Update` pill, 12px `accent` text on a 15% `accent` wash, running `app.update`.
 

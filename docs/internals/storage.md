@@ -17,7 +17,7 @@
 
 - **终端标签**只经 `shared/labels.js` 的 `writeLabel` 写：它统一报错（`Couldn't update the agent`），返回是否写成；`quiet` 用于会重试的写入，只在第一次失败时提示。
 - **内存**里的记忆在代码注释里写明「只记本次运行」，必要时附 `shortcut:` 说明何时改为持久。
-- Inbox Clear 确认框通过命令参数携带开框时的终端地址和窗格 id。名单以 core 回显的 Settle 标签为准，确认时与当前可关闭集合取交集。关闭弹窗即丢弃这份名单。
+- `t3-tabs` 的 `Clean up` 确认范围只留在本次运行的内存中（序号、待关窗格与终端地址映射、预计连带关闭的 space 集合）。确认时逐一重核：已 Settle 的 agent 仍须带 core 回显的 `settled` 标签且子树不忙，非 agent 空 shell 仍须 `atPrompt` 为真，且都不在当前查看标签中；整标签都属待关集合时直接 `tab.close`（`confirmed: true`），空掉的 space 随之关闭，不再补建后台 shell。下一次询问会使旧序号失效。
 - Inbox 的搜索词和键盘高亮只在当前视图内存中使用。卡片的错误信息取当前终端自己的报告；Git 探测结果按机器和路径留在内存，切换工作目录后重新核对。
 - 标签关闭确认的范围只保存在打开它的 `t3-tabs` 副本内存中，包括标签、space、终端地址集合，以及是否会连带关闭 space。确认命令携带本次序号，匹配才消费这份记录。下一次关闭询问会使旧序号失效。
 - Spaces 和独立 Review 栏的目录监听 token、未决 `FolderWatch`、关闭标记只留本次运行的内存；取消后先移走 token，迟到结果只认仍属自己的 token，不重建已释放的监听。
@@ -73,7 +73,7 @@ Review 的树菜单也是本 mod 的原生 popup，复用 `shared/menus.js`：�
 
 ## 读写
 
-`t3.settings` 默认 `{ afterAway: "home", homeMod: "t3-home" }`，Terminal 存为 `homeMod: null`。`t3-actions.actions` 是 `{ list: [{ id, name, command, icon, place, cwd? }], last }`，全局一份。`t3-inbox.rows`、`t3-agents.rows` 发布各自画出的 `{ order, view }`，供上／下 agent 键走同一顺序。重启保留 pins、settings、每 space 面板、Home id、最近 pane（`t3-tabs.recent`，至多 30 个）和终端标签；最后看的 agent 和关闭历史只在内存里。
+`t3.settings` 默认 `{ afterAway: "home", homeMod: "t3-home" }`，Terminal 存为 `homeMod: null`。`t3.projects` 存打开过的非 Home 项目书签 `[{ machine, folder, name, named? }]`（不含未命名的本机 `~` 目录，当前活动项目排最前，最多 50 条），由常驻的 `t3-tabs` 写入（内容未变不写）、`t3-new-menu` 只读。`t3-actions.actions` 是 `{ list: [{ id, name, command, icon, place, cwd? }], last }`，全局一份。`t3-inbox.rows`、`t3-agents.rows` 发布各自画出的 `{ order, view }`，供上／下 agent 键走同一顺序。重启保留 pins、settings、projects、每 space 面板、Home id、最近 pane（`t3-tabs.recent`，至多 30 个）和终端标签；最后看的 agent 和关闭历史只在内存里。
 
 `t3.panels[space]` 只存 `{ tabs, active, open, wide }`，由 `shared/panel.js` 写；增删改规则在纯函数 `shared/surfaces.js`。标签为 `{ id, born, reveal, path?, folder?, trail? }`：`files`、`file:<相对路径>` 或 `review`。`born` 是标签实例号（比本副本给过的都大的毫秒数），关闭再加就是新实例；各 mod 自己比对 `born` 释放旧实例的状态，面板不写别的 mod 的键。`reveal` 是该标签被选中的次数，Files 见它变化就清搜索并定位（T3 的 revealRequestId）。没有 `tabs` 的旧记录（固定页时代的 `page`）从空列表开始，不迁移；首次写入只保留上述字段。布局 stack 子块只是渲染位，空列表选 `panel-empty`；Herdr 自带布局的 stack 没有此块，面板不存标签（`panelState().owns` 为假）。
 

@@ -1,4 +1,4 @@
-// Loads the menu in a fake `herdr`: the order, the keys' scrolling, and where a new space goes.
+// Loads the menu in a fake `herdr`: ordering, scrolling, and where new tabs and spaces open.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -8,20 +8,28 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find } = kit;
 const text = (n) => typeof n === "string" ? n : n?.items ? n.items.map(text).join(" ") : "";
 
-let spaces, machines;
+let spaces, machines, panes = [], closed = 0, checking = true;
 let openProps = {};
 const calls = [], state = {};
 const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }) };
 let platform = "macos";
 const context = vm.createContext({
-  View: class {}, div: element, svg: element, h_flex: element, v_flex: element, Input: { new: element },
-  InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, set_value(v) { value = v; }, type(v) { value = v; on.change({}, cx); } }; } },
+  View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, Input: { new: element },
+  InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, set_value(v) { value = v; }, type(v) { value = v; on.change({}, cx); }, submit() { on.submit(); } }; } },
   settings: () => ({ zoom: 1 }),
-  theme: () => ({ foreground: "#fff" }), spaces: () => spaces, machines: () => machines, panes: () => [], run: (name, args) => calls.push([name, args]),
-  shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, closeOverlay() {}, props: () => ({ overlay: "o", ...openProps }), window: () => ({ platform }), keys: () => [{ section: "global", keys: "cmd-n", action: "space.new" }], home: () => "/home/me", projectMark: element, placeOf: (s) => s.folder, newTab: (s) => calls.push(["tab.new", { space: s.id, folder: s.folder }]),
+  theme: () => ({ foreground: "#fff" }), spaces: () => spaces, machines: () => machines, panes: () => panes, run: (name, args) => calls.push([name, args]),
+  shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, closeOverlay() { closed++; }, props: () => ({ overlay: "o", ...openProps }), window: () => ({ platform }), keys: () => [{ section: "global", keys: "cmd-n", action: "space.new" }], home: () => "/home/me",
+  checking: () => checking, prepareSpace() {}, exec: async () => { throw new Error("No icon probe in the test"); },
 });
-const src = ["color.js", "store.js", "list.js", "tip.js", "focus.js", "palette.js", "new-space.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ").replace("export default class", "globalThis.Mod = class");
-vm.runInContext(src, context);
+const read = (file) => fs.readFileSync(path.join(__dirname, file), "utf8");
+// Keep project helpers in their module scope so their private keyOf doesn't collide with tip.js.
+const projects = `const { projectMark, placeOf, newTab, dormantProjects } = (() => {
+${["project.js", "projects.js"].map((file) => kit.strip(read(file))).join("\n")}
+return { projectMark, placeOf, newTab, dormantProjects };
+})();`;
+const src = ["color.js", "store.js", "list.js", "tip.js", "focus.js", "palette.js", "new-space.js", "main.js"]
+  .map((file) => kit.strip(read(file))).join("\n").replace("export default class", "globalThis.Mod = class");
+vm.runInContext(projects + "\n" + src, context);
 const open = () => { const m = new context.Mod(); m.init({}, cx); return m; };
 const list = (m) => find(m.render(), "new-rows");
 const keysOf = (m) => list(m).items.map((n) => n.key);
@@ -72,6 +80,70 @@ assert.equal(list(m), null);
 press(m, "down"); // no rows: nothing to reach, nothing thrown
 click(open(), "space:r1");
 assert.deepEqual(take(), [["tab.new", { space: "r1", folder: "" }]]);
+
+// Bookmarks follow live spaces, and neither the creation folder nor the current folder duplicates a live space.
+spaces = [remote("r1"), { ...local("a", true), tabs: [{ id: "tab-a" }] }];
+panes = [{ tab: "tab-a", cwd: "/home/me/current" }];
+state["t3.projects"] = [
+  { machine: null, folder: "/home/me/a", name: "Open at creation" },
+  { machine: null, folder: "/home/me/current", name: "Open now" },
+  { machine: null, folder: "/home/me/archive", name: "My Archive", named: true },
+  { machine: "kvm", folder: "/srv/repo", name: "Repo" },
+  { machine: "away", folder: "/srv/offline", name: "Offline" },
+  { machine: "missing", folder: "/srv/gone", name: "Missing" },
+];
+m = open();
+assert.deepEqual(keysOf(m), [
+  "space:a", "space:r1", "project::/home/me/archive", "project:kvm:/srv/repo",
+  "project:away:/srv/offline", "project:missing:/srv/gone",
+]);
+const archive = find(list(m), "project::/home/me/archive");
+assert.equal(archive.style.h, 48);
+assert.ok(text(archive).includes("My Archive ~/archive ⌘3"));
+const beforeOpen = closed;
+press(m, "3", true);
+assert.equal(closed, beforeOpen + 1);
+assert.deepEqual(take(), [["space.new", { folder: "/home/me/archive", machine: "", name: "My Archive" }]]);
+
+// A bookmark with no cached icon falls back to its own mark when another bookmark has an icon.
+checking = false;
+state["t3.spaceIcons"] = { '[null,"/home/me/archive"]': "cache/archive.svg" };
+const marked = list(open());
+assert.ok(kit.walk(find(marked, "project::/home/me/archive")).some((node) => node.kind === "cache/archive.svg"));
+assert.ok(kit.strings(find(marked, "project:kvm:/srv/repo")).includes("R"));
+checking = true;
+delete state["t3.spaceIcons"];
+
+// Search matches a bookmark's name, machine and full folder.
+for (const query of ["My Archive", "/HOME/ME/ARCHIVE"]) {
+  m.spaceInput.type(query);
+  assert.deepEqual(keysOf(m), ["project::/home/me/archive"]);
+}
+m.spaceInput.type("KVM");
+assert.deepEqual(keysOf(m), ["space:r1", "project:kvm:/srv/repo"]);
+const repo = find(list(m), "project:kvm:/srv/repo");
+assert.deepEqual(kit.strings(repo).slice(-4), ["Repo", "kvm ·", "/srv/repo", "⌘2"]);
+assert.ok(kit.walk(repo).some((node) => node.kind === "mods/t3-new-menu/icons/server.svg"));
+assert.equal(repo.style.opacity, undefined);
+press(m, "down");
+m.spaceInput.submit();
+assert.deepEqual(take(), [["space.new", { folder: "/srv/repo", machine: "kvm" }]]);
+
+// An unavailable or unreported machine cannot open a bookmark by click, Enter or a numbered shortcut.
+for (const [query, id] of [["away", "project:away:/srv/offline"], ["missing", "project:missing:/srv/gone"]]) {
+  m = open();
+  m.spaceInput.type(query);
+  assert.equal(find(list(m), id).style.opacity, 0.64);
+  const beforeDisabled = closed;
+  click(m, id);
+  m.spaceInput.submit();
+  press(m, "1", true);
+  assert.deepEqual(take(), []);
+  assert.equal(closed, beforeDisabled);
+}
+panes = [];
+delete state["t3.projects"];
+spaces = [local("a", true), remote("r1"), local("b")];
 
 // New space asks which machine; one that's away can't be picked.
 m = open();

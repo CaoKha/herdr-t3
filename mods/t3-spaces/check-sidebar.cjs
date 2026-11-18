@@ -688,34 +688,10 @@ async function checkInbox() {
     t0.focused = true; remote.focused = false;
   }
   {
-    // Clear asks through Herdr's confirm dialog; only its answer closes settled panes.
-    const n = f.calls.length;
+    // Settled folds and pages without a Clear control; ending settled processes lives in Running.
     f.spaces()[0].tabs[0].active = true;
     inbox.open = true;
-    fire(find(inbox.render(run), "settled-clear"), "on_hover", true, run);
-    assert.equal(find(inbox.render(run), "settled-clear").style.text_color, "#f4f4f6", "lit under the pointer");
-    fire(find(inbox.render(run), "settled-clear"), "on_click", {}, run);
-    assert.equal(f.calls.length, n, "the click only asks");
-    assert.notEqual(find(inbox.render(run), "settled-clear").style.text_color, "#f4f4f6", "the dialog covers it and the pointer may not move: it doesn't stay lit");
-    const { mod, kind, props } = f.overlays.pop();
-    const clear = 't3-inbox.clear:[["vps/t2","p2"]]';
-    assert.deepEqual([mod, kind, props.title, props.command.name], ["confirm", "dialog", "Close 1 terminal?", clear], "published alone, the shipped dialog");
-    const homed = f.load("t3-inbox", { home: "t3-tabs.home" });
-    homed.open = true;
-    fire(find(homed.render(run), "settled-clear"), "on_click", {}, run);
-    const asked = f.overlays.pop();
-    assert.deepEqual([asked.mod, asked.frame, asked.width, asked.props.actions, asked.props.command.name], ["t3-actions", "none", 512, "confirm", clear], "in the layout, T3's");
-    f.panes().push({ pane: "p9", tab: "b2", terminal: "t9" });
-    const answer = props.command.name.slice("t3-inbox.clear:".length);
-    inbox.clearSettled(answer, run);
-    assert.deepEqual(f.calls.splice(n), [["pane.close", { pane: "p2" }]], "another pane keeps the space");
-    f.panes().pop();
-    inbox.clearSettled(answer, run);
-    assert.deepEqual(f.calls.splice(n), [["tab.new", { space: "s2", folder: "/work/s2", focus: false }], ["pane.close", { pane: "p2" }]],
-      "an emptied space keeps a background shell tab where its terminal was");
-    remote.focused = true;
-    assert.equal(find(inbox.render(run), "settled-clear"), null, "the agent in view is never cleared");
-    remote.focused = false;
+    assert.equal(find(inbox.render(run), "settled-clear"), null, "Settled has no Clear button");
   }
   remote.focused = true;
   inbox.render(run);
@@ -2294,8 +2270,10 @@ async function checkInbox() {
     assert.equal(inbox.scopeAt, 1);
     assert.equal(find(panel(), "scope-all").style.bg, undefined);
     {
-      // Past the rows that show, ↑/↓ keep the highlight in view, round the ends too; the rows keep their clicks.
-      f.spaces().push(...Array.from({ length: 12 }, (_, i) => ({ id: `x${i}`, name: `extra ${i}`, active: false, folder: `/work/x${i}`, machine: null, tabs: [] })));
+      // Past the rows that show, ↑/↓ keep the highlight in view, round the ends too; empty spaces (s1) stay out of the filter.
+      assert.equal(find(panel(), "scope-s1"), null, "a space with no Inbox entry is omitted unless selected");
+      f.spaces().push(...Array.from({ length: 12 }, (_, i) => ({ id: `x${i}`, name: `extra ${i}`, active: false, folder: `/work/x${i}`, machine: null, tabs: [{ id: `bx${i}` }] })));
+      f.agents().push(...Array.from({ length: 12 }, (_, i) => ({ address: `tx${i}`, pane: `px${i}`, space: `x${i}`, space_name: `extra ${i}`, tab: `bx${i}`, title: `extra ${i}`, seq: 10 + i, status: "idle" })));
       const rows = () => walk(find(panel(), "inbox-scope-list")).filter((n) => String(n.key).startsWith("scope-")).map((n) => n.key);
       assert.equal(rows().length, 9, "nine show");
       const down = () => fire(find(panel(), "inbox-scope-panel"), "on_key_down", { key: "down" }, cx);
@@ -2306,6 +2284,7 @@ async function checkInbox() {
       inbox.scopeAt = 0;
       fire(find(panel(), "inbox-scope-panel"), "on_key_down", { key: "up" }, cx);
       assert.ok(rows().includes(`scope-${inbox.matches().at(-1).id}`), "up from the first shows the last");
+      f.agents().splice(-12);
       f.spaces().splice(-12);
       inbox.scopeAt = 0;
     }

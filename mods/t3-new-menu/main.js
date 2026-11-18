@@ -1,8 +1,9 @@
-// New: pick the space and open a terminal tab there, or start a new space, on a machine picked as T3 picks an environment.
+// New: open a tab in a live space, reopen a bookmarked project, or start a space on a chosen machine.
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
-import { theme, spaces, panes, run, closeOverlay, props, home, shared, setShared } from "herdr";
+import { theme, spaces, panes, machines, run, closeOverlay, props, home, shared, setShared } from "herdr";
 import { projectMark, placeOf, newTab } from "./project.js";
+import { dormantProjects } from "./projects.js";
 import { newSpacePlan } from "./new-space.js";
 import { step, scrollList } from "./list.js";
 import { keyOf, keyLabel } from "./tip.js";
@@ -42,17 +43,27 @@ export default class NewMenu extends View {
     if (this.picking) return (plan ?? newSpacePlan()).candidates.map(({ machine, layout }) => ({
       key: `machine:${machine ?? ""}`, machine, name: machine ?? "This computer", sub: machine ? STATE[layout] : "Local", off: layout !== "ready",
     })).filter((m) => m.name.toLowerCase().includes(q));
-    const ps = panes(), here = spaces().find(s => s.active)?.machine ?? null;
+    const ps = panes(), all = spaces(), homeId = shared(KEY.home), here = all.find(s => s.active)?.machine ?? null;
     const rank = (s) => (s.active ? 0 : (s.machine ?? null) === here ? 1 : 2);
-    return spaces().filter(s => s.id !== shared(KEY.home) && `${s.name} ${s.machine ?? ""} ${placeOf(s, ps)}`.toLowerCase().includes(q))
+    const live = all.filter(s => s.id !== homeId && `${s.name} ${s.machine ?? ""} ${placeOf(s, ps)}`.toLowerCase().includes(q))
       .sort((a, b) => rank(a) - rank(b) || (a.machine ?? "").localeCompare(b.machine ?? ""))
       .map(s => ({ key: `space:${s.id}`, space: s }));
+    const dormant = dormantProjects(all, ps, homeId, shared(KEY.projects), machines())
+      .filter(p => `${p.name} ${p.machine ?? ""} ${p.folder}`.toLowerCase().includes(q))
+      .map(p => {
+        const key = `project:${p.machine ?? ""}:${p.folder}`;
+        // The project mark remembers its last icon by id.
+        return { key, project: { ...p, id: key }, off: p.off };
+      });
+    return [...live, ...dormant];
   }
 
   choose(item) {
     if (!item || item.off) return;
     closeOverlay(props().overlay);
+    const p = item.project;
     if (item.space) newTab(item.space);
+    else if (p) run("space.new", { folder: p.folder, machine: p.machine ?? "", ...(p.named ? { name: p.name } : {}) });
     else run("space.new", { machine: item.machine ?? "" });
   }
 
@@ -67,28 +78,29 @@ export default class NewMenu extends View {
   }
 
   row(item, i, ps) {
-    const t = theme(), on = this.at === i, s = item.space, h = home();
+    const t = theme(), on = this.at === i, { space, project } = item, entry = space ?? project, h = home();
     const short = (p) => (p && h && p.startsWith(h) ? "~" + p.slice(h.length) : p ?? "");
-    // A home path means nothing on another machine, and its empty folder is its home.
-    const sub = s ? (s.machine ? placeOf(s, ps) || "~" : short(placeOf(s, ps))) : item.sub;
+    const folder = space ? placeOf(space, ps) : project?.folder;
+    // An empty folder on a live remote space is its home.
+    const sub = entry ? (space?.machine ? folder || "~" : short(folder)) : item.sub;
     return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
-      .role("button").accessibility_label(s ? s.name : item.name)
+      .role("button").accessibility_label(entry?.name ?? item.name)
       .when(on, el => el.bg(t.selected))
       .when(Boolean(item.off), el => el.opacity(0.64))
       .on_hover((over, cx) => { if (over && this.at !== i) { this.at = i; cx.notify(); } })
       .on_click(() => this.choose(item))
       // As T3's CommandPaletteTitleIcon: level with the title, not the row.
       .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center()
-        .child(s ? projectMark("mods/t3-new-menu", s, 16, t, ps) : svg(`mods/t3-new-menu/icons/${item.machine ? "server" : "monitor"}.svg`).size(16).text_color(t.muted)))
+        .child(entry ? projectMark("mods/t3-new-menu", entry, 16, t, ps) : svg(`mods/t3-new-menu/icons/${item.machine ? "server" : "monitor"}.svg`).size(16).text_color(t.muted)))
       .child(v_flex().flex_1().min_w(0)
-        .child(div().truncate().text_color(t.foreground).child(s ? s.name : item.name))
+        .child(div().truncate().text_color(t.foreground).child(entry?.name ?? item.name))
         .child(h_flex().min_w(0).gap(4).items_center().text_size(12).line_height("16px").text_color(t.dim)
           // As T3 marks a remote thread: a server icon, then the name.
-          .when(Boolean(s?.machine), el => el
+          .when(Boolean(entry?.machine), el => el
             .child(svg("mods/t3-new-menu/icons/server.svg").size(12).flex_none().text_color(t.muted))
-            .child(div().flex_none().text_color(t.muted).child(`${s.machine} ·`)))
+            .child(div().flex_none().text_color(t.muted).child(`${entry.machine} ·`)))
           .child(div().min_w(0).truncate().child(sub))))
-      .when(Boolean(s) && i < 9, el => el.child(div().flex_none().text_size(12).font_medium().text_color(t.muted).child(keyLabel(`cmd-${i + 1}`))));
+      .when(Boolean(entry) && i < 9, el => el.child(div().flex_none().text_size(12).font_medium().text_color(t.muted).child(keyLabel(`cmd-${i + 1}`))));
   }
 
   render() {

@@ -17,11 +17,13 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 ## Features
 
 - **Inbox search** shows matching agents in a compact list. Use ↑ and ↓ to choose a result and Enter to open it.
-- **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention with Settle and Snooze; Lists shows spaces and agents by project.
+- **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention, with Settle and Snooze. **Settled** holds put-away agents, and **Filter by space** lists only spaces with Inbox entries or spaces already selected. Lists shows spaces and agents by project.
 - **Switching spaces** brings the destination tab bar, terminal and saved right panel into view together, including when returning from Home.
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
 - **Go to** (`cmd-p`): jump to any pane, agent or program, by its name. When recent panes change order, Enter follows the pane you selected.
+- **Running** (`cmd-shift-r` / `ctrl-alt-r`, or the sidebar footer's open space count) lists open spaces and their panes. Focus or close a pane, close a whole space, or choose **Clean up** to confirm closing settled agents, idle shells and any spaces that become empty.
+- **New** lists open spaces first, followed by remembered projects whose last terminal closed. Pick a remembered project to reopen it in its original folder and on its original machine.
 - **Details** (`cmd-shift-b`): locked computer/directory, Open in and global Actions, then Review: one click shows Review, its arrow picks the range. Installed T3 editors, including VSCodium and JetBrains, share one preference with Files; choosing only remembers it, and the main button opens it. Right-click the card to choose what to show.
 - **Slim tabs and framed panes**, in T3 Code's look. In Inbox, clicking the space name in the tab bar breadcrumb opens a menu with New tab and all agents, sub-agents and terminal programs in that space.
 - **Sub-agent menu**: a descendant count opens only the tree, in its original order. Click a row or use arrows and Enter to peek; right-click for the same agent menu as the sidebar, including Send back and Copy address. Each row has the mark an Agents row uses: idle shows elapsed time, Failed is red, and a done dot goes once you've seen it.
@@ -57,6 +59,7 @@ Dragging, sweeping across rows, pins and the rest: [Everyday use](docs/user/guid
 | `cmd-shift-s` | Settle the agent you're looking at and go Home, or bring it back |
 | `cmd-]` / `cmd-[` | Next or previous agent, in the sidebar's order |
 | `cmd-p` | Go to any pane |
+| `cmd-shift-r` / `ctrl-alt-r` | Open Running |
 | `cmd-shift-h` | Go Home |
 | `cmd-shift-,` | The layout's settings |
 | `cmd-alt-b` | Show or hide the space panel, on the page last shown |
@@ -80,11 +83,12 @@ It checks your configuration and required mod entry points before copying files.
 - `t3-inbox`: `hc label <agent> snoozed=<ms>` when an agent is snoozed or wakes.
 - `t3-inbox` identifies linked checkouts with `git rev-parse` and `git worktree list --porcelain -z` in the pane's working directory on its machine.
 - `t3-tabs`: `hc get` before closing a terminal, to see whether a program is running in it. `hc label` when `cmd-shift-s` settles or brings back an agent, and to give back an unread done (`herdr.seen`) or a Woke mark (`snoozed`) that Herdr cleared when it showed a tab you didn't pick, and `hc label <agent> snoozed=` when a failed turn or new work in view ends a snooze.
+- `t3-running`: `hc get` to check whether a shell is idle and eligible for **Clean up**.
 - `t3-agents`: `hc label <agent> snoozed=` when pinning a snoozed agent ends its snooze.
 - `t3-actions`: reads ComputerName, probes installed editors with `open -Ra`, and opens the selected directory with `open`. Its Review row uses the Review page's shared, read-only Git scope helpers asynchronously; it performs no Git writes.
 - `t3-chrome`: on macOS, when the zoom changes, it rewrites the window button position in the installed `layouts/herdr-t3.json`, so the buttons stay on the brand bar's middle line.
 - `t3-files`, read-only, where the space is (on its machine): `git rev-parse`, `git status`, `git check-ignore` and `git ls-files` (with `--no-optional-locks`, so nothing is written under `.git`), `sh` to list a folder or, on another machine, to check a file's size and search paths, `find` outside Git, `base64` for another machine's images. It copies images it shows into `cache/t3-files/` and deletes them when it stops. Right-click: Reveal in Finder and Open in default app run `open` (`xdg-open` on Linux); Mention in agent pastes into the agent's terminal through the clipboard, then puts your clipboard back.
-- `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-new-menu`, `t3-picker`: for each space's icon, `git rev-parse --show-toplevel`, `sh` file tests and `base64` where the space is (on its machine); a found icon is copied into `cache/t3-icons/`.
+- `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-new-menu`, `t3-picker`, `t3-running`: for each space's icon, `git rev-parse --show-toplevel`, `sh` file tests and `base64` where the space is (on its machine); a found icon is copied into `cache/t3-icons/`.
 
 The layout sends no telemetry. The optional Review extra uses its configured analysis service.
 

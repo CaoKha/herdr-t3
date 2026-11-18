@@ -2,6 +2,12 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-19
+
+- **Running** (`cmd-shift-r` / `ctrl-alt-r`, or the sidebar footer button showing the open space count) lists open spaces and their terminals in one place. Focus any pane, close a pane or a whole space, or right-click a space for worktree actions. **Clean up** asks before closing settled agents and idle shells together. Spaces emptied by the cleanup close too.
+- **New** remembers projects after their last terminal closes. Remembered projects appear after open spaces and reopen in their original folder and on their original machine when picked.
+- **Settled** holds put-away agents, with process cleanup moved from its **Clear** button to **Running**. **Filter by space** lists only spaces with Inbox entries or spaces already selected in the filter.
+
 ## 2026-11-18
 
 - Inbox searches within the sidebar. Type a name and open a match from the compact results list. Clicking a pin unpins its card. An empty space filter offers **Show all spaces**.

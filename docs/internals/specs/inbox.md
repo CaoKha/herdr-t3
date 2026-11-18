@@ -6,9 +6,9 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 
 - 32px row, 8 in: Search, then the space filter, New space and New tab (touching 28px buttons, 16px icons). Search and the button group are 4 apart, as T3 (t3-tokens「有意不同」). 8 below the row, the cards start.
 - The Search input stays in the top row. A query matches a card's displayed title and, when available, its own pane's branch, without regard to case. Rank by text relevance, favoring exact names and word matches over partial matches. The query is plain text, with no field prefixes or cross-field AND filtering. No conversation or terminal contents are read. Go to is still a separate global shortcut.
-- Search scoped cards, including folded shelves and Settled cards beyond the first page, but not terminals without Inbox cards. Results replace the normal list with compact, single-line rows: 36px high, 1 apart, rounded 6, with a 16px space mark beside the title and an age at the right. No card actions, shelf headers, Clear, pagination, dragging, or sweeps. The normal folds, page and terminal order are unchanged.
+- Search scoped cards, including folded shelves and Settled cards beyond the first page, but not terminals without Inbox cards. Results replace the normal list with compact, single-line rows: 36px high, 1 apart, rounded 6, with a 16px space mark beside the title and an age at the right. No card actions, shelf headers, pagination, dragging, or sweeps. The normal folds, page and terminal order are unchanged.
 - A new query highlights the first result. Pointer movement and Up/Down move the same highlight with the normal selected row background; arrows wrap and reveal the highlighted result. If that result disappears, the first result is highlighted instead. Enter or a click opens the result and clears the query. Esc with a query and the clear button clear only the query and keep the input. Navigation from elsewhere does not clear search; the route reveal waits for the normal list to return. The query is not saved.
-- The filter is a 288px combobox under its button's left edge: radius 8, inset 4, a 26px search over a rule, 32px rows of radius 4.
+- The filter is a 288px combobox under its button's left edge: radius 8, inset 4, a 26px search over a rule, 32px rows of radius 4. It lists `All spaces` and non-Home spaces that currently hold at least one unscoped Inbox entry (`every` or mod cards) or remain selected in `scope`.
 - If the space filter leaves no cards, the empty state offers Show all spaces. It clears the stored space scope and resets the normal Settled page without switching terminals. An empty query result is not itself a reason to clear scope, and a shelf with cards does not count as empty.
 
 ## Shelves
@@ -16,8 +16,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - Pinned and Active cards occupy the top. Working, Snoozed and Settled are bottom-anchored folded shelves when they have entries; when space runs out they follow the cards in the same scrolling list.
 - Header: 32px, 2px further out than the rows, padding 8, a dim 12px label, a normal-weight count and a 12px chevron. Shelf chevrons switch direction directly (no cross-fade).
 - A folded shelf still shows the row in view, and leaves it out of the hidden count. The row in view also stays visible beyond the Settled page.
-- Settled pages with Show more, and offers Clear when it holds terminals Clear can close. A Settle can appear on the shelf immediately. Clear requires the core's current `settled` label with no pending Settle change. Clear records the eligible terminals when the dialog opens. Confirmation closes only members of that set still eligible and outside the tab in view.
-  The Inbox owns this workflow in `mods/t3-inbox/clear-settled.js`, including the confirmation used by the standalone mod.
+- Settled pages with Show more. A Settle can appear on the shelf immediately; ending settled processes belongs to [Running](dialogs.md#running).
 
 ## Cards
 

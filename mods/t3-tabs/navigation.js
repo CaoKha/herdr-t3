@@ -1,17 +1,18 @@
-import { spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window } from "herdr";
+import { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window } from "herdr";
 import { namer, programOf } from "./name.js";
-import { descendants, ownStatus, subAgents, treeStatus } from "./tree.js";
+import { descendants, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { sidebarParts } from "./sidebar.js";
 import { agentStep } from "./agent-step.js";
 import { newTab } from "./project.js";
+import { rememberProjects } from "./projects.js";
 import { t3Settings } from "./layout-settings.js";
 import { KEY } from "./store.js";
 import { writeLabel } from "./labels.js";
 
 // One instance per Tabs view; the Herdr operations also admit the check's fake core.
-export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel }) {
-  const { spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel } = core;
+export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => checking(), spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel }) {
+  const { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel } = core;
   // lastIn: each tab's agent last in view, which the Inbox's bar holds while a program there has the focus.
   // fresh: spaces where the person started something new (the breadcrumb's space, cmd-t) since last looking at an agent there.
   const trail = {}, lastIn = {}, fresh = new Set(), owed = new Map(), waking = new Map();
@@ -19,7 +20,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   // Spaces that were Home until an agent started there: their rename may not have shown yet.
   const released = new Set();
   let renaming = false, going, inView, wasHome, unread, focusWas, zoomOff, asking, settingsOpen;
-  let tabAnswer, tabAskSerial = 0;
+  let tabAnswer, tabAskSerial = 0, cleanupAnswer, cleanupSerial = 0;
   const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
   // The Inbox's ways with attention hold unless Lists is the mode (docs/adr/0002).
   const listsShown = () => sidebarParts(layout()).stack?.active === "lists";
@@ -126,22 +127,93 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   const SHELL = /^-?(zsh|bash|fish|sh|dash|ksh|tcsh|nu)$/;
   async function atPrompt(terminal) {
     try {
-      const k = JSON.parse((await hc(["get", terminal, "--json"])).stdout);
+      const { code, stdout } = await hc(["get", terminal, "--json"]);
+      if (code !== 0) return false;
+      const k = JSON.parse(stdout);
       return k.foreground?.pid === k.pid && SHELL.test(k.foreground.name);
     } catch { return false; }
   }
 
-  // As T3's confirmTerminalClose: `Close terminal "Pi"?` or `Close 2 terminals?`, then what that ends. A held cmd-w replaces the dialog rather than stacking it.
-  function ask(names, more, command, cx) {
+  function confirmClose(title, detail, command, cx) {
     // The dialog covers it, nothing reports the leaving until the pointer moves, and the × stops the press that would close the card.
     beforeAsk(cx);
     if (asking) closeOverlay(asking);
-    tabAnswer = null;
+    tabAnswer = cleanupAnswer = null;
+    // t3-actions draws T3's alert dialog: the shipped confirm mod's measures are its own.
+    asking = openOverlay({ mod: "t3-actions", kind: "dialog", frame: "none", width: 512, props: { actions: "confirm", title, detail, yes: "Close", command: { name: command } } });
+  }
+
+  // As T3's confirmTerminalClose: `Close terminal "Pi"?` or `Close 2 terminals?`, then what that ends.
+  function ask(names, more, command, cx) {
     const [title, detail] = names.length === 1
       ? [`Close terminal "${names[0]}"?`, "This stops the running process and clears its history."]
       : [`Close ${names.length} terminals?`, `This stops their running processes and clears their histories: ${names.map(n => `"${n}"`).join(", ")}.`];
-    // t3-actions draws T3's alert dialog: the shipped confirm mod's measures are its own.
-    asking = openOverlay({ mod: "t3-actions", kind: "dialog", frame: "none", width: 512, props: { actions: "confirm", title, detail: detail + more, yes: "Close", command: { name: command } } });
+    confirmClose(title, detail + more, command, cx);
+  }
+
+  function cleanupScope() {
+    const sp = spaces(), ps = panes(), ags = agents(), all = terminals();
+    const tabNow = focused()?.tab ?? sp.find(s => s.active)?.tabs.find(c => c.active)?.id;
+    const id = homeId(), openSpaces = sp.filter(s => s.id !== id && !namedHome(s));
+    const tabs = new Set(openSpaces.flatMap(s => s.tabs.map(c => c.id)));
+    const byAddr = new Map(all.map(k => [k.address, k]));
+    const byAgent = new Map(ags.map(a => [a.address, a]));
+    const kids = subAgents(ags, all);
+    const candidates = new Map();
+    for (const p of ps) {
+      const terminal = p.terminal;
+      if (!terminal || p.tab === tabNow || !tabs.has(p.tab)) continue;
+      const a = byAgent.get(terminal), k = byAddr.get(terminal), under = kids(terminal);
+      if (a ? k && !k.parent && stillSettled(k, ownStatus(a.status, terminal, all), under) : !programOf(p)?.agent && !under.length) {
+        candidates.set(p.pane, { terminal, agent: Boolean(a) });
+      }
+    }
+    return { openSpaces, ps, candidates };
+  }
+
+  async function scanCleanup(targets) {
+    const { candidates } = cleanupScope();
+    const eligible = new Map();
+    await Promise.all([...candidates].map(async ([pane, { terminal, agent }]) => {
+      if (targets && targets.get(pane) !== terminal) return;
+      if (agent || await atPrompt(terminal)) eligible.set(pane, { terminal, agent });
+    }));
+    // A prompt probe can take long enough for focus, pane contents or an agent's state to change.
+    const current = cleanupScope();
+    const confirmed = new Map();
+    for (const [pane, { terminal, agent }] of eligible) {
+      const p = current.candidates.get(pane);
+      if (p?.terminal === terminal && p.agent === agent) confirmed.set(pane, terminal);
+    }
+    return { openSpaces: current.openSpaces, ps: current.ps, confirmed };
+  }
+
+  async function cleanup(cx) {
+    const { openSpaces, ps, confirmed } = await scanCleanup(null);
+    const n = confirmed.size;
+    if (!n) return;
+    const m = openSpaces.filter(s => {
+      const tabs = new Set(s.tabs.map(c => c.id));
+      const mine = ps.filter(p => tabs.has(p.tab));
+      return mine.length > 0 && mine.every(p => confirmed.has(p.pane));
+    }).length;
+    const command = `cleanup-now:${++cleanupSerial}`;
+    const emptied = m ? `, closing ${m} empty space${m === 1 ? "" : "s"}` : "";
+    confirmClose(`Close ${n} idle terminal${n === 1 ? "" : "s"}?`,
+      `This ends settled agents and idle shells${emptied}. Active work and the tab you're on stay.`, `t3-tabs.${command}`, cx);
+    cleanupAnswer = { command, targets: confirmed };
+  }
+
+  async function cleanupNow(targets) {
+    const { openSpaces, ps, confirmed } = await scanCleanup(targets);
+    if (!confirmed.size) return;
+    for (const s of openSpaces) {
+      for (const c of s.tabs) {
+        const mine = ps.filter(p => p.tab === c.id);
+        if (mine.length && mine.every(p => confirmed.has(p.pane))) run("tab.close", { id: c.id, confirmed: true });
+        else for (const p of mine) if (confirmed.has(p.pane)) run("pane.close", { pane: p.pane });
+      }
+    }
   }
 
   function tabCloseScope(id) {
@@ -288,18 +360,21 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
       for (const c of homeSpace.tabs.filter(c => c.named && c.name === "Home")) run("tab.rename", { id: c.id, name: "" });
       wasHome = false;
     }
-    const all = spaces(), space = all.find(s => s.active), tab = space?.tabs.find(c => c.active), home = atHome();
+    const all = spaces(), ps = panes();
+    const next = rememberProjects(all, ps, homeId(), home(), shared(KEY.projects));
+    if (next && !checking()) setShared(KEY.projects, next);
+    const space = all.find(s => s.active), tab = space?.tabs.find(c => c.active), isHome = atHome();
     const alive = (id) => all.some(s => s.tabs.some(c => c.id === id));
     const was = inView;
     // Herdr's pick shows until Home does, and that isn't somewhere the person went.
     const toHome = () => { going = { until: Date.now() + 500 }; run("t3-tabs.home"); };
     // Home's last program ended, past closePane: the space went with it.
     if (wasHome && all.length && !all.some(s => s.id === homeId())) toHome();
-    wasHome = home;
+    wasHome = isHome;
     // For the closes this mod doesn't make, which leave() can't go ahead of: the tab's menu, the program ending. Herdr has
     // already picked the neighbour, and it may have been shown.
     const terms = terminals(), every = agents();
-    if (was && !alive(was.tab) && !home) {
+    if (was && !alive(was.tab) && !isHome) {
       // With the Inbox, the agent in view lands on Home, as settling it does: what to look at next stays the person's to say.
       // In Lists, as any tab, unless no space is left to show.
       if (was.agent && (!listsShown() || !space)) toHome();
@@ -311,29 +386,29 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
         if (before) owed.set(a.address, { ...before, until: Date.now() + 3000 });
       }
     }
-    zoomFollows(every);
-    payBack(tab, home, terms, every);
+    zoomFollows(every, ps);
+    payBack(tab, isHome, terms, every);
     endSnoozes(terms, every);
     // What's unread now, for the next frame's close: its turn, and a snooze it woke from (seeing it clears that too).
     unread = new Map(every.filter(a => a.status === "done").map(a => {
       const k = terms.find(k => k.address === a.address);
       return [a.address, { turn: k?.turn ?? 0, snoozed: k?.labels?.snoozed }];
     }));
-    if (going && (Date.now() > going.until || (going.tab ? tab?.id === going.tab : home))) going = null;
+    if (going && (Date.now() > going.until || (going.tab ? tab?.id === going.tab : isHome))) going = null;
     // Until a close's target shows, what shows is Herdr's pick, not somewhere the person went.
-    if (space && tab && !home && !going) trail[space.id] = [tab.id, ...(trail[space.id] ?? []).filter(id => id !== tab.id && alive(id))];
-    inView = tab && !home && !going ? { tab: tab.id, space: space.id, agent: every.some(a => a.tab === tab.id) } : null;
+    if (space && tab && !isHome && !going) trail[space.id] = [tab.id, ...(trail[space.id] ?? []).filter(id => id !== tab.id && alive(id))];
+    inView = tab && !isHome && !going ? { tab: tab.id, space: space.id, agent: every.some(a => a.tab === tab.id) } : null;
     const looked = !going && every.find(a => a.address === inViewAgent(terms, every));
-    if (looked && !home) { lastIn[looked.tab] = looked.address; fresh.delete(looked.space); }
+    if (looked && !isHome) { lastIn[looked.tab] = looked.address; fresh.delete(looked.space); }
     for (const id of Object.keys(lastIn)) if (!alive(id)) delete lastIn[id];
-    return { space, every, all: terms, looked, home };
+    return { space, every, all: terms, looked, home: isHome };
   }
 
   // For what focuses a pane without zoom.js going first, Herdr's own: a toast, hc, the palette, its keys. Its focus moved and the
   // zoom stayed, or a zoom landed on a pane the focus isn't on: the later of the two wins. What the stale zoom showed for that
   // frame is owed its done, as a close's neighbour is. Once per disagreement: pane.zoom toggles, and a repeat would undo it.
-  function zoomFollows(every) {
-    const ps = panes(), f = ps.find(p => p.focused), z = f && ps.find(p => p.tab === f.tab && p.zoomed), was = focusWas;
+  function zoomFollows(every, ps) {
+    const f = ps.find(p => p.focused), z = f && ps.find(p => p.tab === f.tab && p.zoomed), was = focusWas;
     const off = z && z.pane !== f.pane ? `${f.pane}:${z.pane}` : null, told = zoomOff;
     focusWas = f?.pane; zoomOff = off;
     if (!off || off === told) return;
@@ -497,6 +572,14 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
         }
       }
       else if (command.startsWith("close-pane-now:")) await closePaneNow(command.slice("close-pane-now:".length), cx);
+      else if (command === "cleanup") await cleanup(cx);
+      else if (command.startsWith("cleanup-now:")) {
+        const answer = cleanupAnswer;
+        if (answer?.command === command) {
+          cleanupAnswer = null;
+          await cleanupNow(answer.targets);
+        }
+      }
       else if (command === "home") await goHome(cx);
       else if (command === "home-mod") await refitHome(false);
       // As Herdr's own Settings, a dialog; pressed again, it replaces the open one (closing one already gone does nothing).

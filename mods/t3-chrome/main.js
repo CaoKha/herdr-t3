@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { checking, theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
+import { checking, theme, run, props, updates, layout, shared, setShared, spaces, panes, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
 import { tip, glow } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
@@ -101,27 +101,41 @@ export default class WorkspaceChrome extends View {
       // T3's undo notice, the inbox's (t3-inbox.notice), in this row's free space so it covers nothing: "Settled," or
       // "Settled 2," then Undo, which the inbox does. It fades in and out over 200ms, Undo inert while it goes. One older than
       // its 5s and the fade is left from before a restart.
-      const n = shared(KEY.notice);
+      const undo = shared(KEY.notice);
       // Short of room the summary is cut, never Undo: GPUI's flex doesn't do T3's two wraps, which squeezed Undo to nothing.
-      const notice = n && Date.now() - n.at < 6000 && h_flex().id(`undo-notice-${n.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
-        .text_size(11).text_color(t.dim).opacity(n.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
-        .child(div().min_w(0).truncate().child(`${n.action}${n.count === 1 ? "" : ` ${n.count}`},`))
+      const notice = undo && Date.now() - undo.at < 6000 && h_flex().id(`undo-notice-${undo.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
+        .text_size(11).text_color(t.dim).opacity(undo.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
+        .child(div().min_w(0).truncate().child(`${undo.action}${undo.count === 1 ? "" : ` ${undo.count}`},`))
         // As T3's InlineButton: medium, foreground, underlined on hover.
         .child(h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
-          .when(n.live && Date.now() - n.at < 5000, (el) => el.hover((s) => s.underline()).role("button").accessibility_label(`Undo: ${n.action} ${n.count} agent${n.count === 1 ? "" : "s"}`)
+          .when(undo.live && Date.now() - undo.at < 5000, (el) => el.hover((s) => s.underline()).role("button").accessibility_label(`Undo: ${undo.action} ${undo.count} agent${undo.count === 1 ? "" : "s"}`)
             .on_click(() => run("t3-tabs.undo")))
           .child("Undo")
-          .when(n.live && Date.now() - n.at < 5000, (el) => stop(this, t, "undo-notice-undo", el, 4)));
+          .when(undo.live && Date.now() - undo.at < 5000, (el) => stop(this, t, "undo-notice-undo", el, 4)));
+      const homeId = shared(KEY.home);
+      const openSpaces = spaces().filter(s => s.id !== homeId && !(s.machine === null && s.named && s.name === "Home\u200b"));
+      const openTabs = new Set(openSpaces.flatMap(s => (s.tabs ?? []).map(c => c.id)));
+      const termCount = panes().filter(p => openTabs.has(p.tab)).length;
+      const n = openSpaces.length, spaceCount = `${n} space${n === 1 ? "" : "s"}`;
+      const compact = Boolean(notice) || Boolean(ready) || (this.footerW && this.footerW < 220);
+      const runningText = n === 0 ? undefined : compact ? String(n) : spaceCount;
       const button = (id, icon, label, action, key) => tip(this, t, id, label, stop(this, t, id, drawButton(t, id, { size: "default", icon, label, hot: this.hot === id })
         .on_hover(glow(this, id))
         // Each opens over its button, before the pointer can report leaving it.
         .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); }), radiusOf("default")), { action: key });
-      // T3's footer: 8 in and 4 above its row, whatever height the layout gives the block. Its two buttons a group's gap apart,
+      // T3's footer: 8 in and 4 above its row, whatever height the layout gives the block. Its buttons a group's gap apart,
       // 8 to what follows (docs/internals/t3-tokens.md「规则」P3).
-      return focusRoot(this, div().size_full().bg(t.chrome).px(8).pt(4).child(h_flex().h(32).gap(8).items_center()
+      return focusRoot(this, div().size_full().bg(t.chrome).px(8).pt(4)
+        .on_size_change((size, cx) => {
+          const w = size.width / zoomOf();
+          if (w !== this.footerW) { this.footerW = w; cx.notify(); }
+        }).child(h_flex().h(32).gap(8).items_center()
         .child(h_flex().id("footer-buttons").flex_none().gap(GROUP_GAP).items_center()
           .child(button("settings", "mods/t3-chrome/icons/settings.svg", "Settings", () => run("app.settings"), "app.settings"))
-          .child(button("t3-settings", "mods/t3-chrome/icons/sliders-horizontal.svg", "Herdr T3 settings", () => run("t3-tabs.settings"), "t3-tabs.settings")))
+          .child(button("t3-settings", "mods/t3-chrome/icons/sliders-horizontal.svg", "Herdr T3 settings", () => run("t3-tabs.settings"), "t3-tabs.settings"))
+          .child(trigger(this, t, "running", { size: "default", icon: "mods/t3-chrome/icons/layers.svg", text: runningText,
+            label: "Running", hint: `${spaceCount}, ${termCount} terminal${termCount === 1 ? "" : "s"}`,
+            action: "mod.open:t3-running", closed: closedKey("t3-running"), onOpen: () => { run("mod.open", { name: "t3-running" }); } })))
         .child(notice || div().flex_1())
         .when(Boolean(ready), el => el.child(tip(this, t, "app-update", `Update ${ready} downloaded. Click to restart`, stop(this, t, "app-update", div().id("app-update").h(32).px(12).flex_none().flex().items_center()
           .rounded_full().bg(alpha(t.accent, "26")).text_size(12).text_color(t.accent).hover(s => s.bg(alpha(t.accent, "40"))).on_hover(glow(this, "app-update"))
