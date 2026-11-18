@@ -16,7 +16,7 @@
 - **Inbox 下的标签栏**：以你正在看的 agent 为主角，也就是 Inbox 亮着的卡片。左边是它的 space（点击打开空间菜单，可点 New tab `⌘T` 新建标签页，或直接找到并切到当前 space 下的全部 agent、缩进子 agent 与终端程序／shell，右键列表行打开该 agent 或窗格的菜单）、是子 agent 时的父级和它的名字；点名字或 `⌄` 打开这个 agent 的菜单：Pin、Snooze、Settle，和卡片上一样，标签里只有它时还有 Rename。右键名字或父级打开那个 agent 的菜单，和 T3 一样；右键 space 仍打开 space 的菜单。这里只写你正在看的 agent：同一标签里的其他 agent 用它的卡片或窗格去。右边分开放：它的子 agent 的标签，再是不含 agent 的标签。焦点在程序上时 agent 留在那里但不亮；从标签栏进入工具标签时它变暗，点它回去。从 space 菜单点 New tab 或按 `cmd-t` 开始新的事之后只有 space，直到你再看某个 agent。这个 agent 的窗格单独显示时，标题里不再写标签栏已经写了的名字。
 - **新建**：标签栏的 `+` 直接在当前 space 开终端标签（显示 Inbox 时可在标签栏左边 space 菜单里点 New tab 或按 `cmd-t`）；侧栏的 New tab（Lists 和 Inbox 都有）先选 space。侧栏的 New space 在机器多于一台时先问建在哪台；`cmd-n` 不问，直接用当前 space 的机器。不选 agent：在终端里启动。
 - **Home**：Settle 或 Snooze 当前查看的 agent 后，回到一个安静的固定位置，不再跳到下一张卡片，下一步看什么由你决定。想继续跳到下一张，或者把 Home 换成终端或别的 mod，见下面的设置。用这里的按钮或 `cmd-]`、`cmd-p`、`cmd-t` 决定下一步，Undo 能带回刚才的 agent。`cmd-shift-h` 或侧栏左上角的 Herdr logo 可随时进入。它不占 space 序号。它只放一样东西（页面、终端或 mod），没有窗格标题栏：不能 split 也不能关，agent 也不会留在里面。侧栏显示时，空的标签栏会收起，Home 占满高度。
-- **跳转**（`cmd-p`，或 Inbox 的 Search）：每个窗格一行，agent 和程序都在，名字和图标与窗格标题相同（标签名只有你命名过才算），所以输入 `lazygit` 就能直接跳到那个窗格，不管它旁边有没有 agent、在哪个 space。最近待过的窗格排在最前，越近越前，不管当时是怎么切过去的，所以 `cmd-p`、回车就回到刚才所在的窗格；你所在的窗格排最后。输入时，名字匹配的排在只靠目录或 space 匹配的前面。
+- **跳转**（`cmd-p`）：每个窗格一行，agent 和程序都在，名字和图标与窗格标题相同（标签名只有你命名过才算），所以输入 `lazygit` 就能直接跳到那个窗格，不管它旁边有没有 agent、在哪个 space。最近待过的窗格排在最前，越近越前，不管当时是怎么切过去的，所以 `cmd-p`、回车就回到刚才所在的窗格；你所在的窗格排最后。输入时，名字匹配的排在只靠目录或 space 匹配的前面。
 - **详情和 Actions**：square-menu 按钮或 `cmd-shift-b` 打开详情，一个不改终端尺寸的 popup。再点按钮或按 Escape 关闭；换 space、标签或终端时它会关掉并提示。
   - 第一行是所在的机器：悬停 folder 图标看目录，整行右键复制路径。
   - **Open in**：主半边用 Finder 或上次选的已装 T3 编辑器（Cursor、Trae、Kiro、VS Code／Insiders／VSCodium、Zed、Antigravity 和 JetBrains）打开目录；箭头只选用哪个，和 Files 共用。选的编辑器卸载了就回到 Finder；远程 space 上说明为什么不可用。
@@ -36,6 +36,10 @@
 - **Review**（可选，[见扩展](extras.zh-CN.md#pullsreview)）：面板的 Review 标签评审标签工作处的仓库；从 + 添加或按 `cmd-shift-g` 打开。每个 space 各有自己的评审，面板显示当前 space 的。工具栏下方照 pulls.review 是一行组页签：每个页签有类别图标、名字、需要留意时的标记、增删行数、文件数，以及表示已看多少的进度环。选一个组，左边的 diff 和右边的文件树就只显示这个组，AI 分析过后，它的说明显示在 diff 顶部。AI 分析之前按文件夹分组（Docs、Code……）；只有一个组时不列组。树和 Files 一样，每层先目录后文件，名称忽略大小写、数字按数值排；diff 和 `j`/`k` 沿用相同顺序。文件夹默认折叠，只展开到正在看的文件，组的子组是其中的行；正在看的文件是唯一高亮的一行，滚动 diff 时跟着走。每行行首是已看勾选，图标与 Files 相同。文件或文件夹行可像 Files 一样拖进终端，或右键用同一份 Open、Reveal、Open with、Copy path 和 Insert 菜单。右键不改当前文件、目录折叠和已看勾选，菜单打开时该行保持点亮。已删除文件不能拖动，只能 Copy path；子组行两者都没有。标签栏里不显示计数，下面的范围菜单里有。分析状态显示在带 pulls.review logo 的 Review 标签上。Review 顶栏左边的范围按钮照 T3 Code 的 diff 面板，写着正在看的范围（Changes、Uncommitted、Outgoing、Incoming 或某个 commit），点开菜单换一个：上面四项带数量，下面是 Commits，在旁边展开一个可搜索的子菜单。在 Changes 下，`head →` 后面的 base 是一个按钮，照 T3：点开换一个分支来比较，本地或远程都行（行尾的开关切到远程版本），或者选 Automatic 回到默认分支。每个 space 记住自己选的 base，Commits 也只列这个 base 之后的提交。其他机器上的 space 没有 Review。
 
 ## 日常用法
+
+在 Inbox 的 **Search** 中输入名字，侧栏会显示紧凑的结果列表。↑、↓ 选结果，Enter 打开，Esc 清空。`cmd-p` 仍可在整个窗口里跳转。选定的 space 没有匹配卡片时，点 **Show all spaces** 恢复范围。
+
+点击卡片打开 agent。点卡片上的图钉可取消置顶，Undo 可恢复它的位置。悬停分支旁的工作树图标可查看 checkout 目录名和分支名。
 
 从 Home 回到项目或在项目间跳转时，目标终端直接出现在该 space 的工作区域。如果上次离开时开着 Files，它会和终端一起出现。切到已缓存的文件标签时，面包屑和预览一起恢复。
 
@@ -71,7 +75,7 @@ Insert 拒绝包含控制字符的路径；可改用 Copy path。
 | `cmd-alt-]` / `cmd-alt-[`、`ctrl-alt-shift-]` / `ctrl-alt-shift-[` | `t3-tabs.space-next` / `t3-tabs.space-prev` | 下一个或上一个 space，跳过 Home |
 | `cmd-1…9`、`ctrl-alt-1…9` | `t3-tabs.tab:<n>` | 标签栏显示的第 n 个标签 |
 | `cmd-shift-]` / `cmd-shift-[`、`ctrl-tab` / `ctrl-shift-tab`、`ctrl-alt-]` / `ctrl-alt-[` | `t3-tabs.tab-next` / `t3-tabs.tab-prev` | 标签栏显示的下一个或上一个标签 |
-| `cmd-p` | `mod.open:t3-picker` | 按名字或程序跳到任一窗格，或回到上一处（和 Inbox 顶栏的 Search 相同） |
+| `cmd-p` | `mod.open:t3-picker` | 按名字或程序跳到任一窗格，或回到上一处 |
 | `cmd-]` / `cmd-[` | `t3-tabs.next` / `t3-tabs.prev` | 下一个或上一个顶层 agent，按选中侧栏的顺序走，到两端停住，显示或隐藏都一样。Inbox 走它画出来的行（折叠的 shelf 只算当前查看的那一行）；Lists 也走折叠的组 |
 | `cmd-w`、`ctrl-alt-shift-x` | `t3-tabs.close-tab` | 关闭标签，里面有程序在运行时先确认 |
 | `cmd-shift-w`、`ctrl-alt-x` | `t3-tabs.close-pane` | 关闭窗格，里面有程序在运行时先确认 |

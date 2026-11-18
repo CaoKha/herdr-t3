@@ -40,6 +40,7 @@ function fixture(width) {
     Button: { new: id => element("button").id(id) },
     Popover: { new: id => element("popover").id(id) }, HoverCard: { new: id => element("hovercard").id(id) }, Popup: { new: (id, trigger) => element("popup").id(id).child(trigger) }, Input: { new: () => element("input") },
     InputState: { new: () => ({ on() {}, value: () => "", set_value() {}, focus() {} }) },
+    ScrollHandle: { new: () => ({ scroll_to_item() {}, release() {} }) },
     svg: source => element("svg", source), image: source => element("image", source),
     spaces: () => spaces, agents: () => agents, terminals: () => terminals, panes: () => panes,
     machines: () => [{ name: null, layout: "ready" }, { name: "vps", layout: "ready" }], focused: () => shown,
@@ -1896,7 +1897,7 @@ async function checkInbox() {
   {
     // Whatever opens over its button covers it, and the pointer may not move: it doesn't stay lit.
     const f = fixture(256), footer = f.load("t3-chrome", { footer: true }), agents = f.load("t3-agents"), inbox = f.load("t3-inbox");
-    for (const [view, id] of [[footer, "settings"], [agents, "ag-sort"], [inbox, "inbox-search"], [inbox, "inbox-new-tab"]]) {
+    for (const [view, id] of [[footer, "settings"], [agents, "ag-sort"], [inbox, "inbox-new-tab"]]) {
       fire(find(view.render(cx), id), "on_hover", true, cx);
       assert.equal(view.hot, id);
       fire(find(view.render(cx), id), "on_click", {}, cx);
@@ -1980,13 +1981,12 @@ async function checkInbox() {
       }
     }
     {
-      const inbox = f.load("t3-inbox", { picker: "t3-picker" }), search = () => find(inbox.render(cx), "inbox-search");
+      const inbox = f.load("t3-inbox", {});
       f.calls.length = 0;
-      fire(search(), "on_mouse_down:left", {}, cx); f.state["t3-picker.closed"] = Date.now(); fire(search(), "on_click", {}, cx);
-      assert.deepEqual(f.calls, [], "Search closes Go to");
-      fire(search(), "on_click", {}, cx);
-      assert.deepEqual(f.calls.splice(0), [["mod.open", { name: "t3-picker" }]], "the keyboard's click has no press: it opens");
-      delete f.state["t3-picker.closed"];
+      const tree = inbox.render(cx);
+      assert.ok(find(tree, "inbox-search-input"), "Inbox has a search input before any interaction");
+      fire(find(tree, "inbox-search-field"), "on_mouse_down:left", {}, cx);
+      assert.deepEqual(f.calls, [], "focusing Inbox search keeps the current pane and overlays in place");
     }
     // A machine's row is T3's shelf with its folder's +. The + and the chevron stand in the heading's two button columns:
     // in 8 + 2 + 8, the group 2 past the edge puts a 12px chevron's middle 22 from the sidebar's, and a 24px + 10 before it, 50.
@@ -2062,7 +2062,7 @@ async function checkInbox() {
     assert.equal(card("t0").style.opacity, 1, "then it fades in");
     assert.equal(card("t0").style.ml, 4);
     assert.ok(row("t0").style.relative !== undefined);
-    assert.deepEqual(strings(card("t0")).slice(1), ["P", "project 0", "feat/x", "Pi"], "its mark and project, branch, program; no machine on this one");
+    assert.deepEqual(strings(card("t0")).slice(1), ["P", "project 0", "feat/x", "Pi"], "the card describes its own project, branch and program");
     assert.equal(strings(card("t0"))[0], row("t0").style.accessibility_label, "led by the title the row shows");
     // The pointer can report entering the next row before leaving this one.
     hover("vps/t2", true);

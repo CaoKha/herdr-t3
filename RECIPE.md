@@ -32,7 +32,7 @@ The brand bar leaves room for macOS's window buttons, then shows Herdr's own mar
 
 ### Inbox
 
-Inbox is selected at first. Its top row has a Search button drawn like a field (it opens Go to), then the space filter, New space and New tab. Below, Pinned and Active cards fill the top; Working, Snoozed and Settled are folded shelves anchored to the bottom, each with a count, joining the cards' scroll when space runs out. A folded shelf still shows the row in view. Settled pages with Show more and offers Clear.
+Inbox is selected at first. Its top row has a search field that lists compact matching rows in place, then the space filter, New space and New tab. Below, Pinned and Active cards fill the top; Working, Snoozed and Settled are folded shelves anchored to the bottom, each with a count, joining the cards' scroll when space runs out. A folded shelf still shows the row in view. Settled pages with Show more and offers Clear.
 
 A card (78px with all three lines) shows the space and the state or time (Working with its duration, Needs you, Done, else age), the agent's title, and an optional branch ended by the program icon and a remote-machine mark. Viewed, needs-you and done titles are medium `foreground`, others `muted`; working cards sit at 70% until hovered or viewed. Settled and Snoozed entries are slim 36px rows whose time becomes Un-settle or Wake on hover; Snoozed rows show an `accent` alarm clock, and `Woke` is `blocked` text. Hovering a card or Agents row opens a details card at its right. Spec: [inbox](docs/internals/specs/inbox.md).
 
@@ -155,7 +155,7 @@ Clicking a space switches to it; dragging reorders it within its machine (`space
 
 ### Go to, New and Actions
 
-Go to (`cmd-p`, or Inbox's Search) lists every pane, recent first, opening on the previous pane so `cmd-p`, Enter toggles back; Enter focuses across spaces, `ctrl-d` closes safely. New lists spaces, current first; `1…9` pick, and its footer creates a space, asking which machine when there are several.
+Go to (`cmd-p`) lists every pane, recent first, opening on the previous pane so `cmd-p`, Enter toggles back; Enter focuses across spaces, `ctrl-d` closes safely. New lists spaces, current first; `1…9` pick, and its footer creates a space, asking which machine when there are several.
 
 Actions are global. `▶` reruns the last action, its menu runs another and makes it primary, and a gear edits. An action has a Name, a Command, an optional Folder and icon, and opens in a new Tab, Split right or Split down via `terminal.open { argv: ["sh", "-c", command], name, place, folder? }`; the shell stays after it ends. Without a Folder it runs in the focused terminal's cwd, else the space folder.
 
@@ -237,7 +237,7 @@ root: row, background=canvas, terminal_menu=t3-menu
 floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, visually empty
 ```
 
-Sidebar, work and panel columns are `resizable:false` inside, keeping their outside dividers. `spaces` gets `{newMenu:"t3-new-menu"}`; `inbox` gets `{newMenu:"t3-new-menu",picker:"t3-picker",home:"t3-tabs.home",menu:"t3-menu"}`. `main` and `home-main` share the pane frame settings above. The floating `tabs-keys` copy owns commands, Home and per-space panel sync; other `t3-tabs` copies share navigation.
+Sidebar, work and panel columns are `resizable:false` inside, keeping their outside dividers. `spaces` gets `{newMenu:"t3-new-menu"}`; `inbox` gets `{newMenu:"t3-new-menu",home:"t3-tabs.home",menu:"t3-menu"}`. `main` and `home-main` share the pane frame settings above. The floating `tabs-keys` copy owns commands, Home and per-space panel sync; other `t3-tabs` copies share navigation.
 
 Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3-pane`, `t3-home`, `t3-files`, `t3-new-menu`, `t3-picker`, `t3-actions`, `t3-menu`. Adapt the matching shipped mods where they exist; Inbox, Home and Files are new. Keep the shipped `workspace-status`, spinner and program artwork. UI icons are Lucide (24 grid, 1.75 stroke) in each mod's own `icons/`; Files and Review trees use T3/Pierre shapes. A mod can't import outside its folder: shared modules live in `shared/` and `scripts/sync.sh` copies them.
 
@@ -258,13 +258,15 @@ Terminal facts are labels (`settled`, `snoozed`), cross-mod facts and preference
 ## Watch out
 
 - Hidden mods neither draw nor hear commands and start on first display. Keep always-on commands and Snooze timing in the floating `tabs-keys`; the selected mode's order keeps working while hidden, except Inbox's own order before it has ever started. Hold pending intent through model and remote-label lag, and report failed writes.
-- Home's strict identity protects ordinary spaces: release Home's agent space in place, never move or delete its process. Native external closes can flash a neighbour; restart loses close history; native Home splits can't be blocked; zoom groups can't drag; plain lists can't scroll to a row.
+- Home's strict identity protects ordinary spaces: release Home's agent space in place, never move or delete its process. Native external closes can flash a neighbour; restart loses close history; native Home splits can't be blocked; zoom groups can't drag.
 - Keep the confirmations: close and Clear stop terminals and clear history, Remove worktree deletes, wallpaper Delete removes source and cache. Actions run arbitrary `sh -c`. Write the traffic lights with an expected-content write of that one field; `layout.set` discards remembered layout state.
 - A wrong icon path draws nothing and raises nothing; check runtime-built paths in the demo window. Opaque surfaces stand in for blur, scale and letter-spacing the host lacks; transparent popups still block input. Recover missing pointer leave and release; closing a popup must neither reopen it nor close the tab beneath.
 - Before changing render or timers, focus or hover, measurement or scrolling, Review text or wallpaper conversion, read [layout implementation](docs/internals/layout-implementation.md).
 - Keep this brief and the [Chinese one](RECIPE.zh-CN.md) aligned, each at most 60,000 UTF-8 bytes (Gallery skips larger recipes). Change it when what a rebuild produces changes; values and edge rules belong in the specs and t3-tokens.
 
 ## Done when
+
+At default sidebar width, search within Inbox and open a matching agent directly. Distinguish a linked worktree by the icon beside its branch and read its directory name and branch by hovering the icon. Follow an external jump into a long shelf, then scroll away manually. Losing window focus during a drag or sweep leaves every row in place.
 
 Record transitions at the default sidebar width. On returning from Home or switching between spaces with different panel states, the first frame showing the destination terminal has its final position, width and panel. On a cached file-tab switch, the selected tab, breadcrumb and preview identify the same file from the first frame.
 

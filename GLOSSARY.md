@@ -79,7 +79,7 @@ _Avoid_: preferences、config、T3 settings
 
 **Go to**：
 `cmd-p` 打开的跳转面板，每个窗格一行。
-_Avoid_: picker（mod 名）、Search（Inbox 里的入口名）
+_Avoid_: picker（mod 名）；Search 是 Inbox 的行内搜索
 
 **Action**：
 详情 Actions 行里的一条命令，在新标签或分屏里运行。

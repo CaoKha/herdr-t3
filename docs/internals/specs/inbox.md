@@ -4,9 +4,12 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 
 ## Top row and filter
 
-- 32px row, 8 in: a Search button drawn like a search field, then the space filter, New space and New tab (touching 28px buttons, 16px icons). Search and the button group are 4 apart, as T3 (t3-tokens「有意不同」). 8 below the row, the cards start.
-- Search opens Go to; it never filters inline.
+- 32px row, 8 in: Search, then the space filter, New space and New tab (touching 28px buttons, 16px icons). Search and the button group are 4 apart, as T3 (t3-tokens「有意不同」). 8 below the row, the cards start.
+- The Search input stays in the top row. A query matches a card's displayed title and, when available, its own pane's branch, without regard to case. Rank by text relevance, favoring exact names and word matches over partial matches. The query is plain text, with no field prefixes or cross-field AND filtering. No conversation or terminal contents are read. Go to is still a separate global shortcut.
+- Search scoped cards, including folded shelves and Settled cards beyond the first page, but not terminals without Inbox cards. Results replace the normal list with compact, single-line rows: 36px high, 1 apart, rounded 6, with a 16px space mark beside the title and an age at the right. No card actions, shelf headers, Clear, pagination, dragging, or sweeps. The normal folds, page and terminal order are unchanged.
+- A new query highlights the first result. Pointer movement and Up/Down move the same highlight with the normal selected row background; arrows wrap and reveal the highlighted result. If that result disappears, the first result is highlighted instead. Enter or a click opens the result and clears the query. Esc with a query and the clear button clear only the query and keep the input. Navigation from elsewhere does not clear search; the route reveal waits for the normal list to return. The query is not saved.
 - The filter is a 288px combobox under its button's left edge: radius 8, inset 4, a 26px search over a rule, 32px rows of radius 4.
+- If the space filter leaves no cards, the empty state offers Show all spaces. It clears the stored space scope and resets the normal Settled page without switching terminals. An empty query result is not itself a reason to clear scope, and a shelf with cards does not count as empty.
 
 ## Shelves
 
@@ -19,11 +22,21 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 ## Cards
 
 - Radius 6, padding 8. Lines 20/20/16 with gaps 4/2: 78px with all three. Cards 5 apart.
-- Line 1: space mark and name; at the right the state or time: Working with its duration, Needs you, Done, otherwise age. Line 2: the agent's title. Optional line 3: branch, truncated in the middle.
-- The program icon (60%) and the remote-machine mark end the branch line, else the title line.
+- Line 1: space mark and name; at the right the state or time: Working with its duration, Failed, Approval, Input, Needs you, Done, otherwise age. Line 2: the agent's title. Optional line 3: branch, truncated in the middle, preceded by a 14px `FolderGit2` icon for a verified linked worktree.
+- The program icon (60%) and the remote-machine mark end the metadata line, else the title line.
 - Titles of the viewed, needs-you and done agents are medium `foreground`; others normal `muted`, brightened on hover. Hover never moves anything.
 - Working cards are 70% until hovered or viewed.
 - A pinned card shows a pin after its space mark.
+
+### Attention
+
+- The blocked corner says Failed for the card's own terminal error, or Approval / Input for its own current `blocked` report with kind `permission` / `question`. Otherwise it says Needs you. The corner is display only; the existing tree rules still govern attention, Settle and Snooze.
+- Hover details say Error occurred if the card's own current error report has a message, as in T3's generic error notice. They do not show report text.
+
+### Checkout context
+
+- Full cards with a branch look up their own terminal pane's live working directory. Show the icon only for a verified linked checkout. Its tooltip alone says `Worktree: <checkout directory name> (<branch>)`, matching T3's path formatting. A branchless checkout has no Worktree row or tooltip; slim rows retain ordinary details.
+- Run read-only Git off the draw path, at most one lookup stream per machine, with a 4s timeout per command. Cache directory identity by machine and cwd, and checkout membership by machine and Git common directory, for 60s in memory. Re-read only on demand; compact Search results request no lookups. Disconnect invalidates that machine, and results from a no-longer-requested directory must not decorate its replacement.
 
 ## Slim rows (Settled, Snoozed)
 
@@ -51,6 +64,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - One hand-made order, shared with Agents (`shared/pins.js`). Button and menu pins go to the top; dragging picks the place. Pinning ends Snooze.
 - Pinned agents stay at the top whatever their state.
 - Unpin returns the agent to its time slot and offers Undo; that Undo restores just the pin in its place and writes no terminal label.
+- The card's pin is a 16px button holding a 12px icon. Hover or keyboard focus changes it to `pin-off`; click or Enter unpins without opening or lifting the card.
 
 ## Undo notice
 
@@ -66,7 +80,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - Only while dragging: Pinned and Active headers expand to 24px over 150ms, Settled appears even when empty, target headers and gaps use `accent`.
 - Gaps match the destination: a card plus 5px, or a 36px slim row. Empty or folded destinations show a dashed 36px placeholder.
 - In Pinned, the drop goes before or after a card by its upper or lower half. Active and Settled keep their own ordering; no manual positions there. Settled's page length stays fixed as entries enter and leave.
-- Release inside the sidebar commits the target and never opens the row. Leaving past the top or bottom commits the last target. Leaving by a side, Esc, the row disappearing or the window deactivating cancels.
+- Release inside the sidebar commits the target and never opens the row. Leaving past the top or bottom commits the last target. Leaving by a side, Esc, the row disappearing or the window deactivating cancels. Deactivation cancels sweeps too, even with a valid target at a top or bottom edge.
 - The list holds keyboard focus only while dragging, then gives it back to the pane.
 - Sweep: press Settle or Un-settle, cross rows of the same section, release to act on the whole run. Wake sweeps the same way.
 - Snoozed takes no drops: a drop can't choose a time.
@@ -96,7 +110,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 
 - At confirmation, recheck the agent and its descendants. A blocked tree stays in view. Snooze writes a wake timestamp (`snoozed=<wake-ms>`) and puts a viewed agent away.
 - The agent wakes where it was; if a run finished while snoozed, it returns to the top of Active. It carries `Woke` until viewed or clicked with Inbox selected in an active window; a background window can't consume it. A working agent can show `Working` and `Woke` together.
-- A permission prompt shows it as Needs you for a while without removing the label; answering hides it again.
+- A blocked report shows it with its attention label for a while without removing the label; answering hides it again.
 - Failure in its tree, a new turn given in view, Wake, pin or Settle clears the label. A pinned snooze keeps the pin underneath and returns to it on wake. Undo of Settle restores a snooze only if it hasn't expired.
 
 ## Mod cards
@@ -107,6 +121,8 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - Opting in promises the pane can be closed safely: Settle and close (button or Settle key) closes the pane, with no Settled shelf or Undo, and lands on the preceding tab or the adjacent agent, never Home. A space's last tab asks first.
 - No pin, drag or sweep; the space filter applies.
 
-## Filter widening
+## Reveal the row in view
 
-Bringing a filtered-out agent or mod card into view widens the filter to all spaces and saves it, except on the first draw, or when the person picked that filter while already there. Plain sidebar lists can't be scrolled to a row from code (T3 can).
+- An external jump to a space-filtered agent or mod card widens the filter to all spaces and saves it. The first draw and choosing a filter while already viewing an agent leave the filter alone. Lists mode never widens Inbox's filter.
+- While the Inbox is visible in the active window, bringing a different agent or mod card into view reveals its row with the smallest scroll needed. A row already under the pointer stays put. This also reaches the row in a folded shelf or past the Settled page without changing the shelf or page.
+- Use the same viewport for cards and shelves. Resolve the latest address on the next draw against the viewport's actual direct children, not the agent order. Wheel input, hiding Inbox, switching to Lists, or deactivating or closing the window cancels a queued request before it is sent to the viewport. A sent request is one-shot: redraws and reordering do not pull the view back, and scrolling never takes terminal focus.

@@ -11,7 +11,7 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (
 
 ### Go to
 
-- `cmd-p` or the Inbox's Search. One row per pane: agents, shells, programs and mods; never terminals without panes, never Home.
+- `cmd-p`. One row per pane: agents, shells, programs and mods; never terminals without panes, never Home.
 - Order: recent panes newest first, then the current space, the current machine, the remaining space and tab order; the current pane last. Up to 30 live panes are remembered from every navigation route (`t3-tabs.recent`). It opens on the previous pane, so `cmd-p`, Enter toggles back and forth.
 - Row: space mark and shared pane name; beneath, program icon and name, remote machine, space and live sub-agent `+n`; state at the right.
 - Searches space and machine, explicitly named tab, pane name, program name and key, and folder. Pane-name matches rank before metadata-only matches.

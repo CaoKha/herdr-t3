@@ -95,7 +95,7 @@
 - `xs`：栏上（T3 头部，`variant="outline"` 的 xs 按钮组）。高 24，一圈 `input` 描边和一根全高 `input` 中线，静止时就在，没有底（T3 的 `input/32` 底在 chrome 上读作一块按钮，布局不画，同 Actions 原来的理由：底会像选中的标签）；指针下的那一半单独填 `surface` 的悬停底，菜单开着时箭头那半填 on 底。主半边只有图标时宽 25（含左描边），有文字时传 `wide`，左 5 右 7、间距 4（T3 xs 的 `px-[7px]` 加 svg 的 `-mx-0.5`）；箭头半宽 24（含右描边），箭头 16。整体禁用时连描边一起降到 0.64。用于 Files 文件头的 Open in、Actions 栏的 ▶|⌄（见 [Files](specs/files.md#open-in)）。
 - `row`：详情卡里（T3 `isPanel`，`variant="ghost"`）。一体 ghost 组，底和中线属于整组，见[详情](specs/details.md#splits)。
 
-不走 `button()` 的：列表行、菜单行（`shared/menu-row.js`，见下）、标签、分段切换（ToggleGroup）、日历格、select 的触发框和画成输入框的按钮（Inbox 的 Search）、输入框自带的 stepper（`NumberInput` 的 − +）、行内链接（Undo，悬停下划线）、命令面板底部的文字动作（只变亮）、Inbox 卡片和行上的悬停控件（T3 行控件，无底）、Update 胶囊、品牌栏 Home。
+不走 `button()` 的：列表行、菜单行（`shared/menu-row.js`，见下）、标签、分段切换（ToggleGroup）、日历格、select 的触发框、输入框自带的 stepper（`NumberInput` 的 − +）、行内链接（Undo，悬停下划线）、命令面板底部的文字动作（只变亮）、Inbox 卡片和行上的悬停控件（T3 行控件，无底）、Update 胶囊、品牌栏 Home。
 
 ## 菜单行
 

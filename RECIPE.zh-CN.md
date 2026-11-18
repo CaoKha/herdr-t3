@@ -32,7 +32,7 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 ### Inbox
 
-初始选中 Inbox。顶行是画成输入框的 Search 按钮（打开 Go to），然后是 space 筛选、New space、New tab。下面 Pinned、Active 卡片在上；Working、Snoozed、Settled 是贴底的折叠收纳区，带数量，空间不够时并入卡片的滚动。折叠的收纳区仍露出当前查看的行。Settled 用 Show more 分页，并提供 Clear。
+初始选中 Inbox。顶行是可在侧栏内显示紧凑结果列表的 Search 输入框，然后是 space 筛选、New space、New tab。下面 Pinned、Active 卡片在上；Working、Snoozed、Settled 是贴底的折叠收纳区，带数量，空间不够时并入卡片的滚动。折叠的收纳区仍露出当前查看的行。Settled 用 Show more 分页，并提供 Clear。
 
 卡片三行齐全时高 78：space 与状态或时间（Working 加时长、Needs you、Done，否则经过多久），agent 标题，可选的分支行，行末是程序图标和远程机器标记。正在看、需要人、done 的标题是 medium `foreground`，其余 `muted`；工作中卡片平时 70%，悬停或正在看时恢复。Settled、Snoozed 是 36px 窄行，悬停把时间换成 Un-settle 或 Wake；Snoozed 带 `accent` 闹钟，Woke 是 `blocked` 文字。悬停卡片或 Agents 行会在右侧出现详情卡。规格：[inbox](docs/internals/specs/inbox.md)。
 
@@ -155,7 +155,7 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 ### Go to、New 与 Actions
 
-Go to（`cmd-p` 或 Inbox 的 Search）列出所有 pane，最近的在前，打开时选中之前的 pane，所以 `cmd-p`、Enter 来回切换；Enter 跨 space 聚焦，`ctrl-d` 走安全关闭。New 列出 space，当前的在前；`1…9` 选择，底栏可新建 space，多机器时先问哪台。
+Go to（`cmd-p`）列出所有 pane，最近的在前，打开时选中之前的 pane，所以 `cmd-p`、Enter 来回切换；Enter 跨 space 聚焦，`ctrl-d` 走安全关闭。New 列出 space，当前的在前；`1…9` 选择，底栏可新建 space，多机器时先问哪台。
 
 Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设为主动作，齿轮编辑。动作有 Name、Command，可选 Folder 和图标，在新的 Tab、Split right 或 Split down 中运行：`terminal.open { argv: ["sh", "-c", command], name, place, folder? }`，结束后 shell 保留。没填 Folder 时在聚焦终端的 cwd 运行，否则用 space 文件夹。
 
@@ -237,7 +237,7 @@ root: row, background=canvas, terminal_menu=t3-menu
 floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 ```
 
-sidebar、work、panel 列内部 `resizable:false`，外分隔线仍可拖。`spaces` 传 `{newMenu:"t3-new-menu"}`；`inbox` 传 `{newMenu:"t3-new-menu",picker:"t3-picker",home:"t3-tabs.home",menu:"t3-menu"}`。`main` 与 `home-main` 共用上述窗格框设置。浮动 `tabs-keys` 副本负责命令、Home 和每 space 面板同步；其他 `t3-tabs` 副本共用导航。
+sidebar、work、panel 列内部 `resizable:false`，外分隔线仍可拖。`spaces` 传 `{newMenu:"t3-new-menu"}`；`inbox` 传 `{newMenu:"t3-new-menu",home:"t3-tabs.home",menu:"t3-menu"}`。`main` 与 `home-main` 共用上述窗格框设置。浮动 `tabs-keys` 副本负责命令、Home 和每 space 面板同步；其他 `t3-tabs` 副本共用导航。
 
 必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应官方 mod 的从它改，Inbox、Home、Files 新建。保留官方 `workspace-status`、转圈和程序素材。UI 图标是各 mod 自己 `icons/` 里的 Lucide（24 网格、1.75 笔画）；Files 和 Review 的树用 T3／Pierre 图形。mod 不能越出自己目录 import：共享模块放在 `shared/`，由 `scripts/sync.sh` 复制。
 
@@ -258,13 +258,15 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 ## 注意
 
 - 隐藏的 mod 不画也不收命令，首次显示才启动。常驻命令和 Snooze 计时放在浮动 `tabs-keys`；隐藏时所选模式的顺序继续生效，Inbox 从未启动前它自己的顺序除外。模型和远程标签有延迟时保留最后意图，写失败要提示。
-- Home 的严格认领保护普通 space：释放 Home 里的 agent space 时原地释放，不移动或删除进程。外部原生关闭可能闪一下邻居；重启丢关闭历史；原生 Home 分屏拦不住；zoom 组不能拖；普通列表不能用代码滚到某行。
+- Home 的严格认领保护普通 space：释放 Home 里的 agent space 时原地释放，不移动或删除进程。外部原生关闭可能闪一下邻居；重启丢关闭历史；原生 Home 分屏拦不住；zoom 组不能拖。
 - 保留确认：关闭和 Clear 会停终端、清历史，Remove worktree 会删除，壁纸 Delete 删源文件和缓存。Actions 运行任意 `sh -c`。窗口按钮位置只按预期内容写那一个字段；`layout.set` 会丢掉布局记住的状态。
 - 图标路径写错时什么都不画也不报错；运行时拼出的路径要在 demo 窗口里看。宿主没有 blur、缩放动画和字距，用实色代替；透明 popup 仍挡输入。补上漏掉的指针离开和松开；关闭 popup 不能重新打开它，也不能关掉下面的标签。
 - 改 render 或计时器、焦点或悬停、测量或滚动、Review 文本或壁纸转换前，读 [layout implementation](docs/internals/layout-implementation.md)。
 - 本文与[英文版](RECIPE.md)保持一致，各 ≤60,000 UTF-8 字节（Gallery 跳过更大的 RECIPE）。只有重建出来的结果会变时才改它；数值和边界规则写进 specs 和 t3-tokens。
 
 ## 完成标准
+
+在默认侧栏宽度下，在 Inbox 内搜索，直接打开命中的 agent。通过分支旁的图标识别链接工作树，悬停图标查看目录名和分支名。从别处跳到长收纳区中的行，再手动滚开。拖动或扫选时窗口失去焦点，行保留在原处。
 
 在默认侧栏宽度录下切换过程。从 Home 返回，或在面板开关不同的 space 之间切换时，目标终端出现的第一帧已有最终位置、宽度和面板状态。切换已缓存的文件标签时，第一帧的选中标签、面包屑和预览指向同一文件。
 

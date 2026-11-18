@@ -16,6 +16,7 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 
 ## Features
 
+- **Inbox search** shows matching agents in a compact list. Use ↑ and ↓ to choose a result and Enter to open it.
 - **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention with Settle and Snooze; Lists shows spaces and agents by project.
 - **Switching spaces** brings the destination tab bar, terminal and saved right panel into view together, including when returning from Home.
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
@@ -77,6 +78,7 @@ It checks your configuration and required mod entry points before copying files.
 - `t3-spaces`: read-only `git status` / `git rev-parse` in your spaces' folders, watches those repos for changes (`watchFolder`), and `hc machine ls --json`. Clicking Connect on a rebuilt machine runs `hc machine rm` and `hc machine add`.
 - `t3-inbox`: `hc label <agent> settled=<ms>:<turn>` when an agent is settled or unsettled.
 - `t3-inbox`: `hc label <agent> snoozed=<ms>` when an agent is snoozed or wakes.
+- `t3-inbox` identifies linked checkouts with `git rev-parse` and `git worktree list --porcelain -z` in the pane's working directory on its machine.
 - `t3-tabs`: `hc get` before closing a terminal, to see whether a program is running in it. `hc label` when `cmd-shift-s` settles or brings back an agent, and to give back an unread done (`herdr.seen`) or a Woke mark (`snoozed`) that Herdr cleared when it showed a tab you didn't pick, and `hc label <agent> snoozed=` when a failed turn or new work in view ends a snooze.
 - `t3-agents`: `hc label <agent> snoozed=` when pinning a snoozed agent ends its snooze.
 - `t3-actions`: reads ComputerName, probes installed editors with `open -Ra`, and opens the selected directory with `open`. Its Review row uses the Review page's shared, read-only Git scope helpers asynchronously; it performs no Git writes.

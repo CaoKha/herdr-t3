@@ -4,6 +4,8 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-18
 
+- Inbox searches within the sidebar. Type a name and open a match from the compact results list. Clicking a pin unpins its card. An empty space filter offers **Show all spaces**.
+- Inbox reveals the agent you navigate to, shows the agent’s own reported failure and marks a linked worktree with an icon beside its branch. Dragging a card or sweeping an action ends when the window loses focus.
 - When you navigate between spaces or leave Home, the destination terminal opens with its tab bar and saved panel in place.
 - Opening Home for the first time from a project keeps that project visible until the configured Home tab is ready.
 - Files shows a cached file's breadcrumb and preview together as you select its tab. Fast directory reads go straight to the tree.
