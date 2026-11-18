@@ -75,6 +75,22 @@ for bad in broken empty multi wrong-root bad-section; do
   reject_preflight "$bad_home" keys.json "$bad keys.json"
 done
 
+# The layout and keys can't be staged next to their files: stopped before any mod is copied, nothing left behind.
+mkdir "$tmp/no-stage-bin" "$tmp/no-stage"
+cp -R "$app/." "$tmp/no-stage"
+real_mktemp=$(command -v mktemp)
+cat > "$tmp/no-stage-bin/mktemp" <<EOF
+#!/bin/sh
+case "\$*" in (*.herdr-t3-keys.*) echo "mktemp: cannot stage \$*" >&2; exit 1 ;; esac
+exec "$real_mktemp" "\$@"
+EOF
+cat > "$tmp/no-stage-bin/update" <<EOF
+#!/bin/sh
+PATH="$tmp/no-stage-bin:\$PATH" exec "$src/scripts/update.sh"
+EOF
+chmod +x "$tmp/no-stage-bin/mktemp" "$tmp/no-stage-bin/update"
+reject_preflight "$tmp/no-stage" 'cannot stage' 'an unstageable keys.json' "$tmp/no-stage-bin/update"
+
 out=$(update)
 if [ "$(mode "$layout")" != 644 ] || [ "$(mode "$app/keys.json")" != 640 ]; then
   echo 'FAIL check-update: update changed layout or keys permissions'

@@ -346,6 +346,7 @@ export default class Menu extends View {
   // a submenu hangs off, that its submenu went. Its own submenu goes with it.
   async close() {
     this.clock?.cancel();
+    this.emptied?.cancel();
     subLeft(this.s);
     const p = props() ?? {};
     menuClosed(p.overlay);
@@ -494,6 +495,8 @@ export default class Menu extends View {
     const t = theme(), p = props() ?? {};
     if (p.tab === "space-switch") return this.spaceSwitchView(t, p, cx);
     const list = this.liveItems(p), ids = list.map(itemId);
+    // Its target went (a tab or space closed under it): nothing left to pick, so it goes, after this frame.
+    if (!list.length && cx && !this.emptied) this.emptied = cx.timer.after(0, () => { if (!this.liveItems(props() ?? {}).length) closeChain(); });
     if (this.selected === undefined) this.selected = ids[this.at] ?? null;
     const snooze = list.findIndex((it) => it[1] === "snooze");
     const snoozeRow = snooze < 0 ? null : { id: ids[snooze], top: rowTop(list, snooze) };

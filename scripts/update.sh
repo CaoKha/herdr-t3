@@ -150,6 +150,11 @@ if [ -n "$missing" ]; then
 fi
 
 mkdir -p "$app/mods" "$app/layouts"
+# Stage on the destination filesystems before copying any mod, so a failure here leaves the install as it was. Check both originals before publishing either replacement.
+layout_tmp=$(mktemp "$app/layouts/.herdr-t3-update.XXXXXX")
+keys_tmp=$(mktemp "$app/.herdr-t3-keys.XXXXXX")
+prepare_replacement "$staging/layout.new" "$staging/layout.old" "$layout_tmp"
+prepare_replacement "$staging/keys.new" "$staging/keys.old" "$keys_tmp"
 # One mod at a time: other t3-* folders in the app (yours, a test's) are left alone.
 for d in "$src"/mods/t3-*/; do copy_mod "$d" "$app/mods/$(basename "$d")/"; done
 # The Review extra (pulls-review and review): config.json is the person's own, so it is never shipped or deleted.
@@ -160,11 +165,6 @@ fi
 [ ! -d "$app/mods/asciicn-wallpaper" ] || copy_mod "$src/extras/mods/asciicn-wallpaper/" "$app/mods/asciicn-wallpaper/"
 for t in "$src"/extras/themes/*.json; do [ ! -f "$app/themes/$(basename "$t")" ] || cp "$t" "$app/themes/"; done
 
-# Stage on the destination filesystems. Check both originals before publishing either replacement.
-layout_tmp=$(mktemp "$app/layouts/.herdr-t3-update.XXXXXX")
-keys_tmp=$(mktemp "$app/.herdr-t3-keys.XXXXXX")
-prepare_replacement "$staging/layout.new" "$staging/layout.old" "$layout_tmp"
-prepare_replacement "$staging/keys.new" "$staging/keys.old" "$keys_tmp"
 config_pending='Layout and keys were not replaced.'
 check_unchanged "$keys" "$staging/keys.old" "$config_pending"
 check_unchanged "$layout" "$staging/layout.old" "$config_pending"

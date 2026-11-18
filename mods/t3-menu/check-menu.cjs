@@ -696,4 +696,17 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   paneList = [{ pane: "p1", tab: "b1", terminal: "t1", cwd: "/work/s1" }];
   focusState = {};
 }
+// Its target gone before anything could be picked: an empty popup closes, with the menus it hangs off.
+{
+  target = { tab: "tab", target: { id: "gone", space: "s1" }, overlay: "empty-root", parents: ["empty-parent"] };
+  calls = []; closed = [];
+  const m = new context.Menu(); m.init(target, cx);
+  m.render(cx);
+  assert.deepEqual(closed, [], "not while it's being drawn");
+  elapse(0);
+  assert.deepEqual(closed, ["empty-root", "empty-parent"], "an empty menu closes its chain");
+  m.render(cx); elapse(0);
+  assert.deepEqual(closed, ["empty-root", "empty-parent"], "once");
+}
+
 console.log("ok menu");

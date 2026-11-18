@@ -9,12 +9,12 @@ English · [中文](CHANGELOG.zh-CN.md)
 - When you navigate between spaces or leave Home, the destination terminal opens with its tab bar and saved panel in place.
 - Opening Home for the first time from a project keeps that project visible until the configured Home tab is ready.
 - Files shows a cached file's breadcrumb and preview together as you select its tab. Fast directory reads go straight to the tree.
-- A context menu keeps the command you picked when rows move. Go to and the child-agent menu follow the selected pane or terminal. Reopening a file tab retires its previous tab menu and preview reads.
+- A context menu keeps the command you picked when rows move. Go to and the child-agent menu follow the selected pane or terminal. Reopening a file tab retires its previous tab menu and preview reads. A tab or space menu closes when its tab or space closes under it.
 - In standalone Inbox, Settle acts on the agent in focus when you press the shortcut. Home enables Next agent when the selected sidebar has somewhere to go. New space offers the same machines from Inbox, Spaces and the New menu.
 - Review opens the range you picked for its original space and repository. A full-file read interrupted by hiding Review resumes when you return.
 - Closing a tab asks again if the action would now affect additional terminals or close its space. Inbox Clear waits for the core to confirm Settle. Creating Home matches the explicitly named space on this machine.
 - Files follows the most recent selection when directory reads finish out of order. Review defers full refreshes while hidden. The space menu offers Close for a child agent as soon as it has a pane.
-- Updating checks configuration and mod entries before copying. If the layout or key bindings change during the copy, the updater preserves the edit and reports how to resume.
+- Updating checks configuration and mod entries before copying. If the layout or key bindings change during the copy, the updater preserves the edit and reports how to resume. If it can't stage the new layout or key bindings, it stops before copying any mod.
 - Home now picks up wallpapers added during its first conversion. Several changes during one conversion trigger a single follow-up scan.
 - In Files and Review, `cmd-shift-w` and `ctrl-alt-x` dismiss the open menu and keep both the surface tab and the terminal pane open.
 - The close button stays visible as the pointer moves across a terminal tab or rests on its name.
