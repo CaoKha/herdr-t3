@@ -110,7 +110,7 @@ Failure anywhere in a snoozed tree, or a new turn given in view, ends Snooze in 
 
 Active sorts blocked agents first, then by when work returned to the person; the shelves sort by time. Looking at a card never reorders it; clicking runs `agent.focus` without zooming a split.
 
-Settle is always explicit: hover a finished card (pinned ones too) for `✓ Settle`, or press `cmd-shift-s` on the viewed agent. It removes the pin, writes a terminal label and moves the agent to Settled; new work brings it back on its own. Un-settle, the Settle key again, or dragging it out returns it to the top of Active. Clear closes settled agents' eligible terminals after asking, sparing the tab in view.
+Settle is always explicit: hover a finished card (pinned ones too) for `✓ Settle`, or press `cmd-shift-s` on the viewed agent. It removes the pin, writes a terminal label and moves the agent to Settled; new work brings it back on its own. Un-settle, the Settle key again, or dragging it out returns it to the top of Active. Clear closes only terminals counted when the dialog opened that are still eligible, sparing the tab in view.
 
 Pins are one hand-made order shared with Agents; pinning ends Snooze. Settle, Snooze and Unpin show `Settled, Undo` (and the like) in the footer for 5s; Undo restores position, labels and pin. `cmd-z` stays the terminal's.
 
@@ -240,7 +240,7 @@ Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3
 
 Install the required mods as real files (symlinked SVGs don't load), the layout and its SVG, and context-merged keys under `HERDR_APP_HOME` or `~/.config/herdr-app`; select with `layout.switch {"name":"herdr-t3"}`. `scripts/update.sh` (needs `jq`, `rsync`) validates the installed layout and keys, replaces owned mods, keeps theme, focus and stack choices, extra blocks and Review's `config.json`, updates only extras and themes already installed, and merges keys with the repository winning, reporting replacements. Settings, pins and user wallpapers live outside replaced folders. `scripts/sync.sh` also writes the installed home and sibling standalone repositories.
 
-Optional Review: copy `extras/mods/pulls-review` and `extras/mods/review`, set up `jin.review` per its guide and append the `review` page to `panel-body` (update adds the page once the extra exists). The layout has no Review bar by default; one can be added as a `review-bar` block (`pulls-review`, `{block:"review-bar",toggle:true}`) just before `tabs-end`, never with the id `review`. The wallpaper and the theme export (`extras/mods/t3-theme-export`, a zero-height `work` block writing `~/.cache/herdr-app-theme.json` for Pi) are opt-in too; [extras usage](docs/user/extras.md) covers setup.
+Optional Review: copy `extras/mods/pulls-review` and `extras/mods/review`, set up `jin.review` per its guide and append the `review` page to `panel-body` (update adds the page once the extra exists). The layout has no Review bar by default; one can be added as a `review-bar` block (`pulls-review`, `{block:"review-bar"}`) just before `tabs-end`, never with the id `review`. The wallpaper and the theme export (`extras/mods/t3-theme-export`, a zero-height `work` block writing `~/.cache/herdr-app-theme.json` for Pi) are opt-in too; [extras usage](docs/user/extras.md) covers setup.
 
 ### Herdr functions and programs
 

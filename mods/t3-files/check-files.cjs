@@ -24,7 +24,7 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 
 // The page, started in a fake `herdr`: the panel on `page` with Review installed too, every folder holding a.js (changed) and
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
-function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null } = {}) {
+function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null, appDir = null, clock = Date } = {}) {
   const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
     props: null, overlays: [], closed: [], commands: [] };
   const shared = {}, wrote = [], store = new Map([["lines.wrap", "false"], ["nav.width", "300"]]), timers = [], everies = [], failed = [];
@@ -37,6 +37,8 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     if (w.stall?.(line)) await new Promise((r) => w.stalled.push(r));
     // As Herdr's exec when the process can't start (its run_blocking's spawn error).
     if (w.fail?.(line)) throw new Error("cannot run sh: Too many open files (os error 24)");
+    const actual = w.runExec?.(cmd, args, o);
+    if (actual) return actual;
     if (line.includes("rev-parse")) return cwd.startsWith("/n") ? { code: 128, stdout: "" } : { code: 0, stdout: `${cwd}\n\n` };
     if (cmd === "pwd") return { code: 0, stdout: `${cwd}\n` };
     if (line.includes(" status ")) return { code: 0, stdout: "1 .M N... 100644 100644 100644 h1 h2 a.js\0" };
@@ -66,21 +68,24 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   const body = { id: "panel-body", active: page, children: [{ id: "files" }, { id: "review" }, { id: "panel-empty" }] };
   const layout = { id: "root", children: [{ id: "work" }, { id: "panel", children: [body] }] };
   const ctx = vm.createContext({ checking: () => false,
-    View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element,
+    View: class {}, div: element, svg: element, image: (src) => element("image", src), h_flex: element, v_flex: element,
     Input: { new: element }, Editor: { new: element }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v, set_value(x) { v = x; }, focus() { events.focus?.({}, cx); } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
     spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
-    theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => "/tmp/none",
+    theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => appDir ?? "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
     props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
     readTextFile: async (p) => { w.read.push(p); return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : w.texts?.[p] ?? "const a = 1;\n"; },
     watchFolder: (p) => new Promise((resolve, reject) => w.watchers.push({ path: p, task: running, resolve, reject })),
     nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise((r) => { wake = r; }),
-    fs: { unlink: async () => {}, mkdir: async () => {}, writeFile: async () => {} },
+    fs: { unlink: async (...args) => { if (appDir) fs.unlinkSync(...args); },
+      mkdir: async (...args) => { if (appDir) fs.mkdirSync(...args); },
+      writeFile: async (...args) => { if (appDir) fs.writeFileSync(...args); } },
+    Buffer,
     localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
-    Date, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
+    Date: clock, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
   const files = ["store.js", "focus.js", "trigger.js", "tip.js", "list.js", "menu-row.js", "terminal-context.js", "surfaces.js", "panel.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-tree.js", "file-listing.js", "nav-column.js", "submenu.js", "popup-menu.js", "panel-states.js", "model.js", "menus.js", "main.js"];
   const buttons = load("color.js") + "\nconst { drawButton, split, ghostButton, tint, DISABLED, GROUP_GAP } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split, ghostButton, tint, DISABLED, GROUP_GAP };\n})();\n";
@@ -449,6 +454,100 @@ async function manyFolders() {
   assert.ok(find(root, "row-f3/a.js"), "and its file shows");
 }
 
+async function slowRefresh() {
+  let now = 100000;
+  const { view, cx, w, settle, tick } = makePage({ clock: { now: () => now } });
+  w.stall = (line) => line.includes(m.LIST);
+  view.render(cx); await tick();
+  const rootReads = () => w.ran.filter(r => r.line.includes(m.LIST)).length;
+  assert.equal(rootReads(), 1, "started the root listing");
+  for (let i = 0; i < 3; i++) { now += 5000; await tick(); }
+  find(view.render(cx), "t3-files-refresh").handlers.on_click({}, cx); await settle();
+  assert.equal(rootReads(), 1, "three poll intervals and a manual refresh join the slow root listing");
+  w.stall = null;
+  w.stalled.splice(0).forEach(end => end()); await settle();
+  assert.ok(find(view.render(cx), "row-a.js"), "the single read publishes the tree");
+  find(view.render(cx), "t3-files-refresh").handlers.on_click({}, cx); await settle();
+  assert.equal(rootReads(), 2, "a later refresh can start once the first one finishes");
+
+  view.open(view.current(), "a.js", cx); await settle();
+  w.hold = "/r/a.js";
+  now += 5000; await tick();
+  assert.equal(w.held.length, 1, "the next batch finished the tree and is refreshing the open text file");
+  for (let i = 0; i < 3; i++) { now += 5000; await tick(); }
+  assert.equal(rootReads(), 3, "polling still joins the batch while only its file read is pending");
+  assert.equal(w.held.length, 1);
+  w.hold = null;
+  w.held.splice(0).forEach(end => end()); await settle();
+  assert.equal(view.current().view.text, "held\n");
+}
+
+async function hideQueuedRefresh() {
+  const folders = Array.from({ length: 12 }, (_, i) => `folder-${i}`);
+  const listing = new Map([["/r", folders.map(name => `d\0${name}\0`).join("")], ...folders.map(name => [`/r/${name}`, "f\0old.js\0"])]);
+  const { view, cx, w, settle, show, tick } = makePage({ listing });
+  view.render(cx); await tick();
+  view.foldAll(view.current(), cx); await settle();
+  w.stall = line => line.includes(m.LIST) || line.includes(m.IGNORED);
+  find(view.render(cx), "t3-files-refresh").handlers.on_click({}, cx); await settle();
+  assert.equal(w.stalled.length, 8, "all eight slots are occupied, more paths wait");
+  const started = w.ran.length, notified = w.notified;
+  const old = w.stalled.splice(0);
+  show("review"); // Before the next sync, queued work must see the new layout itself.
+  old.splice(0, 1).forEach(end => end()); await settle();
+  assert.equal(w.ran.length, started, "freeing a slot while hidden must start zero execs");
+  assert.equal(w.notified, notified, "a late hidden answer doesn't redraw Files");
+  listing.set("/r", "f\0new.js\0");
+  w.stall = null;
+  show("files"); await tick();
+  assert.equal(w.ran.slice(started).filter(r => r.cwd === "/r" && r.line.includes(m.LIST)).length, 1, "reopening starts one fresh root listing while old commands are still held");
+  old.forEach(end => end()); await settle();
+  assert.ok(find(view.render(cx), "row-new.js"), "reopened Files shows the fresh tree");
+  assert.equal(w.ran.slice(started).filter(r => r.line.includes(m.LIST)).length, folders.length + 1, "only the reopened batch starts folder listings");
+}
+
+async function imagePreview(machine) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "t3-files-image-"));
+  try {
+    const source = "a 'b image.svg", appDir = path.join(tmp, "preview home"), sourcePath = path.join(tmp, source);
+    const drawing = fill => `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="${fill}"/></svg>\n`;
+    const { view, cx, w, tick, send, settle } = makePage({ appDir, clock: { now: () => 100000 },
+      spaces: [space("s1", tmp, true, machine)], listing: new Map([[tmp, `f\0${source}\0`]]) });
+    const attempts = [];
+    w.runExec = (cmd, args, { on }) => {
+      if (cmd !== "cp" && !(on === machine && machine && (cmd === "base64" || cmd === "sh" && args.at(-1) === sourcePath))) return;
+      const probe = cmd === "sh" && args[1] === m.PROBE;
+      if (!probe) attempts.push({ cmd, args, on });
+      try { return { code: 0, stdout: execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+      catch (e) { return { code: e.status ?? 1, stdout: "", stderr: String(e.stderr) }; }
+    };
+    const shown = () => walk(find(view.render(cx), "t3-files-content")).find(n => n.kind === "image")?.source;
+    const bytes = image => fs.readFileSync(path.join(appDir, image), "utf8");
+    fs.writeFileSync(sourcePath, drawing("red"));
+    view.render(cx); await tick();
+    send(`open:${source}`); await settle();
+    const first = shown();
+    assert.ok(first, `the ${machine ? "remote" : "local"} preview draws an image for a path with spaces and quotes`);
+    assert.equal(bytes(first), drawing("red"));
+    assert.equal(attempts.length, 1);
+    if (machine) {
+      assert.equal(attempts[0].on, machine);
+      assert.equal(attempts[0].cmd, "sh", "the remote image command feeds base64 via shell stdin redirection");
+      assert.equal(attempts[0].args.at(-1), sourcePath, "the path travels as a separate argument");
+    }
+    fs.writeFileSync(sourcePath, drawing("blue"));
+    view.current().refreshed -= 10000; await tick();
+    assert.equal(attempts.length, 1, "polling doesn't copy an image again");
+    assert.equal(shown(), first);
+    find(view.render(cx), `row-${source}`).handlers.on_click({}, cx); await settle();
+    const second = shown();
+    assert.equal(attempts.length, 2, "explicitly selecting the same path reads it again");
+    assert.notEqual(second, first, "the host sees a new image path even in the same millisecond");
+    assert.equal(bytes(second), drawing("blue"), "the rendered path contains the replacement bytes");
+    assert.equal(fs.existsSync(path.join(appDir, first)), false, "the superseded copy is released");
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 // Expand all's reach, as T3's: each folder asks the repository it's in (a clone inside the space's folder too) which of its
 // entries are ignored, and those stay closed; folders in no repository open as any. Here the space's folder isn't one.
 async function expandReach() {
@@ -756,6 +855,10 @@ async function surfaceCache() {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   await collapseDuringExpansion();
   await manyFolders();
+  await slowRefresh();
+  await hideQueuedRefresh();
+  await imagePreview(null);
+  await imagePreview("remote");
   await expandReach();
   await largeFiles();
   await page();

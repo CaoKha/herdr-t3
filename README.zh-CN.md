@@ -69,7 +69,7 @@
 git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/scripts/update.sh
 ```
 
-它会覆盖布局和 mod，并合并 `keys.json`；你的置顶、已收起的 agent、动作、主题和聚焦边框都会保留。保留和不保留哪些，见[更新](docs/user/guide.zh-CN.md#更新)。
+它会覆盖布局和 mod，并合并 `keys.json`；你的置顶、已收起的 agent、动作、主题、聚焦边框和已安装 Review 栏的配置都会保留。已卸载扩展的布局块会移除。保留和不保留哪些，见[更新](docs/user/guide.zh-CN.md#更新)。
 
 ## 它会运行什么
 

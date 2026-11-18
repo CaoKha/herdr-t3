@@ -110,7 +110,7 @@ Snooze 子树任一处失败、或查看时开始新轮，两个模式都结束 
 
 Active 先 blocked，其余按何时回到人手上；各收纳区按时间排。查看不改变顺序；点击 `agent.focus`，不自动 zoom 分屏。
 
-Settle 始终手动：悬停已结束的卡片（置顶的也可）按 `✓ Settle`，或对当前 agent 按 `cmd-shift-s`。它去掉 pin、写终端标签、移入 Settled；有新工作自动回来。Un-settle、对它再按 Settle 键或把它拖出来，都会把它放回 Active 顶部。Clear 先确认，再关闭 settled agent 中符合条件的终端，保留当前标签。
+Settle 始终手动：悬停已结束的卡片（置顶的也可）按 `✓ Settle`，或对当前 agent 按 `cmd-shift-s`。它去掉 pin、写终端标签、移入 Settled；有新工作自动回来。Un-settle、对它再按 Settle 键或把它拖出来，都会把它放回 Active 顶部。Clear 只关闭开框时计入、确认时仍符合条件的终端，保留当前标签。
 
 Pin 是一份与 Agents 共用的手排顺序；pin 会结束 Snooze。Settle、Snooze、Unpin 在底栏显示 `Settled, Undo` 之类提示 5s；Undo 恢复位置、标签和 pin。`cmd-z` 留给终端。
 
@@ -240,7 +240,7 @@ sidebar、work、panel 列内部 `resizable:false`，外分隔线仍可拖。`sp
 
 必需 mod 以真实文件安装（SVG 软链不加载），布局、SVG 和按 context 合并的 keys 放在 `HERDR_APP_HOME` 或 `~/.config/herdr-app`；用 `layout.switch {"name":"herdr-t3"}` 选中。`scripts/update.sh`（需要 `jq`、`rsync`）先验证已装的布局和 keys，替换自己的 mod，保留主题、focus、stack 选择、extra 块和 Review 的 `config.json`，只更新已装的 extras 和主题，合并 keys 时仓库优先并报告替换。设置、pins 和用户的壁纸都不在被替换的目录里。`scripts/sync.sh` 还会写已装目录和同级的独立仓库。
 
-可选 Review：复制 `extras/mods/pulls-review` 和 `extras/mods/review`，按其指引装配 `jin.review`，在 `panel-body` 末尾加 `review` 页（extra 存在后 update 会自动加页）。布局默认没有 Review 栏；可以自己在 `tabs-end` 前加一个 `review-bar` 块（`pulls-review`，`{block:"review-bar",toggle:true}`），id 不要用 `review`。壁纸和主题导出（`extras/mods/t3-theme-export`，一个零高的 `work` 块，给 Pi 写 `~/.cache/herdr-app-theme.json`）也是可选；配置见 [extras 使用文档](docs/user/extras.zh-CN.md)。
+可选 Review：复制 `extras/mods/pulls-review` 和 `extras/mods/review`，按其指引装配 `jin.review`，在 `panel-body` 末尾加 `review` 页（extra 存在后 update 会自动加页）。布局默认没有 Review 栏；可以自己在 `tabs-end` 前加一个 `review-bar` 块（`pulls-review`，`{block:"review-bar"}`），id 不要用 `review`。壁纸和主题导出（`extras/mods/t3-theme-export`，一个零高的 `work` 块，给 Pi 写 `~/.cache/herdr-app-theme.json`）也是可选；配置见 [extras 使用文档](docs/user/extras.zh-CN.md)。
 
 ### Herdr 函数与程序
 

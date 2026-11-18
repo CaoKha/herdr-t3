@@ -13,7 +13,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - Pinned and Active cards occupy the top. Working, Snoozed and Settled are bottom-anchored folded shelves when they have entries; when space runs out they follow the cards in the same scrolling list.
 - Header: 32px, 2px further out than the rows, padding 8, a dim 12px label, a normal-weight count and a 12px chevron. Shelf chevrons switch direction directly (no cross-fade).
 - A folded shelf still shows the row in view, and leaves it out of the hidden count. The row in view also stays visible beyond the Settled page.
-- Settled pages with Show more, and offers Clear when it holds terminals Clear can close. Clear asks first and spares the tab in view.
+- Settled pages with Show more, and offers Clear when it holds terminals Clear can close. Clear records the eligible terminals when the dialog opens. Confirmation closes only members of that set still eligible and outside the tab in view.
 
 ## Cards
 
@@ -92,7 +92,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 
 ## Snooze lifecycle
 
-- Snooze writes a wake timestamp (`snoozed=<wake-ms>`) and puts a viewed agent away.
+- At confirmation, recheck the agent and its descendants. A blocked tree stays in view. Snooze writes a wake timestamp (`snoozed=<wake-ms>`) and puts a viewed agent away.
 - The agent wakes where it was; if a run finished while snoozed, it returns to the top of Active. It carries `Woke` until viewed or clicked with Inbox selected in an active window; a background window can't consume it. A working agent can show `Working` and `Woke` together.
 - A permission prompt shows it as Needs you for a while without removing the label; answering hides it again.
 - Failure in its tree, a new turn given in view, Wake, pin or Settle clears the label. A pinned snooze keeps the pin underneath and returns to it on wake. Undo of Settle restores a snooze only if it hasn't expired.

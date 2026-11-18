@@ -2,6 +2,13 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-18
+
+- Inbox Clear closes only terminals included in the confirmation that are still eligible. Custom Snooze leaves an agent in view if it needs you before you confirm.
+- Files coalesces slow directory refreshes, reloads an image when you select it again and previews images from remote Macs.
+- The space menu keeps agents with panes in their own space and avoids rebuilding the terminal index for each row.
+- Updating keeps the settings of an installed Review bar and drops layout blocks for uninstalled extras.
+
 ## 2026-11-17
 
 - Clicking the space name in the Inbox tab bar breadcrumb now opens a space switcher menu below it (keeping the clean breadcrumb spacing intact, brightening on hover/open without shifting `/`), instead of jumping to an empty shell tab. The menu offers **New tab** (`⌘T`) at the top and lists all agents (with status marks and indented sub-agents, active row highlighted without a duplicate checkmark) and non-agent terminal programs or shells in the current space so you can jump straight to any of them or right-click a row for its agent or pane menu. Right-clicking the space name still opens the space menu.

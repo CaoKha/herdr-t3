@@ -32,11 +32,13 @@ let terms = [{ address: "t1", labels: {} }], agentList = [], keyList = [];
 let spaceList = [{ id: "s1", active: true, folder: "/work/p1", tabs: [{ id: "b1" }] }];
 let paneList = [{ pane: "p1", tab: "b1", cwd: "/work/s1" }];
 let focusState = {};
+let now = Date.now();
 // tip.js's keyLabel, as on a Mac: what every key hint in the layout is written with.
 const tipScope = vm.createContext({ window: () => ({ platform: "macos" }), keys: () => keyList });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "tip.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.keyLabel = keyLabel;", tipScope);
 // closeOverlay runs what a closed t3-menu's close() does with the registry (popup-menu.js menuClosed), as Herdr calls close().
 const context = vm.createContext({
+  Date: class extends Date { static now() { return now; } },
   checking: () => false,
   // menu-row.js's: button.js's and tip.js's (no row here is disabled).
   DISABLED: 0.64, glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
@@ -53,9 +55,22 @@ const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar
 vm.runInContext(src, context);
 // Timers run when the test says time has passed.
 let pending = [];
-const timer = { after(ms, f) { const t = { ms, f, cancel() { pending = pending.filter((x) => x !== t); } }; pending.push(t); return t; }, every(ms, f) { const t = { ms, f, cancel() {} }; return t; } };
-const cx = { notify() {}, stop_propagation() {}, spawn() {}, timer, focus_handle: () => { const h = { focused: 0, focus() { h.focused++; } }; return h; } };
-const elapse = (ms) => { for (const t of [...pending]) { if (!pending.includes(t)) continue; t.ms -= ms; if (t.ms <= 0) { t.cancel(); t.f(cx); } } };
+const schedule = (ms, f, repeat) => {
+  const t = { at: now + ms, f, cancel() { pending = pending.filter((x) => x !== t); }, repeat };
+  pending.push(t);
+  return t;
+};
+const timer = { after: (ms, f) => schedule(ms, f, 0), every: (ms, f) => schedule(ms, f, ms) };
+let notifications = 0;
+const cx = { notify() { notifications++; }, stop_propagation() {}, spawn() {}, timer, focus_handle: () => { const h = { focused: 0, focus() { h.focused++; } }; return h; } };
+const elapse = (ms) => {
+  now += ms;
+  for (const t of [...pending]) {
+    if (!pending.includes(t) || t.at > now) continue;
+    if (t.repeat) t.at = now + t.repeat; else t.cancel();
+    t.f(cx);
+  }
+};
 const menu = new context.Menu();
 menu.init({}, cx);
 const choose = (props, label) => {
@@ -322,6 +337,82 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   agentList = []; terms = [{ address: "t1", labels: {} }];
 }
 
+// The clock follows the rows actually drawn by the scrolling viewport.
+{
+  target = { tab: "space-switch", target: { id: "clock-space" } };
+  spaceList = [{ id: "clock-space", tabs: [{ id: "b1" }] }];
+  agentList = Array.from({ length: 11 }, (_, i) => ({ address: `a${i}`, pane: `p${i}`, tab: "b1", status: "idle" }));
+  terms = agentList.map(({ address }) => ({ address, state: "live", status: "idle" }));
+  paneList = agentList.map(({ address, pane, tab }) => ({ terminal: address, pane, tab }));
+  const sm = new context.Menu();
+  sm.init(target, cx);
+  sm.render(cx);
+  const before = notifications;
+  elapse(3000);
+  assert.equal(notifications, before, "idle menu does not redraw on the clock");
+
+  agentList[10].status = terms[10].status = "working";
+  terms[10].status_ms = now - 58_000;
+  const tree = sm.render(cx);
+  assert.equal(find(tree, "space-item-a10"), null, "the working row is below the viewport");
+  elapse(1000);
+  assert.equal(notifications, before, "offscreen duration does not trigger a redraw");
+
+  const menu = find(sm.render(cx), "menu");
+  menu.handlers.on_key_down({ key: "end" }, cx);
+  const readTime = () => JSON.stringify(find(sm.render(cx), "space-item-a10"));
+  assert.ok(readTime().includes("59s"), "scrolling makes the running duration visible");
+  const afterScroll = notifications;
+  elapse(999);
+  assert.equal(notifications, afterScroll, "no redraw before the next whole second");
+  elapse(1);
+  assert.equal(notifications, afterScroll + 1);
+  assert.ok(readTime().includes('"1m"'), "visible working duration advances to 1m");
+  elapse(59_999);
+  assert.equal(notifications, afterScroll + 1, "minute labels do not redraw every second");
+  elapse(1);
+  assert.equal(notifications, afterScroll + 2);
+  assert.ok(readTime().includes('"2m"'), "working duration continues to advance each minute");
+
+  agentList[10].status = terms[10].status = "idle";
+  terms[10].labels = { snoozed: String(now + 2500) };
+  assert.ok(readTime().includes("alarm-clock.svg"));
+  elapse(2500);
+  assert.equal(notifications, afterScroll + 3, "visible Snooze expiry redraws once");
+  assert.ok(!readTime().includes("alarm-clock.svg"));
+  const idle = notifications;
+  elapse(60_000);
+  assert.equal(notifications, idle, "a visible row going idle stops its clock");
+
+  agentList[10].status = terms[10].status = "working";
+  terms[10].status_ms = now;
+  readTime();
+  sm.close();
+  elapse(1000);
+  assert.equal(notifications, idle, "closing the popup cancels the duration refresh");
+}
+
+// Each pass over model data grows with the number of agents and tabs.
+{
+  const reads = [30, 100, 200].map((count) => {
+    let addresses = 0, tabs = 0;
+    agentList = Array.from({ length: count }, (_, i) => ({ address: `a${i}`, pane: `p${i}`, get tab() { tabs++; return `b${i}`; }, status: "idle" }));
+    terms = agentList.map(({ address }) => ({ get address() { addresses++; return address; }, state: "live", status: "idle" }));
+    paneList = agentList.map(({ address }, i) => ({ terminal: address, pane: `p${i}`, get tab() { tabs++; return `b${i}`; } }));
+    spaceList = [{ id: "index-space", tabs: agentList.map((_, i) => ({ id: `b${i}` })) }];
+    target = { tab: "space-switch", target: { id: "index-space" } };
+    const sm = new context.Menu();
+    sm.init(target, cx);
+    assert.ok(find(sm.render(cx), "space-item-a0"));
+    sm.close();
+    return { count, addresses, tabs };
+  });
+  for (const { count, addresses, tabs } of reads) {
+    assert.ok(addresses <= 12 * count && tabs <= 12 * count, `space menu scan must be linear: ${JSON.stringify(reads)}`);
+  }
+  console.log("ok space menu scan", JSON.stringify(reads));
+}
+
 // Space switcher menu (tab: "space-switch"): New tab at top with shortcut, then the space's agents (nested sub-agents included) and non-agent terminal programs.
 {
   const pi = { key: "pi", name: "Pi", agent: true, tint: true, icon: "icons/pi.svg" };
@@ -345,10 +436,10 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
     { address: "t9", pane: "p9", tab: "b9", status: "working", focused: false, program: pi, title: "elsewhere" },
   ];
   terms = [
-    { address: "t1", state: "live", status: "working", status_ms: Date.now() - 120000, program: pi, labels: {} },
+    { address: "t1", state: "live", status: "working", status_ms: now - 120000, program: pi, labels: {} },
     { address: "t1a", parent: "t1", name: "review-runner", state: "live", status: "done", turn: 1, program: pi, labels: {} },
     { address: "t1b", parent: "t1", name: "sub-pane", state: "live", status: "idle", program: pi, labels: {} },
-    { address: "t2", state: "live", status: "idle", program: codex, labels: { snoozed: String(Date.now() + 3600000) } },
+    { address: "t2", state: "live", status: "idle", program: codex, labels: { snoozed: String(now + 3600000) } },
     { address: "t2a", parent: "t2", name: "blocked-kid", state: "live", status: "blocked", program: codex, labels: {} },
     { address: "t-git", state: "live", program: lazygit, labels: {} },
     { address: "t-sh", state: "live", program: zsh, labels: {} },
@@ -454,6 +545,39 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   delete state["t3-menu.spaceClosed"];
   sm.close();
   assert.ok(state["t3-menu.spaceClosed"] > 0 && !state["t3-menu.closed"], "space menu stamps its own closed key so it never blocks agent menus");
+
+  const pickRow = (node, id, command, args) => {
+    calls = []; closed = [];
+    find(node, id).handlers.on_click({}, cx);
+    assert.deepEqual(plain([closed, calls]), [["space-root"], [[command, args]]]);
+  };
+  pickRow(tree, "space-item-t1b", "agent.focus", { terminal: "t1b" });
+
+  // A child split to a different space takes its pane-less branch with it. A pane moved back starts a local row.
+  const foreign = terms.find((k) => k.address === "t9");
+  foreign.parent = "t1";
+  foreign.status = agentList.find((a) => a.address === "t9").status = "blocked";
+  terms.push({ address: "t9a", parent: "t9", state: "live", status: "idle", program: pi });
+  terms.find((k) => k.address === "t1b").parent = "t9";
+  const source = sm.render();
+  assert.ok(!find(source, "space-item-t9") && !find(source, "space-item-t9a"), "the source space excludes a foreign pane's branch");
+  assert.ok(labelsOf(find(source, "space-item-t1")).includes("!"), "a foreign blocked child still contributes to the parent's roll-up");
+  assert.equal(find(source, "space-item-t1b").items[0].style.w, undefined, "the pane returned here starts a local root row");
+  pickRow(source, "space-item-t1a", "terminal.peek", { terminal: "t1a" });
+  pickRow(source, "space-item-t1b", "agent.focus", { terminal: "t1b" });
+  target = { ...target, target: { id: "s9" } };
+  const destination = sm.render();
+  assert.ok(!find(destination, "space-item-t1b"), "the destination excludes a pane in the source space");
+  assert.equal(find(destination, "space-item-t9a").items[0].style.w, 8, "the parked child stays nested in the destination space");
+  pickRow(destination, "space-item-t9", "agent.focus", { terminal: "t9" });
+  pickRow(destination, "space-item-t9a", "terminal.peek", { terminal: "t9a" });
+
+  // A pane missing from agents() can still be placed and focused using panes().
+  agentList = agentList.filter((a) => a.address !== "t9");
+  foreign.status = undefined;
+  pickRow(sm.render(), "space-item-t9", "pane.focus", { pane: "p9" });
+  target = { ...target, target: { id: "s0" } };
+  assert.ok(!find(sm.render(), "space-item-t9"), "global pane data excludes a foreign child even before its first report");
 
   // Restore globals for anything after.
   keyList = []; agentList = []; terms = [{ address: "t1", labels: {} }];

@@ -1,5 +1,10 @@
 # The Actions scene, sourced by `stage.sh scene actions`: two real pi runs in herdr-t3 leave session logs, then the
 # Retro action reads them in a tab of its own, with the action's menu open over the bar.
+retro=$(jq -ce --arg f "$code/herdr-t3" 'first(."t3-actions.actions".list[]? | select(.id == "retro" and .name == "Retro")
+  | {argv: ["sh", "-c", .command], name, place: (.place // "tab"), folder: $f})' "$A/shared.json") || {
+  echo 'Retro is missing from the product Actions menu. Rebuild the demo with stage.sh down and up.' >&2
+  exit 1
+}
 clear_stage
 # The layout without the Review bar another scene adds.
 reopen layout
@@ -15,7 +20,7 @@ first_turn "$first"; first_turn "$t"
 # What `▾ → Retro` does (t3-actions' runAction): it has no command of its own.
 demo herdr-app do demo-stage.actions-last:retro >/dev/null
 focus "$t"
-r=$(demo herdr-app do terminal.open "$(jq -c --arg f "$code/herdr-t3" '."t3-actions".list[] | select(.id == "retro") | {argv: ["sh", "-c", .command], name, place, folder: $f}' "$A/shared.json")")
+r=$(demo herdr-app do terminal.open "$retro")
 first_turn "$(echo "$r" | jq -r .terminal)"; sleep 5
 
 demo herdr-app do demo-stage.actions-menu:1620 >/dev/null; sleep 1

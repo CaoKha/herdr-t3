@@ -5,6 +5,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from "gpui-base";
 import { checking, spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
 import * as fs from "fs/promises";
+import { Buffer } from "buffer";
 import { panelState, surfacesFor, closeSurface, openFile, navigateFolder } from "./panel.js";
 import { terminalFor } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
@@ -38,8 +39,9 @@ const LOCAL_EVERY = 5000, REMOTE_EVERY = 10000, SLOWEST = 60000;
 const READ_AT_ONCE = 8;
 let reading = 0;
 const waiting = [];
-const limited = async (read) => {
+const limited = async (fresh, read) => {
   while (reading >= READ_AT_ONCE) await new Promise((go) => waiting.push(go));
+  if (!fresh()) { waiting.shift()?.(); return null; }
   reading++;
   try { return await read(); } finally { reading--; waiting.shift()?.(); }
 };
@@ -54,6 +56,7 @@ const activeTab = (space) => { const s = surfacesFor(space); return s.tabs.find(
 const tabKey = (tab) => tab ? `${tab.id}:${tab.born}:${tab.reveal ?? 0}` : "";
 const FULL = 3; // the spaces last shown that keep all they read; older ones keep their file, open folders and search
 const CACHE = "cache/t3-files"; // under the app's home, where image() can read
+let lastImage = 0; // The host caches decoded images by path, even after the copied file is deleted.
 const MARKDOWN = "t3-files.markdown"; // "code" once someone picked it; Preview otherwise
 
 const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads from updating the index or filesystem-monitor state
@@ -115,6 +118,7 @@ export default class Files extends View {
   // Its images go with it; one a crash left is cleared at the next start.
   async close() {
     if (props()?.files) return closeMenu(this);
+    this.sleep();
     stopsEnd(this);
     await Promise.all([...this.cached].map((f) => fs.unlink(`${appHome()}/${f}`).catch(() => null)));
   }
@@ -181,10 +185,14 @@ export default class Files extends View {
       }
     }
     if (st === this.awake) return;
-    if (this.awake) { this.awake.loading.clear(); this.awake.expanding = false; }
-    this.awake = st; this.gen++;
-    if (!st?.root) return;
-    if (st.git === undefined) this.load(st, cx); else this.recheck(st, cx);
+    this.sleep();
+    this.awake = st;
+    if (st?.root) this.recheck(st, cx, true);
+  }
+
+  sleep() {
+    if (this.awake) { this.awake.loading.clear(); this.awake.expanding = false; this.awake.refresh = null; }
+    this.awake = null; this.gen++;
   }
 
   // The page in the open panel, the window in front.
@@ -197,7 +205,7 @@ export default class Files extends View {
     return () => {
       if (this.gen !== gen || this.awake !== st || !this.live(st)) return false;
       if (this.shown() && spaces().find((s) => s.active)?.id === st.id) return true;
-      this.awake = null; this.gen++;
+      this.sleep();
       return false;
     };
   }
@@ -206,40 +214,16 @@ export default class Files extends View {
   live(st) { return this.states.get(st.id) === st; }
   changed(st) { st.version++; st.rows = null; }
 
-  // Git asked where the folder is, then the rest as a recheck: a space read again gets its file and search back too.
-  load(st, cx) {
-    const going = this.going(st);
-    cx.spawn(async (cx) => {
-      const top = await exec("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: st.root, on: st.on }).catch(() => null);
-      if (!going()) return;
-      const [dir, prefix] = top?.code === 0 ? top.stdout.split("\n") : [];
-      st.git = dir ? { top: dir, prefix: prefix ?? "" } : null;
-      this.recheck(st, cx);
-    });
-  }
-
-  // Git's marks, and every folder shown listed again. The search's list of files is made again at its next word.
-  async refresh(st, cx) {
-    const go = this.going(st);
-    if (!go() || st.git === undefined) return;
-    const began = st.refreshed = Date.now();
-    const shown = ["", ...st.expanded].filter((p) => p === "" || ancestors(p).every((a) => st.expanded.has(a)));
-    await Promise.all(shown.map((p) => this.list(st, p)));
-    if (!go()) return;
-    st.refreshed = Date.now(); st.took = st.refreshed - began; st.paths = null;
-    cx.notify();
-  }
-
   async list(st, rel) {
     const fresh = this.fresh(st, `list:${rel}`), dir = join(st.root, rel);
     if (!fresh()) return;
     st.loading.add(rel);
     const inIgnored = [rel, ...ancestors(rel)].some((p) => p && st.ignored.has(p));
     const [r, ig] = await Promise.all([
-      limited(() => exec("sh", ["-c", LIST, "files", dir], { on: st.on })).catch((e) => ({ code: 1, stdout: "", stderr: String(e?.message ?? e) })),
+      limited(fresh, () => exec("sh", ["-c", LIST, "files", dir], { on: st.on })).catch((e) => ({ code: 1, stdout: "", stderr: String(e?.message ?? e) })),
       // Asked in the folder itself, so Git answers for the repository it's in, a clone inside the space's folder too, as T3's;
       // in none, it says nothing is ignored.
-      !inIgnored ? limited(() => exec("sh", ["-c", IGNORED, "files", dir, ""], { cwd: dir, on: st.on })).catch(() => null) : null,
+      !inIgnored ? limited(fresh, () => exec("sh", ["-c", IGNORED, "files", dir, ""], { cwd: dir, on: st.on })).catch(() => null) : null,
     ]);
     if (!fresh()) return;
     if (r.code !== 0) {
@@ -266,16 +250,29 @@ export default class Files extends View {
     if (Date.now() - (st.refreshed ?? 0) >= every) this.recheck(st, cx);
   }
 
-  // Git, the folders shown and the file asked again. An image shown is copied whole each time, so it's left be: one changed
-  // shows when it's picked again.
-  recheck(st, cx) {
-    st.refreshed = Date.now();
-    cx.spawn(async (cx) => {
-      await this.refresh(st, cx);
-      // A search showing, found again; each asks only while it shows.
-      if (st.query) this.find(st, st.query, cx);
-      if (st.file && !st.view?.image) this.open(st, st.file, cx, true);
-    });
+  // One batch per space while it shows. A new visibility period can start fresh even when old execs have yet to finish.
+  recheck(st, cx, returning = false) {
+    const go = this.going(st);
+    if (!go() || st.refresh?.some(task => !task.is_done())) return;
+    const tasks = st.refresh = [], track = task => { if (task) tasks.push(task); };
+    track(cx.spawn(async (cx) => {
+      if (!go()) return;
+      if (st.git === undefined) {
+        const top = await exec("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: st.root, on: st.on }).catch(() => null);
+        if (!go()) return;
+        const [dir, prefix] = top?.code === 0 ? top.stdout.split("\n") : [];
+        st.git = dir ? { top: dir, prefix: prefix ?? "" } : null;
+      }
+      const began = Date.now();
+      const shown = ["", ...st.expanded].filter(p => p === "" || ancestors(p).every(a => st.expanded.has(a)));
+      await Promise.all(shown.map(p => this.list(st, p)));
+      if (!go()) return;
+      st.refreshed = Date.now(); st.took = st.refreshed - began; st.paths = null;
+      cx.notify();
+      if (st.query) track(this.find(st, st.query, cx));
+      // Images are copied on selection. Returning also restores a preview that didn't finish or was evicted.
+      if (st.file && (kindOf(st.file) !== "image" || returning && !st.view?.image)) track(this.open(st, st.file, cx, true));
+    }));
   }
 
   toggle(st, path, cx) {
@@ -351,13 +348,14 @@ export default class Files extends View {
     }
     const fresh = this.fresh(st, "file"), abs = join(st.root, rel), kind = kindOf(rel);
     if (!fresh()) return;
-    if (!again && !st.view.loading) {
+    if (!again && kind !== "image" && !st.view.loading) {
       if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(st.view, rel, this.fits(st.view));
       // Plain, picked again: colored now, as it's opened.
       else if (st.view.code && st.view.lang && !st.view.colored && this.fits(st.view)) { st.view.scrolled = false; this.editor(st.view, rel, true); }
       this.keepPreview(st, rel, st.view); return;
     }
-    cx.spawn(async (cx) => {
+    return cx.spawn(async (cx) => {
+      if (!fresh()) return;
       const view = await this.read(st, abs, rel, kind, fresh).catch(() => ({ problem: "This file can't be read." }));
       if (view?.problem) view.failed = failedRead(view.problem);
       if (!view) return;
@@ -397,16 +395,15 @@ export default class Files extends View {
     }
     if (kind === "image") {
       if (st.on && size > REMOTE_IMAGE) return { problem: `This image is larger than 512 KB, too large to bring over from ${st.on}.` };
-      const name = `${CACHE}/${Date.now()}-${nameOf(rel).replace(/[^\w.-]/g, "_")}`, dest = `${appHome()}/${name}`;
+      lastImage = Math.max(Date.now(), lastImage + 1);
+      const name = `${CACHE}/${lastImage}-${nameOf(rel).replace(/[^\w.-]/g, "_")}`, dest = `${appHome()}/${name}`;
       await fs.mkdir(`${appHome()}/${CACHE}`, { recursive: true }).catch(() => null);
       if (!fresh()) return null;
       if (st.on) {
-        const r = await exec("base64", [abs], { on: st.on, timeout: 60000 });
+        const r = await exec("sh", ["-c", 'base64 < "$1"', "image", abs], { on: st.on, timeout: 60000 });
         if (!fresh()) return null;
         if (r.code !== 0) return { problem: "This image can't be read." };
-        const bin = /** @type {any} */ (globalThis).atob(r.stdout.replace(/\s+/g, "")), bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        await fs.writeFile(dest, bytes);
+        await fs.writeFile(dest, Buffer.from(r.stdout.replace(/\s+/g, ""), "base64"));
       } else {
         const r = await exec("cp", [abs, dest]);
         if (r.code !== 0) return { problem: "This image can't be read." };
@@ -470,7 +467,7 @@ export default class Files extends View {
     const words = terms(query), fresh = this.fresh(st, "search");
     this.changed(st); cx.notify();
     if (!words.length || !fresh()) return;
-    cx.spawn(async (cx) => {
+    return cx.spawn(async (cx) => {
       await cx.sleep(200);
       if (!fresh()) return;
       const done = (found) => { st.found = { query, ...found }; this.changed(st); cx.notify(); };

@@ -74,11 +74,13 @@ The layout's own, in the `layout:herdr-t3` section of `keys.json` (an install me
 
 With a dialog or popup open (Go to, New, a menu, Settings, the command palette, the Actions editor and the like), these close-tab and close-pane keys close it instead, as in Herdr's own layout (the `mod:…` sections of `keys.json`).
 
-Otherwise tabs, spaces and panes keep Herdr's own keys. Pinning and dragging in Inbox are by mouse; Clear takes the keyboard as other buttons do.
+Otherwise tabs, spaces and panes keep Herdr's own keys. Pinning and dragging in Inbox are by mouse; Clear takes the keyboard as other buttons do. Confirming closes only terminals counted when the dialog opened that are still settled and outside the tab in view.
 
 By keyboard: move onto a sidebar list with Herdr's `pane.go` and Tab walks every control in the window, the panel's button included, with Enter or Space doing what a click does. In New and Go to, Tab also reaches the footer's buttons (New space, `← Spaces`, New tab).
 
 ## Update
+
+Only one update runs per app home. If an interrupted update leaves `.herdr-t3-update.lock`, wait for its updater and `rsync` processes to exit, remove the empty lock directory with `rmdir`, then retry.
 
 Herdr doesn't update mods or layouts from others, and adding this again would install a renamed second copy (`t3-inbox-2`), since an install never overwrites. Update by overwriting instead:
 
@@ -90,7 +92,7 @@ Or tell your Herdr agent: "Update Herdr T3: clone github.com/JinJieBeWater/herdr
 
 - It overwrites `mods/t3-*` and `layouts/herdr-t3.*`, deleting files that are gone, and the Review and theme-export extras and the extra themes you've installed. Extras you haven't are left out.
 - It merges `keys.json`: the repo's keys go into your `layout:herdr-t3` section and the popups' `mod:…` sections, replacing the same key, and it prints each one it replaced so a remap can go back. Your other keys and sections stay. It also prints keys of yours that aren't in the repo: an old one (`"cmd-shift-a": "t3-tabs.view"`, say) can be deleted.
-- Kept: pins, folds, sort, the layout's settings, the Settled shelf and settled agents, which live in `data/`, `shared.json` and terminal labels, and your actions. From the installed layout: the theme, the sidebar you were on, the focus ring color, the panel's Review slot and the Review bar and theme-export blocks.
+- Kept: pins, folds, sort, the layout's settings, the Settled shelf and settled agents, which live in `data/`, `shared.json` and terminal labels, and your actions. From the installed layout: the theme, the sidebar you were on, the focus ring color, the panel's Review slot and the settings of any Review bar or theme-export block whose extra is still installed. Uninstalling an extra removes its blocks on the next update.
 - Lost: your other edits to the overwritten files; make those again. Going on to the next card after a Settle is a setting now, not an edit.
 - If the first install renamed something because of a clash, the script doesn't know: it installs the original names, so point the layout back at your copy or delete it.
 - What changed, and what some keys now do: the [changelog](../../CHANGELOG.md).

@@ -1,16 +1,20 @@
 #!/bin/sh
 # A made-up scene for the preview pictures, apart from your own Herdr: its own core, app home, HOME and projects.
-#   stage.sh up      build it in $DEMO (default /private/tmp/herdr-t3-demo) and open its window
+#   stage.sh up      build it in $DEMO (defaults to herdr-t3-demo in /private/tmp on macOS) and open its window
 #   stage.sh app     open its window again, if it closed
 #   stage.sh scene <layout|inbox|actions|review>   play that picture's scene and shoot it to $D/<name>.png
 #   stage.sh do …    run anything inside it: `stage.sh do herdr-app shot x.png`
 #   stage.sh key     copy your OpenCode Go key in (only that entry of ~/.pi/agent/auth.json); down deletes it
 #   stage.sh down    close it and delete $DEMO
 # Pi runs on OpenCode Go (deepseek-v4.1-flash). Nothing of yours goes in but the OpenCode Go key, which you copy in yourself.
+# Actions uses the same shared store as the product menu. The Actions scene requires its Retro entry before changing the stage.
+# Layout and Review scenes show the ordinary Review counts.
+# Review shuts down through its authenticated daemon command in the demo HOME. The PID file alone grants no authority to signal.
 set -eu
 src=$(cd "$(dirname "$0")/../.." && pwd)
-D=${DEMO:-/private/tmp/herdr-t3-demo} H=$D/home A=$D/app
-case $D in *..*) echo "DEMO can't climb out with .." >&2; exit 1;; /private/tmp/?*) ;; *) echo "DEMO must be under /private/tmp (it is deleted by down, and pi shortens paths only under its realpath)" >&2; exit 1;; esac
+case $(uname -s) in Darwin) temporary=/private/tmp ;; *) temporary=/tmp ;; esac
+D=${DEMO:-$temporary/herdr-t3-demo} H=$D/home A=$D/app
+case $D in *..*) echo "DEMO can't climb out with .." >&2; exit 1;; "$temporary"/?*) ;; *) echo "DEMO must be under $temporary (it is deleted by down, and pi shortens paths only under its realpath)" >&2; exit 1;; esac
 # down deletes only a folder up made.
 mark=$D/.herdr-t3-demo
 
@@ -106,13 +110,14 @@ layout() {
   jq --arg r "${1-}" '(.. | objects | select(.id? == "work-bottom-inset") | .children) += [{ "id": "stage", "type": "block", "size": { "px": 0 }, "content": { "mod": "demo-stage" } }]
     | (.. | objects | select(.id? == "work") | .children) += [{ "id": "theme-export", "type": "block", "size": { "px": 0 }, "content": { "mod": "t3-theme-export" } }]
     | (.. | objects | select(.id? == "panel-body") | .children) += [{ "id": "review", "type": "block", "content": { "mod": "review" } }]
-    | if $r == "review" then (.. | objects | select(.id? == "tabs-row") | .children) |= ((map(.id) | index("tabs-end")) as $i | .[0:$i] + [{ "id": "review-bar", "type": "block", "size": { "px": 0 }, "window_drag": true, "content": { "mod": "pulls-review", "props": { "block": "review-bar", "toggle": true } } }] + .[$i:]) else . end' \
+    | if $r == "review" then (.. | objects | select(.id? == "tabs-row") | .children) |= ((map(.id) | index("tabs-end")) as $i | .[0:$i] + [{ "id": "review-bar", "type": "block", "size": { "px": 0 }, "window_drag": true, "content": { "mod": "pulls-review", "props": { "block": "review-bar", "toggle": false } } }] + .[$i:]) else . end' \
     "$src/layouts/herdr-t3.json" > "$A/layouts/herdr-t3.json"
 }
 
 install_app() {
   gen="--exclude gpui-kit.d.ts --exclude jsconfig.json"
   for d in "$src"/mods/t3-*/ "$src"/extras/mods/*/ "$src"/scripts/demo/mods/*/; do rsync -a $gen "$d" "$A/mods/$(basename "$d")/"; done
+  cp "$src/shared/store.js" "$A/mods/demo-stage/"
   layout
   cp "$src/layouts/herdr-t3.svg" "$A/layouts/"; cp "$src"/extras/themes/*.json "$A/themes/"; cp "$src/keys.json" "$A/"
   cat > "$A/settings.json" <<EOF
@@ -122,7 +127,7 @@ EOF
   cat > "$A/shared.json" <<'EOF'
 {
   "frame.welcomed": "finished", "layout": "herdr-t3",
-  "t3-actions": { "last": "test", "list": [
+  "t3-actions.actions": { "last": "test", "list": [
     { "id": "test", "name": "Test", "command": "npm test", "icon": "test", "place": "down" },
     { "id": "retro", "name": "Retro", "command": "pi \"/skill:retro Look over this space's agent sessions: what slowed them down, and what would help next time? Your three strongest findings, a few lines each.\"", "icon": "configure", "place": "tab" },
     { "id": "dev", "name": "Dev server", "command": "npm run dev", "icon": "play", "place": "tab" },
@@ -137,9 +142,8 @@ down() {
   [ -d "$D" ] || { echo "nothing at $D"; return; }
   [ -f "$mark" ] || { echo "$D wasn't made by stage.sh up: not deleting it" >&2; exit 1; }
   ! ours || kill "$(cat "$D/app.pid")" 2>/dev/null || true
-  demo jin.review --stop >/dev/null 2>&1 || true
-  # --stop can leave a daemon started with --port running: its pid file names it.
-  p=$(jq -r '.pid // empty' "$H/.pulls.review/daemon.pid" 2>/dev/null || true); [ -z "$p" ] || kill "$p" 2>/dev/null || true
+  # The CLI authenticates the daemon on this HOME's recorded port. Start it here so the caller's repo can't pick its Node.
+  (cd "$H" && demo jin.review --stop) >/dev/null 2>&1 || true
   if mine; then
     for t in $(demo hc ls --all --json | jq -r '.terminals[].address'); do demo hc kill "$t" >/dev/null 2>&1 || true; demo hc rm "$t" >/dev/null 2>&1 || true; done
     demo hc server stop >/dev/null 2>&1 || true

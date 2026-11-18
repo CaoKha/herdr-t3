@@ -593,19 +593,21 @@ for (const width of [208, 256]) {
     assert.equal(f.calls.length, n, "the click only asks");
     assert.notEqual(find(inbox.render(run), "settled-clear").style.text_color, "#f4f4f6", "the dialog covers it and the pointer may not move: it doesn't stay lit");
     const { mod, kind, props } = f.overlays.pop();
-    assert.deepEqual([mod, kind, props.title, props.command.name], ["confirm", "dialog", "Close 1 terminal?", "t3-inbox.clear"], "published alone, the shipped dialog");
+    const clear = 't3-inbox.clear:[["vps/t2","p2"]]';
+    assert.deepEqual([mod, kind, props.title, props.command.name], ["confirm", "dialog", "Close 1 terminal?", clear], "published alone, the shipped dialog");
     const homed = f.load("t3-inbox", { home: "t3-tabs.home" });
     homed.open = true;
     fire(find(homed.render(run), "settled-clear"), "on_click", {}, run);
     const asked = f.overlays.pop();
-    assert.deepEqual([asked.mod, asked.frame, asked.width, asked.props.actions, asked.props.command.name], ["t3-actions", "none", 512, "confirm", "t3-inbox.clear"], "in the layout, T3's");
+    assert.deepEqual([asked.mod, asked.frame, asked.width, asked.props.actions, asked.props.command.name], ["t3-actions", "none", 512, "confirm", clear], "in the layout, T3's");
     f.panes().push({ pane: "p9", tab: "b2", terminal: "t9" });
-    inbox.render(run); inbox.clearSettled();
-    assert.deepEqual(f.calls.splice(n), [["pane.close", { pane: "p2" }], ["space.select", { id: "s0" }], ["tab.select", { id: "b0" }]], "another pane keeps the space");
+    const answer = props.command.name.slice("t3-inbox.clear:".length);
+    inbox.clearSettled(answer, run);
+    assert.deepEqual(f.calls.splice(n), [["pane.close", { pane: "p2" }]], "another pane keeps the space");
     f.panes().pop();
-    inbox.render(run); inbox.clearSettled();
-    assert.deepEqual(f.calls.splice(n), [["tab.new", { space: "s2", folder: "/work/s2" }], ["pane.close", { pane: "p2" }],
-      ["space.select", { id: "s0" }], ["tab.select", { id: "b0" }]], "an emptied space keeps a fresh shell tab where its terminal was, not where the space began");
+    inbox.clearSettled(answer, run);
+    assert.deepEqual(f.calls.splice(n), [["tab.new", { space: "s2", folder: "/work/s2", focus: false }], ["pane.close", { pane: "p2" }]],
+      "an emptied space keeps a background shell tab where its terminal was");
     remote.focused = true;
     assert.equal(find(inbox.render(run), "settled-clear"), null, "the agent in view is never cleared");
     remote.focused = false;

@@ -17,6 +17,7 @@
 
 - **终端标签**只经 `shared/labels.js` 的 `writeLabel` 写：它统一报错（`Couldn't update the agent`），返回是否写成；`quiet` 用于会重试的写入，只在第一次失败时提示。
 - **内存**里的记忆在代码注释里写明「只记本次运行」，必要时附 `shortcut:` 说明何时改为持久。
+- Inbox Clear 确认框通过命令参数携带开框时的终端地址和窗格 id。确认时与当前可关闭集合取交集；关闭弹窗即丢弃这份名单。
 - Spaces 和独立 Review 栏的目录监听 token、未决 `FolderWatch`、关闭标记只留本次运行的内存；取消后先移走 token，迟到结果只认仍属自己的 token，不重建已释放的监听。
 - **用户文件夹**放在 `<appHome>/<用途>/`，不放进 mod 文件夹：`scripts/update.sh` 用 `rsync --delete` 更新 mod，会把它冲掉。生成的缓存放在其中的隐藏子目录（`asciicn-wallpaper/.tiles/`、`.builtin/`），以源文件的 `cksum` 加生成代码的版本号为键，最后写完成标记，所以源文件改了、生成中断、或生成代码换了，都会重新生成；源文件没了，缓存一起删。
 - 检查模式不触碰这些文件、Files 图片缓存或主题导出，也不占用本次运行的壁纸 `previewsReady`；只有真实窗口初始化才清理遗留缓存和草稿。隔离入口见 [layout-implementation](layout-implementation.md)。

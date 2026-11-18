@@ -18,7 +18,7 @@ import { hoverRow, subLeft } from "./submenu.js";
 import { openBeside, closeSub, subGone, closeChain, menuClosed } from "./popup-menu.js";
 import { placeOf } from "./project.js";
 import { presets } from "./snooze-presets.js";
-import { kidStatus, kidTree, notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
+import { agentKids, kidStatus, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { namer, programOf } from "./name.js";
 import { programIcon } from "./program.js";
 import { statusMark } from "./status-mark.js";
@@ -53,31 +53,37 @@ async function checkout(folder, on) {
   return common.stdout.trim() === `${top.stdout.trim()}/.git` ? "main" : "linked";
 }
 
-// The nearest live agent above `address`, through what isn't one (a shell between them), as the tab bar reads it.
-function above(address, all, every) {
-  const byAddress = new Map(all.map((k) => [k.address, k])), seen = new Set();
-  let k = byAddress.get(byAddress.get(address)?.parent);
-  while (k?.state === "live" && !seen.has(k.address)) {
-    const a = every.find((x) => x.address === k.address);
-    if (a) return a;
-    seen.add(k.address);
-    k = byAddress.get(k.parent);
-  }
-  return null;
+// The nearest live agent with a pane above an address. Reuse the answer for intermediate shells and pane-less agents.
+function paneAncestors(byAddress, byAgent) {
+  const cache = new Map();
+  return (address) => {
+    const visited = new Set();
+    let parent = byAddress.get(address)?.parent, found = null;
+    while (byAddress.get(parent)?.state === "live" && !visited.has(parent)) {
+      if (byAgent.has(parent)) { found = byAgent.get(parent); break; }
+      if (cache.has(parent)) { found = cache.get(parent); break; }
+      visited.add(parent);
+      parent = byAddress.get(parent).parent;
+    }
+    for (const addr of visited) cache.set(addr, found);
+    return found;
+  };
 }
 
 // An agent's menu, wherever it's right-clicked (an Inbox card, an Agents row, the tab bar's title): what it can do now, as
 // T3's thread actions. Settle and Snooze are the Inbox's (docs/adr/0002): with Lists chosen they aren't offered.
 function agentItems(address) {
-  const all = terminals(), every = agents(), k = all.find((t) => t.address === address), a = every.find((x) => x.address === address);
+  const all = terminals(), every = agents();
+  const byAddress = new Map(all.map((k) => [k.address, k])), byAgent = new Map(every.map((a) => [a.address, a]));
+  const k = byAddress.get(address), a = byAgent.get(address), above = paneAncestors(byAddress, byAgent);
   if (!k) return [];
   const inbox = sidebarParts(layout()).stack?.active !== "lists";
   const kids = subAgents(every, all)(address), own = ownStatus(a?.status, address, all);
   const busy = [own, ...kids].some((s) => s === "working" || s === "blocked");
-  const parent = k.parent && all.find((t) => t.address === k.parent);
-  const head = a && above(address, all, every);
+  const parent = k.parent && byAddress.get(k.parent);
+  const head = a && above(address);
   // Rename names the tab: only for its lone agent, whose name the tab's would be, and not when Pi names it (name.js).
-  const heads = a ? every.filter((x) => x.tab === a.tab && above(x.address, all, every)?.tab !== a.tab) : [];
+  const heads = a ? every.filter((x) => x.tab === a.tab && above(x.address)?.tab !== a.tab) : [];
   const rename = heads.length === 1 && heads[0] === a && !k.labels?.["pi.session"];
   const pinned = pinList().includes(address), napping = Number(k.labels?.snoozed) > Date.now();
   // The settle key acts on the agent in view, so its key shows only there.
@@ -202,57 +208,89 @@ function took(ms, now) {
   return s < 60 ? `${s}s` : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-// Agents (top-level in tab order, each with nested sub-agents via kidTree) then non-agent terminal panes in `spaceId`.
-function spaceSwitchEntries(spaceId) {
+function groupByTab(list) {
+  const grouped = new Map();
+  for (const item of list) {
+    const tab = item.tab, group = grouped.get(tab);
+    if (group) group.push(item); else grouped.set(tab, [item]);
+  }
+  return grouped;
+}
+
+// Agents and their local branches in tab order, then non-agent terminal panes in `spaceId`.
+function spaceSwitchEntries(spaceId, now) {
   const space = spaces().find((s) => s.id === spaceId);
   if (!space) return [];
   const tabs = space.tabs ?? [];
   const all = terminals(), every = agents(), ps = panes(), f = focused(), name = namer();
   const byAddress = new Map(all.map((k) => [k.address, k]));
+  /** @type {Map<string, Pick<import("herdr").AgentInfo, "address" | "pane" | "tab" | "title" | "program" | "status" | "focused">>} */
+  const byAgent = new Map(every.map((a) => [a.address, a]));
   const listed = new Map(every.map((a) => [a.address, a.status]));
-  const under = subAgents(every, all);
-  const spaceAgents = tabs.flatMap((c) => every.filter((a) => a.tab === c.id));
-  const spaceAgentMap = new Map(spaceAgents.map((a) => [a.address, a]));
+  // A sub-agent may already have a pane before its first report puts it in agents().
+  for (const p of ps) {
+    const k = byAddress.get(p.terminal);
+    if (k?.state === "live" && k.parent && (k.status != null || k.program?.agent) && !byAgent.has(p.terminal)) {
+      byAgent.set(p.terminal, { ...p, address: p.terminal, status: kidStatus(k, listed) });
+    }
+  }
+  const agentsByTab = groupByTab(byAgent.values()), panesByTab = groupByTab(ps);
+  const localTabs = new Set(tabs.map((c) => c.id));
+  const above = paneAncestors(byAddress, byAgent);
   const inbox = sidebarParts(layout()).stack?.active !== "lists";
-  const now = Date.now(), entries = [], seen = new Set();
-
-  const agentHere = (a, address) => Boolean(f?.pane ? a.pane === f.pane : f?.terminal ? address === f.terminal : a.focused);
-  const addSub = (k, depth) => {
-    if (seen.has(k.address)) return;
-    seen.add(k.address);
-    const paneAgent = spaceAgentMap.get(k.address);
-    const label = paneAgent ? name(paneAgent) : (k.name || k.template || k.program?.name || k.address);
-    const st = kidStatus(k, listed);
-    const newsDone = st === "done" && (!paneAgent || !notNews(k, paneAgent.status, under(k.address)));
-    const here = paneAgent ? agentHere(paneAgent, k.address) : (f?.terminal === k.address || f?.agent === k.address);
-    entries.push({
-      kind: "agent", id: `space-item-${k.address}`, address: k.address, pane: paneAgent?.pane ?? null,
-      depth, label, program: paneAgent?.program ?? k.program, status: st, newsDone, snoozed: false,
-      since: k.status_ms || k.created_ms || 0, here,
-    });
+  const entries = [], seen = new Set(), children = new Map(), busyByAddress = new Map();
+  const childrenOf = (address) => {
+    if (!children.has(address)) children.set(address, agentKids(all, address));
+    return children.get(address);
+  };
+  // Roll up the whole tree, including agents in other spaces. The shared status rules only need these two signals.
+  const busyBelow = (address) => {
+    if (busyByAddress.has(address)) return busyByAddress.get(address);
+    const busy = new Set();
+    busyByAddress.set(address, busy);
+    for (const k of childrenOf(address)) {
+      const st = kidStatus(k, listed);
+      if (st === "working") busy.add("working");
+      if (st === "blocked" || st === "error") busy.add("blocked");
+      for (const word of busyBelow(k.address)) busy.add(word);
+    }
+    return busy;
   };
 
-  for (const a of spaceAgents) {
-    if (above(a.address, all, spaceAgents) || seen.has(a.address)) continue;
-    seen.add(a.address);
-    const k = byAddress.get(a.address), kids = under(a.address), own = ownStatus(a.status, a.address, all);
-    const st = treeStatus(own, kids);
-    const newsDone = st === "done" && !notNews(k, a.status, kids);
-    const snoozed = inbox && st !== "working" && st !== "blocked" && Number(k?.labels?.snoozed) > now;
+  const agentHere = (a, address) => Boolean(f?.pane ? a.pane === f.pane : f?.terminal ? address === f.terminal : a.focused);
+  const addAgent = (address, k, a, depth) => {
+    if (seen.has(address) || (a && !localTabs.has(a.tab))) return;
+    seen.add(address);
+    const root = depth === 0;
+    const own = root ? ownStatus(a.status, address, all) : kidStatus(k, listed);
+    const kids = root || (a && own === "done") ? [...busyBelow(address)] : [];
+    const st = root ? treeStatus(own, kids) : own;
+    const snoozedUntil = Number(k?.labels?.snoozed);
+    const napping = snoozedUntil > now;
+    const done = st === "done" && (!a || !stillSettled(k, a.status, kids));
+    const snoozed = root && inbox && napping && st !== "working" && st !== "blocked";
     entries.push({
-      kind: "agent", id: `space-item-${a.address}`, address: a.address, pane: a.pane,
-      depth: 0, label: name(a), program: a.program, status: st, newsDone, snoozed,
-      since: k?.status_ms || k?.created_ms || 0, here: agentHere(a, a.address),
+      kind: "agent", id: `space-item-${address}`, address, pane: a?.pane, listed: listed.has(address), depth,
+      label: a ? name(a) : (k.name || k.template || k.program?.name || address), program: a?.program ?? k?.program,
+      status: st, newsDone: done && !(a && napping), snoozed,
+      snoozedUntil: snoozed || (a && done && napping) ? snoozedUntil : Infinity,
+      since: k?.status_ms || k?.created_ms || 0,
+      here: a ? agentHere(a, address) : (f?.terminal === address || f?.agent === address),
     });
-    for (const sub of kidTree(all, a.address)) addSub(sub.k, sub.depth + 1);
+    for (const child of childrenOf(address)) addAgent(child.address, child, byAgent.get(child.address), depth + 1);
+  };
+
+  for (const c of tabs) {
+    for (const a of agentsByTab.get(c.id) ?? []) {
+      if (!localTabs.has(above(a.address)?.tab)) addAgent(a.address, byAddress.get(a.address), a, 0);
+    }
   }
 
-  const agentPanes = new Set(every.map((a) => a.pane).filter(Boolean));
   let firstTerm = entries.length > 0;
   for (const c of tabs) {
-    const mine = ps.filter((p) => p.tab === c.id);
+    const mine = panesByTab.get(c.id) ?? [];
     for (const p of mine) {
-      if (!p.terminal || agentPanes.has(p.pane)) continue;
+      if (!p.terminal || byAgent.has(p.terminal)) continue;
       entries.push({
         kind: "terminal", id: `space-term-${p.pane}`, pane: p.pane, address: p.terminal,
         depth: 0, label: mine.length === 1 && c.named ? c.name : name(p), program: programOf(p),
@@ -278,7 +316,6 @@ export default class Menu extends View {
     this.origin = globalThis.window?.mouse_position?.();
     this.keys = cx.focus_handle();
     this.keys.focus();
-    if (p?.tab === "space-switch" && !checking()) this.clock = cx.timer.every(1000, (cx) => cx.notify());
     const space = p?.tab === "space" && spaces().find((s) => s.id === p.target?.id);
     const folder = space && place(space);
     if (!checking() && folder)
@@ -322,8 +359,9 @@ export default class Menu extends View {
     else run(it[1], it[2]);
   }
 
-  spaceSwitchView(t, p) {
-    const spaceId = p.target?.id, entries = spaceSwitchEntries(spaceId), now = Date.now();
+  spaceSwitchView(t, p, cx) {
+    const spaceId = p.target?.id, now = Date.now(), entries = spaceSwitchEntries(spaceId, now);
+    let clockAt = Infinity;
     const mono = settings()?.font_family ?? "JetBrains Mono";
     const labels = ["New tab", ...entries.map((e) => e.label)];
     const pick = (i) => {
@@ -337,8 +375,9 @@ export default class Menu extends View {
       const entry = entries[i - 1];
       if (!entry) return;
       if (entry.kind === "agent") {
-        if (entry.pane) focusAgent(entry.address);
-        else run("terminal.peek", { terminal: entry.address });
+        if (!entry.pane) run("terminal.peek", { terminal: entry.address });
+        else if (entry.listed) focusAgent(entry.address);
+        else focusPane(entry.pane);
       } else {
         focusPane(entry.pane);
       }
@@ -354,7 +393,12 @@ export default class Menu extends View {
     const trailOf = (entry) => {
       let mark = null;
       if (entry.kind === "agent") {
+        clockAt = Math.min(clockAt, entry.snoozedUntil);
         if (entry.status === "working") {
+          if (entry.since > 0) {
+            const elapsed = Math.max(0, now - entry.since), unit = elapsed < 60_000 ? 1000 : 60_000;
+            clockAt = Math.min(clockAt, entry.since + (Math.floor(elapsed / unit) + 1) * unit);
+          }
           const time = entry.since > 0 ? h_flex().flex_none().gap(4).items_center().children(took(entry.since, now).split(" ").map((part) => menuHint(t, part).font_family(mono))) : null;
           mark = time ? h_flex().flex_none().gap(4).items_center().child(statusMark(t, "working")).child(time) : statusMark(t, "working");
         } else if (entry.status === "blocked" || entry.status === "error") {
@@ -385,7 +429,7 @@ export default class Menu extends View {
           .when(divider, (el) => el.relative().child(div().absolute().top(0).left(8).right(8).h(1).bg(t.border))),
       });
     };
-    return v_flex()
+    const view = v_flex()
       .id("menu")
       .track_focus(this.keys)
       .w_full()
@@ -404,11 +448,21 @@ export default class Menu extends View {
         wheeled: (keep) => { if (keep >= 0) this.at = keep + 1; },
         draw: drawEntry,
       })));
+    if (cx && !checking() && clockAt !== this.clockAt) {
+      this.clock?.cancel();
+      this.clockAt = clockAt;
+      this.clock = Number.isFinite(clockAt) ? cx.timer.after(Math.max(0, clockAt - Date.now()), (cx) => {
+        this.clock = null;
+        this.clockAt = Infinity;
+        cx.notify();
+      }) : null;
+    }
+    return view;
   }
 
-  render() {
+  render(cx) {
     const t = theme(), p = props() ?? {};
-    if (p.tab === "space-switch") return this.spaceSwitchView(t, p);
+    if (p.tab === "space-switch") return this.spaceSwitchView(t, p, cx);
     const list = items(p, this.git);
     // Its submenu closed itself (← or Esc in it, a click beside it): the keyboard comes back here.
     subGone(this, SUB_CLOSED);

@@ -193,8 +193,11 @@ export default class Tabs extends View {
     const i = arg.lastIndexOf(":"), address = arg.slice(0, i), at = Number(arg.slice(i + 1));
     if (!(at > Date.now())) return notify({ title: "Couldn't snooze the agent", body: "That time has passed. Choose another.", level: "warning" });
     if (this.navigation.atHome || sidebarParts(layout()).stack?.active === "lists") return;
-    const f = { ...focused() }, was = terminals().find(k => k.address === address)?.labels?.snoozed ?? "";
-    const inView = f.terminal === address || agents().find(a => a.focused)?.address === address;
+    // The menu or dialog may still be open when the agent or something under it starts needing the person.
+    const every = agents(), all = terminals(), a = every.find(a => a.address === address), k = all.find(k => k.address === address);
+    if (!a || !k || treeStatus(ownStatus(a.status, address, all), subAgents(every, all)(address)) === "blocked") return;
+    const f = { ...focused() }, was = k.labels?.snoozed ?? "";
+    const inView = f.terminal === address || a.focused;
     if (!await writeLabel(address, "snoozed", String(at))) return;
     this.remember("Snoozed", { address, snoozed: was }, cx);
     const current = focused();
