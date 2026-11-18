@@ -59,7 +59,7 @@ Apply 保存时，在独占的 `.preview/save-<unique-id>` 写入文本（不超
 
 两类按约定取名，不进 `KEY`：
 
-- **弹窗关闭时间戳**：mod 整个就是一个弹窗时用 `<mod>.closed`（`t3-picker.closed`）；mod 平时是别的东西、另外还会以某种弹窗打开时用 `<mod>.<那种弹窗>Closed`（`t3-agents.sortClosed`）。键名只经 `shared/store.js` 的 `closedKey(mod, popup?)` 生成，读写两边不写字面量（`check-store.cjs` 扫描把关）。由弹窗的 `close()` 写，打开它的控件用 `shared/trigger.js` 读（内部是 `focus.js` 的 `justClosed`），按钮的 on 态也由它与打开时间比出来。Review 页内弹层不是 mod 弹窗，外部按下关闭时由页面写 `review.<名字>Closed`（`settingsClosed`、`scopeClosed` 等）。
+- **弹窗关闭时间戳**：mod 整个就是一个弹窗时用 `<mod>.closed`（`t3-picker.closed`）；mod 平时是别的东西、另外还会以某种弹窗打开时用 `<mod>.<那种弹窗>Closed`（`t3-agents.sortClosed`、`t3-menu.spaceClosed`）。键名只经 `shared/store.js` 的 `closedKey(mod, popup?)` 生成，读写两边不写字面量（`check-store.cjs` 扫描把关）。由弹窗的 `close()` 写，打开它的控件用 `shared/trigger.js` 读（内部是 `focus.js` 的 `justClosed`），按钮的 on 态也由它与打开时间比出来。Review 页内弹层不是 mod 弹窗，外部按下关闭时由页面写 `review.<名字>Closed`（`settingsClosed`、`scopeClosed` 等）。
 - **名字由别人定的键**，照用：和 Herdr 自带 mod 共用的 `layout`、`space.colors`、`agents.sort`；Inbox 的 mod 卡片约定 `<mod>.program`、`<mod>.status`、`<mod>.titles`。
 
 Review 的树菜单也是本 mod 的原生 popup，复用 `shared/menus.js`：顶层关闭写 `closedKey("review", "menu")`，子菜单写 `closedKey("review", "submenu")`。开启行的 id／时间只记本次运行；路径、来源 space／tab、删除标记只随 popup props 传递，不改变当前文件或已看状态。

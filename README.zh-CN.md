@@ -21,7 +21,7 @@
 - **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名、标状态。
 - **跳转**（`cmd-p`）：按名字跳到任何窗格，agent 和普通程序都行。
 - **详情**（`cmd-shift-b`）：locked 电脑／目录、Open in、全局 Actions，下面的 Review 行一点就显示 Review，箭头选范围。已装T3编辑器（含VSCodium／JetBrains）与Files共用偏好，菜单只选择，主按钮才打开；右键卡片可选择显示项目。
-- **窄标签、带框窗格**，照 T3 Code 的外观。
+- **窄标签、带框窗格**，照 T3 Code 的外观。在 Inbox 下，点标签栏面包屑里的 space 名打开菜单，可新建标签页或直接切到当前 space 下的其他 agent、子 agent 和终端程序。
 - **子 agent 菜单**：数量入口只打开原顺序的树；点行或方向键加 Enter 来 peek，右键打开侧栏同一份 agent 菜单，含 Send back、Copy address。每行用 Agents 行同样的标记：空闲显示闲了多久，Failed 是红色，完成圆点看过就消失。
 - **其他机器**：它们的 space 按机器分组，Inbox 卡片带机器标记；Lists 中悬停 Agents 行查看机器名。
 - **断连警告**：机器上的 agent 会在断开后停止时，机器标题显示警告；点它打开 Herdr 的修复说明，不自动执行提权命令。

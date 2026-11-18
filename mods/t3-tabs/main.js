@@ -507,34 +507,36 @@ export default class Tabs extends View {
     const nameOf = (address) => { const a = agentOf(address); return a ? name(a) : address; };
     // The title's menu: the agent's (t3-menu's "agent", the same wherever it's opened), as T3's thread actions. It hangs 4 under
     // the title, left edges together, as T3's (rect.left, rect.bottom + 4) and the layout's other menus. A click while it's open
-    // closes it.
-    const titled = ctx.sub ?? ctx.head;
+    // closes it. The space's menu opens the same way under the space crumb, with its own close stamp so the two never block each other.
+    const titled = ctx.sub ?? ctx.head, spaceClosed = closedKey("t3-menu", "space");
     const menu = (b) => {
       openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...hang(b, 220, { align: "start" }), props: { tab: "agent", target: { address: titled }, ...litProp(!b) } });
     };
-    // Its menu up: the title stays lit, its ⌄ shown and its label down, as the layout's other buttons that open one (trigger.js).
-    const menuOn = (id) => popupOpen(this, id, closedKey("t3-menu"));
+    const spaceMenu = (b) => {
+      openOverlay({ mod: "t3-menu", kind: "popup", width: 280, ...hang(b, 280, { align: "start" }), props: { tab: "space-switch", target: { id: space.id }, ...litProp(!b) } });
+    };
+    // Its menu up: the item stays lit, its ⌄ shown and its label down, as the layout's other buttons that open one (trigger.js).
+    const menuOn = (id) => popupOpen(this, id, id === "crumb-space" ? spaceClosed : closedKey("t3-menu"));
     // A right-click is the menu of what's under it, on the pointer, as everywhere: the space's (as in Spaces), an agent's (as
     // its card's).
     const context = (kind, target) => (_e, cx) => { detailsFor(this, null, cx); openMenu(this, kind, target, cx); };
     const sep = (id) => div().id(id).flex_none().text_color(t.dim).child("/");
     const press = (e, cx) => { stopPress(e, cx); detailsFor(this, null, cx); };
     const act = (action) => (_e, cx) => { action(); cx.notify(); };
-    const link = (id, label, el, action, radius = 4) => tip(this, t, id, label, stop(this, t, id, el.id(id).role("button").accessibility_label(label)
-      .on_mouse_down("left", press).on_click(act(action)).on_hover(glow(this, id)), radius), { below: true });
     // A name shown whole has no label, as a tab's (T3's title only repeats it). Cut short, or down to its icon or `…`, the tab's
     // hover label holds it whole, under it, its words where the name starts (`at`, from the item's left; the label's 1 + 8 in).
     const text = (id, label) => nameText(this, id, label, { size: 14, weight: "medium" });
-    // `action` null: the title, which opens its menu.
-    const named = (id, label, el, action, { agent, titled: own = false, shown = true, at = 0, radius = 4 } = /** @type {{ agent: string, titled?: boolean, shown?: boolean, at?: number, radius?: number }} */ ({ agent: null })) => {
-      const wired = action ? el.on_mouse_down("left", press).on_click(act(action)) : opener(this, { id, closed: closedKey("t3-menu"), onOpen: menu, press })(el);
+    // `action` null: opens its menu below itself (`onOpen`, `closed`, `right`).
+    const named = (id, label, el, action, { agent, shown = true, at = 0, radius = 4, onOpen = menu, closed = closedKey("t3-menu"), right = ["agent", { address: titled }] } = /** @type {{ agent?: string, shown?: boolean, at?: number, radius?: number, onOpen?: any, closed?: string, right?: [string, any] }} */ ({})) => {
+      const wired = action ? el.on_mouse_down("left", press).on_click(act(action)) : opener(this, { id, closed, onOpen, press })(el);
+      const rightTarget = action && agent ? ["agent", { address: agent }] : right;
       return stop(this, t, id, namedLabel(this, t, id, label, wired.id(id).role("button").accessibility_label(label)
-        .on_mouse_down("right", context("agent", { address: own ? titled : agent })), {
+        .on_mouse_down("right", context(rightTarget[0], rightTarget[1])), {
         shown, at, onHover: (hovered, cut, cx) => { glow(this, id)(hovered, cx); detailsFor(this, hovered && cut && !menuOn(id) ? id : null, cx); },
         onMove: e => detailsAt(this, id, e),
       }), radius);
     };
-    // As T3's title: its ⌄ is part of it, 4 after the name, 14px, there only while the title is hovered or has the keyboard.
+    // As T3's title: its ⌄ is part of it, 4 after the name, 14px, there only while the item is hovered, focused or open.
     const chevron = (id) => {
       const shown = this.hot === id || within(this, [id]) || menuOn(id);
       return div().id("crumb-menu").flex_none().opacity(shown ? 1 : 0).transition("opacity", { duration: 150, easing: "ease-out" })
@@ -548,16 +550,20 @@ export default class Tabs extends View {
         .text_color(lit || this.hot === id ? t.foreground : t.muted)
         .child(text(id, label))
         .when(lit, e => e.child(chevron(id)));
-      return named(id, label, el, lit ? null : () => focusAgent(address), { agent: address, titled: lit, radius: 6 });
+      return named(id, label, el, lit ? null : () => focusAgent(address), { agent: address, radius: 6 });
     };
     const sub = ctx.sub && named(`peer-${ctx.sub}`, nameOf(ctx.sub), h_flex().min_w(0).flex_shrink(1).gap(4).items_center().rounded(4)
       .text_color(dim ? t.muted : t.foreground).child(text(`peer-${ctx.sub}`, nameOf(ctx.sub)))
-      .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : null, { agent: ctx.sub, titled: !dim });
+      .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : null, { agent: ctx.sub });
+    const spaceLit = this.hot === "crumb-space" || within(this, ["crumb-space"]) || menuOn("crumb-space");
     // Its own width and no less (flex weighting alone let the strip win): capped at the row, where its names shorten.
     return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(14).font_medium()
-      .child(link("crumb-space", `Open a tab in ${space.name}`, h_flex().min_w(0).flex_shrink(1).gap(6).items_center()
-        .text_color(this.hot === "crumb-space" ? t.foreground : t.muted).on_mouse_down("right", context("space", { id: space.id }))
-        .child(projectMark("mods/t3-tabs", space, 14, t, ps)).child(div().min_w(0).truncate().child(space.name)), () => run("t3-tabs.open-empty")))
+      .child(named("crumb-space", space.name, h_flex().h(24).gap(6).rounded(6).items_center().min_w(0).flex_shrink(1)
+        .text_color(spaceLit ? t.foreground : t.muted)
+        .child(projectMark("mods/t3-tabs", space, 14, t, ps))
+        .child(text("crumb-space", space.name)), null, {
+        at: 20, radius: 6, onOpen: spaceMenu, closed: spaceClosed, right: ["space", { id: space.id }],
+      }))
       .when(Boolean(ctx.parent), el => el.child(sep("crumb-sep-parent")).child(named("crumb-parent", nameOf(ctx.parent),
         h_flex().min_w(0).flex_shrink(1).items_center().text_color(this.hot === "crumb-parent" ? t.foreground : t.muted)
           .child(narrow ? div().child("…") : text("crumb-parent", nameOf(ctx.parent))),

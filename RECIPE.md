@@ -128,7 +128,7 @@ A pane mod gets its own card only by opting in with `shared("<mod>.program") = {
 
 ### Tabs, navigation and closing
 
-Clicking a tab selects it, double-click renames, right-click opens its menu, dragging reorders (in Inbox only tabs without agents). The Inbox breadcrumb's space reuses a lone shell tab before creating one; `cmd-t` always creates. A no-agent tab entered from the strip keeps the space's last agent dimmed in the breadcrumb; after the space crumb or `cmd-t`, the breadcrumb shows only the space until another agent is viewed.
+Clicking a tab selects it, double-click renames, right-click opens its menu, dragging reorders (in Inbox only tabs without agents). Clicking the Inbox breadcrumb's space opens its menu (`280` wide, `10` scrollable rows below pinned New tab) with New tab (`t3-tabs.new`) and the current space's agents (with nested sub-agents) and non-agent terminal panes; right-clicking an item opens its agent or pane menu. A no-agent tab entered from the strip keeps the space's last agent dimmed in the breadcrumb; after New tab in the space menu or `cmd-t`, the breadcrumb shows only the space until another agent is viewed.
 
 Agent next/previous walks the selected mode's rows without wrapping; tab next/previous wraps through the displayed tabs. Closing the viewed agent's whole tab or last pane lands on Home in Inbox, on the space's last-viewed tab in Lists; background closes never navigate. Every layout close asks `hc get` first and closes at once only when the terminal holds its own shell; otherwise it asks `Close terminal "<name>"?` (`This stops the running process and clears its history.`).
 

@@ -2425,10 +2425,43 @@ for (const width of [208, 256]) {
     assert.deepEqual([strings(crumbCard("peer-A")), crumbCard("peer-A").style.opacity], [["layout"], 1], "cut short: its whole name");
     assert.deepEqual([find(view.render(cx), "details-peer-A").style.bottom, find(view.render(cx), "details-peer-A").style.left], [0, -9], "under it, its words where the name starts");
     hoverTitle(false);
-    assert.equal(find(root, "crumb-space").style.accessibility_label, "Open a tab in project 0", "the space's label says what it does");
-    fire(find(root, "crumb-space"), "on_click", {}, cx);
-    assert.deepEqual(taken().at(-1), ["t3-tabs.open-empty", {}], "the space is the Inbox's way to a tab to work in");
-    assert.equal(find(f.load("t3-tabs", { part: "end" }).render(cx), "tab-new"), null, "so the Inbox has no + beside it");
+    // Clicking the breadcrumb's space opens its menu below it with no ⌄ (brightening on hover/open without shifting `/`).
+    assert.equal(find(root, "crumb-space").style.accessibility_label, "project 0", "the space's label is its name");
+    assert.equal(find(find(root, "crumb-space"), "crumb-space-menu"), null, "the space crumb has no ⌄");
+    assert.equal(find(root, "crumb-space").style.text_color, f.theme().muted, "the space crumb rests muted");
+    fire(find(view.render(cx), "crumb-space"), "on_hover", true, cx);
+    assert.deepEqual([find(view.render(cx), "crumb-space").style.text_color, find(view.render(cx), "crumb-space").style.bg], [f.theme().foreground, undefined], "hovering the space brightens its text without a pill or moving /");
+    fire(find(view.render(cx), "crumb-space"), "on_hover", false, cx);
+    const spaceCrumb = () => find(view.render(cx), "crumb-space");
+    f.overlays.length = 0;
+    fire(spaceCrumb(), "on_mouse_down:left", { bounds: { x: 260, y: 8, width: 90, height: 24 }, position: { x: 290, y: 20 } }, cx);
+    fire(spaceCrumb(), "on_click", {}, cx);
+    const spaceOpened = f.overlays.pop();
+    assert.deepEqual([spaceOpened.mod, spaceOpened.props.tab, spaceOpened.width, plain(spaceOpened.at)], ["t3-menu", "space-switch", 280, { x: 260, y: 32 + 4 * z }], "space menu hangs under the space from its left edge");
+    assert.deepEqual(plain(spaceOpened.props.target), { id: "s0" });
+    assert.equal(find(view.render(cx), "crumb-space").style.text_color, f.theme().foreground, "the space stays bright while its menu is open");
+    // Pressed again while open: its close() stamps t3-menu.spaceClosed, so the click doesn't reopen it, while opening the title's menu still works.
+    fire(spaceCrumb(), "on_mouse_down:left", { bounds: { x: 260, y: 8, width: 90, height: 24 }, position: { x: 290, y: 20 } }, cx);
+    f.state["t3-menu.spaceClosed"] = Date.now();
+    fire(spaceCrumb(), "on_click", {}, cx);
+    assert.equal(f.overlays.length, 0, "a second click closes the space menu");
+    // Opening the title's menu right after the space menu closed isn't blocked by the space menu's close stamp.
+    delete f.state["t3-menu.closed"];
+    fire(title(), "on_mouse_down:left", { bounds: { x: 300, y: 8, width: 120, height: 24 }, position: { x: 350, y: 20 } }, cx);
+    fire(title(), "on_click", {}, cx);
+    assert.equal(f.overlays.pop().props.tab, "agent", "the title menu still opens after closing the space menu");
+    f.state["t3-menu.closed"] = Date.now();
+    // Keyboard click on the space crumb opens its menu with the first row lit.
+    fire(spaceCrumb(), "on_click", {}, cx);
+    assert.equal(f.overlays.pop().props.lit, 0, "keyboard open lights the first row");
+    f.state["t3-menu.spaceClosed"] = Date.now();
+    // Truncated space crumb shows its full name on hover at x=20 (past icon + gap) and hides while its menu is open.
+    fire(find(view.render(cx), "text-measure-crumb-space"), "on_size_change", { width: 80 }, cx);
+    fire(find(view.render(cx), "text-name-crumb-space"), "on_size_change", { width: 40 }, cx);
+    fire(spaceCrumb(), "on_hover", true, cx); wait();
+    assert.deepEqual([strings(crumbCard("crumb-space")), find(view.render(cx), "details-crumb-space").style.left], [["project 0"], 11], "cut space name shows full label past its icon");
+    fire(spaceCrumb(), "on_hover", false, cx); wait();
+    assert.equal(find(f.load("t3-tabs", { part: "end" }).render(cx), "tab-new"), null, "Inbox still has no + beside it");
     root = at("mine", "p-C");
     assert.deepEqual([Boolean(find(root, "peer-C")), find(root, "peer-A")], [true, null], "the other one focused: the title is it");
     root = at("mine", "p-git");

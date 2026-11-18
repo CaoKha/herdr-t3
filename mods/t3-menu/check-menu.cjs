@@ -14,6 +14,10 @@ function el() {
       else if (key === "child") node.items.push(args[0]);
       else if (key === "children") node.items.push(...args[0]);
       else if (key === "id") node.key = args[0];
+      else if (key === "on_mouse_down" || key === "on_mouse_up" || key === "on_action") {
+        const at = `${key}:${args[0]}`, was = node.handlers[at], now = args[1];
+        node.handlers[at] = was ? (...e) => { was(...e); return now(...e); } : now;
+      }
       else if (key.startsWith("on_")) node.handlers[key] = args[0];
       else node.style[key] = args.length === 1 ? args[0] : args;
       return proxy;
@@ -22,9 +26,12 @@ function el() {
   return proxy;
 }
 const find = (node, id) => !node || typeof node !== "object" ? null : node.key === id ? node : node.items.map((c) => find(c, id)).find(Boolean) ?? null;
-const theme = { selected: "#selected", hover: "#hover", foreground: "#fg", ansi1: "#red" };
+const theme = { selected: "#selected", hover: "#hover", foreground: "#fg", muted: "#muted", dim: "#dim", border: "#border", popover: "#pop", working: "#blue", blocked: "#amber", done: "#green", accent: "#accent", ansi1: "#red" };
 let target = {}, calls = [], closed = [], state = {}, list = "inbox", opened = 0, zoom = 1, view = { width: 1200, height: 800 }, mouse = { x: 0, y: 0 };
 let terms = [{ address: "t1", labels: {} }], agentList = [], keyList = [];
+let spaceList = [{ id: "s1", active: true, folder: "/work/p1", tabs: [{ id: "b1" }] }];
+let paneList = [{ pane: "p1", tab: "b1", cwd: "/work/s1" }];
+let focusState = {};
 // tip.js's keyLabel, as on a Mac: what every key hint in the layout is written with.
 const tipScope = vm.createContext({ window: () => ({ platform: "macos" }), keys: () => keyList });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "tip.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.keyLabel = keyLabel;", tipScope);
@@ -33,20 +40,20 @@ const context = vm.createContext({
   checking: () => false,
   // menu-row.js's: button.js's and tip.js's (no row here is disabled).
   DISABLED: 0.64, glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
-  View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
+  View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, image: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
   run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); context.menuClosed?.(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
   window: { viewport_size: () => view, mouse_position: () => mouse },
-  theme: () => theme, keys: () => keyList, settings: () => ({ zoom }), terminals: () => terms, agents: () => agentList, spaces: () => [{ id: "s1", folder: "/work/p1", tabs: [{ id: "b1" }] }], panes: () => [{ pane: "p1", tab: "b1", cwd: "/work/s1" }], exec: async () => ({ code: 1 }),
+  theme: () => theme, keys: () => keyList, settings: () => ({ zoom }), terminals: () => [...terms], agents: () => [...agentList], spaces: () => spaceList, panes: () => paneList, focused: () => focusState, exec: async () => ({ code: 1 }),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, hc: async () => ({ code: 0 }), notify() {},
   layout: () => ({ id: "root", children: [{ id: "sidebar-lists", active: list, children: [] }] }),
   keyLabel: (k) => tipScope.keyLabel(k),
 });
-const src = ["store.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "project.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "project.js", "name.js", "program.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Menu = class").replace(/^export /gm, "");
 vm.runInContext(src, context);
 // Timers run when the test says time has passed.
 let pending = [];
-const timer = { after(ms, f) { const t = { ms, f, cancel() { pending = pending.filter((x) => x !== t); } }; pending.push(t); return t; } };
+const timer = { after(ms, f) { const t = { ms, f, cancel() { pending = pending.filter((x) => x !== t); } }; pending.push(t); return t; }, every(ms, f) { const t = { ms, f, cancel() {} }; return t; } };
 const cx = { notify() {}, stop_propagation() {}, spawn() {}, timer, focus_handle: () => { const h = { focused: 0, focus() { h.focused++; } }; return h; } };
 const elapse = (ms) => { for (const t of [...pending]) { if (!pending.includes(t)) continue; t.ms -= ms; if (t.ms <= 0) { t.cancel(); t.f(cx); } } };
 const menu = new context.Menu();
@@ -313,5 +320,145 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   key(s, { key: "enter" });
   assert.deepEqual([closed, opens().map((o) => o.mod)], [[again, "root"], ["t3-inbox"]], "Custom…: both close, its dialog opens");
   agentList = []; terms = [{ address: "t1", labels: {} }];
+}
+
+// Space switcher menu (tab: "space-switch"): New tab at top with shortcut, then the space's agents (nested sub-agents included) and non-agent terminal programs.
+{
+  const pi = { key: "pi", name: "Pi", agent: true, tint: true, icon: "icons/pi.svg" };
+  const codex = { key: "codex", name: "Codex", agent: true, tint: true, icon: "icons/codex.svg" };
+  const lazygit = { key: "lazygit", name: "lazygit", agent: false, tint: false, icon: "icons/git.svg" };
+  const zsh = { key: "zsh", name: "zsh", agent: false, tint: true, icon: "icons/terminal.svg" };
+  keyList = [{ section: "layout:herdr-t3", action: "t3-tabs.new", keys: "cmd-t" }];
+  spaceList = [
+    { id: "s0", name: "herdr-t3", active: true, folder: "/work/herdr-t3", tabs: [
+      { id: "b1", named: false, active: true },
+      { id: "b2", named: false, active: false },
+      { id: "b3", named: true, name: "Codex PR", active: false },
+      { id: "b4", named: true, name: "Server", active: false },
+    ] },
+    { id: "s9", name: "other", active: false, folder: "/work/other", tabs: [{ id: "b9", named: false }] },
+  ];
+  agentList = [
+    { address: "t1", pane: "p1", tab: "b1", status: "working", focused: true, program: pi, title: "refactor" },
+    { address: "t1b", pane: "p1b", tab: "b2", status: "idle", focused: false, program: pi, title: "sub-pane" },
+    { address: "t2", pane: "p2", tab: "b3", status: "idle", focused: false, program: codex, title: "Codex PR" },
+    { address: "t9", pane: "p9", tab: "b9", status: "working", focused: false, program: pi, title: "elsewhere" },
+  ];
+  terms = [
+    { address: "t1", state: "live", status: "working", status_ms: Date.now() - 120000, program: pi, labels: {} },
+    { address: "t1a", parent: "t1", name: "review-runner", state: "live", status: "done", turn: 1, program: pi, labels: {} },
+    { address: "t1b", parent: "t1", name: "sub-pane", state: "live", status: "idle", program: pi, labels: {} },
+    { address: "t2", state: "live", status: "idle", program: codex, labels: { snoozed: String(Date.now() + 3600000) } },
+    { address: "t2a", parent: "t2", name: "blocked-kid", state: "live", status: "blocked", program: codex, labels: {} },
+    { address: "t-git", state: "live", program: lazygit, labels: {} },
+    { address: "t-sh", state: "live", program: zsh, labels: {} },
+    { address: "t9", state: "live", status: "working", program: pi, labels: {} },
+    { address: "t-other", state: "live", program: zsh, labels: {} },
+  ];
+  paneList = [
+    { pane: "p1", tab: "b1", terminal: "t1", zoomed: true, focused: true, program: pi, title: "refactor", cwd: "/work/herdr-t3" },
+    { pane: "p-git", tab: "b1", terminal: "t-git", zoomed: false, focused: false, program: lazygit, title: "lazygit", cwd: "/work/herdr-t3" },
+    { pane: "p1b", tab: "b2", terminal: "t1b", zoomed: false, focused: false, program: pi, title: "sub-pane", cwd: "/work/herdr-t3" },
+    { pane: "p2", tab: "b3", terminal: "t2", zoomed: false, focused: false, program: codex, title: "Codex PR", cwd: "/work/herdr-t3" },
+    { pane: "p-sh", tab: "b4", terminal: "t-sh", zoomed: false, focused: false, program: zsh, title: "zsh", cwd: "/work/herdr-t3" },
+    { pane: "p9", tab: "b9", terminal: "t9", zoomed: false, focused: false, program: pi, title: "elsewhere", cwd: "/work/other" },
+    { pane: "p-other", tab: "b9", terminal: "t-other", zoomed: false, focused: false, program: zsh, title: "zsh", cwd: "/work/other" },
+  ];
+  focusState = { space: "s0", tab: "b1", pane: "p1", terminal: "t1" };
+
+  target = { tab: "space-switch", target: { id: "s0" }, overlay: "space-root" };
+  const sm = new context.Menu();
+  sm.init(target, cx);
+  const tree = sm.render();
+  const walk = (n) => !n || typeof n !== "object" ? [] : [n, ...n.items.flatMap(walk)];
+  const labelsOf = (n) => walk(n).flatMap((x) => x.items.filter((c) => typeof c === "string"));
+
+  const newRow = find(tree, "space-new-tab");
+  assert.ok(newRow, "New tab row exists at top");
+  assert.deepEqual(labelsOf(newRow), ["New tab", "⌘T"], "New tab shows shortcut hint");
+
+  const listNode = find(tree, "space-menu-list");
+  assert.ok(listNode, "space entries live inside scrollList");
+  const rowIds = listNode.items.map((r) => r.key);
+  assert.deepEqual(rowIds, ["space-item-t1", "space-item-t1a", "space-item-t1b", "space-item-t2", "space-item-t2a", "space-term-p-git", "space-term-p-sh"], "agents (with nested sub-agents once) then non-agent terminals, excluding other spaces");
+
+  // Sub-agents are indented by 16px (8px lead spacer + 8px row gap) and top-level/sub-agent statuses match the layout's marks.
+  const row1 = find(listNode, "space-item-t1");
+  const row1a = find(listNode, "space-item-t1a");
+  const row2 = find(listNode, "space-item-t2");
+  const row2a = find(listNode, "space-item-t2a");
+  const rowSh = find(listNode, "space-term-p-sh");
+  assert.ok(!walk(row1).some((n) => n.style.path === "mods/t3-menu/icons/check.svg"), "current viewed agent does not stack a check mark next to its status");
+  assert.ok(Boolean(row1.style.bg), "current viewed agent uses active background tint instead of a check mark");
+  assert.equal(row1.style.text_color, theme.foreground, "current viewed agent keeps foreground text");
+  assert.equal(row2.style.text_color, theme.muted, "unselected inactive agent uses muted text until hovered");
+  const trail1 = row1.items.at(-1);
+  assert.ok((trail1.style.pl ?? 0) >= 8, "trailing status adds extra left spacing past the row gap so truncated labels do not crowd it");
+  assert.ok(walk(row1).some((n) => n.style.path === "mods/workspace-chrome/spinner.svg"), "working agent shows spinner");
+  assert.ok(labelsOf(row1).includes("2m"), "working agent shows duration");
+  assert.equal(row1a.items[0].style.w, 8, "sub-agent indented one level (16 - 8 lead spacer)");
+  assert.ok(walk(row1a).some((n) => n.style.rounded_full && n.style.bg === theme.done), "unread sub-agent shows done dot");
+  assert.ok(labelsOf(row2).includes("!"), "blocked sub-agent rolls up to parent");
+  assert.ok(labelsOf(row2a).includes("!"), "blocked sub-agent shows !");
+  // Without a blocked child, snoozed top-level agent shows the accent alarm clock.
+  terms.splice(terms.findIndex((k) => k.address === "t2a"), 1);
+  assert.ok(walk(find(sm.render(), "space-item-t2")).some((n) => n.style.path === "mods/t3-menu/icons/alarm-clock.svg"), "snoozed agent shows alarm clock");
+  assert.ok(labelsOf(rowSh).includes("Server"), "single-pane named terminal tab uses its tab name");
+
+  // Clicking New tab closes and runs t3-tabs.new on the active space; clicking items focuses/peeks properly.
+  const plain = (v) => JSON.parse(JSON.stringify(v));
+  calls = []; closed = [];
+  find(tree, "space-new-tab").handlers.on_click({}, cx);
+  assert.deepEqual(plain([closed, calls]), [["space-root"], [["t3-tabs.new"]]]);
+
+  calls = []; closed = [];
+  row2.handlers.on_click({}, cx);
+  assert.deepEqual(plain([closed, calls]), [["space-root"], [["agent.focus", { terminal: "t2" }]]]);
+
+  calls = []; closed = [];
+  row1a.handlers.on_click({}, cx);
+  assert.deepEqual(plain([closed, calls]), [["space-root"], [["terminal.peek", { terminal: "t1a" }]]]);
+
+  // Clicking a split non-agent terminal in a zoomed tab moves zoom first and focuses its pane.
+  calls = []; closed = [];
+  find(listNode, "space-term-p-git").handlers.on_click({}, cx);
+  assert.deepEqual(plain([closed, calls]), [["space-root"], [["pane.zoom", { pane: "p-git" }], ["pane.focus", { pane: "p-git" }]]]);
+
+  // Right-clicking an agent or terminal row closes the space menu and opens its context menu.
+  calls = []; closed = [];
+  row2.handlers["on_mouse_down:right"]({}, cx);
+  assert.deepEqual(plain([closed, calls.map((c) => [c[0], c[1].mod, c[1].props])]), [["space-root"], [["overlay", "t3-menu", { tab: "agent", target: { address: "t2" } }]]]);
+
+  calls = []; closed = [];
+  find(listNode, "space-term-p-git").handlers["on_mouse_down:right"]({}, cx);
+  assert.deepEqual(plain([closed, calls.map((c) => [c[0], c[1].mod, c[1].props])]), [["space-root"], [["overlay", "t3-menu", { tab: "pane", target: { pane: "p-git", terminal: "t-git" } }]]]);
+
+  // Keyboard navigation walks New tab + scrollList seamlessly, and close() stamps t3-menu.spaceClosed (not t3-menu.closed).
+  const keyNav = (e) => { calls = []; closed = []; find(sm.render(), "menu").handlers.on_key_down(e, cx); };
+  keyNav({ key: "down" }); assert.equal(sm.at, 0);
+  keyNav({ key: "down" }); assert.equal(sm.at, 1);
+  keyNav({ key: "s", key_char: "s", modifiers: {} });
+  assert.equal(sm.at, 3, "typing s jumps to sub-pane (t1b)");
+  keyNav({ key: "end" });
+  assert.equal(sm.at, 6, "End reaches Server at the bottom");
+  keyNav({ key: "enter" });
+  assert.deepEqual(plain([closed, calls]), [["space-root"], [["pane.focus", { pane: "p-sh" }]]]);
+
+  // Over 10 entries caps the scroll viewport at 10 rows (280px).
+  for (let i = 0; i < 8; i++) {
+    paneList.push({ pane: `px-${i}`, tab: "b4", terminal: `tx-${i}`, program: zsh, title: `extra-${i}` });
+  }
+  assert.equal(find(sm.render(), "space-menu-list").style.h, 280, "scrollList caps height at 10 rows");
+
+  delete state["t3-menu.closed"];
+  delete state["t3-menu.spaceClosed"];
+  sm.close();
+  assert.ok(state["t3-menu.spaceClosed"] > 0 && !state["t3-menu.closed"], "space menu stamps its own closed key so it never blocks agent menus");
+
+  // Restore globals for anything after.
+  keyList = []; agentList = []; terms = [{ address: "t1", labels: {} }];
+  spaceList = [{ id: "s1", folder: "/work/p1", tabs: [{ id: "b1" }] }];
+  paneList = [{ pane: "p1", tab: "b1", cwd: "/work/s1" }];
+  focusState = {};
 }
 console.log("ok menu");
