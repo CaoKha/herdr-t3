@@ -81,9 +81,9 @@ _Avoid_: preferences、config、T3 settings
 `cmd-p` 打开的跳转面板，每个窗格一行。
 _Avoid_: picker（mod 名）；Search 是 Inbox 的行内搜索
 
-**Running**：
-`cmd-shift-r` 或侧栏底栏按钮打开的存活盘点与清理面板，按存活 space 分组列出窗格并提供 Clean up。
-_Avoid_: 任务管理器、活动监视器、进程列表
+**Close idle**：
+一步关掉注意力之外闲置的终端（已 Settle 的 agent、停在提示符的 shell）；确认框按 space 点名要关的和仍在运行的。
+_Avoid_: Clean up、Clear、Running、Background（旧名）、回收站
 
 **Action**：
 详情 Actions 行里的一条命令，在新标签或分屏里运行。

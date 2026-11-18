@@ -28,7 +28,7 @@ There is no title bar; terminal opacity is 0 and terminal padding `[8, 0]`. A pa
 
 ### Sidebar frame
 
-The brand bar leaves room for macOS's window buttons, then shows Herdr's own mark and `Herdr`; together they are a button that goes Home. At its right, two touching 28px buttons switch mode (the icon names the destination, `inbox` or `layout-list`) and hide the sidebar. The traffic lights are moved to sit centred on this bar. The footer holds Herdr Settings, Layout Settings (sliders), and Running (layers) in that order, with 32px controls 4px apart. Running opens `t3-running` and shows the open non-Home space count when any are open. The free space shows Undo, and a downloaded update adds an `Update` pill. Spec: [sidebar](docs/internals/specs/sidebar.md).
+The brand bar leaves room for macOS's window buttons, then shows Herdr's own mark and `Herdr`; together they are a button that goes Home. At its right, two touching 28px buttons switch mode (the icon names the destination, `inbox` or `layout-list`) and hide the sidebar. The traffic lights are moved to sit centred on this bar. The footer holds Herdr Settings, Layout Settings (sliders), and Close idle (brush) in that order, 32px icon buttons 4px apart. Close idle runs `t3-tabs.cleanup` directly. The free space shows Undo, and a downloaded update adds an `Update` pill. Spec: [sidebar](docs/internals/specs/sidebar.md).
 
 ### Inbox
 
@@ -76,7 +76,7 @@ Review is for the [pulls.review fork](https://github.com/JinJieBeWater/pulls.rev
 
 ### Popups, dialogs and Home
 
-New, Go to and Running are top-centred popups, 576px wide with a 16px radius and a footer of keycaps. New and Go to use 48px two-line rows. Running uses 36px rows and groups panes beneath space headers. Menus, tooltips and buttons follow [t3-tokens](docs/internals/t3-tokens.md). The Actions editor and confirmations are 512px, radius 16; a confirmation's action is red text on a raised button, after Cancel. Layout Settings follows Herdr's own Settings dialog (880×620). Spec: [dialogs](docs/internals/specs/dialogs.md).
+New and Go to are top-centred popups, 576px wide with a 16px radius and a footer of keycaps. New and Go to use 48px two-line rows. Menus, tooltips and buttons follow [t3-tokens](docs/internals/t3-tokens.md). The Actions editor and confirmations are 512px, radius 16; a confirmation's action is red text on a raised button, after Cancel. Layout Settings follows Herdr's own Settings dialog (880×620). Spec: [dialogs](docs/internals/specs/dialogs.md).
 
 Home is one framed pane without a header: centred Next agent, Go to and New tab buttons with keycaps, no names or counts. On Home the tab row has no panel toggle and folds from 40 to 8px unless it must hold window buttons or the hidden sidebar's controls. Spec: [home](docs/internals/specs/home.md).
 
@@ -141,7 +141,7 @@ Context menus don't select or switch what was right-clicked; impossible items ar
 | Target | Available actions |
 | --- | --- |
 | Agent, including breadcrumb parent/sub-agent row | Pin/Unpin for top-level; in Inbox Settle/Un-settle when tree not busy, Snooze/Wake when eligible; Rename for a lone tab-named non-Pi agent; Copy address; Send back to parent; Close its pane |
-| Space, including group/breadcrumb/filter row and Running header | New tab; Rename; Copy current path; New/Open worktree in repository; Remove worktree in linked worktree (`ansi1`); Close |
+| Space, including group/breadcrumb/filter row | New tab; Rename; Copy current path; New/Open worktree in repository; Remove worktree in linked worktree (`ansi1`); Close |
 | Synthetic unopened checkout | Open, Copy path |
 | Connected/rebuilt machine | New space here, Connect |
 | Tab | New tab, Rename, Close |
@@ -153,11 +153,11 @@ Menu rules: [menus spec](docs/internals/specs/menus.md).
 
 Clicking a space switches to it; dragging reorders it within its machine (`space.move`), a checkout with its expanded worktrees. With a checkout closed, two or more worktrees gather under a dim synthetic checkout that opens it on click. Clicking a top-level agent runs `agent.focus`; a sub-agent row peeks. Pins are the Inbox's; Lists has no Settled group and only hides unread done.
 
-### Go to, New, Running and Actions
+### Go to, New, Close idle and Actions
 
 Go to (`cmd-p`) lists every pane, recent first, opening on the previous pane so `cmd-p`, Enter toggles back; Enter focuses across spaces, `ctrl-d` closes safely. New lists live spaces first (current first within the list) and then dormant projects from `t3.projects`. The always-on `t3-tabs` records the projects, and New shows a bookmark when its machine and folder have no live space. Pick a live space to open a tab at its current location. Pick a bookmark to reopen its folder on the original machine with `space.new`, keeping its explicit name. The platform modifier plus `1…9` picks rows. The footer creates a space, asking which machine when there are several. See [New](docs/internals/specs/dialogs.md#new) and [storage](docs/internals/storage.md).
 
-Running groups every live non-Home pane by space. Search narrows spaces and panes. Click a pane or press Enter on its highlighted row to focus it. Use the pane's `×` or `ctrl-d` to close it, the space header's `×` to close the space, and right-click the header for the space menu and worktree actions. **Clean up** calls `t3-tabs.cleanup`. Ask for confirmation before closing core-confirmed settled agents and non-agent shells at their prompts outside the current tab. At confirmation, recheck the terminals listed in the dialog. Close spaces emptied by cleanup. See [Running](docs/internals/specs/dialogs.md#running) and the [cleanup command](docs/internals/specs/tab-bar.md#t3-tabs-commands).
+**Close idle** (`t3-tabs.cleanup`) ends what is finished but still running without leaving Inbox, and opens no list first. Ask for confirmation before closing core-confirmed settled agents and non-agent shells at their prompts outside the current tab; the dialog names them by space, the spaces that close and the non-agent terminals still running, which stay open. At confirmation, recheck the terminals listed and close spaces emptied this way. With nothing eligible, show a toast naming the programs still running. See [Close idle](docs/internals/specs/dialogs.md#close-idle) and the [cleanup command](docs/internals/specs/tab-bar.md#t3-tabs-commands).
 
 Actions are global. `▶` reruns the last action, its menu runs another and makes it primary, and a gear edits. An action has a Name, a Command, an optional Folder and icon, and opens in a new Tab, Split right or Split down via `terminal.open { argv: ["sh", "-c", command], name, place, folder? }`; the shell stays after it ends. Without a Folder it runs in the focused terminal's cwd, else the space folder.
 
@@ -189,7 +189,7 @@ Every control is a Tab stop clicked by Enter or Space, with a 2px inset `accent`
 | `cmd-shift-g` | `t3-tabs.review`, toggle Review; keyless `t3-tabs.files` does same for Files |
 | `cmd-shift-s` | `t3-tabs.settle`, viewed Inbox agent/mod card only |
 | `cmd-p` | `mod.open:t3-picker` |
-| `cmd-shift-r` / `ctrl-alt-r` | `mod.open:t3-running` |
+| `cmd-shift-r` / `ctrl-alt-r` | `t3-tabs.cleanup` |
 | `cmd-]` / `cmd-[` | `t3-tabs.next` / `prev`, agents, no wrap |
 | `cmd-w`, `ctrl-alt-shift-x` | `t3-tabs.close-tab` |
 | `cmd-shift-w`, `ctrl-alt-x` | `t3-tabs.close-pane` |
@@ -242,7 +242,7 @@ floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, visually empty
 
 Sidebar, work and panel columns are `resizable:false` inside, keeping their outside dividers. `spaces` gets `{newMenu:"t3-new-menu"}`; `inbox` gets `{newMenu:"t3-new-menu",home:"t3-tabs.home",menu:"t3-menu"}`. `main` and `home-main` share the pane frame settings above. The floating `tabs-keys` copy owns commands, Home and per-space panel sync; other `t3-tabs` copies share navigation.
 
-Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3-pane`, `t3-home`, `t3-files`, `t3-new-menu`, `t3-picker`, `t3-running`, `t3-actions`, `t3-menu`. Adapt the matching shipped mods where they exist. Inbox, Home, Files and Running are new. Keep the shipped `workspace-status`, spinner and program artwork. UI icons are Lucide (24 grid, 1.75 stroke) in each mod's own `icons/`; Files and Review trees use T3/Pierre shapes. A mod can't import outside its folder: shared modules live in `shared/` and `scripts/sync.sh` copies them.
+Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3-pane`, `t3-home`, `t3-files`, `t3-new-menu`, `t3-picker`, `t3-actions`, `t3-menu`. Adapt the matching shipped mods where they exist. Inbox, Home and Files are new. Keep the shipped `workspace-status`, spinner and program artwork. UI icons are Lucide (24 grid, 1.75 stroke) in each mod's own `icons/`; Files and Review trees use T3/Pierre shapes. A mod can't import outside its folder: shared modules live in `shared/` and `scripts/sync.sh` copies them.
 
 ### Install
 
@@ -262,7 +262,7 @@ Terminal facts are labels (`settled`, `snoozed`), cross-mod facts and preference
 
 - Hidden mods neither draw nor hear commands and start on first display. Keep always-on commands and Snooze timing in the floating `tabs-keys`; the selected mode's order keeps working while hidden, except Inbox's own order before it has ever started. Hold pending intent through model and remote-label lag, and report failed writes.
 - Home's strict identity protects ordinary spaces: release Home's agent space in place, never move or delete its process. Native external closes can flash a neighbour; restart loses close history; native Home splits can't be blocked; zoom groups can't drag.
-- Keep the confirmations: close and Clean up stop terminals and clear history, Remove worktree deletes, wallpaper Delete removes source and cache. Actions run arbitrary `sh -c`. Write the traffic lights with an expected-content write of that one field; `layout.set` discards remembered layout state.
+- Keep the confirmations: close and Close idle stop terminals and clear history, Remove worktree deletes, wallpaper Delete removes source and cache. Actions run arbitrary `sh -c`. Write the traffic lights with an expected-content write of that one field; `layout.set` discards remembered layout state.
 - A wrong icon path draws nothing and raises nothing; check runtime-built paths in the demo window. Opaque surfaces stand in for blur, scale and letter-spacing the host lacks; transparent popups still block input. Recover missing pointer leave and release; closing a popup must neither reopen it nor close the tab beneath.
 - Before changing render or timers, focus or hover, measurement or scrolling, Review text or wallpaper conversion, read [layout implementation](docs/internals/layout-implementation.md).
 - Keep this brief and the [Chinese one](RECIPE.zh-CN.md) aligned, each at most 60,000 UTF-8 bytes (Gallery skips larger recipes). Change it when what a rebuild produces changes; values and edge rules belong in the specs and t3-tokens.
@@ -282,7 +282,7 @@ Record transitions at the default sidebar width. On returning from Home or switc
 7. Actions add, edit, delete and run in each place and folder: required fields, confirmation, last-run choice, shell kept.
 8. Space panel and Files: every open, replace, duplicate, close, bulk, hide, maximize and eviction rule; local and remote; menus and clipboard; disabled, missing, long and many files; panel versus terminal keys. Details: empty and full Actions, locked machine row, choosing versus running, the keyboard walk, layered Escape, source change, cold and warm opening times.
 9. Review ranges, bases, remotes, commits, groups, reviewed state, `j`/`k`, Analyze, Unicode, binary, empty and error: tree and diff in one order, no unasked analysis, safe wrapping, opaque sticky headers, correct checkbox alpha.
-10. Running: open it from the footer count and both shortcut bindings. Search for a pane, focus it, close a pane and close a whole space. Right-click a space header to reach its worktree actions. Confirm Clean up with both a settled agent and an idle shell in scope. Check that the current tab and running programs stay open, the space that loses its last pane closes, and the footer count drops.
+10. Close idle: run it from the footer button and both shortcut bindings with a settled agent, an idle shell and a running program in another space in scope. The dialog names the first two by space and lists the program. Confirm, then check that the current tab and the program stay open and the space that loses its last pane closes. Run it again with nothing eligible: no dialog, a toast naming the program.
 11. Wallpaper: pictures load from disk at start; `+` menu and drops; the framing card grows upward with a fixed footer; four modes, paper on light themes, EXIF; any picture framed without conversion; zoom about the pointer with the slider in step; Apply, Cancel, retry, two Homes, late work and Delete, with no source edits or resurrection; framing survives restart, cache, theme and resize; light/dark switches picture and background in one frame; odd file names work.
 
 Passing checks don't replace seeing and using it. Report real clicks and keys you couldn't try as unverified, and remove only the demo resources you created.

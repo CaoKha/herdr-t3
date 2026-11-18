@@ -1,13 +1,13 @@
-# New, Go to, Running, Actions and dialogs
+# New, Go to, Actions and dialogs
 
-Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`, `t3-running`), Actions (`t3-actions`), confirmations and Layout Settings. The [RECIPE](../../../RECIPE.md) says what they do; dialog and palette tokens are in [t3-tokens](../t3-tokens.md)「组件」 and「做不到」.
+Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (`t3-actions`), confirmations and Layout Settings. The [RECIPE](../../../RECIPE.md) says what they do; dialog and palette tokens are in [t3-tokens](../t3-tokens.md)「组件」 and「做不到」.
 
-## New, Go to and Running
+## New and Go to
 
 - Top-centred popups, offset 96 (t3-tokens「做不到」), 576 wide, content-sized up to 420, radius 16, 1px border, `shadow_2xl`. Content shows from the first frame.
-- Rows 48 in New and Go to (20px title line and 16px second line, radius 4, 6 vertical padding); 36 in Running (radius 4, 8 horizontal padding).
+- Rows 48: 20px title line and 16px second line, radius 4, 6 vertical padding.
 - A ruled footer with 20px keycaps (radius 4, 12px medium).
-- Go to and Running have a borderless 36px search, 6 above and below. New's list caps at 285, Go to's and Running's at 313; all scroll with the keyboard highlight.
+- Go to has a borderless 36px search, 6 above and below. New's list caps at 285, Go to's at 313; both scroll with the keyboard highlight.
 
 ### Go to
 
@@ -22,19 +22,18 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`, `t3-runnin
 ### New
 
 - Live spaces first (current first, machines kept together), followed by remembered dormant projects (`t3.projects`) whose `(machine, folder)` is not already open; the second line is the folder, with server or machine for remote spaces. Dormant projects on a remote machine that isn't ready stay dimmed (`0.64`) and cannot be picked.
-- Choosing a live space opens a new tab at its current place (`newTab`); choosing a dormant project runs `space.new` with its `folder`, `machine` and explicit `name` when `named`. No process status or close controls appear here ([ADR 0020](../../adr/0020-running-owns-cleanup-and-bookmarks.md)).
+- Choosing a live space opens a new tab at its current place (`newTab`); choosing a dormant project runs `space.new` with its `folder`, `machine` and explicit `name` when `named`. No process status or close controls appear here ([ADR 0020](../../adr/0020-close-idle-and-project-bookmarks.md)).
 - Platform `1…9` pick numbered rows, labelled `⌘1` on macOS and `Super+1` elsewhere.
 - New space in the footer and the Inbox and Spaces headers make the same choice: create immediately with only this computer, otherwise ask which machine. Candidates are this computer, the reported machines, and machines that still have a space. The active space's machine comes first; remote machines that aren't ready (including those no longer reported) are listed but cannot be picked.
 - The footer opens the Machines step in place, with `← Spaces` to go back; a sidebar header opens at that step. Pressing the same header button closes its step; pressing the other switches steps. `cmd-n` creates on the active space's machine directly; New space shows that shortcut only when it creates directly. A sidebar installed without the New menu uses Herdr's native New space command.
 - New tab uses the space's current place (first terminal's folder, else original folder), not always its creation folder.
 
-### Running
+## Close idle
 
-- `cmd-shift-r` (`ctrl-alt-r`), or the sidebar footer's Running button. Lists every live non-Home space and its live panes in 36px rows (`scrollList`).
-- Space header row: 16px space mark, medium space name, optional remote server icon and machine name, and a right-aligned 20px slot holding the dim pane count at rest and a `micro` `×` (`Close space`, closing the popup and running `space.close`) on hover, with no reflow. Clicking the header itself navigates nowhere; right-clicking closes Running and opens the space's context menu (`t3-menu`).
-- Pane row (`pl(24)` under its space): 14px program or terminal icon, shared pane name (medium when focused here), and a right-aligned 20px slot holding the state/settled/snoozed/`Idle` mark (`Settled` check, `Snoozed` alarm clock, `statusMark`, or dim `Idle`) at rest and a `micro` `×` (`Close pane`, running `t3-tabs.close-pane:<pane>`) on pointer hover, with no reflow. Clicking or Enter runs `focusPane`; `ctrl-d` closes the highlighted pane; right-clicking closes Running and opens the agent or pane context menu.
-- Up/Down step across pane rows only (skipping space headers); highlight follows the pane identity across live updates, clearing if that pane closes. Search filters spaces and panes by space, machine, tab name, pane name, program and folder; a matching space shows its panes, and matching panes keep their space header above them.
-- Footer: ↑/↓ Navigate, Enter Go, Ctrl-D Close pane, Esc Close; at the right, `Clean up` (running `t3-tabs.cleanup` after closing Running, disabled when nothing is eligible). On open (outside `checking()`), Running probes non-agent terminals with `hc get` (`atPrompt`) so `Clean up` reflects both settled agents and idle shells.
+- `t3-tabs.cleanup`: `cmd-shift-r` (`ctrl-alt-r`) or the sidebar footer's button. No list opens first: the confirmation names what closes ([ADR 0020](../../adr/0020-close-idle-and-project-bookmarks.md)).
+- Eligible: outside the tab you're on, core-confirmed settled top-level agents with no busy sub-agent, and non-agent shells at their prompt (`hc get`: the foreground is the shell itself). Non-agent terminals running a program stay open.
+- Confirmation: `Close <n> idle terminal(s)?`; its detail names each terminal by space (`"Notarize release build" in herdling; "zsh" in api`), names the spaces that close with them, lists the non-agent terminals still running that stay open (`Still running and left open: …`), and ends with the tab you're on staying. Confirming rechecks each terminal.
+- Nothing eligible: no dialog, an `info` toast `Nothing idle to close`, its body naming the programs still running by space, else `No settled agents or shells at their prompt outside this tab.`
 
 ## Actions
 

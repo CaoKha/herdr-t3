@@ -144,7 +144,8 @@ async function checkCleanup() {
     assert.equal(dialog.kind, "dialog");
     assert.deepEqual(plain(dialog.props), {
       actions: "confirm", title: "Close 4 idle terminals?",
-      detail: "This ends settled agents and idle shells, closing 1 empty space. Active work and the tab you're on stay.",
+      detail: 'This ends settled agents and idle shells: "Pi" and "drained-shell-term" in project 1; "split-shell-term" and "quiet-term" in project 2, closing project 1. '
+        + 'Still running and left open: "vite-term" and "unresponsive-term" in project 2. The tab you\'re on stays.',
       yes: "Close", command: { name: "t3-tabs.cleanup-now:1" },
     });
     assert.deepEqual(f.calls, [], "the scan leaves all panes open");
@@ -202,7 +203,19 @@ async function checkCleanup() {
   {
     const f = fixture(), view = f.navigation();
     await view.handle("cleanup", f.cx);
-    assert.deepEqual([f.calls, f.overlays], [[], []], "do nothing with no eligible panes");
+    assert.deepEqual([f.calls, f.overlays], [[], []], "close nothing and ask nothing with no eligible panes");
+    assert.deepEqual(plain(f.notifications), [{ title: "Nothing idle to close", body: "No settled agents or shells at their prompt outside this tab.", level: "info" }],
+      "a press with nothing to close says so");
+  }
+  {
+    const { f, settled, idle, split, quiet, answers, busy } = cleanupFixture(), view = f.navigation();
+    settled.k.turn++;
+    for (const p of [idle, split, quiet]) answers.set(p.terminal, busy);
+    await view.handle("cleanup", f.cx);
+    assert.deepEqual([f.calls, f.overlays], [[], []]);
+    assert.deepEqual(plain(f.notifications), [{ title: "Nothing idle to close",
+      body: 'Still running: "drained-shell-term" in project 1; "split-shell-term", "quiet-term", "vite-term" and "unresponsive-term" in project 2.', level: "info" }],
+      "with only programs running, the toast names them");
   }
 }
 

@@ -9,7 +9,7 @@
 - **两种侧栏**：侧栏顶栏按钮切换 Inbox（注意力）和 Lists（项目），`cmd-]`／`cmd-[` 都可逐个走。Settle、Snooze 藏 agent 属于 Inbox，Lists 关闭后回之前的标签。
   - Spaces：只在不寻常时显示仓库、分支和领先/落后；worktree 折叠在所属仓库下，checkout 开没开都一样；机器多于一台时按机器分组，`ctrl-1…9` 和切换下一个 space 的键按看到的顺序走。
   - Agents：按 space 或按优先级分组，可置顶，子 agent 缩进在父级下。
-  - Inbox：T3 式 Settle。需要你的 agent 以卡片留在上方，等你处理的排最前。结束的 agent 可以收进 **Settled**，有新工作时自动回来。工作中的 agent 折叠进 Working。Snooze 把不需要你的 agent 藏到你选的时间。要结束已 Settle 的 agent 进程，到 **Running** 操作。
+  - Inbox：T3 式 Settle。需要你的 agent 以卡片留在上方，等你处理的排最前。结束的 agent 可以收进 **Settled**，有新工作时自动回来。工作中的 agent 折叠进 Working。Snooze 把不需要你的 agent 藏到你选的时间。要结束已 Settle 的 agent 进程，用 **Close idle**。
 - **各处同一个名字**：Inbox 卡片、agents 列表、标签和窗格标题用同一条规则给终端取名：Pi 在跑时用 Pi 会话名，其次是你命名过的标签，再其次是有意义的终端标题，最后是程序名。同一个标签里的两个 Pi 各自显示自己的会话名；Pi 退出后在原处启动的 lazygit 显示为 lazygit，不沿用旧会话名。
 - **各处同一套状态标记**：工作中转圈，blocked 或这一轮失败时显示 `!`，done 显示圆点。已 Settle 或 Snooze 的 agent 在各处都不再显示 done 圆点，Lists 也一样；只有 Inbox 会藏起工作中的 Snooze agent，其他地方照样转圈。显示 Inbox 时，标签上不显示任何标记：什么需要你由侧栏来说。
 - **窄标签、带框窗格**：24px 标签，照 T3 的面板标签，标签栏和 space 面板里是同一种：悬停时 × 盖住图标，状态标记留在右端，中键关闭，名字被截断时悬停显示全名；圆角窗格带 28px 标题栏（名字、目录、状态；悬停时出现分屏、缩放、关闭）；分屏时，你不在的窗格标题栏变暗，同 T3。选了 Inbox 时，收起的 agent 也在这里标出：已 Settle 显示勾，Snooze 中显示闹钟和剩余时间。标题栏的状态只表示它自己的 agent；旁边的子 agent 按钮写它启动的全部后代数量，需要你时变色，有在跑的时数字前转圈，tooltip 写需要你和在跑的个数。点开按树序列出，每行是程序图标、名字和 Agents 行同样的标记：工作时长、Needs you、红色 Failed、没看过的完成圆点或空闲时长。指针或 Up／Down 点亮行，点行或 Enter peek；右键打开侧栏同一份 agent 菜单，含 Send back、Copy address，Escape 关闭。Inbox 里就靠它打开子 agent。zoom 一个分屏的标签，标签栏会展开它的各个窗格，每个一段：点一段就改 zoom 它；用窗格标题栏的缩放按钮或 `cmd-shift-enter` 还原分屏。
@@ -17,7 +17,7 @@
 - 点 Inbox 或 Lists 侧栏的 New tab 打开 **New**。选已打开的 space 就在其中新建标签，也可以从列表下方选记住的项目，让它在原来的机器和目录重新打开。项目最后一个终端关闭后，New 仍会记住它。标签栏的 `+`、Inbox 面包屑的 space 菜单里的 New tab，以及 `cmd-t` 都会在当前 space 打开终端标签。在 Home 按 `cmd-t` 则打开 New。机器多于一台时，侧栏的 New space 会先问建在哪台。`cmd-n` 直接用当前 space 的机器。在终端里启动 agent。
 - **Home**：Settle 或 Snooze 当前查看的 agent 后，回到一个安静的固定位置，不再跳到下一张卡片，下一步看什么由你决定。想继续跳到下一张，或者把 Home 换成终端或别的 mod，见下面的设置。用这里的按钮或 `cmd-]`、`cmd-p`、`cmd-t` 决定下一步，Undo 能带回刚才的 agent。`cmd-shift-h` 或侧栏左上角的 Herdr logo 可随时进入。它不占 space 序号。它只放一样东西（页面、终端或 mod），没有窗格标题栏：不能 split 也不能关，agent 也不会留在里面。侧栏显示时，空的标签栏会收起，Home 占满高度。
 - **跳转**（`cmd-p`）：每个窗格一行，agent 和程序都在，名字和图标与窗格标题相同（标签名只有你命名过才算），所以输入 `lazygit` 就能直接跳到那个窗格，不管它旁边有没有 agent、在哪个 space。最近待过的窗格排在最前，越近越前，不管当时是怎么切过去的，所以 `cmd-p`、回车就回到刚才所在的窗格；你所在的窗格排最后。输入时，名字匹配的排在只靠目录或 space 匹配的前面。
-- 按 `cmd-shift-r`／`ctrl-alt-r`，或点击侧栏底栏显示已打开 space 数量的按钮，打开 **Running**。这里按 space 列出当前窗格，跳过 Home。可用搜索缩小范围，点击窗格行或高亮后按 Enter 聚焦。窗格或 space 行上的 `×` 可以关闭对应项，`ctrl-d` 关闭高亮的窗格。右键 space 标题打开菜单，可管理 worktree。**Clean up** 会先询问，再一起关闭已 Settle 的 agent 和空闲 shell，由此清空的 space 也会关闭。它保留当前标签，并在关闭前复查确认框中的终端是否仍符合条件。
+- **Close idle**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的刷子按钮）不离开 Inbox，一步关掉用完却还在运行的终端：当前标签之外已 Settle 的 agent 和停在提示符的 shell。它会先询问：确认框按 space 点名要关的终端，说明哪些 space 随之关闭，并列出仍在运行、不会关闭的程序，忘掉的 `bun dev` 就是这样被发现的。关闭前逐个复查。没有可关的东西时，会弹出提示说明，并列出仍在运行的程序。关掉的 space 仍留在 New 里。要回到某个终端用 Go to：输入 space 名就会列出它的窗格。
 - **详情和 Actions**：square-menu 按钮或 `cmd-shift-b` 打开详情，一个不改终端尺寸的 popup。再点按钮或按 Escape 关闭；换 space、标签或终端时它会关掉并提示。
   - 第一行是所在的机器：悬停 folder 图标看目录，整行右键复制路径。
   - **Open in**：主半边用 Finder 或上次选的已装 T3 编辑器（Cursor、Trae、Kiro、VS Code／Insiders／VSCodium、Zed、Antigravity 和 JetBrains）打开目录；箭头只选用哪个，和 Files 共用。选的编辑器卸载了就回到 Finder；远程 space 上说明为什么不可用。
@@ -59,7 +59,7 @@ Insert 拒绝包含控制字符的路径；可改用 Copy path。
 
 ## 快捷键
 
-布局的快捷键写在 `keys.json` 的 `layout:herdr-t3` 里，安装时会合并进去。下表也列出随布局提供的替代键，例如打开 Running 的 `ctrl-alt-r`。在 Linux 和 Windows 上，也可以在自己的 `keys.json` 里把 Herdr 原生快捷键绑定到下面的命令，使用布局的关闭确认和 space 编号规则。
+布局的快捷键写在 `keys.json` 的 `layout:herdr-t3` 里，安装时会合并进去。下表也列出随布局提供的替代键，例如 Close idle 的 `ctrl-alt-r`。在 Linux 和 Windows 上，也可以在自己的 `keys.json` 里把 Herdr 原生快捷键绑定到下面的命令，使用布局的关闭确认和 space 编号规则。
 
 | 快捷键 | 命令 | 作用 |
 | --- | --- | --- |
@@ -77,16 +77,16 @@ Insert 拒绝包含控制字符的路径；可改用 Copy path。
 | `cmd-1…9`、`ctrl-alt-1…9` | `t3-tabs.tab:<n>` | 标签栏显示的第 n 个标签 |
 | `cmd-shift-]` / `cmd-shift-[`、`ctrl-tab` / `ctrl-shift-tab`、`ctrl-alt-]` / `ctrl-alt-[` | `t3-tabs.tab-next` / `t3-tabs.tab-prev` | 标签栏显示的下一个或上一个标签 |
 | `cmd-p` | `mod.open:t3-picker` | 按名字或程序跳到任一窗格，或回到上一处 |
-| `cmd-shift-r`／`ctrl-alt-r` | `mod.open:t3-running` | 查看打开的 space 和窗格，或清理符合条件的终端 |
+| `cmd-shift-r`／`ctrl-alt-r` | `t3-tabs.cleanup` | Close idle：询问后关闭已 Settle 的 agent 和停在提示符的 shell |
 | `cmd-]` / `cmd-[` | `t3-tabs.next` / `t3-tabs.prev` | 下一个或上一个顶层 agent，按选中侧栏的顺序走，到两端停住，显示或隐藏都一样。Inbox 走它画出来的行（折叠的 shelf 只算当前查看的那一行）；Lists 也走折叠的组 |
 | `cmd-w`、`ctrl-alt-shift-x` | `t3-tabs.close-tab` | 关闭标签，里面有程序在运行时先确认 |
 | `cmd-shift-w`、`ctrl-alt-x` | `t3-tabs.close-pane` | 关闭窗格，里面有程序在运行时先确认 |
 
-有对话框或弹窗开着时（Go to、New、Running、菜单、Settings、命令面板、Actions 编辑器等），这几个关闭标签和窗格的键改为关掉它，和 Herdr 自带布局一样（`keys.json` 里的 `mod:…` 分区）。
+有对话框或弹窗开着时（Go to、New、菜单、Settings、命令面板、Actions 编辑器等），这几个关闭标签和窗格的键改为关掉它，和 Herdr 自带布局一样（`keys.json` 里的 `mod:…` 分区）。
 
 在 Files 或 Review 里，`cmd-shift-w` 和 `ctrl-alt-x` 用来收起当前菜单。要用这两个键关闭终端窗格，先把焦点移回终端。
 
-其他标签、space 和窗格操作沿用 Herdr 自己的快捷键。Inbox 里的置顶和拖动用鼠标。在 Running 里可用 Tab 移到 **Clean up** 等控件。
+其他标签、space 和窗格操作沿用 Herdr 自己的快捷键。Inbox 里的置顶和拖动用鼠标。
 
 键盘操作：用 Herdr 的 `pane.go` 移到侧栏列表后，Tab 能走遍窗口里的所有控件，包括面板按钮，Enter 或 Space 和点击效果相同。在新建菜单和跳转里，Tab 还能走到底部按钮（New space、`← Spaces`、New tab）。
 

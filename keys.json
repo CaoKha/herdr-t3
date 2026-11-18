@@ -5,8 +5,8 @@
     "cmd-alt-b": "t3-tabs.panel",
     "cmd-shift-s": "t3-tabs.settle",
     "cmd-p": "mod.open:t3-picker",
-    "cmd-shift-r": "mod.open:t3-running",
-    "ctrl-alt-r": "mod.open:t3-running",
+    "cmd-shift-r": "t3-tabs.cleanup",
+    "ctrl-alt-r": "t3-tabs.cleanup",
     "cmd-]": "t3-tabs.next",
     "cmd-[": "t3-tabs.prev",
     "cmd-w": "t3-tabs.close-tab",
@@ -65,12 +65,6 @@
     "cmd-shift-,": "t3-tabs.settings"
   },
   "mod:t3-picker": {
-    "cmd-w": "overlay.close",
-    "ctrl-alt-shift-x": "overlay.close",
-    "cmd-shift-w": "overlay.close",
-    "ctrl-alt-x": "overlay.close"
-  },
-  "mod:t3-running": {
     "cmd-w": "overlay.close",
     "ctrl-alt-shift-x": "overlay.close",
     "cmd-shift-w": "overlay.close",

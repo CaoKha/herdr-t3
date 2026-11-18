@@ -4,9 +4,9 @@
 
 ## 2026-11-19
 
-- **Running**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏显示已打开 space 数量的按钮）集中列出打开的 space 和终端。可以聚焦任一窗格、关闭单个窗格或整个 space，也可以右键 space 管理 worktree。**Clean up** 经确认后一起关闭已 Settle 的 agent 和空闲 shell，清空的 space 也会关闭。
+- **Close idle**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的刷子按钮）不离开 Inbox，关掉已 Settle 的 agent 和空闲 shell。确认框按 space 点名要关的终端、随之关闭的 space 和仍在运行的程序（例如忘掉的 `bun dev`），后者保持打开。没有可关的东西时会弹出提示。
 - **New** 会在项目的最后一个终端关闭后记住它。记住的项目排在已打开的 space 后面，选中后会在原来的机器和目录重新打开。
-- **Settled** 收纳已收起的 agent，原来由 **Clear** 负责的进程清理移到 **Running**。**Filter by space** 只列出有 Inbox 条目或已在筛选中选中的 space。
+- **Settled** 收纳已收起的 agent，原来由 **Clear** 负责的进程清理移到 **Close idle**。**Filter by space** 只列出有 Inbox 条目或已在筛选中选中的 space。
 
 ## 2026-11-18
 

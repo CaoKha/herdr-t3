@@ -28,7 +28,7 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 ### 侧栏框架
 
-品牌栏先给 macOS 窗口按钮留位置，再放 Herdr 官方标记和 `Herdr`，两者合成回 Home 的按钮。右侧两个相接的 28px 按钮切模式（图标表示点击后去哪：`inbox` 或 `layout-list`）和隐藏侧栏。窗口按钮挪到与这条栏的中线对齐。底栏的 32px 控件间隔 4px，依次是 Herdr Settings、布局设置（sliders）和 Running（layers）。Running 点击打开 `t3-running`，有非 Home space 打开时显示其数量。空位显示 Undo，下载好更新后多一个 `Update` 胶囊。规格：[sidebar](docs/internals/specs/sidebar.md)。
+品牌栏先给 macOS 窗口按钮留位置，再放 Herdr 官方标记和 `Herdr`，两者合成回 Home 的按钮。右侧两个相接的 28px 按钮切模式（图标表示点击后去哪：`inbox` 或 `layout-list`）和隐藏侧栏。窗口按钮挪到与这条栏的中线对齐。底栏的 32px 控件间隔 4px，依次是 Herdr Settings、布局设置（sliders）和 Close idle（brush），都是图标按钮。Close idle 直接运行 `t3-tabs.cleanup`。空位显示 Undo，下载好更新后多一个 `Update` 胶囊。规格：[sidebar](docs/internals/specs/sidebar.md)。
 
 ### Inbox
 
@@ -76,7 +76,7 @@ Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/
 
 ### 弹层、对话框与 Home
 
-New、Go to 和 Running 是顶部居中的弹层，宽 576px、圆角 16px，底部是键帽提示。New 和 Go to 的两行条目高 48px。Running 每行高 36px，窗格按 space 分组。菜单、提示和按钮照 [t3-tokens](docs/internals/t3-tokens.md)。Actions 编辑器和确认框宽 512、圆角 16；确认框的执行按钮在 Cancel 后，raised 底红字。布局设置照 Herdr 自己的 Settings 对话框（880×620）。规格：[dialogs](docs/internals/specs/dialogs.md)。
+New 和 Go to 是顶部居中的弹层，宽 576px、圆角 16px，底部是键帽提示。New 和 Go to 的两行条目高 48px。菜单、提示和按钮照 [t3-tokens](docs/internals/t3-tokens.md)。Actions 编辑器和确认框宽 512、圆角 16；确认框的执行按钮在 Cancel 后，raised 底红字。布局设置照 Herdr 自己的 Settings 对话框（880×620）。规格：[dialogs](docs/internals/specs/dialogs.md)。
 
 Home 是一张带框、无标题的窗格：正中 Next agent、Go to、New tab 三个带键帽的按钮，无名字或计数。在 Home 时标签栏没有面板开关，整行从 40 收成 8，除非要放窗口按钮或隐藏侧栏的控件。规格：[home](docs/internals/specs/home.md)。
 
@@ -141,7 +141,7 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 | 对象 | 可用动作 |
 | --- | --- |
 | Agent，含面包屑父级／子 agent 行 | 顶层 Pin/Unpin；Inbox 下子树不忙时 Settle/Un-settle、符合条件 Snooze/Wake；名字来自唯一标签且不是 Pi 时 Rename；Copy address；Send back 父级；Close 自己 pane |
-| Space，含分组／面包屑／筛选行和 Running 标题行 | New tab；Rename；Copy 当前 path；仓库 New/Open worktree；linked worktree 的 Remove worktree（`ansi1`）；Close |
+| Space，含分组／面包屑／筛选行 | New tab；Rename；Copy 当前 path；仓库 New/Open worktree；linked worktree 的 Remove worktree（`ansi1`）；Close |
 | 未开 checkout 虚行 | Open、Copy path |
 | 已连接／重建机器 | New space here、Connect |
 | Tab | New tab、Rename、Close |
@@ -153,11 +153,11 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 点 space 切换；拖动在同机器内排序（`space.move`），checkout 带着展开的 worktree 一起动。checkout 没开、有两个及以上 worktree 时，它们收在一个暗色虚 checkout 下，点它打开该 checkout。点顶层 agent `agent.focus`，点子 agent 行 peek。Pin 与 Inbox 共用；Lists 没有 Settled 组，只隐去未读 done。
 
-### Go to、New、Running 与 Actions
+### Go to、New、Close idle 与 Actions
 
 Go to（`cmd-p`）列出所有 pane，最近的在前，打开时选中之前的 pane，所以 `cmd-p`、Enter 来回切换；Enter 跨 space 聚焦，`ctrl-d` 走安全关闭。New 先列出已打开的 space，当前项排最前，再列出 `t3.projects` 记住但尚未打开的项目。常驻的 `t3-tabs` 记录项目。New 按机器和目录这一对值判断项目是否已打开。选已打开的 space 在其当前位置新建标签，选书签则用 `space.new` 在原机器和目录重新打开，并保留显式命名。平台修饰键加 `1…9` 选择对应行。底栏可新建 space，多机器时先问哪台。见 [New](docs/internals/specs/dialogs.md#new) 和 [storage](docs/internals/storage.md)。
 
-Running 按 space 列出所有非 Home 窗格，可以搜索 space 和窗格。点击窗格行或高亮后按 Enter 聚焦。点窗格行的 `×` 或按 `ctrl-d` 关闭窗格，点 space 标题行的 `×` 关闭整个 space，右键标题打开含 worktree 操作的 space 菜单。**Clean up** 调用 `t3-tabs.cleanup`，并询问是否关闭当前标签之外已由 core 确认为 Settled 的 agent 和停在提示符的非 agent shell。确认时复查对话框列出的终端。清空的 space 随之关闭。见 [Running](docs/internals/specs/dialogs.md#running) 和[清理命令](docs/internals/specs/tab-bar.md#t3-tabs-commands)。
+**Close idle**（`t3-tabs.cleanup`）不离开 Inbox，关掉用完却还在运行的终端，不先打开任何列表。询问是否关闭当前标签之外已由 core 确认为 Settled 的 agent 和停在提示符的非 agent shell；确认框按 space 点名这些终端、随之关闭的 space 和仍在运行的非 agent 终端，后者保持打开。确认时复查列出的终端，清空的 space 随之关闭。没有符合条件的终端时，弹出提示并列出仍在运行的程序。见 [Close idle](docs/internals/specs/dialogs.md#close-idle) 和[清理命令](docs/internals/specs/tab-bar.md#t3-tabs-commands)。
 
 Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设为主动作，齿轮编辑。动作有 Name、Command，可选 Folder 和图标，在新的 Tab、Split right 或 Split down 中运行：`terminal.open { argv: ["sh", "-c", command], name, place, folder? }`，结束后 shell 保留。没填 Folder 时在聚焦终端的 cwd 运行，否则用 space 文件夹。
 
@@ -189,7 +189,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 | `cmd-shift-g` | `t3-tabs.review`，Review 开关；无键 `t3-tabs.files` 同理 |
 | `cmd-shift-s` | `t3-tabs.settle`，当前 Inbox agent/mod 卡 |
 | `cmd-p` | `mod.open:t3-picker` |
-| `cmd-shift-r`／`ctrl-alt-r` | `mod.open:t3-running` |
+| `cmd-shift-r`／`ctrl-alt-r` | `t3-tabs.cleanup` |
 | `cmd-]`／`cmd-[` | `t3-tabs.next/prev`，agent，不循环 |
 | `cmd-w`、`ctrl-alt-shift-x` | `t3-tabs.close-tab` |
 | `cmd-shift-w`、`ctrl-alt-x` | `t3-tabs.close-pane` |
@@ -242,7 +242,7 @@ floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 
 sidebar、work、panel 列内部 `resizable:false`，外分隔线仍可拖。`spaces` 传 `{newMenu:"t3-new-menu"}`；`inbox` 传 `{newMenu:"t3-new-menu",home:"t3-tabs.home",menu:"t3-menu"}`。`main` 与 `home-main` 共用上述窗格框设置。浮动 `tabs-keys` 副本负责命令、Home 和每 space 面板同步；其他 `t3-tabs` 副本共用导航。
 
-必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-running`、`t3-actions`、`t3-menu`。有对应官方 mod 的从它改，Inbox、Home、Files 和 Running 新建。保留官方 `workspace-status`、转圈和程序素材。UI 图标是各 mod 自己 `icons/` 里的 Lucide（24 网格、1.75 笔画）；Files 和 Review 的树用 T3／Pierre 图形。mod 不能越出自己目录 import：共享模块放在 `shared/`，由 `scripts/sync.sh` 复制。
+必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应官方 mod 的从它改，Inbox、Home 和 Files 新建。保留官方 `workspace-status`、转圈和程序素材。UI 图标是各 mod 自己 `icons/` 里的 Lucide（24 网格、1.75 笔画）；Files 和 Review 的树用 T3／Pierre 图形。mod 不能越出自己目录 import：共享模块放在 `shared/`，由 `scripts/sync.sh` 复制。
 
 ### 安装
 
@@ -262,7 +262,7 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 
 - 隐藏的 mod 不画也不收命令，首次显示才启动。常驻命令和 Snooze 计时放在浮动 `tabs-keys`；隐藏时所选模式的顺序继续生效，Inbox 从未启动前它自己的顺序除外。模型和远程标签有延迟时保留最后意图，写失败要提示。
 - Home 的严格认领保护普通 space：释放 Home 里的 agent space 时原地释放，不移动或删除进程。外部原生关闭可能闪一下邻居；重启丢关闭历史；原生 Home 分屏拦不住；zoom 组不能拖。
-- 保留确认：关闭和 Clean up 会停终端、清历史，Remove worktree 会删除，壁纸 Delete 删源文件和缓存。Actions 运行任意 `sh -c`。窗口按钮位置只按预期内容写那一个字段；`layout.set` 会丢掉布局记住的状态。
+- 保留确认：关闭和 Close idle 会停终端、清历史，Remove worktree 会删除，壁纸 Delete 删源文件和缓存。Actions 运行任意 `sh -c`。窗口按钮位置只按预期内容写那一个字段；`layout.set` 会丢掉布局记住的状态。
 - 图标路径写错时什么都不画也不报错；运行时拼出的路径要在 demo 窗口里看。宿主没有 blur、缩放动画和字距，用实色代替；透明 popup 仍挡输入。补上漏掉的指针离开和松开；关闭 popup 不能重新打开它，也不能关掉下面的标签。
 - 改 render 或计时器、焦点或悬停、测量或滚动、Review 文本或壁纸转换前，读 [layout implementation](docs/internals/layout-implementation.md)。
 - 本文与[英文版](RECIPE.md)保持一致，各 ≤60,000 UTF-8 字节（Gallery 跳过更大的 RECIPE）。只有重建出来的结果会变时才改它；数值和边界规则写进 specs 和 t3-tokens。
@@ -282,7 +282,7 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 7. Actions 增、改、删，在各位置和目录运行：必填项、确认、上次选择、shell 保留。
 8. space 面板与 Files：每条打开、替换、去重、关闭、批量、隐藏、放大和驱逐规则；本机与远程；菜单与剪贴板；禁用、缺失、长名和大量文件；面板与终端快捷键。详情：Actions 空与满、locked 机器行、选择与执行、键盘走查、分层 Escape、来源失效、冷暖打开耗时。
 9. Review 范围、base、远程、commit、组、已看、`j`/`k`、Analyze、Unicode、二进制、空与失败：树和 diff 同序，不误分析，换行安全，吸顶头不透明，勾选框 alpha 正确。
-10. Running：从底栏计数按钮和两组快捷键打开，搜索并聚焦窗格，分别关闭单个窗格和整个 space。右键 space 标题可用 worktree 操作。让一个已 Settle 的 agent 和一个空闲 shell 同时符合清理条件，确认 Clean up 后检查当前标签和仍在运行的程序保留、被清空的 space 关闭、底栏计数减少。
+10. Close idle：让一个已 Settle 的 agent、一个空闲 shell 和另一个 space 里运行中的程序同时在范围内，分别从底栏按钮和两组快捷键运行。确认框按 space 点名前两者并列出程序；确认后检查当前标签和程序保留、被清空的 space 关闭。没有符合条件的终端时再运行一次：不弹确认框，弹出提示并列出程序。
 11. 壁纸：启动时从磁盘加载；`+` 菜单和拖入；取景卡向上展开、底栏不动；四种模式、浅色纸面、EXIF 方向；任何画取景都不重新转换；以指针为中心缩放、滑条同步；Apply、Cancel、重试、两个 Home、迟到任务和 Delete，不改原图、不复活；构图经重启、缓存、主题和尺寸变化保留；切换明暗时画与背景同一帧换好；特殊文件名可用。
 
 检查通过不能替代亲眼看和亲手用。没试过的真实点击和按键须注明未验证，只清理本次创建的 demo 资源。

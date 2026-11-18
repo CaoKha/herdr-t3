@@ -12,7 +12,7 @@ import { writeLabel } from "./labels.js";
 
 // One instance per Tabs view; the Herdr operations also admit the check's fake core.
 export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => checking(), spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel }) {
-  const { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel } = core;
+  const { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel } = core;
   // lastIn: each tab's agent last in view, which the Inbox's bar holds while a program there has the focus.
   // fresh: spaces where the person started something new (the breadcrumb's space, cmd-t) since last looking at an agent there.
   const trail = {}, lastIn = {}, fresh = new Set(), owed = new Map(), waking = new Map();
@@ -171,12 +171,14 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     return { openSpaces, ps, candidates };
   }
 
+  // `kept`: the non-agent terminals in scope still running a program, which the confirmation lists and leaves open.
   async function scanCleanup(targets) {
     const { candidates } = cleanupScope();
-    const eligible = new Map();
+    const eligible = new Map(), busy = new Set();
     await Promise.all([...candidates].map(async ([pane, { terminal, agent }]) => {
       if (targets && targets.get(pane) !== terminal) return;
       if (agent || await atPrompt(terminal)) eligible.set(pane, { terminal, agent });
+      else busy.add(pane);
     }));
     // A prompt probe can take long enough for focus, pane contents or an agent's state to change.
     const current = cleanupScope();
@@ -185,22 +187,41 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       const p = current.candidates.get(pane);
       if (p?.terminal === terminal && p.agent === agent) confirmed.set(pane, terminal);
     }
-    return { openSpaces: current.openSpaces, ps: current.ps, confirmed };
+    const kept = new Set([...busy].filter(pane => current.candidates.has(pane)));
+    return { openSpaces: current.openSpaces, ps: current.ps, confirmed, kept };
   }
 
+  // `"a" and "b" in web; "c" in api`, the spaces in order, the panes named as their headers name them.
+  function bySpace(openSpaces, ps, panesIn) {
+    const name = namer();
+    return openSpaces.flatMap(s => {
+      const tabs = new Set(s.tabs.map(c => c.id));
+      const names = ps.filter(p => tabs.has(p.tab) && panesIn.has(p.pane)).map(p => `"${name(p)}"`);
+      return names.length ? [`${andList(names)} in ${s.name}`] : [];
+    }).join("; ");
+  }
+
+  const andList = list => list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
+
   async function cleanup(cx) {
-    const { openSpaces, ps, confirmed } = await scanCleanup(null);
+    const { openSpaces, ps, confirmed, kept } = await scanCleanup(null);
     const n = confirmed.size;
-    if (!n) return;
-    const m = openSpaces.filter(s => {
+    // The footer's button can't know without probing shells, so a press with nothing to close says so.
+    if (!n) {
+      notify({ title: "Nothing idle to close", level: "info",
+        body: kept.size ? `Still running: ${bySpace(openSpaces, ps, kept)}.` : "No settled agents or shells at their prompt outside this tab." });
+      return;
+    }
+    const emptied = openSpaces.filter(s => {
       const tabs = new Set(s.tabs.map(c => c.id));
       const mine = ps.filter(p => tabs.has(p.tab));
       return mine.length > 0 && mine.every(p => confirmed.has(p.pane));
-    }).length;
+    }).map(s => s.name);
     const command = `cleanup-now:${++cleanupSerial}`;
-    const emptied = m ? `, closing ${m} empty space${m === 1 ? "" : "s"}` : "";
+    const closing = emptied.length ? `, closing ${andList(emptied)}` : "";
+    const left = kept.size ? ` Still running and left open: ${bySpace(openSpaces, ps, kept)}.` : "";
     confirmClose(`Close ${n} idle terminal${n === 1 ? "" : "s"}?`,
-      `This ends settled agents and idle shells${emptied}. Active work and the tab you're on stay.`, `t3-tabs.${command}`, cx);
+      `This ends settled agents and idle shells: ${bySpace(openSpaces, ps, confirmed)}${closing}.${left} The tab you're on stays.`, `t3-tabs.${command}`, cx);
     cleanupAnswer = { command, targets: confirmed };
   }
 

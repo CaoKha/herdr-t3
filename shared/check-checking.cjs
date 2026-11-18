@@ -51,10 +51,6 @@ async function check(checking) {
   chromeView.alignLights(cx); chromeView.probeReview(cx);
   const spaces = load("mods/t3-spaces/main.js"), spacesView = new spaces.Mod();
   spacesView.reconnecting = {}; spacesView.refreshMachines(cx);
-  const running = load("mods/t3-running/main.js");
-  running.subAgents = () => () => []; running.agents = () => []; running.terminals = () => []; running.programOf = () => null;
-  running.panes = () => [{ pane: "p", tab: "c", terminal: "t1" }]; running.spaces = () => [{ id: "s", active: true, tabs: [{ id: "c" }] }];
-  new running.Mod().init({}, cx);
   const targets = load("shared/open-in.js");
   await vm.runInContext("installedTargets()", targets);
   if (checking) {

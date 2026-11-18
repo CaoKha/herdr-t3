@@ -688,7 +688,7 @@ async function checkInbox() {
     t0.focused = true; remote.focused = false;
   }
   {
-    // Settled folds and pages without a Clear control; ending settled processes lives in Running.
+    // Settled folds and pages without a Clear control; ending settled processes is Close idle.
     f.spaces()[0].tabs[0].active = true;
     inbox.open = true;
     assert.equal(find(inbox.render(run), "settled-clear"), null, "Settled has no Clear button");

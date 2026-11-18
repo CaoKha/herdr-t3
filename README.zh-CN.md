@@ -22,7 +22,7 @@
 - **Home**：收起正在看的 agent 后，回到一个安静的页面，不会自动跳到下一张卡片。下一步看什么由你决定。也可以在设置（`cmd-shift-,`）里改成跳到下一张卡片，或者把 Home 换成终端或你自己的 mod。
 - **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名、标状态。
 - **跳转**（`cmd-p`）：按名字跳到任何窗格，agent 和普通程序都行。最近访问顺序变化时，Enter 仍跳到你选中的窗格。
-- **Running**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏显示已打开 space 数量的按钮）列出打开的 space 和窗格。可以聚焦或关闭单个窗格、关闭整个 space，也可以点 **Clean up**，确认后关闭已 Settle 的 agent、空闲 shell 和由此清空的 space。
+- **Close idle**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的刷子按钮）不离开 Inbox，关掉已 Settle 的 agent 和空闲 shell。它会先询问，按 space 点名要关的终端、随之关闭的 space 和仍在运行的程序，后者保持打开。
 - **New** 先列出打开的 space，再列出记住的项目。项目的最后一个终端关闭后仍可选中，在原来的机器和目录重新打开。
 - **详情**（`cmd-shift-b`）：locked 电脑／目录、Open in、全局 Actions，下面的 Review 行一点就显示 Review，箭头选范围。已装T3编辑器（含VSCodium／JetBrains）与Files共用偏好，菜单只选择，主按钮才打开；右键卡片可选择显示项目。
 - **窄标签、带框窗格**，照 T3 Code 的外观。在 Inbox 下，点标签栏面包屑里的 space 名打开菜单，可新建标签页或直接切到当前 space 下的其他 agent、子 agent 和终端程序。
@@ -59,7 +59,7 @@
 | `cmd-shift-s` | Settle 当前查看的 agent 并回到 Home，已 Settle 的则取回 |
 | `cmd-]` / `cmd-[` | 按侧栏的顺序到下一个或上一个 agent |
 | `cmd-p` | 跳到任一窗格 |
-| `cmd-shift-r`／`ctrl-alt-r` | 打开 Running |
+| `cmd-shift-r`／`ctrl-alt-r` | 关闭闲置终端 |
 | `cmd-shift-h` | 回到 Home |
 | `cmd-shift-,` | 布局的设置 |
 | `cmd-alt-b` | 打开或关闭 space 面板，停在上次的页面 |
@@ -83,12 +83,12 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 - `t3-inbox`：Snooze 或唤醒时运行 `hc label <agent> snoozed=<ms>`。
 - `t3-inbox` 在窗格所在机器的工作目录中用 `git rev-parse` 和 `git worktree list --porcelain -z` 识别链接工作树。
 - `t3-tabs`：关闭终端前运行 `hc get`，看里面有没有程序在跑。用 `cmd-shift-s` Settle 或取回 agent 时运行 `hc label`；Herdr 显示了你没选的标签、清掉了未读的 done（`herdr.seen`）或 Woke 标记（`snoozed`）时，也用它还回去；这一轮失败或查看时有新工作结束 Snooze 时，运行 `hc label <agent> snoozed=`。
-- `t3-running`：用 `hc get` 检查 shell 是否空闲、能否纳入 **Clean up**。
+- `t3-tabs`：用 `hc get` 检查 shell 是否空闲、能否纳入 **Close idle**。
 - `t3-agents`：置顶一个 Snooze 中的 agent、结束它的 Snooze 时，运行 `hc label <agent> snoozed=`。
 - `t3-actions`：读取 ComputerName，用 `open -Ra` 检测编辑器，通过 `open` 打开所选目录；Review 行异步复用Review页的只读Git范围助手，不执行Git写操作。
 - `t3-chrome`：macOS 上缩放变化时，改写已安装的 `layouts/herdr-t3.json` 里的窗口按钮位置，让按钮留在品牌栏的中线上。
 - `t3-files`：只读，在 space 所在的机器上执行：`git rev-parse`、`git status`、`git check-ignore` 和 `git ls-files`（带 `--no-optional-locks`，不会往 `.git` 里写东西），用 `sh` 列文件夹，在其他机器上也用它查文件大小、搜路径；不在 Git 里时用 `find`；其他机器上的图片用 `base64` 传回。显示的图片复制到 `cache/t3-files/`，mod 停止时删掉。右键菜单：Reveal in Finder 和 Open in default app 执行 `open`（Linux 上是 `xdg-open`）；Mention in agent 借剪贴板粘贴进 agent 的终端，然后恢复你原来的剪贴板。
-- `t3-spaces`、`t3-agents`、`t3-inbox`、`t3-new-menu`、`t3-picker`、`t3-running`：为每个 space 的图标，在 space 所在的位置（它的机器上）运行 `git rev-parse --show-toplevel`、`sh` 文件检测和 `base64`；找到的图标复制到 `cache/t3-icons/`。
+- `t3-spaces`、`t3-agents`、`t3-inbox`、`t3-new-menu`、`t3-picker`：为每个 space 的图标，在 space 所在的位置（它的机器上）运行 `git rev-parse --show-toplevel`、`sh` 文件检测和 `base64`；找到的图标复制到 `cache/t3-icons/`。
 
 布局不发送遥测；可选Review扩展使用它配置的分析服务。
 
