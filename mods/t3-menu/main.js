@@ -24,6 +24,7 @@ import { programIcon } from "./program.js";
 import { statusMark } from "./status-mark.js";
 import { alpha } from "./color.js";
 import { focusAgent, focusPane } from "./zoom.js";
+import { prepareSpace } from "./space-arrival.js";
 import { pinList } from "./pins.js";
 import { sidebarParts } from "./sidebar.js";
 import { closedKey } from "./store.js";
@@ -384,7 +385,10 @@ export default class Menu extends View {
     else if (it[1] === "copy") cx.write_to_clipboard(it[2].text);
     else if (wake !== null) run(`t3-tabs.snooze:${it[2].address}:${wake}`, {});
     else if (it[1] === "custom-snooze") openOverlay({ mod: "t3-inbox", kind: "dialog", frame: "none", width: 384, props: { customSnooze: it[2].address, answer: "t3-tabs.snooze" } });
-    else run(it[1], it[2]);
+    else {
+      if (it[1] === "tab.new") prepareSpace(it[2].space);
+      run(it[1], it[2]);
+    }
   }
 
   spaceSwitchView(t, p, cx) {
@@ -397,7 +401,10 @@ export default class Menu extends View {
       if (i === 0) {
         const active = spaces().find((s) => s.active);
         if (active?.id === spaceId) run("t3-tabs.new");
-        else { const sp = spaces().find((s) => s.id === spaceId); if (sp) run("tab.new", { space: sp.id, folder: place(sp) }); }
+        else {
+          const sp = spaces().find((s) => s.id === spaceId);
+          if (sp) { prepareSpace(sp.id); run("tab.new", { space: sp.id, folder: place(sp) }); }
+        }
         return;
       }
       const entry = entries[i - 1];

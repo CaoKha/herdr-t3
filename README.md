@@ -17,6 +17,7 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 ## Features
 
 - **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention with Settle and Snooze; Lists shows spaces and agents by project.
+- **Switching spaces** brings the destination tab bar, terminal and saved right panel into view together, including when returning from Home.
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
 - **Go to** (`cmd-p`): jump to any pane, agent or program, by its name. When recent panes change order, Enter follows the pane you selected.

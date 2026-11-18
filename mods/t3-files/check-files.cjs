@@ -69,8 +69,9 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   const layout = { id: "root", children: [{ id: "work" }, { id: "panel", children: [body] }] };
   const ctx = vm.createContext({ checking: () => false,
     View: class {}, div: element, svg: element, image: (src) => element("image", src), h_flex: element, v_flex: element,
-    Input: { new: element }, Editor: { new: element }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
-    InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v, set_value(x) { v = x; }, focus() { events.focus?.({}, cx); } }; } },
+    Input: { new: element }, Editor: { new: (state) => element("editor", state) }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
+    InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v,
+      set_value(x) { assert.ok(!w.drawing, "InputState.set_value must run outside the draw"); v = x; }, focus() { events.focus?.({}, cx); } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
     spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
     theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => appDir ?? "/tmp/none",
@@ -93,6 +94,8 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
   const view = new ctx.Mod();
   view.init({}, cx);
+  const render = view.render.bind(view);
+  view.render = (cx) => { w.drawing = true; try { return render(cx); } finally { w.drawing = false; } };
   // One of its menus: another copy, opened with these props.
   // One of its menus: another copy, opened with these props; they stay the app's props until `w.props = null`.
   const menu = (p) => { w.props = { overlay: "m1", ...p }; const v = new ctx.Mod(); v.init({}, cx); return v; };
@@ -819,6 +822,91 @@ async function surfaceCache() {
   view.open(st, "b.js", cx); await settle(); assert.notEqual(st.view.code, editors[1], "re-add starts with a new Editor");
 }
 
+async function firstPreviewFrame() {
+  const { view, cx, w, ctx, fire, send, settle } = makePage();
+  const draw = () => view.render(cx);
+  const code = (frame) => find(frame, "t3-files-code")?.items[0].source?.text;
+  w.texts = { "/r/a.js": "// ALPHA", "/r/b.js": "// BRAVO" };
+  draw(); await settle();
+  for (const file of ["a.js", "b.js"]) { send(`open:${file}`); await settle(); draw(); await fire(0); }
+  send("search:b"); await settle();
+  const readCount = w.read.length, editorCount = w.made.length;
+  w.focused = "terminal";
+  ctx.activateSurface("file:a.js");
+  let frame = draw(); // No timers, including no 0ms timer, have run since the tab switch.
+  assert.deepEqual([ctx.panelState().active, Boolean(find(frame, "crumb-a.js")), code(frame), find(frame, "row-a.js")?.style.bg?.[0]],
+    ["file:a.js", true, "// ALPHA", "#ffffff1f"], "the active tab, breadcrumb, code and tree selection agree in the first frame");
+  assert.ok(kit.strings(find(frame, "t3-files-search-field")).includes("Search files"), "the first frame does not show the old query beside the restored tree");
+
+  ctx.openFile("unread.js");
+  frame = draw();
+  assert.ok(find(frame, "crumb-unread.js") && find(frame, "t3-files-loading"), "an uncached tab shows its own loading state in the first frame");
+  assert.equal(code(frame), undefined, "an uncached tab never shows the old Editor");
+  ctx.activateSurface("file:b.js");
+  await fire(0);
+  assert.equal(code(draw()), "// BRAVO", "only the latest tab still owns the preview after the timer");
+  assert.equal(w.read.length, readCount, "the superseded tab never starts a read and cached code is not re-read on a switch");
+  assert.equal(w.made.length, editorCount, "tab switches reuse cached Editors");
+  assert.equal(w.focused, "terminal", "external tab switches do not take focus");
+  assert.equal(view.search.value(), "", "the native input follows the cleared query after the draw");
+
+  ctx.activateSurface("file:unread.js");
+  draw(); await fire(0);
+  assert.equal(code(draw()), "const a = 1;\n", "an uncached tab that stays selected finishes loading");
+
+  send("search:a"); await settle();
+  ctx.activateSurface("file:b.js"); draw();
+  send("search:b"); await settle(); await fire(0);
+  assert.equal(view.search.value(), "b", "a deferred clear must not erase a newer query");
+  assert.ok(!find(draw(), "row-a.js"), "the newer query still owns the tree");
+}
+
+async function treeLoadingDelay() {
+  const findLoading = (page) => find(page.view.render(page.cx), "t3-files-tree-loading");
+  const fast = makePage();
+  fast.ctx.showPage("files");
+  assert.equal(findLoading(fast), null, "a cold tree does not flash Loading on its first frame");
+  await fast.settle();
+  await fast.fire(150);
+  assert.equal(findLoading(fast), null, "a fast read does not leave a stale loading message");
+  assert.ok(find(fast.view.render(fast.cx), "row-a.js"), "a fast read goes directly to rows");
+
+  for (const result of ["rows", "failure", "hidden"]) {
+    const slow = makePage(), { view, cx, w, ctx, settle, fire, show } = slow;
+    ctx.showPage("files");
+    w.stall = (line) => line.includes(m.LIST);
+    view.render(cx); await settle();
+    assert.equal(w.stalled.length, 1, "the root read is pending");
+    await fire(149);
+    assert.equal(findLoading(slow), null, "no placeholder before 150ms even with a read still pending");
+    if (result === "hidden") {
+      show("review");
+      const notified = w.notified;
+      await fire(150);
+      assert.equal(w.notified, notified, "a hidden tree's stale timer cannot request a redraw");
+      w.stall = null; w.stalled.pop()(); await settle();
+      show("files");
+      assert.equal(findLoading(slow), null, "returning starts a fresh wait without a placeholder");
+      await settle();
+      assert.ok(find(view.render(cx), "row-a.js"), "a fresh read can finish after returning");
+      continue;
+    }
+    await fire(150);
+    assert.ok(findLoading(slow), "a slow read shows Loading at 150ms while still pending");
+    if (result === "failure") w.fail = w.stall;
+    w.stall = null; w.stalled.pop()(); await settle();
+    assert.equal(findLoading(slow), null, "the read result replaces Loading immediately");
+    const frame = view.render(cx);
+    if (result === "rows") assert.ok(find(frame, "row-a.js"), "the tree shows the rows after a slow success");
+    else {
+      const error = find(frame, "t3-files-retry-");
+      assert.ok(error, "the tree shows its root error after a slow failure");
+      w.fail = null; error.handlers.on_click({}, cx); await settle();
+      assert.ok(find(view.render(cx), "row-a.js"), "retry still restores the tree");
+    }
+  }
+}
+
 async function latePreview() {
   const appDir = fs.mkdtempSync(path.join(os.tmpdir(), "t3-files-late-preview-"));
   try {
@@ -979,6 +1067,8 @@ async function latePreview() {
   await resources();
   await closeKeys();
   await surfaceCache();
+  await firstPreviewFrame();
+  await treeLoadingDelay();
   await latePreview();
   await searchMatchesWords();
   await menus();

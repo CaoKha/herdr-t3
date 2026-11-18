@@ -74,6 +74,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 - Tab next/previous wraps through the displayed tabs; `cmd-1…9` numbering follows them too.
 - The floating keys block can advance navigation with no strip present. The strip and the tab-number / tab-cycle commands advance from the current Herdr observation before using the same tab order, regardless of which block drew first. Repeating an unchanged observation does not repeat a zoom, end a Snooze twice, or record a temporary close neighbour as a visit.
 - Space keys follow sidebar order, folded worktrees included, skipping Home and synthetic checkout rows; project numbers stay stable.
+- When the layout knows the destination, prepare its work frame before selecting it: Home uses `home-main` with no pane header and an 8px tab row (40px with a hidden sidebar or window buttons); other spaces use `main` and 40px. Spaces clicks and keys, Go to, agent jumps and new tabs in an existing space share this arrival step. The first frame with the destination's content uses that frame and its [saved panel](space-panel.md#column).
 
 ## Close landing
 

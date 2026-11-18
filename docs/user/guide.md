@@ -37,6 +37,8 @@ Each part in more detail than the [README](../../README.md).
 
 ## Everyday use
 
+When you return from Home or jump between projects, the destination terminal appears below its tab bar. If you left Files open there, it appears alongside the terminal. Selecting a cached file tab brings back its breadcrumb and preview together.
+
 If the list changes while a menu is open, your click or Enter still applies to the command and target you selected. When that target disappears, choose again. This also applies when you close and reopen a file tab with the same path. In standalone Inbox, Settle uses the agent in focus when you press the shortcut.
 
 Insert refuses paths containing control characters; use Copy path instead.

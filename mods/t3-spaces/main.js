@@ -19,6 +19,7 @@ import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
+import { prepareSpace } from "./space-arrival.js";
 
 // T3's project row, and its list's 1px between items (gap-px). A drag's math goes by the pitch.
 const ROW = 32, STACK = 1, PITCH = ROW + STACK;
@@ -326,6 +327,7 @@ export default class Spaces extends View {
           .when(kids > 0, el => el.child(this.foldButton(t, foldId, g.repo, hiding, ghost))),
       );
     if (ghost) return el;
+    const select = () => { prepareSpace(w.id); run("space.select", { id: w.id }); };
     return stop(this, t, rowId, el
       .id(rowId)
       .role("button")
@@ -339,12 +341,12 @@ export default class Spaces extends View {
       .on_mouse_up("left", (_e, cx) => {
         if (this.drag?.id !== w.id || this.drag.moved) return;
         this.drag = null;
-        run("space.select", { id: w.id });
+        select();
         cx.notify();
       })
       .on_mouse_down("right", (_e, cx) => openMenu(this, "space", { id: w.id }, cx)),
     // A space goes by its mouse-up, which a key isn't.
-    8, { enter: () => run("space.select", { id: w.id }) });
+    8, { enter: select });
   }
 
   // Dragging, as T3's sidebar and the inbox do it: press a space and move 6px to lift it, with its worktrees when it's a

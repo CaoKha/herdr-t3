@@ -18,7 +18,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   let states = new Map();
   // Spaces that were Home until an agent started there: their rename may not have shown yet.
   const released = new Set();
-  let renaming = false, going, homing, inView, wasHome, unread, focusWas, zoomOff, asking, settingsOpen;
+  let renaming = false, going, inView, wasHome, unread, focusWas, zoomOff, asking, settingsOpen;
   let tabAnswer, tabAskSerial = 0;
   const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
   // The Inbox's ways with attention hold unless Lists is the mode (docs/adr/0002).
@@ -45,9 +45,6 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     if (found) setShared(KEY.home, found.id);
   }
   const atHome = () => Boolean(knownHome()?.active);
-  // Home's tab is selected but spaces() hasn't caught up: the layout already takes Home's shape, so Home's first frame isn't
-  // the 60px shorter one under `main`'s header and the unfolded row. 1s at most, for a select that didn't land.
-  const shownHome = (home = atHome()) => home || (homing != null && Date.now() - homing < 1000);
   // The one mod Home is (t3.settings, docs/adr/0005); null: a shell in the home folder.
   const homeMod = () => t3Settings().homeMod;
   const fill = () => homeMod() ? { mod: homeMod() } : {};
@@ -66,21 +63,37 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     const here = machines().find(m => m.name === null);
     if (here && here.layout !== "ready") return;
     knowHome();
-    if (knownHome()) return refitHome(true);
-    const before = new Set(spaces().map(s => s.id));
-    run("space.new", { name: HOME_NAME, machine: "", folder: home() });
+    const all = spaces();
+    if (knownHome(all)) return refitHome(true);
+    const before = new Set(all.map(s => s.id)), from = all.find(s => s.active)?.id;
+    // `space.new` can't start with a mod. Keep the current space showing while Home gets its page.
+    run("space.new", { name: HOME_NAME, machine: "", folder: home(), focus: false });
     const found = await seen(cx, () => spaces().find(s => !before.has(s.id) && namedHome(s))?.id);
     const made = spaces().find(s => s.id === found && namedHome(s));
     if (!made) return;
     setShared(KEY.home, made.id);
-    // A new space comes with a shell: Home as a terminal, that's it. Else, as a space can't lose its last tab, the mod goes in first.
-    if (!homeMod()) return;
-    const shell = made.tabs[0]?.id;
-    run("tab.new", { space: made.id, name: "Home", mod: homeMod() });
     const sameHome = () => spaces().find(s => s.id === made.id && namedHome(s));
-    const page = await seen(cx, () => sameHome()?.tabs.find(c => c.id !== shell)?.id);
+    const shell = made.tabs[0]?.id, mod = homeMod();
+    let page = shell;
+    if (mod) {
+      const oldTabs = new Set(made.tabs.map(c => c.id));
+      run("tab.new", { space: made.id, name: "Home", mod, focus: false });
+      page = await seen(cx, () => {
+        const pages = sameHome()?.tabs.filter(c => !oldTabs.has(c.id) && c.named && c.name === "Home");
+        if (!pages?.length) return;
+        const ps = panes();
+        return pages.find(c => ps.some(p => p.tab === c.id && p.mod === mod))?.id;
+      });
+    }
     const tabs = sameHome()?.tabs ?? [];
-    if (tabs.some(c => c.id === page) && tabs.some(c => c.id === shell)) run("tab.close", { id: shell, confirmed: true });
+    if (!tabs.some(c => c.id === page)) return;
+    const shown = spaces().find(s => s.active)?.id;
+    // The person may have selected another space while the page was being prepared.
+    if (shown === from || shown === made.id) {
+      api.arrive?.(made.id);
+      run("tab.select", { id: page });
+    }
+    if (mod && tabs.some(c => c.id === shell)) run("tab.close", { id: shell, confirmed: true });
   }
   // The selected sidebar's rows, shown or hidden, stopping at either end.
   function step(command) {
@@ -92,6 +105,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
   // agent its unread done: return to the tab last shown there. tab.select brings the space along; the space first would show its active tab for that step.
   function showSpace(s) {
     const back = trail[s.id]?.find(id => s.tabs.some(c => c.id === id));
+    api.arrive?.(s.id);
     run(back ? "tab.select" : "space.select", { id: back ?? s.id });
   }
   // The spaces the keys count and walk: all but Home, wrapping as space.next does.
@@ -193,7 +207,11 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     const tabs = new Set(space.tabs.map(c => c.id));
     const ps = panes(), mine = ps.filter(p => tabs.has(p.tab));
     // panes() hasn't caught up with Home yet: showing it is all there is to do.
-    if (!mine.length) return go && run("space.select", { id: space.id });
+    if (!mine.length) {
+      if (!go) return;
+      api.arrive?.(space.id);
+      return run("space.select", { id: space.id });
+    }
     const fits = (p) => homeMod() ? p.mod === homeMod() : Boolean(p.terminal);
     const owns = mine.filter(p => ps.filter(q => q.tab === p.tab).length === 1);
     let own = owns.find(fits) ?? owns.find(p => p.mod);
@@ -205,11 +223,8 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     }
     if (!go) return;
     // tab.select brings the space along, so nothing else there shows on the way.
-    if (own) {
-      homing = Date.now();
-      api.arrive?.(space.id);
-      return run("tab.select", { id: own.tab });
-    }
+    api.arrive?.(space.id);
+    if (own) return run("tab.select", { id: own.tab });
     run("tab.new", { space: space.id, name: "Home", folder: home(), ...fill() });
   }
 
@@ -289,8 +304,6 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
       wasHome = false;
     }
     const all = spaces(), space = all.find(s => s.active), tab = space?.tabs.find(c => c.active), home = atHome();
-    // The arrival grace period ends with the first real Home observation, not with whichever copy reads the model first.
-    if (home) homing = null;
     const alive = (id) => all.some(s => s.tabs.some(c => c.id === id));
     const was = inView;
     // Herdr's pick shows until Home does, and that isn't somewhere the person went.
@@ -328,7 +341,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     const looked = !going && every.find(a => a.address === inViewAgent(terms, every));
     if (looked && !home) { lastIn[looked.tab] = looked.address; fresh.delete(looked.space); }
     for (const id of Object.keys(lastIn)) if (!alive(id)) delete lastIn[id];
-    return { space, every, all: terms, looked, home: shownHome(home) };
+    return { space, every, all: terms, looked, home };
   }
 
   // For what focuses a pane without zoom.js going first, Herdr's own: a toast, hc, the palette, its keys. Its focus moved and the
@@ -480,9 +493,9 @@ export function navigation(beforeAsk = (_cx) => {}, core = { spaces, panes, agen
     run("tab.select", { id: list[(list.findIndex(c => c.id === w.shownTab) + by + list.length) % list.length].id });
   }
 
-  // arrive(space): set by the view, lays the window out for Home (row, frame, panel) in the same go as the select that shows it.
+  // arrive(space): set by the keys block; prepares the destination's work frame, tab row and panel before selecting it.
   const api = {
-    get atHome() { return shownHome(); },
+    get atHome() { return atHome(); },
     advance() { advance(); },
     nextCard,
     async handle(command, cx) {

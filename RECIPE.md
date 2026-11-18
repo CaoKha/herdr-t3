@@ -266,6 +266,8 @@ Terminal facts are labels (`settled`, `snoozed`), cross-mod facts and preference
 
 ## Done when
 
+Record transitions at the default sidebar width. On returning from Home or switching between spaces with different panel states, the first frame showing the destination terminal has its final position, width and panel. On a cached file-tab switch, the selected tab, breadcrumb and preview identify the same file from the first frame.
+
 1. `wc -c RECIPE.md RECIPE.zh-CN.md`: each at most 60,000, same coverage, local links and preview resolve. `scripts/check.sh` prints `all checks passed` (after `scripts/sync.sh`, which also writes outside the repo): shared copies, mod checks and types, icons, overlays, render and update guards.
 2. `layout.switch {"name":"herdr-t3"}` succeeds and `herdr-app status` shows no missing mods or render warnings. In a separate demo window (`scripts/demo/stage.sh up`, `scene <name>`, `do herdr-app shot <file>`, `down`), whole-window screenshots at the default 256px sidebar, narrow, light, dark and zoomed show every region unclipped and the traffic lights in place.
 3. Inbox: Settle, Un-settle, Undo, new work, pins from both modes, drag, sweep, cancel and Clear restore positions and pins as described; Clear asks and spares the tab in view; after-putting-away follows the preference; background actions never navigate; Lists' Settle key does nothing; with the sidebar hidden, order, no-wrap and the 5s Undo still hold.

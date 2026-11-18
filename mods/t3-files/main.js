@@ -33,6 +33,7 @@ const EXPAND_MAX = 200;
 // Asked again while it shows: here every 5 s, another machine every 10; a refresh that took long, 10 times as long, a minute at
 // most. Event-driven refresh is a separate change; a hidden page runs nothing.
 const LOCAL_EVERY = 5000, REMOTE_EVERY = 10000, SLOWEST = 60000;
+const TREE_WAIT = 150;
 // Herdr runs each exec as a process with two pipes and doesn't raise a GUI app's 256 open files (launchd's soft limit): a refresh
 // listing every folder Expand all opened, all at once, had dozens fail to start ("Too many open files"). Listing reads go
 // READ_AT_ONCE at a time, across every space this copy reads.
@@ -115,7 +116,7 @@ export default class Files extends View {
         if (c === "focus") { enter(this, cx, "t3-files-refresh"); this.search.focus(); }
         if (!st || at < 0) continue;
         if (what === "open") this.pick(st, arg, cx);
-        else if (what === "pick") this.pick(st, arg, cx, false, true);
+        else if (what === "pick") this.pick(st, arg, cx, true);
         else if (what === "search") { this.search.set_value(arg); this.find(st, arg, cx); }
       }
     });
@@ -170,42 +171,56 @@ export default class Files extends View {
       for (const [path, kept] of st.previews) if (!tabs.some(t => t.path === path && t.born === kept.born)) { this.releasePreview(kept.view); st.previews.delete(path); if (st.view === kept.view) st.view = null; }
       if (st.file && !tabs.some(t => t.path === st.file && t.born === st.fileBorn)) { st.file = null; st.view = null; }
     }
-    const st = sp && this.shown() ? this.stateFor(sp) : null;
+    const st = sp && this.inPanel() ? this.stateFor(sp) : null;
+    const awake = window()?.active ? st : null, returning = awake !== this.awake;
+    if (returning) { this.sleep(); this.awake = awake; }
     if (st) {
-      // A tab picked (its reveal moved), or another tab: shown, its search cleared, the tree on it (T3's revealRequestId). The
-      // tree takes the keyboard only when the person went there from it or the breadcrumbs, never for a tab
-      // picked elsewhere: the terminal they type in keeps it.
-      const tab = activeTab(sp.id), key = tabKey(tab), picked = st.seen !== key;
-      const matches = () => st.file === (tab?.folder ? null : tab?.path ?? null) && st.folder === (tab?.folder ? tab.path ?? "" : null);
-      if (picked || !matches()) {
-        if (picked) this.supersedeReveal(st);
+      const tab = activeTab(sp.id), key = tabKey(tab);
+      const file = tab?.folder ? null : tab?.path ?? null, folder = tab?.folder ? tab.path ?? "" : null;
+      if (st.seen !== key || st.file !== file || st.folder !== folder) {
+        // Bind the tab, its cached preview and tree selection before drawing. Only the work that needs the host waits.
         st.seen = key;
+        if (file) this.showPreview(st, file, tab);
+        else { st.file = null; st.view = null; st.folder = folder; st.trail = tab?.trail ?? folder; }
+        const path = file ?? folder;
+        if (path !== null) { this.clearSearch(st); st.focus = path || null; }
+        const latest = this.select(st, path || null);
+        st.pick = path === null ? null : { latest, focus, queued: false };
+        this.changed(st);
+      }
+      const pick = st.pick;
+      if (awake && pick && !pick.queued) {
+        pick.queued = true;
         cx.timer.after(0, (cx) => {
-          // Moved on meanwhile (another pick, or Files opened one itself): that one's what shows.
-          if (!this.shown() || spaces().find(p => p.active)?.id !== st.id || st.seen !== key || tabKey(activeTab(st.id)) !== key) return;
-          // A redraw may have queued this before the breadcrumb's timer applied the same tab.
-          if (!picked && matches()) return;
-          if (tab?.folder) {
-            st.file = null; st.view = null; st.folder = tab.path ?? ""; st.trail = tab.trail ?? st.folder;
-            this.find(st, "", cx); this.search.set_value(""); this.reveal(st, st.folder, cx, focus);
-          } else if (tab?.path) this.pick(st, tab.path, cx, true, focus);
-          else { st.file = null; st.view = null; st.folder = null; st.trail = null; this.select(st, null); this.changed(st); cx.notify(); }
+          pick.queued = false;
+          if (st.pick !== pick || !this.going(st)() || tabKey(activeTab(st.id)) !== key) return;
+          st.pick = null;
+          if (file) this.loadPreview(st, file, cx);
+          // A later tree move, too, owns the selection and any scroll or focus it requested.
+          if (pick.latest()) this.reveal(st, file ?? folder, cx, pick.focus);
         });
       }
     }
-    if (st === this.awake) return;
-    this.sleep();
-    this.awake = st;
-    if (st?.root) this.recheck(st, cx, true);
+    if (returning && awake?.root) {
+      if (!awake.entries.has("") && !awake.errors.has("")) {
+        const go = this.going(awake);
+        cx.timer.after(TREE_WAIT, cx => {
+          if (!go() || awake.entries.has("") || awake.errors.has("")) return;
+          awake.treeWaiting = true; cx.notify();
+        });
+      }
+      this.recheck(awake, cx, true);
+    }
   }
 
   sleep() {
-    if (this.awake) { this.awake.loading.clear(); this.awake.expanding = false; this.awake.refresh = null; }
+    if (this.awake) { this.awake.loading.clear(); this.awake.expanding = false; this.awake.refresh = null; this.awake.treeWaiting = false; }
     this.awake = null; this.gen++;
   }
 
   // The page in the open panel, the window in front.
-  shown() { const p = panelState(); return p.open && p.page === "files" && Boolean(window()?.active); }
+  inPanel() { const p = panelState(); return p.open && p.page === "files"; }
+  shown() { return this.inPanel() && Boolean(window()?.active); }
   // Whether what started now may go on: `st` still the one worked for and in view, without having gone out of it since. It
   // asks the layout itself, as sync sees a hide only at its next tick; one it finds puts the page to sleep, so showing again
   // reads again.
@@ -263,6 +278,7 @@ export default class Files extends View {
   recheck(st, cx, returning = false) {
     const go = this.going(st);
     if (!go() || st.refresh?.some(task => !task.is_done())) return;
+    const readingPick = Boolean(st.pick); // The just-selected tab will load its own preview after the draw.
     const tasks = st.refresh = [], track = task => { if (task) tasks.push(task); };
     track(cx.spawn(async (cx) => {
       if (!go()) return;
@@ -274,13 +290,18 @@ export default class Files extends View {
       }
       const began = Date.now();
       const shown = ["", ...st.expanded].filter(p => p === "" || ancestors(p).every(a => st.expanded.has(a)));
-      await Promise.all(shown.map(p => this.list(st, p)));
+      const firstTree = !st.entries.has("") && !st.errors.has("");
+      await Promise.all(shown.map(async p => {
+        await this.list(st, p);
+        // A restored tree can already show its first rows or its root error while children are still listing.
+        if (p === "" && firstTree && shown.length > 1 && go()) cx.notify();
+      }));
       if (!go()) return;
       st.refreshed = Date.now(); st.took = st.refreshed - began; st.paths = null;
       cx.notify();
       if (st.query) track(this.find(st, st.query, cx));
       // Images are copied on selection. Returning also restores a preview that didn't finish or was evicted.
-      if (st.file && (kindOf(st.file) !== "image" || returning && !st.view?.image)) track(this.open(st, st.file, cx, true));
+      if (!readingPick && st.file && (kindOf(st.file) !== "image" || returning && !st.view?.image)) track(this.loadPreview(st, st.file, cx, true));
     }));
   }
 
@@ -341,27 +362,34 @@ export default class Files extends View {
     cx.notify();
   }
 
-  // A file shown from elsewhere (its tab, a command, a breadcrumb menu): the search cleared, the file open, the tree on it.
-  pick(st, path, cx, selected = false, focus = false) {
-    st.folder = null; st.trail = null;
-    st.query = ""; st.found = null;
-    this.search.set_value("");
-    this.open(st, path, cx, false, selected);
+  // A file shown from a command or breadcrumb menu: the search cleared, the file open, the tree on it.
+  pick(st, path, cx, focus = false) {
+    this.clearSearch(st);
+    if (this.search.value()) this.search.set_value("");
+    this.open(st, path, cx);
     this.reveal(st, path, cx, focus);
   }
 
-  // Shows a file; `again` reads it again where it may have changed, and leaves it as it was if it hasn't.
-  open(st, rel, cx, again = false, selected = false) {
-    if (!again) {
-      if (!selected) openFile(rel);
-      // Opened here: what the panel shows now is this, not a pick to answer.
-      const tab = activeTab(st.id), kept = st.previews.get(rel);
-      st.seen = tabKey(tab);
-      st.file = rel; st.fileBorn = tab?.born;
-      st.view = kept && kept.born === tab?.born ? kept.view : { loading: true };
-      this.changed(st);
-      cx.notify();
-    }
+  // Selects the preview using memory only: safe during a draw, even when the file has never been read.
+  showPreview(st, rel, tab) {
+    const kept = st.previews.get(rel);
+    st.file = rel; st.fileBorn = tab?.born; st.folder = null; st.trail = null;
+    st.view = kept && kept.born === tab?.born ? kept.view : { loading: true };
+  }
+
+  open(st, rel, cx) {
+    openFile(rel);
+    // Opened here: what the panel shows now is this, not a pick to answer.
+    const tab = activeTab(st.id);
+    st.seen = tabKey(tab); st.pick = null;
+    this.showPreview(st, rel, tab);
+    this.changed(st);
+    cx.notify();
+    return this.loadPreview(st, rel, cx);
+  }
+
+  // Use the selected preview or read it; `again` checks for changes without replacing identical text.
+  loadPreview(st, rel, cx, again = false) {
     const pending = this.fresh(st, "file"), id = `file:${rel}`, born = st.fileBorn, abs = join(st.root, rel), kind = kindOf(rel);
     // A close or tab switch can reach the panel before Files syncs. Polling still reads for the instance Files was showing.
     const fresh = () => {
@@ -371,9 +399,13 @@ export default class Files extends View {
     };
     if (!fresh()) return;
     if (!again && kind !== "image" && !st.view.loading) {
-      if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(st.view, rel, this.fits(st.view));
+      if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) {
+        this.editor(st.view, rel, this.fits(st.view)); cx.notify();
+      }
       // Plain, picked again: colored now, as it's opened.
-      else if (st.view.code && st.view.lang && !st.view.colored && this.fits(st.view)) { st.view.scrolled = false; this.editor(st.view, rel, true); }
+      else if (st.view.code && st.view.lang && !st.view.colored && this.fits(st.view)) {
+        st.view.scrolled = false; this.editor(st.view, rel, true); cx.notify();
+      }
       this.keepPreview(st, rel, st.view); return;
     }
     return cx.spawn(async (cx) => {
@@ -484,8 +516,7 @@ export default class Files extends View {
   // and are once the page shows again (recheck).
   find(st, query, cx) {
     query = query.slice(0, 256);
-    if (st.query !== query) { this.supersedeReveal(st); st.searchClosed = new Set(); ticket(st, "expand"); st.expanding = false; st.expandAll = false; }
-    st.query = query;
+    this.setQuery(st, query);
     const words = terms(query), fresh = this.fresh(st, "search");
     this.changed(st); cx.notify();
     if (!words.length || !fresh()) return;
@@ -523,6 +554,28 @@ export default class Files extends View {
     });
   }
 
+  setQuery(st, query) {
+    if (st.query === query) return;
+    this.supersedeReveal(st); st.searchClosed = new Set(); ticket(st, "expand"); st.expanding = false; st.expandAll = false;
+    st.query = query;
+  }
+
+  clearSearch(st) {
+    this.setQuery(st, ""); st.found = null;
+  }
+
+  // Draw the model's words now. Updating the native field waits until after the draw and uses the latest space and query.
+  syncSearch(st, cx) {
+    if (this.search.value() === st.query || this.searchQueued) return;
+    this.searchQueued = true;
+    cx.timer.after(0, cx => {
+      this.searchQueued = false;
+      const current = this.inPanel() && this.current();
+      if (!current || this.search.value() === current.query) return;
+      this.search.set_value(current.query); cx.notify();
+    });
+  }
+
   // What the search field's words found, once they're searched.
   found(st) { return st.query.trim() && st.found?.query === st.query ? st.found : null; }
 
@@ -539,7 +592,7 @@ export default class Files extends View {
 
   // A breadcrumb: the person's own move, so the tree takes the keyboard once it's there.
   navigate(st, path, cx) {
-    if (path && path === st.trail && path !== st.folder) { this.pick(st, path, cx, false, true); return; }
+    if (path && path === st.trail && path !== st.folder) { this.pick(st, path, cx, true); return; }
     navigateFolder(path, st.trail ?? st.file ?? path, Boolean(st.file));
     this.sync(cx, true);
   }
@@ -595,8 +648,7 @@ export default class Files extends View {
     });
     // Plain code shown: colored once left alone. Behind, not asked: a refresh draws it again once it's in front.
     else if (!v?.waiting && this.wantsColor(v) && this.shown()) this.colorLater(st, v, IDLE, cx);
-    // The search field shows this space's words.
-    if (this.searchFor !== st.id) { this.searchFor = st.id; if (this.search.value() !== st.query) this.search.set_value(st.query); }
+    this.syncSearch(st, cx);
     const width = this.size?.width ?? 800;
     return focusRoot(this, v_flex().id("t3-files").relative().size_full().min_h(0).text_color(t.foreground).text_size(13)
       .track_focus(this.handle).on_mouse_down("left", () => this.handle.focus())
@@ -673,7 +725,7 @@ export default class Files extends View {
             .child(div().text_color(t.ansi1).child(v.problem))
             .child(div().max_w_full().whitespace_normal().child(st.file)).child(div().max_w_full().whitespace_normal().text_color(t.dim).child(st.root))
             .child(h_flex().gap(4)
-              .child(this.control(t, "t3-files-retry-file", "refresh-cw", "Try reading the file again", cx => { st.view = { loading: true }; cx.notify(); this.open(st, st.file, cx, true); }))
+              .child(this.control(t, "t3-files-retry-file", "refresh-cw", "Try reading the file again", cx => { st.view = { loading: true }; cx.notify(); this.loadPreview(st, st.file, cx, true); }))
               .child(this.control(t, "t3-files-locate", "folder-tree", "Locate the file in Files", cx => { this.navOpen = true; this.reveal(st, st.file, cx, true); })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
           // 12 in, the page's edge (t3-tokens「规则」R1), not T3's px-6.
@@ -718,7 +770,8 @@ export default class Files extends View {
       .child(stop(this, t, "t3-files-search-field", div().id("t3-files-search-field").relative().flex_1().min_w(0).h(28).px(9).rounded(6).border_1().border_color(this.searchFocused ? t.accent : "#00000000")
         .when(Boolean(this.searchFocused), el => el.bg(t.background))
         .on_mouse_down("left", (_e, cx) => { this.search.focus(); cx.stop_propagation(); })
-        .child(Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files"))
+        .child(this.search.value() === st.query ? Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files")
+          : div().h_full().flex().items_center().truncate().text_size(12).text_color(st.query ? t.foreground : t.dim).child(st.query || "Search files"))
         .when(Boolean(this.searchFocused), el => el.child(div().id("t3-files-search-ring").absolute().inset_0().rounded(6).border(3).border_color(alpha(t.accent, "3d")))), 6, { enter: () => this.search.focus() }))
       .when(folders > 0, el => el.child(this.control(t, "t3-files-fold-all", this.allExpanded(st) ? "chevrons-down-up" : "chevrons-up-down", this.allExpanded(st) ? "Collapse all folders" : "Expand all folders", cx => this.foldAll(st, cx))));
   }
@@ -775,7 +828,8 @@ export default class Files extends View {
       .child("This folder can't be listed. Click to retry.").on_click((_e, cx) => retry("", cx));
     const found = this.found(st);
     if (found?.error) return div().p(16).text_size(12).text_color(t.ansi1).cursor_pointer().on_click((_e, cx) => this.find(st, st.query, cx)).child(found.error);
-    if (!st.entries.has("") || st.query.trim() && !found) return div().id("t3-files-tree-loading").px(12).py(4).text_size(12).text_color(t.dim).child("Loading files…");
+    if (st.query.trim() && !found || !st.entries.has("") && st.treeWaiting && this.shown()) return div().id("t3-files-tree-loading").px(12).py(4).text_size(12).text_color(t.dim).child("Loading files…");
+    if (!st.entries.has("")) return div();
     const rows = this.rows(st);
     if (!rows.length) return st.query.trim() ? div().id("t3-files-no-matches").px(12).py(16).text_size(12).text_color(t.dim).child("No matching files.") : div();
     const ringed = this.treeHandle.is_focused() && this.treeKeys ? st.index.at.get(st.focus ?? st.file) ?? -1 : -1, selected = st.index.at.get(st.selected) ?? -1;

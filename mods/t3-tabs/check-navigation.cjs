@@ -118,6 +118,7 @@ async function check() {
   // A same-named remote Home can appear before the local space creation is reflected in spaces().
   {
     const f = fixture(), view = f.navigation(), spaces = f.spaces();
+    view.arrive = id => f.calls.push(["arrive", id, f.state["t3-tabs.home"] === id]);
     const pending = view.handle("home", f.cx);
     await flush();
     const reserved = "Home\u200b";
@@ -125,17 +126,41 @@ async function check() {
     await f.tick();
     try {
       assert.deepEqual([f.state["t3-tabs.home"], f.calls],
-        [undefined, [["space.new", { name: reserved, machine: "", folder: "/home/test" }]]], "the remote Home remains untouched");
+        [undefined, [["space.new", { name: reserved, machine: "", folder: "/home/test", focus: false }]]], "the remote Home remains untouched and the local starter stays out of view");
       const local = { id: "local-home", machine: null, named: true, name: reserved, tabs: [{ id: "local-shell" }] };
       spaces.push(local);
       await f.tick();
       assert.equal(f.state["t3-tabs.home"], local.id);
-      local.tabs.push({ id: "local-page" });
+      const adding = ["tab.new", { space: "local-home", name: "Home", mod: "t3-home", focus: false }];
+      assert.deepEqual(f.calls.slice(1), [adding], "adding the page does not show Home yet");
+      local.tabs.push({ id: "unrelated" }, { id: "local-page", named: true, name: "Home" });
+      f.panes().push({ pane: "other", tab: "unrelated", mod: "review" });
+      await f.tick();
+      assert.deepEqual(f.calls.slice(1), [adding], "neither another mod tab nor a tab without the Home pane is ready to show");
+      f.panes().push({ pane: "home", tab: "local-page", mod: "t3-home" });
       await f.tick(); await pending;
-      assert.deepEqual(f.calls.slice(1), [["tab.new", { space: "local-home", name: "Home", mod: "t3-home" }], ["tab.close", { id: "local-shell", confirmed: true }]]);
+      assert.deepEqual(f.calls.slice(1), [adding, ["arrive", "local-home", true], ["tab.select", { id: "local-page" }], ["tab.close", { id: "local-shell", confirmed: true }]]);
     } catch (e) { closeRaces.push(e); }
   }
   if (closeRaces.length) throw new AggregateError(closeRaces, "destructive navigation races");
+
+  // Background creation must not steal focus from a space selected while Home was getting ready.
+  {
+    const f = fixture(), [source, destination] = f.spaces(), view = f.navigation();
+    view.arrive = id => f.calls.push(["arrive", id]);
+    const pending = view.handle("home", f.cx);
+    const h = { id: "h", machine: null, named: true, name: "Home\u200b", active: false, tabs: [{ id: "starter", active: true }] };
+    f.spaces().push(h);
+    await f.tick();
+    f.calls.length = 0;
+    source.active = false;
+    destination.active = true;
+    h.tabs.push({ id: "page", named: true, name: "Home" });
+    f.panes().push({ pane: "ph", tab: "page", mod: "t3-home" });
+    await f.tick(); await pending;
+    assert.deepEqual(f.calls, [["tab.close", { id: "starter", confirmed: true }]], "keep the later project and remove only the starter");
+    assert.equal(f.state["t3-tabs.home"], "h", "the prepared Home is available next time");
+  }
 
   // Closing one split keeps the surviving panes in view, both through T3 and when a program ends itself.
   for (const external of [false, true]) {
@@ -210,21 +235,25 @@ async function check() {
     assert.deepEqual(made(), [], "too soon to tell: no second Home");
     f.machines()[0].layout = "ready";
     await say("home");
-    assert.deepEqual(made(), [["space.new", { name: "Home\u200b", machine: "", folder: "/home/test" }]]);
+    assert.deepEqual(made(), [["space.new", { name: "Home\u200b", machine: "", folder: "/home/test", focus: false }]]);
     // A slow core: past 2s it still counts as the Home it asked for, or it'd be an orphan in the lists.
     for (let i = 0; i < 100; i++) await tick();
     assert.equal(f.state["t3-tabs.home"], undefined, "not known until it's seen");
     // In the model's middle: its place doesn't change the keys' count or the spaces' rows.
-    const home = { id: "h", name: "Home\u200b", named: true, active: true, machine: null, folder: "/home/test", tabs: [{ id: "shell", name: "1" }] };
-    list[0].active = false; list.splice(1, 0, home);
+    const home = { id: "h", name: "Home\u200b", named: true, active: false, machine: null, folder: "/home/test", tabs: [{ id: "shell", name: "1", active: true }] };
+    list.splice(1, 0, home);
     await tick();
     assert.equal(f.state["t3-tabs.home"], "h");
-    assert.deepEqual(made(), [["tab.new", { space: "h", name: "Home", mod: "t3-home" }]]);
+    assert.equal(view.atHome, false, "Home's layout isn't applied over the project while waiting");
+    assert.deepEqual(made(), [["tab.new", { space: "h", name: "Home", mod: "t3-home", focus: false }]]);
     assert.ok(f.spaces().find(s => s.id === "h").tabs.some(c => c.id === "shell"), "the page goes in before the shell leaves");
-    home.tabs.push({ id: "page", name: "Home", active: true });
+    home.tabs.push({ id: "page", named: true, name: "Home", active: false });
+    f.panes().push({ pane: "ph", tab: "page", mod: "t3-home" });
     await tick();
-    assert.deepEqual(made(), [["tab.close", { id: "shell", confirmed: true }]]);
+    assert.deepEqual(made(), [["tab.select", { id: "page" }], ["tab.close", { id: "shell", confirmed: true }]]);
     home.tabs.shift();
+    list[0].active = false; home.active = home.tabs[0].active = true;
+    f.panes().pop();
     await say("home");
     assert.deepEqual(made(), [["space.select", { id: "h" }]], "there's one Home");
 
@@ -271,10 +300,10 @@ async function check() {
     {
       home.active = false; list[0].active = true;
       panes.push({ pane: "ph", tab: "page", mod: "t3-home", title: "Home" });
-      view.arrive = () => f.calls.push(["arrive", view.atHome]);
+      view.arrive = id => f.calls.push(["arrive", id]);
       await say("home"); await pending;
-      assert.deepEqual(made(), [["arrive", true], ["tab.select", { id: "page" }]], "laid out for Home, then shown");
-      assert.equal(view.atHome, true, "spaces() hasn't caught up: still Home's shape");
+      assert.deepEqual(made(), [["arrive", "h"], ["tab.select", { id: "page" }]], "laid out for Home, then shown");
+      assert.equal(view.atHome, false, "preparing Home does not change the observed active space");
       home.active = true; list[0].active = false;
       view.advance();
       assert.equal(view.atHome, true);
@@ -815,21 +844,31 @@ async function check() {
     assert.deepEqual([f.closed, f.overlays.length], [[1], 2], "pressed again, it replaces the open one");
   }
 
-  // Home is the mod the person named (t3.settings): it's what a new Home gets and what an emptied one goes back to.
-  {
+  // The Home preference picks the first visible tab, whether a custom mod or the Terminal.
+  for (const mod of ["review", null]) {
     const f = fixture(), list = f.spaces(), view = f.navigation();
-    f.state["t3.settings"] = { homeMod: "review" };
+    f.state["t3.settings"] = { homeMod: mod };
     const pending = view.handle("home", f.cx); await flush();
-    assert.deepEqual(plain(f.calls.splice(0)), [["space.new", { name: "Home\u200b", machine: "", folder: "/home/test" }]]);
-    list[0].active = false;
-    list.push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, folder: "/home/test", tabs: [{ id: "shell", name: "1" }] });
+    assert.deepEqual(plain(f.calls.splice(0)), [["space.new", { name: "Home\u200b", machine: "", folder: "/home/test", focus: false }]]);
+    const h = { id: "h", name: "Home\u200b", named: true, active: false, machine: null, folder: "/home/test", tabs: [{ id: "shell", name: "1", active: true }] };
+    list.push(h);
+    view.arrive = id => f.calls.push(["arrive", id, f.state["t3-tabs.home"] === id]);
     await f.tick();
-    assert.deepEqual(plain(f.calls.splice(0)), [["tab.new", { space: "h", name: "Home", mod: "review" }]]);
-    list.at(-1).tabs.push({ id: "page", name: "Home" }); await f.tick(); await pending;
-    f.calls.length = 0; list.at(-1).tabs.shift();
-    f.panes().push({ pane: "pr", tab: "page", mod: "review" });
-    await view.handle("close-pane:pr", f.cx);
-    assert.deepEqual(plain(f.calls.splice(0)), [], "Home's mod stays");
+    if (mod) {
+      assert.deepEqual(plain(f.calls.splice(0)), [["tab.new", { space: "h", name: "Home", mod: "review", focus: false }]]);
+      h.tabs.push({ id: "page", named: true, name: "Home" });
+      f.panes().push({ pane: "pr", tab: "page", mod: "review" });
+      await f.tick();
+      assert.deepEqual(plain(f.calls.splice(0)), [["arrive", "h", true], ["tab.select", { id: "page" }], ["tab.close", { id: "shell", confirmed: true }]]);
+    } else {
+      assert.deepEqual(plain(f.calls.splice(0)), [["arrive", "h", true], ["tab.select", { id: "shell" }]], "Terminal is selected directly and kept");
+    }
+    await pending;
+    if (mod) {
+      h.tabs.shift();
+      await view.handle("close-pane:pr", f.cx);
+      assert.deepEqual(f.calls, [], "Home's mod stays");
+    }
   }
 
   // Home is one thing alone: its own tab, a lone pane that's the setting's mod or, set so, a shell. Another mod there, or an
@@ -886,7 +925,7 @@ async function check() {
       assert.equal(strip.frame().atHome, false, "an ordinary space now: its tabs show");
       f.calls.length = 0;
       strip.handle("home", f.cx); await flush();
-      assert.deepEqual(plain(f.calls), [["space.new", { name: "Home\u200b", machine: "", folder: "/home/test" }]], "a new Home");
+      assert.deepEqual(plain(f.calls), [["space.new", { name: "Home\u200b", machine: "", folder: "/home/test", focus: false }]], "a new Home");
       every.pop();
     }
   }

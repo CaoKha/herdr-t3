@@ -46,6 +46,12 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   // Home: laid out with the select that shows it, kept while spaces() still lists the old space.
   p.restorePanel(view, 'home'); p.syncPanel(view); assert.equal(ui.open, false); assert.equal(saved['t3.panels'].a.open, true);
   ui.space = 'home'; p.syncPanel(view); ui.space = 'a'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, tabs()], [true, '*file:a.js']);
+  // The model can skip Home and report a third space. It is not the source, even within the arrival grace period.
+  saved['t3.panels'].b = { open: true, active: 'review', wide: false, tabs: [{ id: 'review', born: 1 }] };
+  p.restorePanel(view, 'home'); p.syncPanel(view);
+  ui.space = 'b'; p.syncPanel(view);
+  assert.deepEqual([ui.open, ui.page, ui.wide], [true, 'review', false], 'restore a third space without waiting for Home');
+  assert.equal(saved['t3.panels'].a.wide, true, 'preparing Home did not change the source record');
   // An older build's record: its page isn't a tab; its fields go at the first write.
   saved['t3.panels'].b = { open: true, page: 'review', wide: false, selected: 'x' }; ui.space = 'b';
   assert.equal(tabs(), ''); p.showPage('files'); assert.deepEqual(Object.keys(saved['t3.panels'].b).sort(), ['active', 'open', 'tabs', 'wide']);

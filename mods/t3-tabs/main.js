@@ -8,6 +8,7 @@ import { tip, glow } from "./tip.js";
 import { detailsFor, detailsAt } from "./details.js";
 import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
+import { registerSpaceArrival } from "./space-arrival.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { litProp } from "./list.js";
@@ -90,6 +91,9 @@ const leadOf = (mine) => mine.find(p => p.status != null) ?? mine.find(p => p.fo
 const nameOf = (c, lead, name) => c.named ? c.name : lead ? name(lead) : "Terminal";
 
 export default class Tabs extends View {
+  /** @type {{ space?: string }} */
+  panelPending = null; // Written by panel.js on this block only.
+
   init(_props, cx) {
     this.pressed = null;
     this.over = null;
@@ -109,7 +113,11 @@ export default class Tabs extends View {
       }
     });
     if (part !== "keys") return;
-    nav().arrive = (space) => { this.fitRow(window()); restorePanel(this, space); };
+    this.releaseArrival = registerSpaceArrival(nav().arrive = (space) => {
+      const source = spaces().find(s => s.active)?.id, pending = this.panelPending;
+      this.fitRow(window(), space === shared(KEY.home), Boolean(pending));
+      if (space !== source || pending?.space) restorePanel(this, space, source);
+    });
     // Only this copy answers: every other copy would open its own dialog.
     cx.spawn(async (cx) => {
       for (;;) {
@@ -303,13 +311,13 @@ export default class Tabs extends View {
   // sidebar hidden (the row holds its toggle and the macOS window buttons) nor with window buttons of the bar's own. A layout
   // click, so it reads the row's size and corrects it whatever left it so (a quit at Home, another layout). Home's pane shows in
   // `home-main`, the same frame with no header: a blank header still took its 28px, a strip over Home's terminal.
-  fitRow(w) {
+  fitRow(w, atHome, force = false) {
     const root = layout(), row = layoutNode(root, "tabs-row"), work = layoutNode(root, "work-main");
-    const child = this.navigation.atHome ? "home-main" : "main";
-    if (work && work.active !== child) run("layout.select", { stack: "work-main", child });
+    const child = atHome ? "home-main" : "main";
+    if (work && (force || work.active !== child)) run("layout.select", { stack: "work-main", child });
     if (!row) return;
-    const px = this.navigation.atHome && !sidebarParts(root).rail?.hidden && !w?.buttons ? 8 : ROW_PX;
-    if (row.size?.px !== px) run("layout.resize", { id: "tabs-row", px });
+    const px = atHome && !sidebarParts(root).rail?.hidden && !w?.buttons ? 8 : ROW_PX;
+    if (force || row.size?.px !== px) run("layout.resize", { id: "tabs-row", px });
   }
 
   // Another layout's bar shouldn't stay compact because this one was narrow when it went.
@@ -317,7 +325,7 @@ export default class Tabs extends View {
     stopsEnd(this);
     if (props()?.part === "measure") setShared(KEY.compact, false);
     // Another layout starts its own memory.
-    if (props()?.part === "keys") brain = null;
+    if (props()?.part === "keys") { this.releaseArrival?.(); brain = null; }
   }
 
   endDrag() {
@@ -337,9 +345,9 @@ export default class Tabs extends View {
     if (props()?.part === "keys") {
       this.navigation.advance();
       rememberTerminal();
-      syncPanel(this);
+      const space = syncPanel(this);
       keepRecent();
-      this.fitRow(w);
+      this.fitRow(w, Boolean(space) && space === shared(KEY.home));
       return div();
     }
     const stopPress = (_e, cx) => cx.stop_propagation();

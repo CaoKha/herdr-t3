@@ -266,6 +266,8 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 
 ## 完成标准
 
+在默认侧栏宽度录下切换过程。从 Home 返回，或在面板开关不同的 space 之间切换时，目标终端出现的第一帧已有最终位置、宽度和面板状态。切换已缓存的文件标签时，第一帧的选中标签、面包屑和预览指向同一文件。
+
 1. `wc -c RECIPE.md RECIPE.zh-CN.md` 各 ≤60,000，覆盖一致，本地链接和预览图存在。`scripts/check.sh` 输出 `all checks passed`（之前跑 `scripts/sync.sh`，它会写仓库外）：共享副本、mod 检查与类型、图标、overlay、render 和 update 守卫。
 2. `layout.switch {"name":"herdr-t3"}` 成功，`herdr-app status` 无缺 mod 和重绘警告。在独立 demo 窗口（`scripts/demo/stage.sh up`、`scene <name>`、`do herdr-app shot <file>`、`down`）里，默认 256px 侧栏、窄窗、浅色、深色和 zoom 的整窗截图各区域无裁切，窗口按钮位置正确。
 3. Inbox：Settle、Un-settle、Undo、新工作、两种模式的 pin、拖动、划选、取消和 Clear 按描述还原位置和 pin；Clear 先问并保留当前标签；收起后的去处遵循偏好；后台动作不跳；Lists 的 Settle 键无作用；侧栏隐藏时顺序、不循环和 5s Undo 照旧。

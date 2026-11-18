@@ -8,13 +8,16 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 - Default content: centred Next agent (disabled when there is nowhere to go), Go to and New tab. At most 320 wide, 32 high, radius 8; 14px text on the left, keycaps on the right; no names or counts.
 - 40 is added below the group so it sits centred against the whole window, top bar included.
 - The tab row has no tabs, `+`, Actions, Review or panel toggle (`⌥⌘B` still opens the panel), and folds from 40 to 8, except when it must hold the hidden sidebar's controls, macOS window buttons or Windows window buttons. Leaving restores 40.
-- The first frame on arrival already has Home's frame and its own panel state.
+- When arriving from another space, Home's first frame already has its frame and its own panel state.
 
 ## Identity
 
 - One local hidden space, shared across projects and machines, created on demand.
 - Claimed only by its remembered id (`t3-tabs.home`), or by the strict local explicit name `Home\u200b`; never by plain `Home` or by its contents.
-- When waiting for a newly created Home, use the same local explicit-name check. A remote namesake can appear first without being claimed. Add the Home tab before closing the starter tab, and check that both still belong to the local Home before closing.
+- When waiting for a newly created Home, use the same local explicit-name check. A remote namesake can appear first without being claimed.
+- With another space showing, create Home and add its configured mod without changing focus. Leave the previous space visible until the mod pane exists, then set Home's frame and panel state before selecting the mod tab. Close the starter tab only if both tabs still belong to the local Home. For Terminal, select the starter tab itself.
+- If a different project is showing when Home is ready, leave that project selected and finish preparing Home in the background.
+- When no space is showing, Herdr shows the first space even with `focus: false`. Its starter terminal can appear until the mod tab is ready; `space.new` cannot take a mod.
 - Hidden from Spaces, New, the Inbox filter, Go to and space navigation.
 - Holds one selected mod (`t3-home` by default) or, for Terminal, a shell in the home folder.
 

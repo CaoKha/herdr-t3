@@ -4,6 +4,9 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-18
 
+- When you navigate between spaces or leave Home, the destination terminal opens with its tab bar and saved panel in place.
+- Opening Home for the first time from a project keeps that project visible until the configured Home tab is ready.
+- Files shows a cached file's breadcrumb and preview together as you select its tab. Fast directory reads go straight to the tree.
 - A context menu keeps the command you picked when rows move. Go to and the child-agent menu follow the selected pane or terminal. Reopening a file tab retires its previous tab menu and preview reads.
 - In standalone Inbox, Settle acts on the agent in focus when you press the shortcut. Home enables Next agent when the selected sidebar has somewhere to go. New space offers the same machines from Inbox, Spaces and the New menu.
 - Review opens the range you picked for its original space and repository. A full-file read interrupted by hiding Review resumes when you return.
