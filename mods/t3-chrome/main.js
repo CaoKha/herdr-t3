@@ -122,8 +122,8 @@ export default class WorkspaceChrome extends View {
         .child(h_flex().id("footer-buttons").flex_none().gap(GROUP_GAP).items_center()
           .child(button("settings", "mods/t3-chrome/icons/settings.svg", "Settings", () => run("app.settings"), "app.settings"))
           .child(button("t3-settings", "mods/t3-chrome/icons/sliders-horizontal.svg", "Herdr T3 settings", () => run("t3-tabs.settings"), "t3-tabs.settings"))
-          // Straight to the confirmation, which names what closes: nothing to browse first (ADR 0020).
-          .child(button("close-idle", "mods/t3-chrome/icons/brush-cleaning.svg", "Close idle terminals", () => run("t3-tabs.cleanup"), "t3-tabs.cleanup")))
+          // Clean up: what closes and what still runs, in the dialog t3-tabs opens (ADR 0020).
+          .child(button("clean-up", "mods/t3-chrome/icons/trash-2.svg", "Clean up", () => run("t3-tabs.cleanup"), "t3-tabs.cleanup")))
         .child(notice || div().flex_1())
         .when(Boolean(ready), el => el.child(tip(this, t, "app-update", `Update ${ready} downloaded. Click to restart`, stop(this, t, "app-update", div().id("app-update").h(32).px(12).flex_none().flex().items_center()
           .rounded_full().bg(alpha(t.accent, "26")).text_size(12).text_color(t.accent).hover(s => s.bg(alpha(t.accent, "40"))).on_hover(glow(this, "app-update"))

@@ -18,7 +18,7 @@ What the [RECIPE](../../../RECIPE.md) leaves out of the sidebar's frame: exact g
 
 ## Footer
 
-- 44px high. 32px buttons 4 apart (t3-tokens P3; radius 8, 16px icons), 8 in from the side and 4 from the top: Herdr Settings, the layout's sliders button (Layout Settings), then Close idle (`brush-cleaning` icon, running `t3-tabs.cleanup`), a plain 32px icon button with no count and never disabled: whether a shell is idle takes a probe, so a press with nothing to close gets a toast ([dialogs](dialogs.md#close-idle)). Its tooltip reads `Close idle terminals` with its shortcut.
+- 44px high. 32px buttons 4 apart (t3-tokens P3; radius 8, 16px icons), 8 in from the side and 4 from the top: Herdr Settings, the layout's sliders button (Layout Settings), then Clean up (`trash-2` icon, running `t3-tabs.cleanup`, which opens its dialog), a plain 32px icon button with no count and never disabled: whether a shell is idle takes a probe, so a press with nothing in it gets a toast ([dialogs](dialogs.md#clean-up)). Its tooltip reads `Clean up` with its shortcut.
 - The free space between them and the edge holds the Undo notice ([inbox](inbox.md#undo-notice)).
 - When an update has downloaded: a right-aligned 32px `Update` pill, 12px `accent` text on a 15% `accent` wash, running `app.update`.
 

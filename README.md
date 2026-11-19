@@ -22,7 +22,7 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
 - **Go to** (`cmd-p`): jump to any pane, agent or program, by its name. When recent panes change order, Enter follows the pane you selected.
-- **Close idle** (`cmd-shift-r` / `ctrl-alt-r`, or the brush button in the sidebar footer) closes settled agents and idle shells without leaving Inbox. It asks first, naming each by space, the spaces that close and the programs still running, which stay open.
+- **Clean up** (`cmd-shift-r` / `ctrl-alt-r`, or the trash can in the sidebar footer) reclaims what's finished without leaving Inbox: settled agents and idle shells fold into one block that **Close** ends, and each program left behind, still running where no agent is at work any more, is a card you can go to or **Stop**.
 - **New** lists open spaces first, followed by remembered projects whose last terminal closed. Pick a remembered project to reopen it in its original folder and on its original machine.
 - **Details** (`cmd-shift-b`): locked computer/directory, Open in and global Actions, then Review: one click shows Review, its arrow picks the range. Installed T3 editors, including VSCodium and JetBrains, share one preference with Files; choosing only remembers it, and the main button opens it. Right-click the card to choose what to show.
 - **Slim tabs and framed panes**, in T3 Code's look. In Inbox, clicking the space name in the tab bar breadcrumb opens a menu with New tab and all agents, sub-agents and terminal programs in that space.
@@ -59,7 +59,7 @@ Dragging, sweeping across rows, pins and the rest: [Everyday use](docs/user/guid
 | `cmd-shift-s` | Settle the agent you're looking at and go Home, or bring it back |
 | `cmd-]` / `cmd-[` | Next or previous agent, in the sidebar's order |
 | `cmd-p` | Go to any pane |
-| `cmd-shift-r` / `ctrl-alt-r` | Close idle terminals |
+| `cmd-shift-r` / `ctrl-alt-r` | Open Clean up |
 | `cmd-shift-h` | Go Home |
 | `cmd-shift-,` | The layout's settings |
 | `cmd-alt-b` | Show or hide the space panel, on the page last shown |
@@ -83,7 +83,7 @@ It checks your configuration and required mod entry points before copying files.
 - `t3-inbox`: `hc label <agent> snoozed=<ms>` when an agent is snoozed or wakes.
 - `t3-inbox` identifies linked checkouts with `git rev-parse` and `git worktree list --porcelain -z` in the pane's working directory on its machine.
 - `t3-tabs`: `hc get` before closing a terminal, to see whether a program is running in it. `hc label` when `cmd-shift-s` settles or brings back an agent, and to give back an unread done (`herdr.seen`) or a Woke mark (`snoozed`) that Herdr cleared when it showed a tab you didn't pick, and `hc label <agent> snoozed=` when a failed turn or new work in view ends a snooze.
-- `t3-tabs`: `hc get` to check whether a shell is idle and eligible for **Close idle**.
+- `t3-tabs`: `hc get` to check whether a shell is idle and eligible for **Clean up**, and which process a running one shows.
 - `t3-agents`: `hc label <agent> snoozed=` when pinning a snoozed agent ends its snooze.
 - `t3-actions`: reads ComputerName, probes installed editors with `open -Ra`, and opens the selected directory with `open`. Its Review row uses the Review page's shared, read-only Git scope helpers asynchronously; it performs no Git writes.
 - `t3-chrome`: on macOS, when the zoom changes, it rewrites the window button position in the installed `layouts/herdr-t3.json`, so the buttons stay on the brand bar's middle line.

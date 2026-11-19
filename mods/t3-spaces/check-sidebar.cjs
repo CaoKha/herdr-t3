@@ -8,9 +8,9 @@ const element = kit.elements({ args: "auto", adds: ["child"] }), { plain, find, 
 // A row's laid-out children, without the absolutely placed tree lines.
 const inFlow = row => row.items.filter(n => !("absolute" in n.style));
 
-// A mod as Herdr would load it (kit.bundle), button.js's private tint kept apart from project.js's exported one.
+// A mod as Herdr would load it (kit.bundle), with the names mods import button.js's button and tint under.
 function bundle(dir) {
-  const own = (file, src) => file === "button.js" ? "const { button, radiusOf, ghostTint, GROUP_GAP } = (() => {\n" + kit.strip(src) + "\nreturn { button, radiusOf, ghostTint: tint, GROUP_GAP }; })();\nconst drawButton = button;" : null;
+  const own = (file, src) => file === "button.js" ? kit.strip(src) + "\nconst drawButton = button, ghostTint = tint;" : null;
   const code = kit.bundle((file) => fs.readFileSync(path.join(dir, file), "utf8"), "main.js", own);
   // t3-tabs reads measured-text.js's named as namedLabel.
   return code.includes("namedLabel(") ? code + "\nconst namedLabel = named;" : code;
@@ -688,7 +688,7 @@ async function checkInbox() {
     t0.focused = true; remote.focused = false;
   }
   {
-    // Settled folds and pages without a Clear control; ending settled processes is Close idle.
+    // Settled folds and pages without a Clear control; ending settled processes is Clean up.
     f.spaces()[0].tabs[0].active = true;
     inbox.open = true;
     assert.equal(find(inbox.render(run), "settled-clear"), null, "Settled has no Clear button");

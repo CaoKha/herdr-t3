@@ -7,7 +7,7 @@ import { View, div, svg } from "gpui-kit";
 import { foldArrow, planMotion, flying, leavingRows } from "./motion.js";
 import { v_flex, h_flex } from "gpui-base";
 import { checking, spaces, machines, panes, focused, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, props, layout, nextCommand } from "herdr";
-import { projectMark, tint } from "./project.js";
+import { projectMark, monogramColor } from "./project.js";
 import { newSpaceButton } from "./new-space.js";
 import { repoFacts } from "./repos.js";
 import { spaceOrdering } from "./ordering.js";
@@ -398,7 +398,7 @@ export default class Spaces extends View {
     // While a row's lifted, nothing under the pointer lights or labels itself.
     if (this.drag?.moved) this.hot = this.overMachine = null;
     // The shipped mods (the Terminals picker) still color spaces from "space.colors": the same color, from the name.
-    const colors = Object.fromEntries(sp.filter(p => p.name !== "~").map(p => [p.id, tint(p.name, false)]));
+    const colors = Object.fromEntries(sp.filter(p => p.name !== "~").map(p => [p.id, monogramColor(p.name, false)]));
     if (JSON.stringify(colors) !== JSON.stringify(shared("space.colors") ?? {})) setShared("space.colors", colors);
     const rows = this.rows = this.grouped(t);
     // New space here goes as the space it made arrives, with no leave to say so: it would come back lit.

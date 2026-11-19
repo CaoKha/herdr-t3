@@ -18,28 +18,28 @@ const tips = new Map();
 vm.runInContext("const drawButton = button; tip = globalThis.recordTip;", Object.assign(scope, {
   recordTip: (_v, _t, id, label, button, options) => { tips.set(id, [label, plain(options ?? {})]); return button; },
 }));
-const view = new scope.Mod(), render = () => view.render(cx), closeIdle = () => find(render(), "close-idle");
+const view = new scope.Mod(), render = () => view.render(cx), cleanUp = () => find(render(), "clean-up");
 view.init({}, cx);
 spaces.push({ id: "one", machine: null, tabs: [{ id: "tab-one" }] });
 panes.push({ tab: "tab-one" });
 
-// Close idle runs at once: its confirmation names what closes, and t3-tabs says when there's nothing to close.
-const icon = closeIdle();
-assert.ok(icon, "Close idle is in the footer");
+// Clean up opens at once: its dialog names what closes, and t3-tabs says when there's nothing to clean up.
+const icon = cleanUp();
+assert.ok(icon, "Clean up is in the footer");
 assert.equal(icon.style.w, 32);
 assert.equal(icon.style.h, 32);
-assert.equal(icon.items[0].source, "mods/t3-chrome/icons/brush-cleaning.svg");
+assert.equal(icon.items[0].source, "mods/t3-chrome/icons/trash-2.svg");
 assert.deepEqual(strings(icon), []);
-assert.deepEqual(tips.get("close-idle"), ["Close idle terminals", { action: "t3-tabs.cleanup" }]);
+assert.deepEqual(tips.get("clean-up"), ["Clean up", { action: "t3-tabs.cleanup" }]);
 const buttons = find(render(), "footer-buttons");
 assert.equal(buttons.style.gap, 4);
-assert.deepEqual(buttons.items.map(button => button.key), ["settings", "t3-settings", "close-idle"]);
+assert.deepEqual(buttons.items.map(button => button.key), ["settings", "t3-settings", "clean-up"]);
 
 saved["t3.notice"] = { gen: 1, at: now, action: "Settled", count: 3, shown: true, live: true };
 assert.ok(find(render(), "undo-notice-undo"));
-assert.ok(closeIdle(), "still there beside Undo");
+assert.ok(cleanUp(), "still there beside Undo");
 delete saved["t3.notice"];
 
-fire(closeIdle(), "on_click", {}, cx);
+fire(cleanUp(), "on_click", {}, cx);
 assert.deepEqual(calls.map(([name]) => name), ["t3-tabs.cleanup"]);
-console.log("ok: Close idle footer button and tooltip");
+console.log("ok: Clean up footer button and tooltip");

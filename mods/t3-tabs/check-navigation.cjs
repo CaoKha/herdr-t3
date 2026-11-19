@@ -142,11 +142,18 @@ async function checkCleanup() {
     const dialog = f.overlays[0];
     assert.equal(dialog.mod, "t3-actions");
     assert.equal(dialog.kind, "dialog");
+    // Clean up: what closes, by space, folded into one count; each program still running, a card with its process.
     assert.deepEqual(plain(dialog.props), {
-      actions: "confirm", title: "Close 4 idle terminals?",
-      detail: 'This ends settled agents and idle shells: "Pi" and "drained-shell-term" in project 1; "split-shell-term" and "quiet-term" in project 2, closing project 1. '
-        + 'Still running and left open: "vite-term" and "unresponsive-term" in project 2. The tab you\'re on stays.',
-      yes: "Close", command: { name: "t3-tabs.cleanup-now:1" },
+      actions: "clean-up",
+      idle: [
+        { pane: "settled", name: "Pi", space: "project 1", spaceId: "s1", machine: null, program: f.agents()[0].program },
+        { pane: "drained-shell", name: "drained-shell-term", space: "project 1", spaceId: "s1", machine: null, program: null },
+        { pane: "split-shell", name: "split-shell-term", space: "project 2", spaceId: "s2", machine: "vps", program: null },
+        { pane: "quiet", name: "quiet-term", space: "project 2", spaceId: "s2", machine: "vps", program: null },
+      ],
+      // project 2 still has agents at work: its programs are in use, not left behind.
+      cards: [],
+      command: { name: "t3-tabs.cleanup-now:1" },
     });
     assert.deepEqual(f.calls, [], "the scan leaves all panes open");
     assert.deepEqual(f.labelled.map(args => args[1]).sort(),
@@ -204,18 +211,44 @@ async function checkCleanup() {
     const f = fixture(), view = f.navigation();
     await view.handle("cleanup", f.cx);
     assert.deepEqual([f.calls, f.overlays], [[], []], "close nothing and ask nothing with no eligible panes");
-    assert.deepEqual(plain(f.notifications), [{ title: "Nothing idle to close", body: "No settled agents or shells at their prompt outside this tab.", level: "info" }],
-      "a press with nothing to close says so");
+    assert.deepEqual(plain(f.notifications), [{ title: "Nothing to clean up", body: "No idle or left-behind terminals outside this tab.", level: "info" }],
+      "a press with nothing in Clean up says so");
   }
   {
     const { f, settled, idle, split, quiet, answers, busy } = cleanupFixture(), view = f.navigation();
     settled.k.turn++;
     for (const p of [idle, split, quiet]) answers.set(p.terminal, busy);
     await view.handle("cleanup", f.cx);
-    assert.deepEqual([f.calls, f.overlays], [[], []]);
-    assert.deepEqual(plain(f.notifications), [{ title: "Nothing idle to close",
-      body: 'Still running: "drained-shell-term" in project 1; "split-shell-term", "quiet-term", "vite-term" and "unresponsive-term" in project 2.', level: "info" }],
-      "with only programs running, the toast names them");
+    assert.deepEqual([f.calls, f.overlays], [[], []], "programs in spaces whose agents still work aren't in Clean up");
+    assert.equal(f.notifications[0]?.title, "Nothing to clean up");
+  }
+  {
+    // A program is left behind once no agent in its space is active, and never in the space you're in.
+    const { f, answers, busy } = cleanupFixture(), view = f.navigation();
+    const [current] = f.spaces();
+    f.spaces().push({ id: "s3", name: "project 3", machine: null, folder: "/work/p3", tabs: [{ id: "left-tab" }] });
+    current.tabs.push({ id: "here-tab" });
+    for (const [pane, tab] of [["leftover", "left-tab"], ["here-prog", "here-tab"]]) {
+      f.panes().push({ pane, tab, terminal: pane + "-term" });
+      answers.set(pane + "-term", busy);
+    }
+    // The space you're in, even with its agent gone.
+    f.agents().splice(0, 1);
+    await view.handle("cleanup", f.cx);
+    assert.deepEqual(plain(f.overlays[0].props).cards,
+      [{ pane: "leftover", name: "leftover-term", space: "project 3", spaceId: "s3", machine: null, program: null, process: "vite" }]);
+  }
+  {
+    // A card's × stops its program at once: Clean up already asked. Alone in its tab, the tab goes with it.
+    const { f } = cleanupFixture(), view = f.navigation();
+    await view.handle("stop-pane:vite", f.cx);
+    await view.handle("stop-pane:quiet", f.cx);
+    await view.handle("stop-pane:gone", f.cx);
+    assert.deepEqual(f.calls, [["pane.close", { pane: "vite" }], ["tab.close", { id: "quiet-shell-tab", confirmed: true }]]);
+    assert.deepEqual(f.overlays, [], "no confirmation");
+    f.calls.length = 0;
+    await view.handle("go-pane:vite", f.cx);
+    assert.deepEqual(f.calls, [["pane.focus", { pane: "vite" }]], "a card goes to its pane");
   }
 }
 

@@ -17,7 +17,7 @@
 
 - **终端标签**只经 `shared/labels.js` 的 `writeLabel` 写：它统一报错（`Couldn't update the agent`），返回是否写成；`quiet` 用于会重试的写入，只在第一次失败时提示。
 - **内存**里的记忆在代码注释里写明「只记本次运行」，必要时附 `shortcut:` 说明何时改为持久。
-- `t3-tabs` 的 `Close idle` 确认范围只留在本次运行的内存中（序号、待关窗格与终端地址映射、预计连带关闭的 space 集合）。确认时逐一重核：已 Settle 的 agent 仍须带 core 回显的 `settled` 标签且子树不忙，非 agent 空 shell 仍须 `atPrompt` 为真，且都不在当前查看标签中；整标签都属待关集合时直接 `tab.close`（`confirmed: true`），空掉的 space 随之关闭，不再补建后台 shell。下一次询问会使旧序号失效。
+- `t3-tabs` 的 `Clean up` 确认范围只留在本次运行的内存中（序号、待关窗格与终端地址映射、预计连带关闭的 space 集合）。确认时逐一重核：已 Settle 的 agent 仍须带 core 回显的 `settled` 标签且子树不忙，非 agent 空 shell 仍须 `atPrompt` 为真，且都不在当前查看标签中；整标签都属待关集合时直接 `tab.close`（`confirmed: true`），空掉的 space 随之关闭，不再补建后台 shell。下一次询问会使旧序号失效。
 - Inbox 的搜索词和键盘高亮只在当前视图内存中使用。卡片的错误信息取当前终端自己的报告；Git 探测结果按机器和路径留在内存，切换工作目录后重新核对。
 - 标签关闭确认的范围只保存在打开它的 `t3-tabs` 副本内存中，包括标签、space、终端地址集合，以及是否会连带关闭 space。确认命令携带本次序号，匹配才消费这份记录。下一次关闭询问会使旧序号失效。
 - Spaces 和独立 Review 栏的目录监听 token、未决 `FolderWatch`、关闭标记只留本次运行的内存；取消后先移走 token，迟到结果只认仍属自己的 token，不重建已释放的监听。

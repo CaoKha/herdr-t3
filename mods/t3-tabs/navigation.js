@@ -125,13 +125,22 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
   // A pane is empty when its own shell holds the foreground. No answer counts as busy: better to ask.
   // shortcut: a shell's background jobs read as empty, upgrade if Herdr ever reports them.
   const SHELL = /^-?(zsh|bash|fish|sh|dash|ksh|tcsh|nu)$/;
-  async function atPrompt(terminal) {
+  // What holds a terminal's foreground: `prompt` when it's its own shell; `process` its name, null without an answer.
+  async function foreground(terminal) {
     try {
       const { code, stdout } = await hc(["get", terminal, "--json"]);
-      if (code !== 0) return false;
-      const k = JSON.parse(stdout);
-      return k.foreground?.pid === k.pid && SHELL.test(k.foreground.name);
-    } catch { return false; }
+      if (code !== 0) return { prompt: false, process: null };
+      const k = JSON.parse(stdout), name = k.foreground?.name ?? null;
+      return { prompt: k.foreground?.pid === k.pid && SHELL.test(name ?? ""), process: name };
+    } catch { return { prompt: false, process: null }; }
+  }
+  const atPrompt = async (terminal) => (await foreground(terminal)).prompt;
+
+  function openCleanUp(props, cx) {
+    beforeAsk(cx);
+    if (asking) closeOverlay(asking);
+    tabAnswer = cleanupAnswer = null;
+    asking = openOverlay({ mod: "t3-actions", kind: "dialog", frame: "none", width: 512, props });
   }
 
   function confirmClose(title, detail, command, cx) {
@@ -168,17 +177,27 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
         candidates.set(p.pane, { terminal, agent: Boolean(a) });
       }
     }
-    return { openSpaces, ps, candidates };
+    // Spaces still at work: the one you're in, and any with a top-level agent that isn't settled (snoozed counts: it comes back).
+    // Their programs are in use; only another space's are left behind.
+    const working = new Set(openSpaces.filter(s => s.tabs.some(c => c.id === tabNow)).map(s => s.id));
+    const spaceOfTab = new Map(openSpaces.flatMap(s => s.tabs.map(c => [c.id, s.id])));
+    for (const a of ags) {
+      const k = byAddr.get(a.address), space = spaceOfTab.get(a.tab);
+      if (!space || k?.parent) continue;
+      if (!(k && stillSettled(k, ownStatus(a.status, a.address, all), kids(a.address)))) working.add(space);
+    }
+    return { openSpaces, ps, candidates, working };
   }
 
-  // `kept`: the non-agent terminals in scope still running a program, which the confirmation lists and leaves open.
+  // `kept`: the non-agent terminals in scope still running a program (pane → its process); cleanup keeps those left behind.
   async function scanCleanup(targets) {
     const { candidates } = cleanupScope();
-    const eligible = new Map(), busy = new Set();
+    const eligible = new Map(), busy = new Map();
     await Promise.all([...candidates].map(async ([pane, { terminal, agent }]) => {
       if (targets && targets.get(pane) !== terminal) return;
-      if (agent || await atPrompt(terminal)) eligible.set(pane, { terminal, agent });
-      else busy.add(pane);
+      const fg = agent ? null : await foreground(terminal);
+      if (agent || fg.prompt) eligible.set(pane, { terminal, agent });
+      else busy.set(pane, fg.process);
     }));
     // A prompt probe can take long enough for focus, pane contents or an agent's state to change.
     const current = cleanupScope();
@@ -187,42 +206,40 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       const p = current.candidates.get(pane);
       if (p?.terminal === terminal && p.agent === agent) confirmed.set(pane, terminal);
     }
-    const kept = new Set([...busy].filter(pane => current.candidates.has(pane)));
-    return { openSpaces: current.openSpaces, ps: current.ps, confirmed, kept };
+    const kept = new Map([...busy].filter(([pane]) => current.candidates.has(pane)));
+    return { openSpaces: current.openSpaces, ps: current.ps, confirmed, kept, working: current.working };
   }
 
-  // `"a" and "b" in web; "c" in api`, the spaces in order, the panes named as their headers name them.
-  function bySpace(openSpaces, ps, panesIn) {
-    const name = namer();
-    return openSpaces.flatMap(s => {
-      const tabs = new Set(s.tabs.map(c => c.id));
-      const names = ps.filter(p => tabs.has(p.tab) && panesIn.has(p.pane)).map(p => `"${name(p)}"`);
-      return names.length ? [`${andList(names)} in ${s.name}`] : [];
-    }).join("; ");
-  }
-
-  const andList = list => list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
-
+  // Clean up (t3-actions draws it): what closes, by space, and a card for each program left behind. Nothing in it, a toast.
   async function cleanup(cx) {
-    const { openSpaces, ps, confirmed, kept } = await scanCleanup(null);
+    const { openSpaces, ps, confirmed, kept: running, working } = await scanCleanup(null);
     const n = confirmed.size;
-    // The footer's button can't know without probing shells, so a press with nothing to close says so.
-    if (!n) {
-      notify({ title: "Nothing idle to close", level: "info",
-        body: kept.size ? `Still running: ${bySpace(openSpaces, ps, kept)}.` : "No settled agents or shells at their prompt outside this tab." });
+    // Left behind: a program running where no agent is at work any more. Elsewhere it's in use, and not Clean up's.
+    const tabSpace = new Map(openSpaces.flatMap(s => s.tabs.map(c => [c.id, s.id])));
+    const kept = new Map([...running].filter(([pane]) => !working.has(tabSpace.get(ps.find(p => p.pane === pane)?.tab))));
+    if (!n && !kept.size) {
+      notify({ title: "Nothing to clean up", body: "No idle or left-behind terminals outside this tab.", level: "info" });
       return;
     }
-    const emptied = openSpaces.filter(s => {
-      const tabs = new Set(s.tabs.map(c => c.id));
-      const mine = ps.filter(p => tabs.has(p.tab));
-      return mine.length > 0 && mine.every(p => confirmed.has(p.pane));
-    }).map(s => s.name);
-    const command = `cleanup-now:${++cleanupSerial}`;
-    const closing = emptied.length ? `, closing ${andList(emptied)}` : "";
-    const left = kept.size ? ` Still running and left open: ${bySpace(openSpaces, ps, kept)}.` : "";
-    confirmClose(`Close ${n} idle terminal${n === 1 ? "" : "s"}?`,
-      `This ends settled agents and idle shells: ${bySpace(openSpaces, ps, confirmed)}${closing}.${left} The tab you're on stays.`, `t3-tabs.${command}`, cx);
-    cleanupAnswer = { command, targets: confirmed };
+    const name = namer(), mine = s => { const tabs = new Set(s.tabs.map(c => c.id)); return ps.filter(p => tabs.has(p.tab)); };
+    // Each row as Clean up draws it: the pane's own name and program, under its space's mark.
+    const rows = (has) => openSpaces.flatMap(s => mine(s).filter(p => has(p.pane)).map(p => ({
+      pane: p.pane, name: name(p), space: s.name, spaceId: s.id, machine: s.machine ?? null, program: programOf(p) ?? null,
+    })));
+    const idle = rows(pane => confirmed.has(pane));
+    const cards = rows(pane => kept.has(pane)).map(c => ({ ...c, process: kept.get(c.pane) }));
+    const command = n ? `cleanup-now:${++cleanupSerial}` : null;
+    openCleanUp({ actions: "clean-up", idle, cards, command: command && { name: `t3-tabs.${command}` } }, cx);
+    cleanupAnswer = command && { command, targets: confirmed };
+  }
+
+  // A card's ×: Clean up already asked, so the program stops now; alone in its tab, the tab goes too, as cleanup closes.
+  function stopPane(pane) {
+    const p = panes().find(x => x.pane === pane);
+    if (!p) return;
+    const mine = panes().filter(x => x.tab === p.tab);
+    if (mine.length === 1) run("tab.close", { id: p.tab, confirmed: true });
+    else run("pane.close", { pane });
   }
 
   async function cleanupNow(targets) {
@@ -594,6 +611,8 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       }
       else if (command.startsWith("close-pane-now:")) await closePaneNow(command.slice("close-pane-now:".length), cx);
       else if (command === "cleanup") await cleanup(cx);
+      else if (command.startsWith("stop-pane:")) stopPane(command.slice("stop-pane:".length));
+      else if (command.startsWith("go-pane:")) focusPane(command.slice("go-pane:".length));
       else if (command.startsWith("cleanup-now:")) {
         const answer = cleanupAnswer;
         if (answer?.command === command) {

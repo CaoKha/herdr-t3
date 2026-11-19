@@ -4,10 +4,10 @@
 
 ## 2026-11-19
 
-- **Close idle**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的刷子按钮）不离开 Inbox，关掉已 Settle 的 agent 和空闲 shell。确认框按 space 点名要关的终端、随之关闭的 space 和仍在运行的程序（例如忘掉的 `bun dev`），后者保持打开。没有可关的东西时会弹出提示。
+- **Clean up**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的垃圾桶图标）不离开 Inbox 回收用完的终端。已 Settle 的 agent 和空闲 shell 折成一块，写明有几个、哪些 space 随之关闭，点 **Close** 一起关掉。被落下的程序，也就是所在 space 已没有在工作的 agent、却还在运行的程序（例如忘掉的 `bun dev`），各是一张卡片，写明所在 space 和进程：可以跳过去，也可以点 **Stop**（或按 `ctrl-d`）当场停掉。还有 agent 在工作的 space 里的程序，以及你正在的 space 里的程序，不会列出。没有可清理的东西时会弹出提示。
 - Inbox 面包屑的 space 菜单可以就地关闭终端：指针移到行上点 `×`，或按 `ctrl-d`；有程序在运行时会先询问，菜单保持打开，可以连续关掉几个。
 - **New** 会在项目的最后一个终端关闭后记住它。记住的项目排在已打开的 space 后面，选中后会在原来的机器和目录重新打开。
-- **Settled** 收纳已收起的 agent，原来由 **Clear** 负责的进程清理移到 **Close idle**。**Filter by space** 只列出有 Inbox 条目或已在筛选中选中的 space。
+- **Settled** 收纳已收起的 agent，原来由 **Clear** 负责的进程清理移到 **Clean up**。**Filter by space** 只列出有 Inbox 条目或已在筛选中选中的 space。
 
 ## 2026-11-18
 

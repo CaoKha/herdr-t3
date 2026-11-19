@@ -28,7 +28,7 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 ### 侧栏框架
 
-品牌栏先给 macOS 窗口按钮留位置，再放 Herdr 官方标记和 `Herdr`，两者合成回 Home 的按钮。右侧两个相接的 28px 按钮切模式（图标表示点击后去哪：`inbox` 或 `layout-list`）和隐藏侧栏。窗口按钮挪到与这条栏的中线对齐。底栏的 32px 控件间隔 4px，依次是 Herdr Settings、布局设置（sliders）和 Close idle（brush），都是图标按钮。Close idle 直接运行 `t3-tabs.cleanup`。空位显示 Undo，下载好更新后多一个 `Update` 胶囊。规格：[sidebar](docs/internals/specs/sidebar.md)。
+品牌栏先给 macOS 窗口按钮留位置，再放 Herdr 官方标记和 `Herdr`，两者合成回 Home 的按钮。右侧两个相接的 28px 按钮切模式（图标表示点击后去哪：`inbox` 或 `layout-list`）和隐藏侧栏。窗口按钮挪到与这条栏的中线对齐。底栏的 32px 控件间隔 4px，依次是 Herdr Settings、布局设置（sliders）和 Clean up（trash），都是图标按钮。Clean up 运行 `t3-tabs.cleanup`，打开它的对话框。空位显示 Undo，下载好更新后多一个 `Update` 胶囊。规格：[sidebar](docs/internals/specs/sidebar.md)。
 
 ### Inbox
 
@@ -153,11 +153,11 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 点 space 切换；拖动在同机器内排序（`space.move`），checkout 带着展开的 worktree 一起动。checkout 没开、有两个及以上 worktree 时，它们收在一个暗色虚 checkout 下，点它打开该 checkout。点顶层 agent `agent.focus`，点子 agent 行 peek。Pin 与 Inbox 共用；Lists 没有 Settled 组，只隐去未读 done。
 
-### Go to、New、Close idle 与 Actions
+### Go to、New、Clean up 与 Actions
 
 Go to（`cmd-p`）列出所有 pane，最近的在前，打开时选中之前的 pane，所以 `cmd-p`、Enter 来回切换；Enter 跨 space 聚焦，`ctrl-d` 走安全关闭。New 先列出已打开的 space，当前项排最前，再列出 `t3.projects` 记住但尚未打开的项目。常驻的 `t3-tabs` 记录项目。New 按机器和目录这一对值判断项目是否已打开。选已打开的 space 在其当前位置新建标签，选书签则用 `space.new` 在原机器和目录重新打开，并保留显式命名。平台修饰键加 `1…9` 选择对应行。底栏可新建 space，多机器时先问哪台。见 [New](docs/internals/specs/dialogs.md#new) 和 [storage](docs/internals/storage.md)。
 
-**Close idle**（`t3-tabs.cleanup`）不离开 Inbox，关掉用完却还在运行的终端，不先打开任何列表。询问是否关闭当前标签之外已由 core 确认为 Settled 的 agent 和停在提示符的非 agent shell；确认框按 space 点名这些终端、随之关闭的 space 和仍在运行的非 agent 终端，后者保持打开。确认时复查列出的终端，清空的 space 随之关闭。没有符合条件的终端时，弹出提示并列出仍在运行的程序。见 [Close idle](docs/internals/specs/dialogs.md#close-idle) 和[清理命令](docs/internals/specs/tab-bar.md#t3-tabs-commands)。
+**Clean up**（`t3-tabs.cleanup`）不离开 Inbox，打开一个对话框，它本身就是确认框。当前标签之外已由 core 确认为 Settled 的 agent 和停在提示符的非 agent shell 折成一块，写明数量和随之关闭的 space，展开按 space 列名字；**Close** 一起关掉，逐个复查，清空的 space 随之关闭。被落下的程序，也就是所在 space 已没有在工作的 agent、且不是你正在的 space 里仍在运行的非 agent 终端，各是一张卡片，写明 space、机器和前台进程：点卡片跳过去，点 `Stop` 或高亮后按 `ctrl-d` 当场停掉；用文字而不用 `×`，因为它不再询问。还有 agent 在工作的 space 里的程序算在用，不列出。数量和随之关闭的 space 随仍在的终端实时更新。底部说明跳过了什么：当前标签，以及你正在的 space 里的程序。两样都没有时弹出提示。见 [Clean up](docs/internals/specs/dialogs.md#clean-up) 和[清理命令](docs/internals/specs/tab-bar.md#t3-tabs-commands)。
 
 Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设为主动作，齿轮编辑。动作有 Name、Command，可选 Folder 和图标，在新的 Tab、Split right 或 Split down 中运行：`terminal.open { argv: ["sh", "-c", command], name, place, folder? }`，结束后 shell 保留。没填 Folder 时在聚焦终端的 cwd 运行，否则用 space 文件夹。
 
@@ -262,7 +262,7 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 
 - 隐藏的 mod 不画也不收命令，首次显示才启动。常驻命令和 Snooze 计时放在浮动 `tabs-keys`；隐藏时所选模式的顺序继续生效，Inbox 从未启动前它自己的顺序除外。模型和远程标签有延迟时保留最后意图，写失败要提示。
 - Home 的严格认领保护普通 space：释放 Home 里的 agent space 时原地释放，不移动或删除进程。外部原生关闭可能闪一下邻居；重启丢关闭历史；原生 Home 分屏拦不住；zoom 组不能拖。
-- 保留确认：关闭和 Close idle 会停终端、清历史，Remove worktree 会删除，壁纸 Delete 删源文件和缓存。Actions 运行任意 `sh -c`。窗口按钮位置只按预期内容写那一个字段；`layout.set` 会丢掉布局记住的状态。
+- 保留确认：关闭和 Clean up 会停终端、清历史，Remove worktree 会删除，壁纸 Delete 删源文件和缓存。Actions 运行任意 `sh -c`。窗口按钮位置只按预期内容写那一个字段；`layout.set` 会丢掉布局记住的状态。
 - 图标路径写错时什么都不画也不报错；运行时拼出的路径要在 demo 窗口里看。宿主没有 blur、缩放动画和字距，用实色代替；透明 popup 仍挡输入。补上漏掉的指针离开和松开；关闭 popup 不能重新打开它，也不能关掉下面的标签。
 - 改 render 或计时器、焦点或悬停、测量或滚动、Review 文本或壁纸转换前，读 [layout implementation](docs/internals/layout-implementation.md)。
 - 本文与[英文版](RECIPE.md)保持一致，各 ≤60,000 UTF-8 字节（Gallery 跳过更大的 RECIPE）。只有重建出来的结果会变时才改它；数值和边界规则写进 specs 和 t3-tokens。
@@ -282,7 +282,7 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 7. Actions 增、改、删，在各位置和目录运行：必填项、确认、上次选择、shell 保留。
 8. space 面板与 Files：每条打开、替换、去重、关闭、批量、隐藏、放大和驱逐规则；本机与远程；菜单与剪贴板；禁用、缺失、长名和大量文件；面板与终端快捷键。详情：Actions 空与满、locked 机器行、选择与执行、键盘走查、分层 Escape、来源失效、冷暖打开耗时。
 9. Review 范围、base、远程、commit、组、已看、`j`/`k`、Analyze、Unicode、二进制、空与失败：树和 diff 同序，不误分析，换行安全，吸顶头不透明，勾选框 alpha 正确。
-10. Close idle：让一个已 Settle 的 agent、一个空闲 shell 和另一个 space 里运行中的程序同时在范围内，分别从底栏按钮和两组快捷键运行。确认框按 space 点名前两者并列出程序；确认后检查当前标签和程序保留、被清空的 space 关闭。没有符合条件的终端时再运行一次：不弹确认框，弹出提示并列出程序。
+10. Clean up：让一个已 Settle 的 agent 和一个空闲 shell 在范围内，再在一个只有已 Settle agent 的 space 和一个有工作中 agent 的 space 里各开一个程序，分别从底栏按钮和两组快捷键打开 Clean up。Idle 块写 2，展开能看到名字；只有第一个程序作为卡片出现在 Left behind 下，写明进程。点 `Stop` 停掉它：卡片消失，对话框还在；如果它所在的 space 已没有别的东西，该 space 会出现在 `closes` 里。关掉其余的，检查当前标签保留、失去最后一个窗格的 space 关闭。范围内什么都没有时再打开一次：不弹对话框，只弹提示。
 11. 壁纸：启动时从磁盘加载；`+` 菜单和拖入；取景卡向上展开、底栏不动；四种模式、浅色纸面、EXIF 方向；任何画取景都不重新转换；以指针为中心缩放、滑条同步；Apply、Cancel、重试、两个 Home、迟到任务和 Delete，不改原图、不复活；构图经重启、缓存、主题和尺寸变化保留；切换明暗时画与背景同一帧换好；特殊文件名可用。
 
 检查通过不能替代亲眼看和亲手用。没试过的真实点击和按键须注明未验证，只清理本次创建的 demo 资源。

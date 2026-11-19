@@ -16,7 +16,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 - Pinned and Active cards occupy the top. Working, Snoozed and Settled are bottom-anchored folded shelves when they have entries; when space runs out they follow the cards in the same scrolling list.
 - Header: 32px, 2px further out than the rows, padding 8, a dim 12px label, a normal-weight count and a 12px chevron. Shelf chevrons switch direction directly (no cross-fade).
 - A folded shelf still shows the row in view, and leaves it out of the hidden count. The row in view also stays visible beyond the Settled page.
-- Settled pages with Show more. A Settle can appear on the shelf immediately; ending settled processes belongs to [Close idle](dialogs.md#close-idle).
+- Settled pages with Show more. A Settle can appear on the shelf immediately; ending settled processes belongs to [Clean up](dialogs.md#clean-up).
 
 ## Cards
 

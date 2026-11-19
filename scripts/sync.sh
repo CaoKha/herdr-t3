@@ -11,10 +11,10 @@ gen="--exclude gpui-kit.d.ts --exclude jsconfig.json"
 # shared/ holds one source for what several mods use; a mod can't import outside its folder, so each gets a copy.
 share() { f=$1; shift; for d; do cp "$src/shared/$f.js" "$src/$d/"; done; }
 share name mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu
-share program mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu
+share program mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu mods/t3-actions
 share tree mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu
 share status-mark mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review
-share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu
+share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu mods/t3-actions
 share projects mods/t3-tabs mods/t3-new-menu
 share new-space mods/t3-inbox mods/t3-spaces mods/t3-new-menu
 share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
@@ -26,7 +26,7 @@ share motion mods/t3-inbox mods/t3-agents mods/t3-spaces
 share focus extras/mods/review mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/asciicn-wallpaper
 share list mods/t3-chrome mods/t3-tabs mods/t3-inbox mods/t3-agents mods/t3-pane mods/t3-actions mods/t3-menu mods/t3-new-menu mods/t3-picker mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
 share zoom mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-menu
-share space-arrival mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-menu mods/t3-spaces mods/t3-new-menu
+share space-arrival mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-menu mods/t3-spaces mods/t3-new-menu mods/t3-actions
 share sidebar mods/t3-chrome mods/t3-home mods/t3-tabs mods/t3-spaces mods/t3-agents mods/t3-inbox mods/t3-pane mods/t3-menu
 share layout-settings mods/t3-chrome mods/t3-tabs mods/t3-inbox
 share snooze-presets mods/t3-inbox mods/t3-menu
