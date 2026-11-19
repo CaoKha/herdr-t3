@@ -105,6 +105,7 @@
 - 只在指针停在行上或键盘选中时用 `selected` 底；指针离开就熄灭，宿主晚到的 leave 不熄灭指针已进入的下一行（`shared/list.js` 的 `litOnHover`）。子菜单开着时（`open`）父行保持点亮。
 - 禁用：整行透明度 0.64（`DISABLED`），不点亮、不响应点击；`hint` 用 `tip()` 说明原因，不用宿主 `.tooltip()`。
 - 行尾提示用 `menuHint`，分隔线用 `menuRule`。按键用 `list.js` 的 `menuKeys`，滚动用 `scrollList`，子菜单用 `popup-menu.js`／`submenu.js`，由各菜单自己接。`label` 不是文字（元素）时，调用方自己设 `accessibility_label`；role 不是按钮的（设置页 Select 的选项 `list_box_option`、base 的 `radio_button`）在调用方覆盖。
+- 行内关闭是唯一例外，只在面包屑的 space 菜单（2026-11-19 用户决定）：能关的行在指针点亮时，`trail` 换成 `micro` 的 ghost `×`（`ghostButton`，`x.svg`），键盘点亮的行保持原标记；按下走 `t3-tabs.close-pane` 的确认，菜单保持打开、列表随之更新，方便连续关掉几个。T3 的菜单没有这种控件，别的菜单不照搬。
 - 子 agent 列表也用 `menuRow`：每级缩进 16 用 `lead` 放 `16 × 层级 − 8` 的占位（加上行的 gap 8），状态用 `trail`。Review 的 base 和 Commits 列表、Review 设置的语言／agent／model 子菜单、设置页 Select 的选项也用 `menuRow`：指针离开即熄灭，和其余菜单一致（2026-11-14 用户决定）。
 
 ## 程序标志

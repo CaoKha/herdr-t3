@@ -29,6 +29,7 @@ import { pinList } from "./pins.js";
 import { sidebarParts } from "./sidebar.js";
 import { closedKey } from "./store.js";
 import { keyLabel } from "./tip.js";
+import { ghostButton } from "./button.js";
 
 // What a submenu's close() stamps, for the menu it hangs off (popup-menu.js subGone).
 const SUB_CLOSED = closedKey("t3-menu", "submenu");
@@ -388,6 +389,10 @@ export default class Menu extends View {
 
   spaceSwitchView(t, p, cx) {
     const spaceId = p.target?.id, now = Date.now(), entries = spaceSwitchEntries(spaceId, now);
+    // Its last tab closed from here, the space went: nothing left to show, so it goes, after this frame.
+    if (cx && !this.emptied && !spaces().some((s) => s.id === spaceId)) this.emptied = cx.timer.after(0, () => { if (!spaces().some((s) => s.id === spaceId)) closeChain(); });
+    // A closed last row takes the highlight back to the row now last.
+    if (this.at > entries.length) this.at = entries.length;
     let clockAt = Infinity;
     const mono = settings()?.font_family ?? "JetBrains Mono";
     const labels = ["New tab", ...entries.map((e) => e.label)];
@@ -412,6 +417,14 @@ export default class Menu extends View {
       } else {
         focusPane(entry.pane);
       }
+    };
+    // The pane a row's × or Ctrl+D closes: a sub-agent peeked without a pane has none.
+    const paneOf = (entry) => entry?.kind === "agent" ? terminalPane(entry.address)?.pane : entry?.pane;
+    // The menu stays: closing a few in a row is what it's for, and the list follows as each pane goes. t3-tabs asks
+    // first while a program runs, as Go to's Ctrl+D.
+    const closeEntry = (entry) => {
+      const pane = paneOf(entry);
+      if (pane) run(`t3-tabs.close-pane:${pane}`);
     };
     const rightClick = (entry) => (_e, cx) => {
       cx.stop_propagation();
@@ -444,6 +457,9 @@ export default class Menu extends View {
     };
     const drawEntry = (j) => {
       const entry = entries[j], rowIndex = j + 1, lit = this.at === rowIndex;
+      // Only under the pointer: a highlight walked by keys keeps its mark where it is.
+      const closing = lit && this.pointer && Boolean(paneOf(entry));
+      const closeId = `space-close-${entry.address ?? entry.pane}`;
       const color = entry.here || lit ? t.foreground : t.muted;
       const divider = entry.firstInGroup && !lit && this.at !== rowIndex - 1 && !entry.here && !entries[j - 1]?.here;
       return menuRow(this, t, entry.id, {
@@ -452,7 +468,11 @@ export default class Menu extends View {
         color,
         lead: entry.depth > 0 ? div().w(entry.depth * 16 - 8).flex_none() : undefined,
         icon: programIcon(entry.program, 16, color) ?? svg("mods/t3-menu/icons/terminal.svg").size(16).flex_none().text_color(color),
-        trail: trailOf(entry),
+        trail: closing
+          ? h_flex().flex_none().pl(10).items_center().child(ghostButton(this, t, closeId, {
+            size: "micro", surface: "card", icon: "mods/t3-menu/icons/x.svg", label: `Close ${entry.label}`, act: () => closeEntry(entry),
+          }))
+          : trailOf(entry),
         pick: () => pick(rowIndex),
         also: (row) => row.when(entry.here, (el) => el.accessibility_label(entry.label))
           .when(entry.here && !lit, (el) => el.bg(alpha(t.foreground, "12")))
@@ -460,6 +480,7 @@ export default class Menu extends View {
           .when(divider, (el) => el.relative().child(div().absolute().top(0).left(8).right(8).h(1).bg(t.border))),
       });
     };
+    const keyed = menuKeys(this, labels, (at) => pick(at));
     const view = v_flex()
       .id("menu")
       .track_focus(this.keys)
@@ -468,7 +489,16 @@ export default class Menu extends View {
       .p(4)
       .bg(t.popover)
       .text_size(14)
-      .on_key_down(menuKeys(this, labels, (at) => pick(at)))
+      .on_mouse_move((_e, cx) => { if (!this.pointer) { this.pointer = true; cx.notify(); } })
+      .on_key_down((e, cx) => {
+        this.pointer = false;
+        if (e.key === "d" && e.modifiers?.control) {
+          closeEntry(entries[this.at - 1]);
+          cx.stop_propagation();
+          return;
+        }
+        keyed(e, cx);
+      })
       .child(menuRow(this, t, "space-new-tab", {
         at: [this, "at", 0], label: "New tab", icon: "mods/t3-menu/icons/plus.svg",
         trail: menuHint(t, shortcut("t3-tabs.new")), pick: () => pick(0),

@@ -39,12 +39,15 @@ let now = Date.now();
 // tip.js's keyLabel, as on a Mac: what every key hint in the layout is written with.
 const tipScope = vm.createContext({ window: () => ({ platform: "macos" }), keys: () => keyList });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "tip.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.keyLabel = keyLabel;", tipScope);
+// button.js in a scope of its own: its tint() and project.js's share a name in one bundle.
+const buttonScope = vm.createContext({ div: el, h_flex: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, glow: () => () => {}, alpha: (c) => c });
+vm.runInContext(fs.readFileSync(path.join(__dirname, "button.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.ghostButton = ghostButton; globalThis.DISABLED = DISABLED;", buttonScope);
 // closeOverlay runs what a closed t3-menu's close() does with the registry (popup-menu.js menuClosed), as Herdr calls close().
 const context = vm.createContext({
   Date: class extends Date { static now() { return now; } },
   checking: () => false,
   // menu-row.js's: button.js's and tip.js's (no row here is disabled).
-  DISABLED: 0.64, glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
+  DISABLED: buttonScope.DISABLED, ghostButton: (...a) => buttonScope.ghostButton(...a), glow: () => () => {}, tip: (_v, _t, _id, _label, el) => el,
   View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, image: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
   run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); context.menuClosed?.(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
   window: { viewport_size: () => view, mouse_position: () => mouse },
@@ -607,6 +610,45 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   calls = []; closed = [];
   find(listNode, "space-term-p-git").handlers["on_mouse_down:right"]({}, cx);
   assert.deepEqual(plain([closed, calls.map((c) => [c[0], c[1].mod, c[1].props])]), [["space-root"], [["overlay", "t3-menu", { tab: "pane", target: { pane: "p-git", terminal: "t-git" } }]]]);
+
+  // A row the pointer lights swaps its mark for a × that closes the pane (asking first, as other closes do); the keyboard's
+  // highlight keeps the mark, and Ctrl+D closes its row. A sub-agent with no pane has nothing to close.
+  const menuNode = () => find(sm.render(), "menu");
+  menuNode().handlers.on_mouse_move({}, cx);
+  sm.at = 4;
+  const x2 = find(sm.render(), "space-close-t2");
+  assert.ok(x2, "the pointer's row shows its close button");
+  assert.ok(!walk(find(sm.render(), "space-item-t2")).some((n) => n.style.path === "mods/t3-menu/icons/alarm-clock.svg"), "the × takes the mark's place");
+  sm.at = 2;
+  assert.equal(find(sm.render(), "space-close-t1a"), null, "a sub-agent without a pane has no close button");
+  calls = []; closed = [];
+  x2.handlers.on_click({}, cx);
+  assert.deepEqual(plain([closed, calls]), [[], [["t3-tabs.close-pane:p2"]]], "× closes the pane through t3-tabs and leaves the menu open");
+  sm.at = 6;
+  menuNode().handlers.on_key_down({ key: "up", modifiers: {} }, cx);
+  assert.equal(find(sm.render(), "space-close-t2"), null, "a key puts the × away");
+  assert.equal(sm.at, 5);
+  sm.at = 5; // t2a left the list above, so lazygit is row 5
+  calls = []; closed = [];
+  menuNode().handlers.on_key_down({ key: "d", key_char: "d", modifiers: { control: true } }, cx);
+  assert.deepEqual(plain([closed, calls]), [[], [["t3-tabs.close-pane:p-git"]]], "Ctrl+D closes the lit row's pane and leaves the menu open");
+  // The pane goes: the list follows live, the highlight on the row that took its place, or the last row once the end is gone.
+  const gitPane = paneList.splice(paneList.findIndex((p) => p.pane === "p-git"), 1)[0];
+  assert.ok(!find(sm.render(), "space-term-p-git"), "the closed pane leaves the open menu");
+  assert.equal(sm.at, 5, "the highlight stays on the row that took its place");
+  sm.at = 6;
+  sm.render();
+  assert.equal(sm.at, 5, "past the end, the highlight comes back to the last row");
+  paneList.push(gitPane);
+  // The space itself went (its last tab closed): nothing left, so the menu goes, after this frame.
+  const spacesWere = spaceList;
+  spaceList = spaceList.filter((sp) => sp.id !== "s0");
+  closed = [];
+  sm.render(cx);
+  elapse(0);
+  assert.deepEqual(closed, ["space-root"], "a menu whose space closed goes away");
+  spaceList = spacesWere;
+  sm.at = -1;
 
   // Keyboard navigation walks New tab + scrollList seamlessly, and close() stamps t3-menu.spaceClosed (not t3-menu.closed).
   const keyNav = (e) => { calls = []; closed = []; find(sm.render(), "menu").handlers.on_key_down(e, cx); };

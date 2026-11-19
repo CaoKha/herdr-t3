@@ -128,7 +128,7 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 ### 标签、导航与关闭
 
-单击标签选中，双击改名，右键打开菜单，拖动排序（Inbox 只能拖不含 agent 的标签）。点击 Inbox 面包屑的 space 打开菜单（宽 `280`，顶置 New tab 后最多滚动 10 行），列出 New tab（`t3-tabs.new`）以及当前 space 下的全部 agent（含嵌套子 agent）与非 agent 终端窗格；右键行项打开对应的 agent 或窗格菜单。从标签条进入不含 agent 的标签时，面包屑保留该 space 最后看的 agent 并变暗；从 space 菜单点 New tab 或按 `cmd-t` 之后，面包屑只有 space，直到再看某个 agent。
+单击标签选中，双击改名，右键打开菜单，拖动排序（Inbox 只能拖不含 agent 的标签）。点击 Inbox 面包屑的 space 打开菜单（宽 `280`，顶置 New tab 后最多滚动 10 行），列出 New tab（`t3-tabs.new`）以及当前 space 下的全部 agent（含嵌套子 agent）与非 agent 终端窗格；右键行项打开对应的 agent 或窗格菜单，悬停行上的 `×` 或高亮后按 `ctrl-d` 经常规确认关闭该窗格。从标签条进入不含 agent 的标签时，面包屑保留该 space 最后看的 agent 并变暗；从 space 菜单点 New tab 或按 `cmd-t` 之后，面包屑只有 space，直到再看某个 agent。
 
 上／下 agent 按所选模式的行走，不循环；上／下标签在显示的标签间循环。关闭当前 agent 整标签或最后 pane，Inbox 回 Home，Lists 回该 space 最近看的标签；后台关闭不跳。布局发起的每次关闭都先问 `hc get`：只剩自己的 shell 时立即关，否则询问 `Close terminal "<名字>"?`（`This stops the running process and clears its history.`）。
 

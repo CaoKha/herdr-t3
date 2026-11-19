@@ -5,6 +5,7 @@ English · [中文](CHANGELOG.zh-CN.md)
 ## 2026-11-19
 
 - **Close idle** (`cmd-shift-r` / `ctrl-alt-r`, or the brush button in the sidebar footer) closes settled agents and idle shells without leaving Inbox. Its confirmation names each terminal by space, the spaces that close with them and the programs still running, such as a forgotten `bun dev`, which stay open. With nothing to close, a notice says so.
+- The Inbox breadcrumb's space menu closes a terminal in place: point at a row for its `×`, or press `ctrl-d`. It asks first while a program runs, and the menu stays open so you can close several.
 - **New** remembers projects after their last terminal closes. Remembered projects appear after open spaces and reopen in their original folder and on their original machine when picked.
 - **Settled** holds put-away agents, with process cleanup moved from its **Clear** button to **Close idle**. **Filter by space** lists only spaces with Inbox entries or spaces already selected in the filter.
 
