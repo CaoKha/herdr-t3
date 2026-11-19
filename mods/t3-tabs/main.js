@@ -4,7 +4,7 @@ import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, th
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { statusMark } from "./status-mark.js";
-import { tip, glow } from "./tip.js";
+import { tip, glow, undoLabel } from "./tip.js";
 import { detailsFor, detailsAt } from "./details.js";
 import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
@@ -160,6 +160,7 @@ export default class Tabs extends View {
   // `given`: an agent's menu names it; the key takes the agent in view.
   async settle(cx, given = null) {
     // Settle is the Inbox's: Lists has no Settled to put it in (docs/adr/0002).
+    // At Home nothing is in view to settle, and Undo has its own key, as T3's.
     if (this.navigation.atHome || sidebarParts(layout()).stack?.active === "lists") return;
     const f = { ...focused() }, ps = panes(), p = ps.find(p => p.pane === f.pane), every = agents(), all = terminals();
     if (!given && p?.mod && programOf(p)?.inbox) {
@@ -608,11 +609,13 @@ export default class Tabs extends View {
   undoNotice(t) {
     const n = shared(KEY.notice);
     if (!n || Date.now() - n.at >= 6000) return null;
+    const live = n.live && Date.now() - n.at < 5000;
+    const button = h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
+      .when(live, el => stop(this, t, "undo-notice-undo", el.hover(s => s.underline()).on_hover(glow(this, "undo-notice-undo"))
+        .role("button").accessibility_label(`Undo: ${n.action}`).on_click(() => run("t3-tabs.undo")), 4)).child(undoLabel("t3-tabs.undo"));
     return h_flex().id(`undo-notice-${n.gen}`).flex_none().h(24).gap(4).items_center().text_size(11).text_color(t.dim)
       .opacity(n.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
       .child(`${n.action}${n.count === 1 ? "" : ` ${n.count}`},`)
-      .child(h_flex().id("undo-notice-undo").h(24).items_center().font_medium().text_color(t.foreground)
-        .when(n.live && Date.now() - n.at < 5000, el => stop(this, t, "undo-notice-undo", el.hover(s => s.underline()).role("button")
-          .accessibility_label(`Undo: ${n.action}`).on_click(() => run("t3-tabs.undo")), 4)).child("Undo"));
+      .child(button);
   }
 }

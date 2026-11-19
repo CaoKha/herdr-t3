@@ -64,11 +64,15 @@ Insert 拒绝包含控制字符的路径；可改用 Copy path。
 | 快捷键 | 命令 | 作用 |
 | --- | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details` | 切换详情 |
+| `cmd-b` | `layout.toggle:sidebar` | 隐藏或显示侧栏 |
+| `cmd-shift-l` | `t3-tabs.sidebar` | 在 Lists 和 Inbox 之间切换侧栏。在本布局里它取代 Herdr 的 `layout.switch` |
 | `cmd-shift-s` | `t3-tabs.settle` | Settle 当前查看的 agent 并回到 Home，已 Settle 的则取回。选中 Inbox 时能用，显示或隐藏都一样；Lists 里不起作用。忙着的不动，置顶的会取消置顶 |
+| `cmd-shift-z` | `t3-tabs.undo` | Undo，提示可撤销时有效 |
 | `cmd-shift-h` | `t3-tabs.home` | 回到 Home |
 | `cmd-shift-,` | `t3-tabs.settings` | 打开布局的设置 |
 | `cmd-alt-b` | `t3-tabs.panel` | 打开 space 面板并停在上次的页面，或关闭它 |
 | `cmd-shift-g` | `t3-tabs.review` | 打开面板并切到 Review；已在显示 Review 就关闭面板。需装 Review 扩展 |
+| `cmd-shift-e` | `t3-tabs.files` | 打开面板并切到 Files；已在显示 Files 就关闭面板 |
 | Files 或 Review 里 `cmd-w`、`ctrl-alt-shift-x` | `t3-files.close`、`review.close` | 关闭活动面板标签，不关终端 |
 | Files 或 Review 里 `cmd-t` | `t3-chrome.surface-menu` | 在 + 下打开菜单，F／R 添加 Files／Review |
 | 终端焦点内 `cmd-t`、`ctrl-alt-c` | `t3-tabs.new` | 新建终端标签 |

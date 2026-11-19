@@ -4,6 +4,7 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-19
 
+- New keys: `cmd-shift-l` switches the sidebar between Lists and Inbox (in this layout it takes the place of Herdr's `layout.switch`), `cmd-shift-e` opens Files in the space panel or closes it, as `cmd-shift-g` does Review, `cmd-b` hides or shows the sidebar, and `cmd-shift-z` is Undo while the notice offers it. As in T3, the notice's button names its key: `Settled, ⇧⌘Z to undo`.
 - **Clean up** (`cmd-shift-r` / `ctrl-alt-r`, or the trash can in the sidebar footer) reclaims what's finished without leaving Inbox. Settled agents and idle shells fold into one block saying how many and which spaces close; **Close** ends them. Programs left behind, still running in a space where no agent is at work any more, such as a forgotten `bun dev`, are cards with their space and process: go to one, or **Stop** it (`ctrl-d` too) with no second question. Programs where an agent is still working, or in the space you're in, aren't listed. With nothing to clean up, a notice says so.
 - The Inbox breadcrumb's space menu closes a terminal in place: point at a row for its `×`, or press `ctrl-d`. It asks first while a program runs, and the menu stays open so you can close several.
 - **New** remembers projects after their last terminal closes. Remembered projects appear after open spaces and reopen in their original folder and on their original machine when picked.

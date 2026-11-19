@@ -1,9 +1,13 @@
 {
   "layout:herdr-t3": {
+    "cmd-b": "layout.toggle:sidebar",
+    "cmd-shift-l": "t3-tabs.sidebar",
     "cmd-shift-b": "t3-tabs.details",
+    "cmd-shift-e": "t3-tabs.files",
     "cmd-shift-g": "t3-tabs.review",
     "cmd-alt-b": "t3-tabs.panel",
     "cmd-shift-s": "t3-tabs.settle",
+    "cmd-shift-z": "t3-tabs.undo",
     "cmd-p": "mod.open:t3-picker",
     "cmd-shift-r": "t3-tabs.cleanup",
     "ctrl-alt-r": "t3-tabs.cleanup",

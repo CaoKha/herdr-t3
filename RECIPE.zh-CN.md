@@ -112,7 +112,7 @@ Active 先 blocked，其余按何时回到人手上；各收纳区按时间排�
 
 Settle 始终手动：悬停已结束的卡片（置顶的也可）按 `✓ Settle`，或对当前 agent 按 `cmd-shift-s`。它去掉 pin、写终端标签、移入 Settled；有新工作自动回来。Un-settle、对它再按 Settle 键或把它拖出来，都会把它放回 Active 顶部。
 
-Pin 是一份与 Agents 共用的手排顺序；pin 会结束 Snooze。Settle、Snooze、Unpin 在底栏显示 `Settled, Undo` 之类提示 5s；Undo 恢复位置、标签和 pin。`cmd-z` 留给终端。
+Pin 是一份与 Agents 共用的手排顺序；pin 会结束 Snooze。Settle、Snooze、Unpin 在底栏显示 `Settled, ⇧⌘Z to undo` 之类提示 5s（没绑键时只写 `Undo`）；Undo 恢复位置、标签和 pin。`cmd-z` 留给终端；Undo 的键是 `cmd-shift-z`。
 
 拖动卡片或窄行时，徽章预告结果（Pin、Unpin、Settle、Un-settle、Wake）；Esc 取消。按住 Settle 或 Un-settle 划过多行，松手成批处理。顺序变化时各行滑动、淡入淡出。
 
@@ -186,8 +186,11 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details`，切详情；侧栏用原按钮 |
 | `cmd-alt-b` | `t3-tabs.panel`，隐藏／恢复space面板 |
-| `cmd-shift-g` | `t3-tabs.review`，Review 开关；无键 `t3-tabs.files` 同理 |
+| `cmd-b` | `layout.toggle:sidebar` |
+| `cmd-shift-l` | `t3-tabs.sidebar`，Lists ↔ Inbox |
+| `cmd-shift-g`／`cmd-shift-e` | `t3-tabs.review`／`t3-tabs.files`，Review／Files 开关 |
 | `cmd-shift-s` | `t3-tabs.settle`，当前 Inbox agent/mod 卡 |
+| `cmd-shift-z` | `t3-tabs.undo`，Undo 有效时 |
 | `cmd-p` | `mod.open:t3-picker` |
 | `cmd-shift-r`／`ctrl-alt-r` | `t3-tabs.cleanup` |
 | `cmd-]`／`cmd-[` | `t3-tabs.next/prev`，agent，不循环 |

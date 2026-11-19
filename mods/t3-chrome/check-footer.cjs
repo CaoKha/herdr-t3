@@ -10,7 +10,7 @@ const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ is_focus
 const scope = vm.createContext({
   View: class {}, div: el, h_flex: el, svg: src => el("svg", src), theme: () => theme,
   props: () => ({ footer: true }), settings: () => ({ zoom: 2 }), updates: () => ({ app }),
-  spaces: () => spaces, panes: () => panes, shared: key => saved[key],
+  spaces: () => spaces, panes: () => panes, shared: key => saved[key], keys: () => [], window: () => ({ platform: "macos" }),
   run: (name, args) => calls.push([name, args === undefined ? null : plain(args)]), Date: { now: () => now },
 });
 vm.runInContext(bundle(file => fs.readFileSync(__dirname + "/" + file, "utf8")), scope);

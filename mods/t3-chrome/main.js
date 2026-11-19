@@ -1,7 +1,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { checking, theme, run, props, updates, layout, shared, setShared, spaces, window, settings, appHome, readTextFile, writeTextFile, notify, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { tip, glow } from "./tip.js";
+import { tip, glow, undoLabel } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { notePanelWidth } from "./titlebar.js";
@@ -101,17 +101,20 @@ export default class WorkspaceChrome extends View {
       // T3's undo notice, the inbox's (t3-inbox.notice), in this row's free space so it covers nothing: "Settled," or
       // "Settled 2," then Undo, which the inbox does. It fades in and out over 200ms, Undo inert while it goes. One older than
       // its 5s and the fade is left from before a restart.
-      const undo = shared(KEY.notice);
+      const undo = shared(KEY.notice), undoLive = Boolean(undo?.live && Date.now() - undo.at < 5000);
+      const undoButton = undo && h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
+        .when(undoLive, (el) => el.hover((s) => s.underline()).on_hover(glow(this, "undo-notice-undo")).role("button")
+          .accessibility_label(`Undo: ${undo.action} ${undo.count} agent${undo.count === 1 ? "" : "s"}`)
+          .on_click(() => run("t3-tabs.undo")))
+        .child(undoLabel("t3-tabs.undo"))
+        .when(undoLive, (el) => stop(this, t, "undo-notice-undo", el, 4));
       // Short of room the summary is cut, never Undo: GPUI's flex doesn't do T3's two wraps, which squeezed Undo to nothing.
       const notice = undo && Date.now() - undo.at < 6000 && h_flex().id(`undo-notice-${undo.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
         .text_size(11).text_color(t.dim).opacity(undo.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
         .child(div().min_w(0).truncate().child(`${undo.action}${undo.count === 1 ? "" : ` ${undo.count}`},`))
         // As T3's InlineButton: medium, foreground, underlined on hover.
-        .child(h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
-          .when(undo.live && Date.now() - undo.at < 5000, (el) => el.hover((s) => s.underline()).role("button").accessibility_label(`Undo: ${undo.action} ${undo.count} agent${undo.count === 1 ? "" : "s"}`)
-            .on_click(() => run("t3-tabs.undo")))
-          .child("Undo")
-          .when(undo.live && Date.now() - undo.at < 5000, (el) => stop(this, t, "undo-notice-undo", el, 4)));
+        // T3's names its key in the button (threadUndoLabel), so it has no tooltip.
+        .child(undoButton);
       const button = (id, icon, label, action, key) => tip(this, t, id, label, stop(this, t, id, drawButton(t, id, { size: "default", icon, label, hot: this.hot === id })
         .on_hover(glow(this, id))
         // Each opens over its button, before the pointer can report leaving it.

@@ -112,7 +112,7 @@ Active sorts blocked agents first, then by when work returned to the person; the
 
 Settle is always explicit: hover a finished card (pinned ones too) for `✓ Settle`, or press `cmd-shift-s` on the viewed agent. It removes the pin, writes a terminal label and moves the agent to Settled; new work brings it back on its own. Un-settle, the Settle key again, or dragging it out returns it to the top of Active.
 
-Pins are one hand-made order shared with Agents; pinning ends Snooze. Settle, Snooze and Unpin show `Settled, Undo` (and the like) in the footer for 5s; Undo restores position, labels and pin. `cmd-z` stays the terminal's.
+Pins are one hand-made order shared with Agents; pinning ends Snooze. Settle, Snooze and Unpin show `Settled, ⇧⌘Z to undo` (and the like; plain `Undo` with no key bound) in the footer for 5s; Undo restores position, labels and pin. `cmd-z` stays the terminal's; Undo's key is `cmd-shift-z`.
 
 Dragging a card or slim row previews its result on a badge (Pin, Unpin, Settle, Un-settle, Wake); Esc cancels. Pressing Settle or Un-settle and sweeping across rows acts on the whole run. Rows slide and fade when order changes.
 
@@ -186,8 +186,11 @@ Every control is a Tab stop clicked by Enter or Space, with a 2px inset `accent`
 | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details`, toggle details; sidebar uses its button |
 | `cmd-alt-b` | `t3-tabs.panel`, hide/restore the space panel |
-| `cmd-shift-g` | `t3-tabs.review`, toggle Review; keyless `t3-tabs.files` does same for Files |
+| `cmd-b` | `layout.toggle:sidebar` |
+| `cmd-shift-l` | `t3-tabs.sidebar`, Lists ↔ Inbox |
+| `cmd-shift-g` / `cmd-shift-e` | `t3-tabs.review` / `t3-tabs.files`, toggle Review / Files |
 | `cmd-shift-s` | `t3-tabs.settle`, viewed Inbox agent/mod card only |
+| `cmd-shift-z` | `t3-tabs.undo`, while Undo is live |
 | `cmd-p` | `mod.open:t3-picker` |
 | `cmd-shift-r` / `ctrl-alt-r` | `t3-tabs.cleanup` |
 | `cmd-]` / `cmd-[` | `t3-tabs.next` / `prev`, agents, no wrap |

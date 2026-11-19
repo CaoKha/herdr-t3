@@ -57,7 +57,7 @@ function fixture(width) {
     },
     openOverlay: spec => overlays.push(spec), closeOverlay: id => closed.push(id), updates: () => ui.updates,
     nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise(() => {}),
-    keys: () => [{ section: "layout:herdr-t3", keys: "cmd-t", action: "t3-tabs.new" }, { section: "global", keys: "cmd-n", action: "space.new" }],
+    keys: () => [{ section: "layout:herdr-t3", keys: "cmd-t", action: "t3-tabs.new" }, { section: "layout:herdr-t3", keys: "cmd-shift-z", action: "t3-tabs.undo" }, { section: "global", keys: "cmd-n", action: "space.new" }],
   };
   function load(name, props = {}) {
     const storage = stores.get(name) ?? new Map();
@@ -462,12 +462,12 @@ for (const width of [208, 256]) {
   assert.ok(find(footer.render(cx), "undo-notice-3"), "Lists have Undo too");
   f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
   const note = find(footer.render(cx), "undo-notice-3");
-  assert.deepEqual([strings(note), "flex_1" in note.style, note.style.text_size], [["Settled 2,", "Undo"], true, 11]);
+  assert.deepEqual([strings(note), "flex_1" in note.style, note.style.text_size], [["Settled 2,", "⇧⌘Z to undo"], true, 11]);
   assert.ok("flex_none" in find(note, "undo-notice-undo").style && "truncate" in note.items[0].style, "short of room the summary is cut, never Undo");
   fire(find(note, "undo-notice-undo"), "on_click", {}, cx);
   assert.deepEqual(f.calls.pop(), ["t3-tabs.undo", {}]);
   f.state["t3.notice"].count = 1;
-  assert.deepEqual(strings(find(footer.render(cx), "undo-notice-3")), ["Settled,", "Undo"]);
+  assert.deepEqual(strings(find(footer.render(cx), "undo-notice-3")), ["Settled,", "⇧⌘Z to undo"], "as T3's: the key in the button, no hover needed");
   f.state["t3.notice"].at = Date.now() - 60000;
   assert.equal(find(footer.render(cx), "undo-notice-3"), null, "one left from before a restart doesn't show");
   delete f.state["t3.notice"];
@@ -2761,11 +2761,14 @@ async function checkInbox() {
     const tree = hidden ? tabs.render(cx) : f.load("t3-chrome", { footer: true }).render(cx);
     const undo = find(tree, "undo-notice-undo");
     assert.ok(undo, "Undo is in the visible bar");
+    assert.deepEqual(strings(undo), ["⇧⌘Z to undo"], `hidden=${hidden}: the key in the button`);
     fire(undo, "on_click", {}, cx);
     assert.deepEqual(f.calls.pop(), ["t3-tabs.undo", {}]);
     f.spaces()[0].active = false;
     f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, tabs: [{ id: "home" }] });
     f.state["t3-tabs.home"] = "h"; f.state["t3.pins"] = ["new", "head", "tail"];
+    await tabs.settle(cx);
+    assert.deepEqual([f.state["t3.notice"]?.live, f.calls.length], [true, 0], `${mode}, hidden=${hidden}: at Home the Settle key leaves Undo to its own key, as T3's`);
     await tabs.undo();
     assert.deepEqual(plain([k.labels.settled, k.labels.snoozed, f.state["t3.pins"]]), ["", until, ["new", "head", "t0", "tail"]]);
     assert.deepEqual(plain(f.calls.splice(0)), [["agent.focus", { terminal: "t0" }]], "Undo returns from Home");

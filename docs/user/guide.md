@@ -64,11 +64,15 @@ The layout's bindings live in the `layout:herdr-t3` section of `keys.json` and a
 | Key | Command | Does |
 | --- | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details` | Toggle Details |
+| `cmd-b` | `layout.toggle:sidebar` | Hides or shows the sidebar |
+| `cmd-shift-l` | `t3-tabs.sidebar` | Switches the sidebar between Lists and Inbox. In this layout it replaces Herdr's `layout.switch` |
 | `cmd-shift-s` | `t3-tabs.settle` | Settles the agent in view and goes to Home, or brings it back if it's settled. With Inbox selected, shown or hidden; in Lists it does nothing. A busy agent stays, a pinned one loses its pin |
+| `cmd-shift-z` | `t3-tabs.undo` | Undo, while the Undo notice offers it |
 | `cmd-shift-h` | `t3-tabs.home` | Goes to Home |
 | `cmd-shift-,` | `t3-tabs.settings` | Opens the layout's settings |
 | `cmd-alt-b` | `t3-tabs.panel` | Shows the space panel on the page last shown, or hides it |
 | `cmd-shift-g` | `t3-tabs.review` | Opens the panel on Review, or closes it if it's already showing Review. Only with the Review extra |
+| `cmd-shift-e` | `t3-tabs.files` | Opens the panel on Files, or closes it if it's already showing Files |
 | `cmd-w`, `ctrl-alt-shift-x` in Files or Review | `t3-files.close`, `review.close` | Close the active panel tab, not the terminal |
 | `cmd-t` in Files or Review | `t3-chrome.surface-menu` | Open + under it; F / R add Files / Review |
 | `cmd-t`, `ctrl-alt-c` with terminal focus | `t3-tabs.new` | New terminal tab |
