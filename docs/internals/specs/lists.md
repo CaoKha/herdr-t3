@@ -49,6 +49,7 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 - Tree lines are 1.5 wide and run down the parent icon's centre, 15.25 from the row's edge (a level down, 35.25). A middle child's line runs on; a last child's turns in: 9.75 long, 6 radius, ending 4 before the child's icon. Worktrees under a checkout use the same lines, their icon 20 in, level with a sub-agent's.
 - Blocked or errored sub-agents still show one step in while folded.
 - A sub-agent with its own pane appears once, under its parent, unless pinned.
+- When the row standing for the agent in view changes (its own row, else its sub-agent row, else the lit ancestor), the next frame scrolls it just into view, only while Lists shows in the active window. A row under the pointer isn't scrolled to, and a wheel turn cancels a pending reveal. Windowed, the list moves its top; shorter, its scroll box scrolls to the row.
 - A folded sub-agent in view lights its parent. Reading a viewed done agent changes its mark to Idle but keeps it in Done until left.
 - Fold state of ended agents is dropped.
 

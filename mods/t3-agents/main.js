@@ -2,8 +2,8 @@
 // A viewed done agent stays in Done until left.
 
 import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, settings, openOverlay, closeOverlay, props, nextCommand } from "herdr";
+import { v_flex, h_flex, ScrollHandle } from "gpui-base";
+import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, settings, openOverlay, closeOverlay, props, nextCommand, window } from "herdr";
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { stopsInit, stopsEnd, focusRoot, enter } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
@@ -23,9 +23,16 @@ const SORT_WIDTH = 200;
 // Past this many rows the list is windowed (render); before its first measure it draws this tall, and two rows past each end.
 const WINDOW_AT = 50, FIRST_H = 800, OVERDRAW = 74;
 
+function revealVisible({ rail, stack } = sidebarParts(layout())) {
+  return window()?.active !== false && !rail?.hidden && !stack?.hidden && stack?.active !== "inbox";
+}
+
 export default class Agents extends View {
   async close() {
     if (props()?.sortMenu) setShared(closedKey("t3-agents", "sort"), Date.now());
+    this.cancelReveal();
+    this.listScroll?.release();
+    this.listScroll = null;
     stopsEnd(this);
   }
 
@@ -39,6 +46,7 @@ export default class Agents extends View {
       return;
     }
     stopsInit(this, cx);
+    this.listScroll = ScrollHandle.new();
     // pane.go onto this list (mod.json's "focusable"): the keyboard starts at the heading's button.
     cx.spawn(async (cx) => {
       for (;;) if (await nextCommand() === "focus") enter(this, cx, "ag-sort");
@@ -50,6 +58,25 @@ export default class Agents extends View {
     cx.timer.every(30000, (cx) => cx.notify()); // The rows' times move with nothing else changing.
     // Older installs kept pins in this list's storage; move them over once, before the inbox writes any.
     if (shared(KEY.pins) == null && localStorage.getItem("pins")) setPinned(JSON.parse(localStorage.getItem("pins")));
+  }
+
+  cancelReveal() {
+    this.revealTimer?.cancel();
+    this.revealTimer = null;
+    this.reveal = null;
+  }
+
+  requestReveal(key, cx) {
+    this.cancelReveal();
+    if (!key) return;
+    const request = this.reveal = { key, ready: false };
+    this.revealTimer = cx.timer.after(0, (cx) => {
+      if (this.reveal !== request) return;
+      this.revealTimer = null;
+      if (!revealVisible()) { this.cancelReveal(); return; }
+      request.ready = true;
+      cx.notify();
+    });
   }
 
   isFolded(id, initial = true) {
@@ -192,7 +219,7 @@ export default class Agents extends View {
     // counts: Idle folds by default, and leaving a row there would take it off the walk, with no key back.
     const ordered = groups.flatMap(g => g.members), order = [...new Set(ordered.map(a => a.address))];
     this.publishRows({ order, view: ancestor });
-    return { sort, list: ordered, all, shown, ps, sp, now, byPriority, facts, listed, groups };
+    return { sort, list: ordered, all, shown, ancestor, ps, sp, now, byPriority, facts, listed, groups };
   }
 
   publishRows(drawn) {
@@ -225,11 +252,34 @@ export default class Agents extends View {
       if (this.details === gone) this.details = null;
       if (this.detailsOut === gone) this.detailsOut = null;
     }
+    const target = (data.shown && entries.some((e) => e.key === `sub-${data.shown}`) ? `sub-${data.shown}`
+      : data.shown && entries.some((e) => e.key === data.shown) ? data.shown
+      : data.ancestor && entries.some((e) => e.key === data.ancestor) ? data.ancestor : null);
+    if (!revealVisible()) this.cancelReveal();
+    else if (this.inView !== undefined && target !== this.inView) this.requestReveal(target === this.hovered ? null : target, cx);
+    this.inView = target;
+    if (this.reveal && (!target || this.reveal.key !== target || this.hovered === target)) this.cancelReveal();
     // A long list draws only the rows in view, scrolled by the wheel (windowed): a frame that built every row of 200 agents
     // made some 13,000 elements. shortcut: windowed, Tab reaches only the rows drawn; switch to a host virtual list when its rows can hold handlers.
     const windowed = entries.length > WINDOW_AT;
     const z = Number(settings()?.zoom) || 1, at = /** @type {any} */ (this).motion.at, total = entries.reduce((sum, e) => sum + e.h, 0);
-    const seen = this.listH ?? FIRST_H, top = this.listTop = windowed ? Math.max(0, Math.min(this.listTop ?? 0, total - seen)) : 0;
+    const seen = this.listH ?? FIRST_H;
+    if (windowed && this.reveal?.ready) {
+      const box = at.get(target);
+      this.cancelReveal();
+      if (box) {
+        const cur = this.listTop ?? 0;
+        if (box.y < cur) this.listTop = box.y;
+        else if (box.y + box.h > cur + seen) this.listTop = Math.max(0, box.y + box.h - seen);
+      }
+    }
+    const top = this.listTop = windowed ? Math.max(0, Math.min(this.listTop ?? 0, total - seen)) : 0;
+    const exits = leavingRows(this, windowed ? top : 0);
+    if (!windowed && this.reveal?.ready) {
+      const rowAt = entries.findIndex((e) => e.key === target);
+      this.cancelReveal();
+      if (rowAt >= 0 && this.listScroll) this.listScroll.scroll_to_item(exits.length + rowAt);
+    }
     const rows = windowed
       ? entries.filter((e) => at.get(e.key).y + e.h > top - OVERDRAW && at.get(e.key).y < top + seen + OVERDRAW)
         .map((e) => div().absolute().left(0).right(0).top(at.get(e.key).y - top).child(flying(this, e.key, e.el())))
@@ -261,17 +311,21 @@ export default class Agents extends View {
       .when(list.length === 0, (el) =>
         el.child(div().px(16).py(24).text_center().text_size(12).line_height("16px").text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
-      .when(!windowed, (el) => el.child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8).overflow_y_scroll()
+      .when(!windowed, (el) => el.child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8)
         // The rows in one box that scrolls, so the leaving ones placed in it scroll with them.
-        .child(v_flex().id("ag-content").relative().w_full().flex_none().gap(STACK).children(leavingRows(this)).children(rows))))
+        .child(v_flex().id("ag-content").relative().w_full().flex_1().min_h(0).gap(STACK).overflow_y_scroll()
+          .when(Boolean(this.listScroll), (c) => c.track_scroll(this.listScroll))
+          .on_scroll_wheel(() => this.cancelReveal())
+          .children(exits).children(rows))))
       .when(windowed, (el) => el.child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8)
         .child(div().id("ag-window").relative().size_full().overflow_hidden()
           .on_size_change((size, cx) => { const h = size.height / z; if (h !== this.listH) { this.listH = h; cx.notify(); } })
           .on_scroll_wheel((e, cx) => {
             cx.stop_propagation();
+            this.cancelReveal();
             const next = Math.max(0, Math.min(top - e.delta.y / z, total - seen));
             if (next !== top) { this.listTop = next; cx.notify(); }
           })
-          .children(leavingRows(this, top)).children(rows)))));
+          .children(exits).children(rows)))));
   }
 }
