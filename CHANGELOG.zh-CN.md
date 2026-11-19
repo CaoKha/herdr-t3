@@ -6,6 +6,7 @@
 
 - 新快捷键：`cmd-shift-l` 在 Lists 和 Inbox 之间切换侧栏（在本布局里它取代 Herdr 的 `layout.switch`），`cmd-shift-e` 在 space 面板打开或关闭 Files，和 `cmd-shift-g` 之于 Review 一样，`cmd-b` 隐藏或显示侧栏，`cmd-shift-z` 在提示可撤销时执行 Undo。和 T3 一样，撤销提示的按钮直接写出快捷键：`Settled, ⇧⌘Z to undo`。
 - Lists 的 Agents 会把你移到的 agent 滚进视野，指针正停在那一行时除外；滚动滚轮会让它停下。
+- 面板宽度不足 640px 时，在 Review 里选中文件会收起文件树，把位置让给 diff；点树按钮可以再打开。更宽时，文件树保持你选的开合状态。
 - **Clean up**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的垃圾桶图标）不离开 Inbox 回收用完的终端。已 Settle 的 agent 和空闲 shell 折成一块，写明有几个、哪些 space 随之关闭，点 **Close** 一起关掉。被落下的程序，也就是所在 space 已没有在工作的 agent、却还在运行的程序（例如忘掉的 `bun dev`），各是一张卡片，写明所在 space 和进程：可以跳过去，也可以点 **Stop**（或按 `ctrl-d`）当场停掉。还有 agent 在工作的 space 里的程序，以及你正在的 space 里的程序，不会列出。没有可清理的东西时会弹出提示。
 - Inbox 面包屑的 space 菜单可以就地关闭终端：指针移到行上点 `×`，或按 `ctrl-d`；有程序在运行时会先询问，菜单保持打开，可以连续关掉几个。
 - **New** 会在项目的最后一个终端关闭后记住它。记住的项目排在已打开的 space 后面，选中后会在原来的机器和目录重新打开。

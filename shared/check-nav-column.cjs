@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const store = new Map();
 const src = ["tip.js", "color.js", "nav-column.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.nav = { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth };";
+  + "\nglobalThis.nav = { NAV_NARROW, navRange, navWidth, navOpen, setNavOpen, navShown, withNav, holdWidth };";
 // Elements that keep their handlers and widths: a fake page to drag the column's edge in.
 const made = [];
 const element = () => {
@@ -34,7 +34,7 @@ const context = vm.createContext({ KEY: { navWidth: "t3.navWidth" }, shared: (k)
   div: make, h_flex: make, v_flex: make, svg: make, ghostButton: make,
   localStorage: { getItem: (k) => store.get(`local:${k}`) ?? null, setItem: (k, v) => { sets.push([k, String(v)]); store.set(`local:${k}`, String(v)); } } });
 vm.runInContext(src, context);
-const { navRange, navWidth, navOpen, setNavOpen, withNav, holdWidth } = context.nav;
+const { NAV_NARROW, navRange, navWidth, navOpen, setNavOpen, navShown, withNav, holdWidth } = context.nav;
 
 
 assert.deepEqual([...navRange(1200)], [160, 560], "wide: 560 at most");
@@ -51,6 +51,11 @@ assert.equal(navWidth(681), 300, "this page's width");
 assert.equal(navOpen(), true, "open to start");
 setNavOpen(false);
 assert.equal(navOpen(), false);
+assert.equal(NAV_NARROW, 640);
+assert.equal(navShown(500, true, undefined), true, "narrow before a file pick follows wide preference");
+assert.equal(navShown(500, true, false), false, "narrow after a file pick collapses without changing wide preference");
+assert.equal(navShown(500, false, true), true, "narrow toggle peeks even when wide preference is closed");
+assert.equal(navShown(640, true, false), true, "at 640 and above, wide preference governs");
 
 // Dragged by its left edge, the column follows the pointer (zoomed pixels: zoom 2 here) within its range, drawn by this page
 // alone, and the width it lands at is written once, on release. Its width is this page's own, whatever the page's width:

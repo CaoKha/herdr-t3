@@ -33,7 +33,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Tree
 
-- The navigation column works as Files' ([files](files.md#layout)), with this page's own open state and width.
+- The navigation column works as Files' ([files](files.md#layout)), with this page's own open state and width, and one breakpoint Files lacks: under 640 wide (`NAV_NARROW`), picking a file in the tree, by click or key, folds the column for this run (`narrowNav`), and its toggle shows or folds it without touching the kept open state. Until a pick, and from 640 up, the kept state governs.
 
 - Only the current group's folders and files, then its subgroups as rows: category, name, critical, count, reviewed. Subgroups start open, folders folded. A subgroup is never compacted into its sole folder. Clicking a subgroup opens it and scrolls to its header.
 - Files keep Files' natural order; diff, line requests and `j`/`k` follow it.
