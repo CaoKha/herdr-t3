@@ -15,13 +15,13 @@ done
 # herdr-t3-inbox: a contributor's one-line fix, under review.
 cd "$code/herdr-t3-inbox"
 git checkout -q -b fix/working-pill-days
-python3 -I - mods/t3-inbox/row-view.js <<'PY'
+python3 -I - mods/t3-inbox/status-mark.js <<'PY'
 import sys
 p = sys.argv[1]; s = open(p).read()
 old = "  return s < 60 ? `${s}s` : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;\n"
 new = "  const h = Math.floor(m / 60);\n  return s < 60 ? `${s}s` : m < 60 ? `${m}m` : h < 24 ? `${h}h ${m % 60}m` : `${Math.floor(h / 24)}d ${h % 24}h`;\n"
 assert old in s, "took() changed upstream: update the review branch"
-open(p, "w").write(s.replace(old, new).replace("as T3's Working pill: 9s, 4m, 1h 5m.", "as T3's Working pill: 9s, 4m, 1h 5m, 2d 3h."))
+open(p, "w").write(s.replace(old, new).replace("the sub-agent menus too: 9s, 4m, 1h 5m.", "the sub-agent menus too: 9s, 4m, 1h 5m, 2d 3h."))
 PY
 git commit -q -am "fix(t3-inbox): a run over a day reads 2d 3h, not 51h 12m"
 git checkout -q main
