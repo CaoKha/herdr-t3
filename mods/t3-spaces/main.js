@@ -429,7 +429,7 @@ export default class Spaces extends View {
         // The same two as Inbox's top row, so switching modes moves nothing.
         .child(h_flex().flex_none().items_center()
           .child(tool("space-new", "New space", "folder-plus", newSpaceButton(props()?.newMenu)))
-          .child(tool("space-new-tab", "New tab", "square-pen", { closed: closedKey(props()?.newMenu ?? "new-menu"), onOpen: () => run("mod.open", { name: props()?.newMenu ?? "new-menu" }) }))))
+          .child(tool("space-new-tab", "New tab in…", "square-pen", { closed: closedKey(props()?.newMenu ?? "new-menu"), onOpen: () => run("mod.open", { name: props()?.newMenu ?? "new-menu" }) }))))
       .child(v_flex().id("space-list").flex_1().min_h(0).overflow_y_scroll()
         .on_mouse_move((e, cx) => this.dragTo(e, cx))
         // Released anywhere in the list, it lands where the gap is.

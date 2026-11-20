@@ -15,6 +15,7 @@
 - 在 Home 隐藏或显示侧栏（`cmd-b` 或两处侧栏按钮）时，Home 只移动一次；以前顶栏会晚一拍才跟上，Home 会跳两下。asciicn 壁纸则完全不动：它按整个窗口取景，侧栏只是盖住或露出它的左边。保存过的构图改为相对窗口，位置可能稍有不同。
 - 隐藏侧栏的按钮照 T3 放在窗口按钮之后，侧栏隐藏时也留在同一个位置，收起和找回都在一处。隐藏时它只有图标：旁边的 `! 1 ◌ 2` 计数去掉了。侧栏隐藏期间，布局不显示 agent 的状态：有 agent 需要你时，Herdr 自己的通知照样会告诉你；把侧栏找回来就能看到全部。
 - 品牌栏的 Show lists／Show inbox 按钮去掉了：用 `cmd-shift-l` 或设置 → Sidebar → Sidebar shows 切换。设置现在分 Home 和 Sidebar 两页。
+- 几个控件改了名，让名字说清动作：侧栏的方形笔和 Go to 的底栏叫 **New tab in…**，agent 菜单里叫 **Close pane**、**Zoom pane**／**Unzoom pane**，Inbox 里叫 **Clear Woke mark**，详情里叫 **Copy path**。
 - Lists 的 Agents 会把你移到的 agent 滚进视野，指针正停在那一行时除外；滚动滚轮会让它停下。
 - 面板宽度不足 640px 时，在 Review 里选中文件会收起文件树，把位置让给 diff；点树按钮可以再打开。更宽时，文件树保持你选的开合状态。
 - **Clean up**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的垃圾桶图标）不离开 Inbox 回收用完的终端。已 Settle 的 agent 和空闲 shell 折成一块，写明有几个、哪些 space 随之关闭，点 **Close** 一起关掉。被落下的程序，也就是所在 space 已没有在工作的 agent、却还在运行的程序（例如忘掉的 `bun dev`），各是一张卡片，写明所在 space 和进程：可以跳过去，也可以点 **Stop**（或按 `ctrl-d`）当场停掉。还有 agent 在工作的 space 里的程序，以及你正在的 space 里的程序，不会列出。没有可清理的东西时会弹出提示。

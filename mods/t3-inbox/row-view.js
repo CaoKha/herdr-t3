@@ -119,8 +119,8 @@ export function inboxRowView(view, t, model, actions, drag) {
       .child(mark).child(div().child(label))
       .when(Boolean(time), (el) => el.children(time.split(" ").map((part) => div().font_family(settings().font_family ?? "JetBrains Mono").child(part))));
     // It wakes where it was, so this carries the weight, as T3's; a click dismisses it, and it stays on hover.
-    const wokeMark = woke(a) && tip(view, t, `woke-${a.address}`, "Dismiss Woke notification", stop(view, t, `woke-${a.address}`, h_flex().id(`woke-${a.address}`).h(20).gap(4).flex_none().items_center().font_medium().text_color(t.blocked)
-      .hover((s) => s.underline()).on_hover(glow(view, `woke-${a.address}`)).role("button").accessibility_label("Dismiss Woke notification")
+    const wokeMark = woke(a) && tip(view, t, `woke-${a.address}`, "Clear Woke mark", stop(view, t, `woke-${a.address}`, h_flex().id(`woke-${a.address}`).h(20).gap(4).flex_none().items_center().font_medium().text_color(t.blocked)
+      .hover((s) => s.underline()).on_hover(glow(view, `woke-${a.address}`)).role("button").accessibility_label("Clear Woke mark")
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click((_e, cx) => {
         cx.stop_propagation();

@@ -126,9 +126,9 @@ export default class Picker extends View {
         .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
       // New work goes through New, which picks the space (and for a new space, the machine).
       .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"], ["Esc", "Close"]],
-        stop(this, t, "picker-new", footAction(t, "picker-new", "New tab")
+        stop(this, t, "picker-new", footAction(t, "picker-new", "New tab in…")
           .on_click(() => { closeOverlay(props().overlay); run("mod.open", { name: "t3-new-menu" }); })
           .child(svg("mods/t3-picker/icons/square-pen.svg").size(14).text_color(t.muted))
-          .child("New tab"), 8))));
+          .child("New tab in…"), 8))));
   }
 }

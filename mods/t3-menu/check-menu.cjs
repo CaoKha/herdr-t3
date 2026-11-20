@@ -89,7 +89,7 @@ assert.deepEqual(choose({ tab: "pane", target: { pane: "p1", terminal: "t1" } },
 assert.deepEqual(choose({ tab: "pane", target: { pane: "p1", terminal: "t1" } }, "Copy address"), [["clipboard", "t1"]], "Copy address puts the terminal's address on the clipboard");
 assert.ok(!vm.runInContext("items", context)({ tab: "pane", target: { pane: "p1" } }, null).some((it) => it[0] === "Copy address"), "a mod pane has no address to copy");
 const block = vm.runInContext("items", context)({ tab: "pane", target: { pane: "block", terminal: "t1" } }, null).map((it) => it[0]);
-assert.ok(block.includes("Copy address") && !["Split right", "Split down", "Zoom", "Close pane"].some((l) => block.includes(l)), "a terminal outside a tab has no pane to split, zoom or close");
+assert.ok(block.includes("Copy address") && !["Split right", "Split down", "Zoom pane", "Close pane"].some((l) => block.includes(l)), "a terminal outside a tab has no pane to split, zoom or close");
 assert.deepEqual(choose({ tab: "tab", target: { id: "b1", space: "s1" } }, "Rename"), [["tab.rename", { id: "b1" }]], "the rest is Herdr's");
 assert.deepEqual(choose({ tab: "tab", target: { id: "b1", space: "s1" } }, "New tab"), [["tab.new", { space: "s1", folder: "/work/s1" }]], "New tab opens where the space's terminals are, not where it was made");
 assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["space.close", { id: "s1" }]], "a space's Close is Herdr's, which asks itself");
@@ -113,7 +113,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   }
   assert.equal(row("Split down").icon, "mods/t3-menu/icons/panel-bottom.svg");
   assert.notEqual(row("Split down").icon, row("Split right").icon, "the two splits look apart");
-  assert.deepEqual([row("Split right").hint, row("Split down").hint, row("Zoom").hint], [["⌘D"], ["⇧⌘D"], ["⇧⌘Enter"]], "keys as the layout writes them");
+  assert.deepEqual([row("Split right").hint, row("Split down").hint, row("Zoom pane").hint], [["⌘D"], ["⇧⌘D"], ["⇧⌘Enter"]], "keys as the layout writes them");
   assert.deepEqual(row("Copy address").hint, [], "no address on the right: only keys go there");
   keyList = []; target = {};
 }
@@ -127,12 +127,12 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
     terms = [{ address: "t1", state: "live", turn: 2, labels }];
   };
   agent();
-  assert.deepEqual(labels(), ["Pin", "Settle", "Snooze", "Rename", "Copy address", "Close"]);
-  assert.deepEqual(groups(), [0, 0, 0, 1, 1, 2], "state, then names and copies, then Close: a rule between");
+  assert.deepEqual(labels(), ["Pin", "Settle", "Snooze", "Rename", "Copy address", "Close pane"]);
+  assert.deepEqual(groups(), [0, 0, 0, 1, 1, 2], "state, then names and copies, then Close pane: a rule between");
   agent({ status: "working" });
-  assert.deepEqual(labels(), ["Pin", "Snooze", "Rename", "Copy address", "Close"], "busy: no Settle");
+  assert.deepEqual(labels(), ["Pin", "Snooze", "Rename", "Copy address", "Close pane"], "busy: no Settle");
   agent({ status: "blocked" });
-  assert.deepEqual(labels(), ["Pin", "Rename", "Copy address", "Close"], "needing you: neither Settle nor Snooze");
+  assert.deepEqual(labels(), ["Pin", "Rename", "Copy address", "Close pane"], "needing you: neither Settle nor Snooze");
   agent({}, { settled: "1:2" });
   assert.ok(labels().includes("Un-settle"), "settled since its last turn");
   agent({}, { snoozed: String(Date.now() + 3600000) });
@@ -143,20 +143,20 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   agent();
   assert.deepEqual(choose({ tab: "agent", target: { address: "t1" } }, "Settle"), [["t3-tabs.settle:t1", {}]], "the agent it was opened on, in view or not");
   assert.deepEqual(choose({ tab: "agent", target: { address: "t1" } }, "Pin"), [["t3-tabs.pin:t1", {}]]);
-  assert.deepEqual(choose({ tab: "agent", target: { address: "t1" } }, "Close"), [["t3-tabs.close-pane:p1"]], "its pane, asking first");
+  assert.deepEqual(choose({ tab: "agent", target: { address: "t1" } }, "Close pane"), [["t3-tabs.close-pane:p1"]], "its pane, asking first");
   assert.deepEqual(choose({ tab: "agent", target: { address: "t1" } }, "Copy address"), [["clipboard", "t1"]]);
   state["t3.pins"] = ["t1"];
   assert.equal(labels()[0], "Unpin");
   assert.deepEqual(choose({ tab: "agent", target: { address: "t1" } }, "Unpin"), [["t3-tabs.unpin:t1", {}]], "Unpin with its Undo");
   delete state["t3.pins"];
   list = "lists";
-  assert.deepEqual(labels(), ["Pin", "Rename", "Copy address", "Close"], "Settle and Snooze are the Inbox's (docs/adr/0002)");
+  assert.deepEqual(labels(), ["Pin", "Rename", "Copy address", "Close pane"], "Settle and Snooze are the Inbox's (docs/adr/0002)");
   list = "inbox";
   // A sub-agent kept in the tab beside its parent: no pin or rename of its own, and it can go back.
   agentList = [{ address: "t1", pane: "p1", tab: "b1", status: "working" }, { address: "t2", pane: "p2", tab: "b1", status: "done", focused: true }];
   paneList.push({ pane: "p2", tab: "b1", terminal: "t2" });
   terms = [{ address: "t1", name: "lead", state: "live", labels: {} }, { address: "t2", parent: "t1", state: "live", labels: {} }];
-  assert.deepEqual(JSON.parse(JSON.stringify(items({ tab: "agent", target: { address: "t2" } }, null).map((it) => it[0]))), ["Settle", "Snooze", "Copy address", "Send back to lead", "Close"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(items({ tab: "agent", target: { address: "t2" } }, null).map((it) => it[0]))), ["Settle", "Snooze", "Copy address", "Send back to lead", "Close pane"]);
   paneList.pop();
   // One with no pane (a sub-agent the parent still holds): only its address.
   terms = [{ address: "t1", state: "live", labels: {} }, { address: "t3", parent: "t1", state: "live", labels: {} }];
@@ -242,7 +242,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   const box = { x: 100, y: 200, width: 212, height: 28 };
   const move = (m, i, position, bounds = box) => { calls = []; closed = []; row(m, i).handlers.on_mouse_move({ position, bounds }, cx); };
   let m = root();
-  // Pin, Settle, Snooze, Rename, Copy address, Close: Snooze alone ends in T3's chevron.
+  // Pin, Settle, Snooze, Rename, Copy address, Close pane: Snooze alone ends in T3's chevron.
   assert.deepEqual([0, 1, 2, 3, 4, 5].map((i) => row(m, i).items.at(-1).style.path ?? null), [null, null, "mods/t3-menu/icons/chevron-right.svg", null, null, null]);
   move(m, 2, { x: 150, y: 210 });
   elapse(99);
@@ -365,7 +365,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   const clickTrace = trace();
 
   m = open(); tree = m.render();
-  key(tree, "end"); key(tree, "up"); // Copy address, the row before Close.
+  key(tree, "end"); key(tree, "up"); // Copy address, the row before Close pane.
   agentList[0].status = "working";
   key(tree, "enter", clipboard);
   const enterTrace = trace();
@@ -713,15 +713,15 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   };
   const parkedContext = contextMenuFor("t9a"), paneContext = contextMenuFor("t9"), spaceTarget = target;
   const items = vm.runInContext("items", context);
-  assert.deepEqual(plain(items(parkedContext, null).map(it => it[0])), ["Copy address", "Send back to t9"], "a pane-less child gets no Close");
+  assert.deepEqual(plain(items(parkedContext, null).map(it => it[0])), ["Copy address", "Send back to t9"], "a pane-less child gets no Close pane");
   target = paneContext;
   const actionMenu = new context.Menu(); actionMenu.init(target, cx);
   const menuTree = actionMenu.render();
-  const closeRow = rowNamed(menuTree, "Close");
-  assert.ok(closeRow, "a child with a pane gets Close before its first report");
+  const closeRow = rowNamed(menuTree, "Close pane");
+  assert.ok(closeRow, "a child with a pane gets Close pane before its first report");
   calls = []; closed = [];
   closeRow.handlers.on_click({}, cx);
-  assert.deepEqual(plain([closed, calls]), [["agent-root"], [["t3-tabs.close-pane:p9"]]], "Close goes through the pane confirmation entry point");
+  assert.deepEqual(plain([closed, calls]), [["agent-root"], [["t3-tabs.close-pane:p9"]]], "Close pane goes through the pane confirmation entry point");
   target = spaceTarget;
 
   const beforeKeep = sm.render();

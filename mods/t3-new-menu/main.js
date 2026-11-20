@@ -34,7 +34,7 @@ export default class NewMenu extends View {
     (this.picking ? this.machineInput : this.spaceInput).focus();
   }
 
-  // For the buttons that open this: see justClosed in focus.js. New space's and New tab's apart, as each opens the other's step.
+  // For the buttons that open this: see justClosed in focus.js. New space's and New tab in…'s apart, as each opens the other's step.
   close() { setShared(closedKey("t3-new-menu", this.picking ? "pick" : undefined), Date.now()); }
 
   // The current space first, then its machine's, so a machine's spaces stay together.

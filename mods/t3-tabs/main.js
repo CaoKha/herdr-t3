@@ -626,7 +626,7 @@ export default class Tabs extends View {
     const live = n.live && Date.now() - n.at < 5000;
     const button = h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
       .when(live, el => stop(this, t, "undo-notice-undo", el.hover(s => s.underline()).on_hover(glow(this, "undo-notice-undo"))
-        .role("button").accessibility_label(`Undo: ${n.action}`).on_click(() => run("t3-tabs.undo")), 4)).child(undoLabel("t3-tabs.undo"));
+        .role("button").accessibility_label(`Undo: ${n.action} ${n.count} agent${n.count === 1 ? "" : "s"}`).on_click(() => run("t3-tabs.undo")), 4)).child(undoLabel("t3-tabs.undo"));
     return h_flex().id(`undo-notice-${n.gen}`).flex_none().h(24).gap(4).items_center().text_size(11).text_color(t.dim)
       .opacity(n.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
       .child(`${n.action}${n.count === 1 ? "" : ` ${n.count}`},`)

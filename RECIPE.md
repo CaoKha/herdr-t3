@@ -32,7 +32,7 @@ The brand bar leaves room for macOS's window buttons, then, as T3's sidebar trig
 
 ### Inbox
 
-Inbox is selected at first. Its top row has a search field that lists compact matching rows in place, then Filter by space, New space and New tab. The filter offers All spaces and non-Home spaces that have Inbox entries before applying the filter or are already selected. Below, Pinned and Active cards fill the top; Working, Snoozed and Settled are folded shelves anchored to the bottom, each with a count, joining the cards' scroll when space runs out. A folded shelf still shows the row in view. Settled holds put-away agents and pages with Show more. Its header has the label, count and fold chevron.
+Inbox is selected at first. Its top row has a search field that lists compact matching rows in place, then Filter by space, New space and New tab in…. The filter offers All spaces and non-Home spaces that have Inbox entries before applying the filter or are already selected. Below, Pinned and Active cards fill the top; Working, Snoozed and Settled are folded shelves anchored to the bottom, each with a count, joining the cards' scroll when space runs out. A folded shelf still shows the row in view. Settled holds put-away agents and pages with Show more. Its header has the label, count and fold chevron.
 
 A card (78px with all three lines) shows the space and the state or time (Working with its duration, Needs you, Done, else age), the agent's title, and an optional branch ended by the program icon and a remote-machine mark. Viewed, needs-you and done titles are medium `foreground`, others `muted`; working cards sit at 70% until hovered or viewed. Settled and Snoozed entries are slim 36px rows whose time becomes Un-settle or Wake on hover; Snoozed rows show an `accent` alarm clock, and `Woke` is `blocked` text. Hovering a card or Agents row opens a details card at its right. Spec: [inbox](docs/internals/specs/inbox.md).
 
@@ -140,12 +140,12 @@ Context menus don't select or switch what was right-clicked; impossible items ar
 
 | Target | Available actions |
 | --- | --- |
-| Agent, including breadcrumb parent/sub-agent row | Pin/Unpin for top-level; in Inbox Settle/Un-settle when tree not busy, Snooze/Wake when eligible; Rename for a lone tab-named non-Pi agent; Copy address; Send back to parent; Close its pane |
+| Agent, including breadcrumb parent/sub-agent row | Pin/Unpin for top-level; in Inbox Settle/Un-settle when tree not busy, Snooze/Wake when eligible; Rename for a lone tab-named non-Pi agent; Copy address; Send back to parent; Close pane |
 | Space, including group/breadcrumb/filter row | New tab; Rename; Copy current path; New/Open worktree in repository; Remove worktree in linked worktree (`ansi1`); Close |
 | Synthetic unopened checkout | Open, Copy path |
 | Connected/rebuilt machine | New space here, Connect |
 | Tab | New tab, Rename, Close |
-| Terminal/pane header/zoom segment/mod card | Split right/down, Zoom; Copy address for terminal; right-click to program or back; Send back; Close pane |
+| Terminal/pane header/zoom segment/mod card | Split right/down, Zoom pane/Unzoom pane; Copy address for terminal; right-click to program or back; Send back; Close pane |
 
 Menu rules: [menus spec](docs/internals/specs/menus.md).
 

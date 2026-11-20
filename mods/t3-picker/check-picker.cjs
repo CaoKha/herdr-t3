@@ -133,6 +133,6 @@ terms[0].labels.settled = "1:1"; assert.equal(done(), false);
 terms[0].turn = 2; assert.ok(done());
 terms[0].labels = { snoozed: String(Date.now() + 60000) }; assert.equal(done(), false);
 terms[0].labels.snoozed = String(Date.now() - 1); assert.ok(done());
-// Tab reaches the footer's New tab, as every control in a popup.
+// Tab reaches the footer's New tab in…, as every control in a popup.
 assert.equal(find(open().render(), "picker-new").style.tab_index, 0);
 console.log("ok picker");

@@ -20,7 +20,7 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 
 ## Workspace rows
 
-- **Machine**: the computer's name (this Mac's ComputerName, or the remote machine), truncated to one line. Locked: transparent, no hover, no chevron. The folder is only a tooltip in the row's trailing 32px slot, on the same vertical line as the other rows' chevrons. Right-click on the whole row opens a one-item Copy full path menu (right-click always opens a menu in this layout). No migration of a pretend terminal.
+- **Machine**: the computer's name (this Mac's ComputerName, or the remote machine), truncated to one line. Locked: transparent, no hover, no chevron. The folder is only a tooltip in the row's trailing 32px slot, on the same vertical line as the other rows' chevrons. Right-click on the whole row opens a one-item Copy path menu (right-click always opens a menu in this layout). No migration of a pretend terminal.
 - **Open in**: Finder plus the installed T3 editors (Cursor, Trae, Kiro, VS Code, VS Code Insiders, VSCodium, Zed, Antigravity, JetBrains). The menu is always there; choosing only saves the global target, the main half opens. A missing target falls back to Finder. Remote spaces disable it with a reason. App icons are coloured `image()`s; without a dedicated icon, this mod's own `app-window`, never another mod's file. Host checks: `open -Ra` / `open -a`; Finder uses `open -R`.
 - **Actions** (global, see [dialogs](dialogs.md#actions)): empty, an Add action row; otherwise the primary action with a menu. Edit shows only on hover or keyboard focus.
 

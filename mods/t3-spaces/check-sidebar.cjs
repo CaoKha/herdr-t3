@@ -1889,12 +1889,12 @@ async function checkInbox() {
       fire(find(view.render(cx), tab), "on_mouse_down:left", {}, cx);
       f.state["t3-new-menu.pickClosed"] = Date.now();
       fire(find(view.render(cx), tab), "on_click", {}, cx);
-      assert.deepEqual(f.calls.splice(0), [["mod.open", { name: "t3-new-menu" }]], "New tab over New space's step changes step");
+      assert.deepEqual(f.calls.splice(0), [["mod.open", { name: "t3-new-menu" }]], "New tab in… over New space's step changes step");
       delete f.state["t3-new-menu.closed"]; delete f.state["t3-new-menu.pickClosed"];
       fire(find(view.render(cx), space), "on_mouse_down:left", {}, cx);
       f.state["t3-new-menu.closed"] = Date.now();
       fire(find(view.render(cx), space), "on_click", {}, cx);
-      assert.deepEqual(f.overlays.splice(0).map((o) => plain(o.props)), [{ pick: true }], "New space over New tab's step changes step once");
+      assert.deepEqual(f.overlays.splice(0).map((o) => plain(o.props)), [{ pick: true }], "New space over New tab in…'s step changes step once");
       delete f.state["t3-new-menu.closed"];
     }
     {
@@ -1979,7 +1979,7 @@ async function checkInbox() {
     assert.equal(find(lists.render(cx), "machine-logout-vps"), null, "a repaired machine loses the warning");
     const label = (id) => { lists.hot = id; fire(find(lists.render(cx), `tip-over-${id}`), "on_hover", true, cx); while (cx.timers.length) { const t = cx.timers.shift(); if (!t.gone) t.fn(cx); } return strings(find(lists.render(cx), `tip-${id}`).style.content); };
     assert.deepEqual(label("space-new"), ["New space"], "⌘N doesn't ask, as this does");
-    assert.deepEqual(label("space-new-tab"), ["New tab"]);
+    assert.deepEqual(label("space-new-tab"), ["New tab in…"]);
     assert.deepEqual(label("machine-add-local"), ["New space here (⌘N)"], "⌘N makes it on this space's machine");
     assert.deepEqual(label("machine-add-vps"), ["New space here"], "and not on another");
     assert.deepEqual(label("machine-state-local"), ["Connected"]);
@@ -2073,7 +2073,7 @@ async function checkInbox() {
     assert.equal(card(tabs, "tab-new").style.text_size, 12);
     fire(find(tabs.render(cx), "tab-new"), "on_click", {}, cx);
     lit(inbox, "inbox-new-tab");
-    assert.deepEqual(strings(card(inbox, "inbox-new-tab")), ["New tab"], "a label names its control; what opens says the rest");
+    assert.deepEqual(strings(card(inbox, "inbox-new-tab")), ["New tab in…"], "a label names its control; what opens says the rest");
     fire(find(inbox.render(cx), "inbox-new-tab"), "on_click", {}, cx);
     assert.deepEqual(strings(card(inbox, "inbox-new-tab")), [], "what opens over it takes its label down");
     inbox.hot = "inbox-scope";

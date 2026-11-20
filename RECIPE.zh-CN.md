@@ -32,7 +32,7 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 ### Inbox
 
-初始选中 Inbox。顶行是可在侧栏内显示紧凑结果列表的 Search 输入框，然后是 Filter by space、New space、New tab。筛选列出 All spaces，以及应用筛选前有 Inbox 条目或已被选中的非 Home space。下面 Pinned、Active 卡片在上；Working、Snoozed、Settled 是贴底的折叠收纳区，带数量，空间不够时并入卡片的滚动。折叠的收纳区仍露出当前查看的行。Settled 收纳已收起的 agent，用 Show more 分页。标题行只显示名称、数量和折叠箭头。
+初始选中 Inbox。顶行是可在侧栏内显示紧凑结果列表的 Search 输入框，然后是 Filter by space、New space、New tab in…。筛选列出 All spaces，以及应用筛选前有 Inbox 条目或已被选中的非 Home space。下面 Pinned、Active 卡片在上；Working、Snoozed、Settled 是贴底的折叠收纳区，带数量，空间不够时并入卡片的滚动。折叠的收纳区仍露出当前查看的行。Settled 收纳已收起的 agent，用 Show more 分页。标题行只显示名称、数量和折叠箭头。
 
 卡片三行齐全时高 78：space 与状态或时间（Working 加时长、Needs you、Done，否则经过多久），agent 标题，可选的分支行，行末是程序图标和远程机器标记。正在看、需要人、done 的标题是 medium `foreground`，其余 `muted`；工作中卡片平时 70%，悬停或正在看时恢复。Settled、Snoozed 是 36px 窄行，悬停把时间换成 Un-settle 或 Wake；Snoozed 带 `accent` 闹钟，`Woke` 是 `blocked` 文字。悬停卡片或 Agents 行会在右侧出现详情卡。规格：[inbox](docs/internals/specs/inbox.md)。
 
@@ -140,12 +140,12 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 | 对象 | 可用动作 |
 | --- | --- |
-| Agent，含面包屑父级／子 agent 行 | 顶层 Pin/Unpin；Inbox 下子树不忙时 Settle/Un-settle、符合条件 Snooze/Wake；名字来自唯一标签且不是 Pi 时 Rename；Copy address；Send back 父级；Close 自己 pane |
+| Agent，含面包屑父级／子 agent 行 | 顶层 Pin/Unpin；Inbox 下子树不忙时 Settle/Un-settle、符合条件 Snooze/Wake；名字来自唯一标签且不是 Pi 时 Rename；Copy address；Send back 父级；Close pane |
 | Space，含分组／面包屑／筛选行 | New tab；Rename；Copy 当前 path；仓库 New/Open worktree；linked worktree 的 Remove worktree（`ansi1`）；Close |
 | 未开 checkout 虚行 | Open、Copy path |
 | 已连接／重建机器 | New space here、Connect |
 | Tab | New tab、Rename、Close |
-| 终端／pane 头／zoom 段／mod 卡 | Split right/down、Zoom；终端 Copy address；把右键交程序或取回；Send back；Close pane |
+| 终端／pane 头／zoom 段／mod 卡 | Split right/down、Zoom pane/Unzoom pane；终端 Copy address；把右键交程序或取回；Send back；Close pane |
 
 菜单规则：[menus](docs/internals/specs/menus.md)。
 

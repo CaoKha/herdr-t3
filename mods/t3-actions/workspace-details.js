@@ -123,8 +123,8 @@ export function directoryMenu(view) {
   const t = theme(), p = props();
   const copy = (_at, cx) => { cx.write_to_clipboard(p.source.folder ?? ""); closeOverlay(p.overlay); notify({ title: "Path copied", body: p.source.folder ?? "", level: "success" }); };
   return v_flex().id("details-directory-menu").p(4).bg(t.popover).track_focus(view.keys)
-    .on_key_down(menuKeys(view, ["Copy full path"], copy))
-    .child(menuRow(view, t, "details-copy-directory", { at: [view, "at", 0], label: "Copy full path", pick: (cx) => copy(0, cx) }));
+    .on_key_down(menuKeys(view, ["Copy path"], copy))
+    .child(menuRow(view, t, "details-copy-directory", { at: [view, "at", 0], label: "Copy path", pick: (cx) => copy(0, cx) }));
 }
 
 

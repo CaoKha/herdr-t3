@@ -95,7 +95,7 @@ function agentItems(address) {
       ["Copy address", "copy", { text: address }],
       ...(parent ? [[`Send back to ${parent.name || parent.address}`, "terminal.park", { terminal: address }]] : []),
     ],
-    pane ? [["Close", "pane.close", { pane: pane.pane }]] : [],
+    pane ? [["Close pane", "pane.close", { pane: pane.pane }]] : [],
   );
 }
 
@@ -119,13 +119,13 @@ function items(p, git) {
       const toProgram = term?.labels?.["herdr.right-click"] === "program";
       // A terminal shown outside a tab (a layout terminal block, a window) has
       // no pane to split, zoom or close: its pane is the block's id.
-      const inTab = panes().some((pane) => pane.pane === tg.pane && (!tg.terminal || pane.terminal === tg.terminal));
+      const tabbed = panes().find((pane) => pane.pane === tg.pane && (!tg.terminal || pane.terminal === tg.terminal));
       return grouped(
-        inTab
+        tabbed
           ? [
               ["Split right", "pane.split", { direction: "right", pane: tg.pane }],
               ["Split down", "pane.split", { direction: "down", pane: tg.pane }],
-              ["Zoom", "pane.zoom", { pane: tg.pane }],
+              [tabbed.zoomed ? "Unzoom pane" : "Zoom pane", "pane.zoom", { pane: tg.pane }],
             ]
           : [],
         [
@@ -139,7 +139,7 @@ function items(p, git) {
             : []),
           ...(parent ? [[`Send back to ${parent.name || parent.address}`, "terminal.park", { terminal: term.address }]] : []),
         ],
-        inTab ? [["Close pane", "pane.close", { pane: tg.pane }]] : [],
+        tabbed ? [["Close pane", "pane.close", { pane: tg.pane }]] : [],
       );
     }
     case "tab": {

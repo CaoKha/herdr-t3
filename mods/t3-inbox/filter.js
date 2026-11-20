@@ -155,7 +155,7 @@ export function inboxTop(view, t, model) {
     .child(tip(view, t, "inbox-scope", "Filter by space", filter, { off: view.scopeOpen, hint: "Shift+click to pick several", below: true }))
     .child(tool("inbox-new-space", "New space", "folder-plus", newSpaceButton(props()?.newMenu)))
     // The layout passes its own menu; docked alone, the shipped one.
-    .child(tool("inbox-new-tab", "New tab", "square-pen", { closed: closedKey(props()?.newMenu ?? "new-menu"), onOpen: () => run("mod.open", { name: props()?.newMenu ?? "new-menu" }) })));
+    .child(tool("inbox-new-tab", "New tab in…", "square-pen", { closed: closedKey(props()?.newMenu ?? "new-menu"), onOpen: () => run("mod.open", { name: props()?.newMenu ?? "new-menu" }) })));
 
 
   return top;

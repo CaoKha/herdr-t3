@@ -17,7 +17,7 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (
 - Searches space and machine, explicitly named tab, pane name, program name and key, and folder. Pane-name matches rank before metadata-only matches.
 - Enter or click runs `pane.focus`, across spaces. `ctrl-d` closes through the same confirmation as other closes ([tab-bar](tab-bar.md#close-confirmation)).
 - A highlight belongs to a pane, not its row number. Reordering doesn't change the target. If the pane is no longer in the results, clear the highlight and don't go or close. An edited query doesn't accept the old results: the first matching pane is selected when the new results appear.
-- Footer: ↑/↓ Navigate, Enter Go, Ctrl-D Close pane, Esc Close; New tab opens New.
+- Footer: ↑/↓ Navigate, Enter Go, Ctrl-D Close pane, Esc Close; New tab in… opens New.
 
 ### New
 
