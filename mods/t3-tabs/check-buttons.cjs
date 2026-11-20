@@ -15,7 +15,7 @@ const env = {
   Popup: { new: (_id, trigger) => element().child(trigger) },
   theme: () => t, props: () => part, settings: () => ({ zoom: 1 }), window: () => ({ platform, buttons: true }),
   spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => ({}), shared: () => null,
-  sidebarParts: () => ({ stack: { active: "lists" } }), panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
+  sidebarParts: () => ({ stack: { active: "lists" } }), toggleLeft: () => 8, panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
   glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
   tipCard: (_t, id) => element().id(id), FADE: {},
@@ -37,6 +37,8 @@ function load(dir) {
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/store.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/list.js"), "utf8")), scope);
   vm.runInContext('globalThis.namedLabel = named;', scope);
+  // The brand bar's Home button, t3-chrome's alone.
+  if (fs.existsSync(path.join(dir, "brand.js"))) vm.runInContext(strip(fs.readFileSync(path.join(dir, "brand.js"), "utf8")), scope);
   vm.runInContext("(() => {\n" + strip(["color.js", "button.js", "trigger.js", "tab.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; Object.assign(globalThis, { trigger, opener, popupOpen, hang });\n})();", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, surfaceWidths: {}, surfaceStrip: {}, pressed: null, over: null, area: 600 });
@@ -115,12 +117,10 @@ panelOpen = false;
 platform = "linux";
 root = tabs.render();
 assert.equal(find(root, "minimize").items[0], "−"); assert.equal(find(root, "maximize").items[0], "□");
-const toggle = tabs.sidebarToggle(t, () => {}, [{ status: "done" }], a => a.status);
-assert.equal(toggle.style.h, 28); assert.equal(toggle.style.px, 10); assert.equal(toggle.style.gap, 6);
-assert.equal(toggle.style.w, undefined); assert.ok(find(toggle, "agents-done"));
-assert.equal(tabs.sidebarToggle(t, () => {}, [], a => a.status).style.w, 28, "nothing to count: the 28px square");
+const toggle = tabs.sidebarToggle(t, () => {});
+assert.equal(toggle.style.h, 28); assert.equal(toggle.style.w, 28, "the 28px square, its icon alone"); assert.equal(toggle.items.length, 1);
 click(toggle, "sidebar-toggle");
-assert.equal(calls.pop()[0], "layout.toggle");
+assert.equal(calls.pop()[0], "t3-tabs.toggle-sidebar");
 part = {};
 tabs.overTab = "tab-b";
 root = tabs.render();
@@ -167,8 +167,9 @@ for (const id of ["settings", "t3-settings"]) assert.equal(click(root, id).style
 assert.deepEqual(calls.splice(0).map(c => c[0]), ["app.settings", "t3-tabs.settings"]);
 part = {};
 root = chrome.render();
-for (const id of ["sidebar-mode", "sidebar-toggle"]) assert.equal(click(root, id).style.h, 28);
-assert.deepEqual(calls.splice(0).map(c => c[0]), ["t3-tabs.sidebar", "layout.toggle"]);
+assert.equal(find(root, "sidebar-mode"), null, "the mode is a setting and ⌘⇧L, not a brand-bar button");
+assert.equal(click(root, "sidebar-toggle").style.h, 28);
+assert.deepEqual(calls.splice(0).map(c => c[0]), ["t3-tabs.toggle-sidebar"]);
 part = { part: "panel" };
 root = chrome.render();
 for (const id of ["panel-wide", "panel-close"]) assert.equal(click(root, id).style.h, 28);

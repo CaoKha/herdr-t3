@@ -104,26 +104,28 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     // up meanwhile; a smaller window doesn't.
     const sideOf = async (p) => { const [, w, ht] = (await svgOf(p)).match(/^<svg [^>]*width="(\d+)" height="(\d+)"/); return Math.max(+w, +ht); };
     const pxOf = (p) => Number(p.match(/-(\d+)\.svg$/)?.[1]);
+    // The window and Home with it: the picture is framed against the window.
+    const tall = (n) => { h.height = n; r.win.bounds = { ...r.win.bounds, height: n }; };
     // Lighthouse is 331×137: covering 1000×800 it shows 1932.8 wide.
     assert.deepEqual([pxOf(dark), await sideOf(dark)], [2048, 2048], "1x: 1932.8 device px, up to 2048");
-    h.height = 600;
+    tall(600);
     assert.equal(await shown(), dark, "a smaller window keeps the picture");
-    h.height = 1000;
+    tall(1000);
     assert.equal(at("wallpaper-picture")?.props.path, dark, "a taller window keeps the last picture up while it's made again");
     const taller = await shown();
     assert.deepEqual([pxOf(taller), await sideOf(taller)], [2560, 2560], "1000 high: 2416 device px, up to 2560");
-    h.height = 700;
+    tall(700);
     r.win.bounds = { ...r.win.bounds, x: 1440 };
     const retina = await shown();
     assert.deepEqual([pxOf(retina), await sideOf(retina)], [3584, 3584], "700 high on a 2x screen: 1691 points, 3382 device px");
     r.win.bounds = { ...r.win.bounds, x: 0 };
     assert.equal(await shown(), retina, "back on a 1x screen it keeps the sharper one");
-    h.height = 4000;
+    tall(4000);
     assert.equal(pxOf(await shown()), 4096, "never past 4096, the size before");
     // A screen it hasn't seen is asked about again.
     r.win.screens = [...r.win.screens, [2880, 0, 1440, 900, 3]];
     r.win.bounds = { ...r.win.bounds, x: 2880 };
-    h.height = 800;
+    tall(800);
     assert.equal(h.screenScale(cx), null, "a screen not known yet waits for its scale");
     await settle(() => h.screenScale(cx) === 3);
     r.win.bounds = { ...r.win.bounds, x: 0 };
@@ -371,13 +373,29 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const saved = await shown();
     assert.ok(saved?.includes("/.tiles/Coast/"), "the saved picture is drawn from its own cache");
     assert.equal(await svgOf(saved), drawn, "the same picture the preview showed");
-    h.width = 600;
+    h.width = 600; r.win.bounds = { ...r.win.bounds, width: 600 };
     const at600 = at(`wallpaper-at:${saved}`).props;
-    assert.ok(Math.abs(at600.w - 1200) < 1e-6, "saved Fit at 2× recomputes for a narrower Home");
-    h.width = 1000;
+    assert.ok(Math.abs(at600.w - 1200) < 1e-6, "saved Fit at 2× recomputes for a narrower window");
+    h.width = 1000; r.win.bounds = { ...r.win.bounds, width: 1000 };
     state[PLACEMENTS]["file:Coast"] = { mode: "nonsense", zoom: Infinity, x: -2, y: 3 };
     assert.equal(at(`wallpaper-at:${saved}`).props.bottom, 0, "nonsense framing falls back to bounded values");
     state[PLACEMENTS]["file:Coast"] = kept;
+    // Hiding the sidebar at Home widens Home 256 to the left and unfolds the tab row 32 from the top, its bottom right where it
+    // was. The picture is framed against the window, so on screen it stays put, saved framing or none: the sidebar only covers
+    // or uncovers its left part. Measured from Home's bottom right: the picture's right edge, bottom, width and height.
+    const onScreen = () => {
+      const g = at(`wallpaper-at:${saved}`).props, right = g.right ?? h.width - (parseFloat(g.left) / 100 * h.width + (g.ml ?? 0)) - g.w;
+      return [right + g.w, g.bottom, g.w, g.h].map((v) => Math.round(v * 1000) / 1000);
+    };
+    for (const framing of [kept, undefined]) {
+      if (framing) state[PLACEMENTS]["file:Coast"] = framing; else delete state[PLACEMENTS]["file:Coast"];
+      const home = (width, height) => { h.width = width; h.height = h.seen = height; return onScreen(); };
+      const shownSidebar = home(1000 - 256, 800 - 8), hidden = home(1000, 800 - 40);
+      assert.deepEqual(hidden, shownSidebar, `${framing ? "saved framing" : "no framing"}: hiding the sidebar leaves the picture where it was`);
+      assert.deepEqual(home(1000 - 256, 800 - 8), shownSidebar, "and showing it again");
+    }
+    state[PLACEMENTS]["file:Coast"] = kept;
+    h.width = 1000; h.height = h.seen = 800;
 
     // The next run of the app shows a saved picture from disk, converting and writing nothing.
     const again = await runtime(base, { stubs: source });

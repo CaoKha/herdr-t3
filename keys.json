@@ -1,6 +1,6 @@
 {
   "layout:herdr-t3": {
-    "cmd-b": "layout.toggle:sidebar",
+    "cmd-b": "t3-tabs.toggle-sidebar",
     "cmd-shift-l": "t3-tabs.sidebar",
     "cmd-shift-b": "t3-tabs.details",
     "cmd-shift-e": "t3-tabs.files",

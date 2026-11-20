@@ -7,7 +7,8 @@ import { trigger, hang } from "./trigger.js";
 import { notePanelWidth } from "./titlebar.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
-import { sidebarParts } from "./sidebar.js";
+import { toggleLeft, sidebarParts } from "./sidebar.js";
+import { brand, BRAND_FIXED, BRAND_GAP } from "./brand.js";
 import { initSettings, settingsView } from "./settings.js";
 import { KEY, closedKey } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo, layoutNode, REVIEW_STATUS } from "./panel.js";
@@ -33,14 +34,14 @@ const headPad = (root) => side(layoutNode(root, "panel")) + side(layoutNode(root
 // Stamped as `+`'s menu closes: a press on `+` that closed it mustn't reopen it (trigger.js).
 const SURFACE_CLOSED = closedKey("t3-chrome", "surface");
 
-// The sidebar shows either Lists (Spaces and Agents) or the Inbox (t3-inbox): a stack in the layout.
-const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 export default class WorkspaceChrome extends View {
   async close() { stopsEnd(this); if (props()?.part === "surface-menu") setShared(SURFACE_CLOSED, Date.now()); }
 
   init(_props, cx) {
     // The panel head's tab widths, by id, and where its strip is scrolled (scroll-strip.js).
     this.surfaceWidths = {}; this.surfaceStrip = {};
+    // The brand's name width, unzoomed, written by brand() (brand.js) once drawn.
+    this.brandNameW = 0;
     if (props()?.view === "settings") return initSettings(this, cx);
     stopsInit(this, cx);
     if (props()?.part?.startsWith("surface-")) {
@@ -53,38 +54,61 @@ export default class WorkspaceChrome extends View {
     // The panel's cmd-t (keys.json mod:t3-files and mod:review): + 's menu, under +. Only the head's copy listens.
     if (props()?.part === "panel") cx.spawn(async () => { for (;;) if (await nextCommand() === "surface-menu") this.openSurfaceMenu(null); });
     if (!props()?.footer && !props()?.part) {
-      this.alignLights(cx);
-      // The brand copy stays alive with the sidebar hidden; no redraw is needed until a zoom actually changes the file.
-      cx.timer.every(250, cx => this.alignLights(cx));
+      this.alignLayout(cx);
+      // The brand copy stays alive with the sidebar hidden; no redraw is needed until a zoom or the name's width changes the file.
+      cx.timer.every(250, cx => this.alignLayout(cx));
     }
   }
 
-  alignLights(cx) {
+  // As T3's (AppSidebarLayout, SidebarBrandWidthProbe), in the one layout file the window reads: the macOS window buttons on the
+  // brand row's middle, and the sidebar never narrower than the brand row, so the name ends where the filter icon below does.
+  alignLayout(cx) {
     if (checking()) return;
     if (shared("layout") !== "herdr-t3") return;
     const root = /** @type {any} */ (layout()), w = window(), zoom = Number(settings().zoom) || 1;
-    if (w?.platform !== "macos" || w.fullscreen || root?.titlebar !== "none" || !root.traffic_lights || this.lightsWriting) return;
-    // Once per zoom and layout value: an update that rewrites the layout is aligned again, a failure isn't retried.
-    const seen = `${zoom}:${root.traffic_lights[1]}`;
-    if (this.lightsSeen === seen) return;
-    this.lightsSeen = seen;
+    if (w?.platform !== "macos" || w.fullscreen || root?.titlebar !== "none" || !root.traffic_lights || this.layoutWriting) return;
     // Native buttons are unzoomed, centered 8px below y; the brand row's center is 20 logical px.
     const y = Math.round((12 + 20 * (zoom - 1)) * 1000) / 1000;
-    if (root.traffic_lights[1] === y) return;
-    this.lightsWriting = true;
+    // The toggle's inset, 28 and BRAND_GAP, the tile and the name, then T3's 4 + 2 × 28 + 12 after it; never under T3's 208. Only once
+    // the name is measured: before that there is no row to fit.
+    const { rail } = sidebarParts(root);
+    const min = this.brandNameW && rail ? Math.max(208, Math.ceil(toggleLeft(w, root, zoom) + 28 + BRAND_GAP + BRAND_FIXED + this.brandNameW + 72)) : undefined;
+    // Once per value: an update that rewrites the layout is aligned again, a failure isn't retried.
+    const seen = `${zoom}:${root.traffic_lights[1]}:${min}:${rail?.min}`;
+    if (this.layoutSeen === seen) return;
+    this.layoutSeen = seen;
+    const lights = root.traffic_lights[1] !== y, fit = min !== undefined && rail.min !== min;
+    if (!lights && !fit) return;
+    this.layoutWriting = true;
     cx.spawn(async () => {
       try {
         const file = `${appHome()}/layouts/herdr-t3.json`, before = await readTextFile(file);
         if (before === null) throw new Error("Couldn't read the layout file.");
         const saved = JSON.parse(before);
-        if (saved.titlebar !== "none" || !saved.traffic_lights || saved.traffic_lights[1] === y) return;
-        saved.traffic_lights = [saved.traffic_lights[0], y];
-        const after = before.replace(/("traffic_lights"\s*:\s*)\[[^\]]*\]/, (_match, key) => key + JSON.stringify(saved.traffic_lights));
-        if (JSON.stringify(JSON.parse(after)) !== JSON.stringify(saved)) throw new Error("Couldn't locate the layout's window buttons.");
-        await writeTextFile(file, after, before);
+        if (saved.titlebar !== "none" || !saved.traffic_lights) return;
+        let after = before;
+        if (lights && saved.traffic_lights[1] !== y) {
+          saved.traffic_lights = [saved.traffic_lights[0], y];
+          after = after.replace(/("traffic_lights"\s*:\s*)\[[^\]]*\]/, (_match, key) => key + JSON.stringify(saved.traffic_lights));
+          if (JSON.stringify(JSON.parse(after)) !== JSON.stringify(saved)) throw new Error("Couldn't locate the layout's window buttons.");
+        }
+        const savedRail = fit ? sidebarParts(saved).rail : undefined;
+        if (fit && savedRail?.min !== min) {
+          if (typeof savedRail?.min !== "number") throw new Error("Couldn't locate the sidebar's minimum width.");
+          savedRail.min = min;
+          // Of every "min" in the file, the one whose edit gives exactly the intended layout: another node's is never touched.
+          const want = JSON.stringify(saved), text = after;
+          after = undefined;
+          for (const m of text.matchAll(/("min"\s*:\s*)-?\d+(?:\.\d+)?/g)) {
+            const tried = text.slice(0, m.index) + m[1] + min + text.slice(m.index + m[0].length);
+            if (JSON.stringify(JSON.parse(tried)) === want) { after = tried; break; }
+          }
+          if (after === undefined) throw new Error("Couldn't locate the sidebar's minimum width.");
+        }
+        if (after !== before) await writeTextFile(file, after, before);
       } catch (e) {
-        notify({ title: "Couldn't align the window buttons", body: String(e), level: "error" });
-      } finally { this.lightsWriting = false; }
+        notify({ title: "Couldn't fit the layout to the brand row", body: String(e), level: "error" });
+      } finally { this.layoutWriting = false; }
     });
   }
 
@@ -133,43 +157,27 @@ export default class WorkspaceChrome extends View {
           .role("button").accessibility_label(`Restart into Herdr ${ready}`)
           .on_click(() => run("app.update")).child("Update"), 16))))));
     }
-    // Room for the macOS window buttons (layout traffic_lights), a place to drag the window, and the
-    // sidebar toggle at its right edge; while the sidebar is hidden, t3-tabs shows it after the buttons.
-    const inbox = inboxShown(), w = window();
-    // Herdr's mark and name where its own layout has them, past the macOS window buttons; a click goes Home, which has no
-    // button of its own. Its colours are louder than anything else here, so it waits at 70% and its name is muted, both lit
-    // on hover, with no background behind them. As T3's, no tooltip. The window buttons are screen points, unzoomed: the last ends at 68
-    // (traffic_lights x 16, three 12s 8 apart), and the logo's tile shows 16pt from it, less the PNG's 2 of clear edge and
-    // this button's 6 in. Short of room the name gives way whole, never cut to "Her…", and never the buttons.
-    const zoom = settings().zoom || 1, left = w?.platform === "macos" && !w?.fullscreen ? (68 + 16 - 2) / zoom - 6 : 8, on = this.hot === "home"
-      // Lit at Home too: its tab bar is empty and its panes may be anyone's, so this says where you are.
-      || spaces().some((s) => s.active && s.id === shared(KEY.home));
-    // What the name has past the left inset: less the 8 at the right, two 28px buttons, this button's 6 each side, the 20px logo and 8 gap.
-    const named = !this.brandW || this.brandW - left - 8 - 56 - 12 - 20 - 8 >= (this.nameW || 0);
+    // As T3's: past the macOS window buttons (layout traffic_lights) the sidebar's toggle, where it stays with the sidebar hidden
+    // (t3-tabs draws it there then, sidebar.js toggleLeft), then BRAND_GAP on Herdr's tile and name, then a place to drag the window. Which
+    // mode the sidebar shows is a setting (settings.js) and ⌘⇧L, not a button here.
+    const w = window(), zoom = settings().zoom || 1, left = toggleLeft(w, layout(), zoom);
+    // One look always, as T3's (brand.js): a click goes Home, which has no row of its own. Only here: with the sidebar hidden the
+    // tab row keeps the toggle alone, as T3's collapsed sidebar.
+    // What the name has past the left inset: less the 8 at the right, the 28px toggle and the BRAND_GAP after it, and the rest of the
+    // button. Short of room the name gives way whole; never the tile or the toggle.
+    const named = !this.brandW || this.brandW - left - 8 - 28 - BRAND_GAP - BRAND_FIXED >= (this.brandNameW || 0);
     return focusRoot(this, h_flex().id("brand").size_full().bg(t.chrome).pl(left).pr(8).items_center()
       .on_size_change((size, cx) => { this.brandW = size.width / zoom; cx.notify(); })
-      .child(stop(this, t, "home", h_flex().id("home").h(28).min_w(0).px(6).gap(8).items_center().rounded(8)
-        .text_size(14).font_medium().text_color(on ? t.foreground : t.muted).on_hover(glow(this, "home"))
-        .role("button").accessibility_label("Home")
-        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click(() => run("t3-tabs.home"))
-        .child(image("frame/welcome/herdr.png").size(20).flex_none().rounded(5).opacity(on ? 1 : 0.7))
-        .when(named, el => el.child(div().id("home-name").flex_none().child("Herdr")
-          .on_size_change((size, cx) => { this.nameW = size.width / zoom; cx.notify(); }))), 8))
-      .child(div().flex_1())
-      // T3's 28px title bar buttons, side by side instead of its 12 apart, so each stands over a button of the list's top row below.
-      // The mode a click shows: a tray for the Inbox, rows with their marks for the lists.
-      .child(tip(this, t, "sidebar-mode", inbox ? "Show lists" : "Show inbox", stop(this, t, "sidebar-mode", drawButton(t, "sidebar-mode", {
-        size: "sm", icon: `mods/t3-chrome/icons/${inbox ? "layout-list" : "inbox"}.svg`, label: inbox ? "Show lists" : "Show inbox", hot: this.hot === "sidebar-mode" })
-        .on_hover(glow(this, "sidebar-mode"))
-        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .on_click(() => run("t3-tabs.sidebar")), radiusOf("sm")), { action: "t3-tabs.sidebar", below: true }))
+      // T3's 28px title bar button.
       .child(tip(this, t, "sidebar-toggle", "Hide sidebar", stop(this, t, "sidebar-toggle", drawButton(t, "sidebar-toggle", {
         size: "sm", icon: "mods/t3-chrome/icons/panel-left.svg", label: "Hide sidebar", hot: this.hot === "sidebar-toggle" })
-        .on_hover(glow(this, "sidebar-toggle"))
+        .flex_none().on_hover(glow(this, "sidebar-toggle"))
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         // It goes with the sidebar, before the pointer can report leaving it.
-        .on_click(() => { this.hot = null; run("layout.toggle", { id: "sidebar" }); }), radiusOf("sm")), { action: "layout.toggle:sidebar", below: true })));
+        .on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true }))
+      .child(div().w(BRAND_GAP).flex_none())
+      .child(brand(this, t, { named, zoom }))
+      .child(div().flex_1()));
   }
 
   // Whether Review can read the active space where its tab works, asked again only when that changes. Until Git answers it

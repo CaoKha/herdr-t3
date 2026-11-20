@@ -9,12 +9,12 @@
 // The picture picked is the person's, shared under KEY.wallpaper, so a new Home shows it too.
 // With props.menu this mod is + 's menu, opened as a popup: its picks go back to the Home that opened it as commands.
 //
-// Without saved framing a picture covers Home: it scales with the pane's height, its subject (`focus`) pinned by a
-// percentage, so a width change (the sidebar folding) only shows more or less of its edges; one narrower than the pane fills
-// the width and is cut evenly at the top and bottom. Saved framing (cover/contain, zoom, alignment) is relative too.
+// A picture is framed against the window (stage()), not the pane: Home shows the part of it over Home, the window's bottom
+// right on Home's, which the sidebar and the tab row leave where they are. Hiding the sidebar or unfolding the row then only
+// uncovers or covers its edge; nothing moves or rescales. Without saved framing it covers the window, its subject (`focus`)
+// pinned by a percentage; saved framing (cover/contain, zoom, alignment) is relative to the window too.
 // Reaching Home other than by t3-tabs (which lays it out first), the pane shows for a frame or two 60px short (still under
-// `main`'s header and the unfolded tab row, see t3-tabs' fitRow) before it takes its height: the picture hangs from the
-// bottom, which stays put, and a smaller height counts only once it has lasted 250ms, so that dip neither moves nor rescales it.
+// `main`'s header and the unfolded tab row, see t3-tabs' fitRow) before it takes its height; that dip moves nothing either.
 // shortcut: imports go through sh, cp, rm, cksum and base64, the dialog through osascript (macOS) or zenity (Linux), an image
 // through sips (macOS) or ImageMagick (Linux); on Windows the menu offers no file dialog, until Herdr gives mods a file picker.
 import { View, div, image, svg } from "gpui-kit";
@@ -459,10 +459,10 @@ export default class Wallpaper extends View {
     // The same picture, or an earlier mode of this draft (one framing for all its modes), moves with the framing; another,
     // such as the last picture under a new draft, stays where it was.
     const mine = (s) => s.id === scene.id || (!!this.draft && (s.id === `preview:${this.draft.id}` || s.id.startsWith(`preview:${this.draft.id}:`)));
-    const at = (shown) => ({ ...shown, p: mine(shown.scene) ? p : shown.p });
+    const at = (shown) => ({ ...shown, p: mine(shown.scene) ? p : shown.p }), stage = this.stage();
     const layer = ({ scene: s, path: src, p: pp }) => {
-      const [w, h] = this.size(s, pp);
-      return div().id(`wallpaper-at:${src}`).absolute().bottom((this.height - h) * (1 - pp.y)).left(`${pp.x * 100}%`).ml(-pp.x * w).w(w).h(h)
+      const [w, h] = this.size(s, pp), bottom = (stage.H - h) * (1 - pp.y), right = (stage.W - w) * (1 - pp.x);
+      return div().id(`wallpaper-at:${src}`).absolute().bottom(bottom).right(right).w(w).h(h)
         .opacity(fade).transition("opacity", FADE).child(image(src).id("wallpaper-picture").size_full());
     };
     if (ready) this.held = { scene, path, p };
@@ -560,16 +560,29 @@ export default class Wallpaper extends View {
     return focusRoot(this, root.children(picture).when(waiting, (el) => el.child(chip)).child(corner));
   }
 
-  // The picture's size in Home for framing `p`: covering or inside it at 1×, times the zoom.
+  // What a picture is framed in: the window, in layout px (Home's own size, a check's Home bigger than its window). Its bottom
+  // right is Home's.
+  stage() {
+    const b = /** @type {any} */ (globalThis).window?.bounds?.(), W = this.width ?? 0, H = this.height ?? 0;
+    return b?.width ? { W: Math.max(W, b.width / zoom()), H: Math.max(H, b.height / zoom()) } : { W, H };
+  }
+
+  // A Home point (unzoomed px) in the stage.
+  onStage(at) {
+    const { W, H } = this.stage();
+    return { x: at.x + W - (this.width ?? 0), y: at.y + H - (this.seen ?? this.height ?? 0) };
+  }
+
+  // The picture's size for framing `p`: covering or inside the stage at 1×, times the zoom.
   size(scene, p) {
-    const unit = (p.mode === "contain" ? Math.min : Math.max)(this.height / scene.height, (this.width ?? 0) / scene.width) * p.zoom;
+    const { W, H } = this.stage(), unit = (p.mode === "contain" ? Math.min : Math.max)(H / scene.height, W / scene.width) * p.zoom;
     return [scene.width * unit, scene.height * unit];
   }
 
-  // framing.js's box: Home and the picture at 1×.
+  // framing.js's box: the stage and the picture at 1×.
   box(d) {
     const [w, h] = this.size(d.scene, { ...d.placement, zoom: 1 });
-    return { W: this.width ?? 0, H: this.height ?? 0, w, h };
+    return { ...this.stage(), w, h };
   }
 
   setPlacement(d, change, cx) {
@@ -583,7 +596,7 @@ export default class Wallpaper extends View {
   // Zooms by `r` with Home point `at` (unzoomed px) held still; null, Home's middle.
   zoomBy(d, r, at, cx) {
     if (d !== this.draft || !d?.scene) return;
-    this.setPlacement(d, zoomAt(d.placement, r, at ?? { x: (this.width ?? 0) / 2, y: (this.height ?? 0) / 2 }, this.box(d)), cx);
+    this.setPlacement(d, zoomAt(d.placement, r, this.onStage(at ?? { x: (this.width ?? 0) / 2, y: (this.seen ?? this.height ?? 0) / 2 }), this.box(d)), cx);
   }
 
   resetOf(d) { return placement({ mode: d.placement.mode }, d.scene?.focus); }

@@ -177,7 +177,7 @@ export default class Pane extends View {
     const t = theme();
     if (props()?.kids) return this.kidsMenu(t);
     const p = this.me();
-    // Home has no header, mod or shell (docs/adr/0005): nothing to split, zoom or close, and the brand bar's lit mark tells where this is.
+    // Home has no header, mod or shell (docs/adr/0005): nothing to split, zoom or close, and Home itself tells where this is.
     if (!p || spaces().find((s) => s.id === shared(KEY.home))?.tabs.some((c) => c.id === p.tab)) return div();
     const named = namer()(p);
     const pic = programIcon(programOf(p), 14, t.muted);

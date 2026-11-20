@@ -28,7 +28,7 @@ There is no title bar; terminal opacity is 0 and terminal padding `[8, 0]`. A pa
 
 ### Sidebar frame
 
-The brand bar leaves room for macOS's window buttons, then shows Herdr's own mark and `Herdr`; together they are a button that goes Home. At its right, two touching 28px buttons switch mode (the icon names the destination, `inbox` or `layout-list`) and hide the sidebar. The traffic lights are moved to sit centred on this bar. The footer holds Herdr Settings, Layout Settings (sliders), and Clean up (trash) in that order, 32px icon buttons 4px apart. Clean up runs `t3-tabs.cleanup`, which opens its dialog. The free space shows Undo, and a downloaded update adds an `Update` pill. Spec: [sidebar](docs/internals/specs/sidebar.md).
+The brand bar leaves room for macOS's window buttons, then, as T3's sidebar trigger, a 28px button that hides the sidebar, then, 8 after it, the sidebar's one gap between icons, Herdr's app icon, as big as the sidebar button's icon, and a muted `Herdr` beside it, together a button that goes Home; it has one look, unlit at Home and on hover, and the name gives way whole when the bar is short. With the sidebar hidden the tab row starts at the same inset, so the toggle doesn't move; it is the icon alone and, as T3's collapsed sidebar, nothing else stands before the tabs: no brand. The row says nothing of the agents: their state is the sidebar's, and Herdr's own notice says when one needs the person. The brand bar has no mode button: `cmd-shift-l` and Layout Settings switch Lists and Inbox. The traffic lights are moved to sit centred on this bar, and, as T3's, the sidebar is never narrower than this bar's row, so in a narrow window `Herdr` ends where the Inbox filter button's icon below does. The footer holds Herdr Settings, Layout Settings (sliders), and Clean up (trash) in that order, 32px icon buttons 4px apart. Clean up runs `t3-tabs.cleanup`, which opens its dialog. The free space shows Undo, and a downloaded update adds an `Update` pill. Spec: [sidebar](docs/internals/specs/sidebar.md).
 
 ### Inbox
 
@@ -92,7 +92,7 @@ Space marks are the project's favicon, else the name's first letter in a name-ha
 
 ### Inbox versus Lists
 
-The brand button switches mode, even with the sidebar hidden, leaving it hidden. Both modes share names, pins and what Settle and Snooze mean; attention rules apply only with Inbox selected, visible or hidden:
+`cmd-shift-l` (or Layout Settings' Sidebar shows) switches mode, even with the sidebar hidden, leaving it hidden. Both modes share names, pins and what Settle and Snooze mean; attention rules apply only with Inbox selected, visible or hidden:
 
 | Rule | Inbox | Lists |
 | --- | --- | --- |
@@ -163,7 +163,7 @@ Actions are global. `▶` reruns the last action, its menu runs another and make
 
 ### Home and Settings
 
-Putting away the viewed agent (Settle, Snooze, drag, sweep) goes Home by default, leaving the next choice to the person; Layout Settings can make it walk to the next card instead. Closing a viewed agent's whole tab still lands Home. `cmd-shift-h` or the brand mark goes Home.
+Putting away the viewed agent (Settle, Snooze, drag, sweep) goes Home by default, leaving the next choice to the person; Layout Settings can make it walk to the next card instead. Closing a viewed agent's whole tab still lands Home. `cmd-shift-h` or the brand bar's mark goes Home.
 
 Home is one local hidden space shared across projects and machines, created on demand, found only by its remembered id or the exact name `Home\u200b`, and left out of every list. It holds one mod (`t3-home` by default) or a shell; if that shell starts an agent, the space becomes an ordinary one in place and the next Home is fresh.
 
@@ -176,7 +176,7 @@ Layout Settings (footer sliders or `cmd-shift-,`) has two pages. Home has exactl
 
 ### Optional asciicn wallpaper Home
 
-Installing `extras/mods/asciicn-wallpaper` and choosing it in Home shows makes Home a static, theme-coloured ASCII picture. Built-ins come from [asciicn](https://asciicn.dev) (MIT). A switcher at the bottom right, shown on hover, steps between pictures, frames the current one and adds more through `+`: choose an image (not on Windows), or open the wallpaper folder; dropping an image on Home works too. A new picture opens a framing card with modes (Dots, Braille, Blocks, Quadrants), Fill/Fit, zoom and Apply/Cancel. Home never blanks: the last picture stays until the next has loaded, the other appearance's picture is ready before a light/dark switch, and waits over 150ms show progress. Spec: [wallpaper](docs/internals/specs/wallpaper.md).
+Installing `extras/mods/asciicn-wallpaper` and choosing it in Home shows makes Home a static, theme-coloured ASCII picture. Built-ins come from [asciicn](https://asciicn.dev) (MIT). A switcher at the bottom right, shown on hover, steps between pictures, frames the current one (against the window, so hiding the sidebar or unfolding the tab row moves nothing) and adds more through `+`: choose an image (not on Windows), or open the wallpaper folder; dropping an image on Home works too. A new picture opens a framing card with modes (Dots, Braille, Blocks, Quadrants), Fill/Fit, zoom and Apply/Cancel. Home never blanks: the last picture stays until the next has loaded, the other appearance's picture is ready before a light/dark switch, and waits over 150ms show progress. Spec: [wallpaper](docs/internals/specs/wallpaper.md).
 
 ### Keyboard and focus
 
@@ -186,7 +186,7 @@ Every control is a Tab stop clicked by Enter or Space, with a 2px inset `accent`
 | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details`, toggle details; sidebar uses its button |
 | `cmd-alt-b` | `t3-tabs.panel`, hide/restore the space panel |
-| `cmd-b` | `layout.toggle:sidebar` |
+| `cmd-b` | `t3-tabs.toggle-sidebar` |
 | `cmd-shift-l` | `t3-tabs.sidebar`, Lists ↔ Inbox |
 | `cmd-shift-g` / `cmd-shift-e` | `t3-tabs.review` / `t3-tabs.files`, toggle Review / Files |
 | `cmd-shift-s` | `t3-tabs.settle`, viewed Inbox agent/mod card only |
@@ -279,7 +279,7 @@ Record transitions at the default sidebar width. On returning from Home or switc
 1. `wc -c RECIPE.md RECIPE.zh-CN.md`: each at most 60,000, same coverage, local links and preview resolve. `scripts/check.sh` prints `all checks passed` (after `scripts/sync.sh`, which also writes outside the repo): shared copies, mod checks and types, icons, overlays, render and update guards.
 2. `layout.switch {"name":"herdr-t3"}` succeeds and `herdr-app status` shows no missing mods or render warnings. In a separate demo window (`scripts/demo/stage.sh up`, `scene <name>`, `do herdr-app shot <file>`, `down`), whole-window screenshots at the default 256px sidebar, narrow, light, dark and zoomed show every region unclipped and the traffic lights in place.
 3. Inbox: Settle, Un-settle, Undo, new work, pins from both modes, drag and sweep with cancel behave as described. The Settled header shows the label, count and fold chevron. Filter by space omits a shell-only space with no Inbox entries and retains a selected space after its last Inbox entry disappears. Putting away the viewed agent follows the preference. Background actions never navigate. The Settle key does nothing in Lists. With the sidebar hidden, navigation order, no-wrap and the 5s Undo still hold.
-4. Snooze of working and pinned agents, permission prompts, failure or a new viewed turn (also before Inbox has started), foreground and background expiry: hidden counts, Needs you, `Woke` and pins follow the rules; invalid Custom input keeps the dialog open; cancel changes nothing.
+4. Snooze of working and pinned agents, permission prompts, failure or a new viewed turn (also before Inbox has started), foreground and background expiry: Needs you, `Woke` and pins follow the rules; invalid Custom input keeps the dialog open; cancel changes nothing.
 5. The breadcrumb's current, held, away and fresh states, sub-agents and zoom agree with the lit card and focus. Closing active and background tabs, last and split panes lands where described, keeps unread neighbours and asks before stopping a program; close keys over an overlay never close the tab beneath.
 6. Starting an agent in Home's shell leaves an ordinary space with the agent and a clean next Home, project numbers stable. Go to: previous pane and name matches first, remote metadata and keyboard access while the terminal retains its Tab key. New: pick a live space to open a tab at its current location. Close a project's last terminal, find the project below the live spaces, and reopen it on the same machine in the same folder. Once opened, it appears with the live spaces as a single entry. Worktree folds keep grouping and numbering.
 7. Actions add, edit, delete and run in each place and folder: required fields, confirmation, last-run choice, shell kept.

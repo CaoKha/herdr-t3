@@ -40,6 +40,13 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 - A held or away title returns to its agent on click and has no chevron. The current title opens the agent menu below, left-aligned, its chevron shown only on hover, focus, or while its menu is open; the space crumb brightens on hover, focus, or while open without a chevron (keeping `/` symmetrical and fixed) and opens the space menu below, left-aligned (`280` wide, `closedKey("t3-menu", "space")`).
 - Right-click on the space, title or parent opens that object's menu, dimmed or not.
 
+## Hidden sidebar
+
+- The row starts at `toggleLeft` (`shared/sidebar.js`), the brand bar's own inset, so the sidebar toggle stays on the same screen points shown or hidden ([sidebar](sidebar.md#brand-bar)). Outside macOS's window buttons that is 8.
+- Then the toggle, `Show sidebar`: a 28 ghost `sm` icon button, nothing else. It says nothing of the agents (no counts or marks, 2026-11-19 user decision): their state is the sidebar's, and Herdr's own notice says when one needs the person. It carries 4 on its right, so what follows is a group's 8 away (t3-tokens P3).
+- That 8 is the brand bar's from the same toggle to Herdr's tile ([sidebar](sidebar.md#brand-bar), `BRAND_GAP`): in Inbox, hiding the sidebar puts the breadcrumb's 14px space mark where the 16px tile was, left edges together (2026-11-20 user decision: the sidebar has one gap between icons).
+- Nothing else before the tabs or the breadcrumb: no brand, as T3's collapsed sidebar leaves only its trigger (2026-11-20 user decision; Home is `cmd-shift-h`, the palette, or the brand bar once shown), at Home or away, in Inbox or Lists: no Inbox cards, no blocked agents (2026-11-20 user decision, [ADR 0010](../../adr/0010-inbox-tab-bar-follows-the-agent.md)). `check-hidden-row.cjs` holds it.
+
 ## Tab tooltips
 
 - Only a clipped name gets a label: `tip.js`'s tooltip, below the tab, with the whole name (t3-tokens P5). Whole names get none, and the state isn't said, as `×` no longer covers the mark. Any press on the tab hides it; it stays down while a drag is held.
@@ -74,7 +81,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 - Tab next/previous wraps through the displayed tabs; `cmd-1…9` numbering follows them too.
 - The floating keys block can advance navigation with no strip present. The strip and the tab-number / tab-cycle commands advance from the current Herdr observation before using the same tab order, regardless of which block drew first. Repeating an unchanged observation does not repeat a zoom, end a Snooze twice, or record a temporary close neighbour as a visit.
 - Space keys follow sidebar order, folded worktrees included, skipping Home and synthetic checkout rows; project numbers stay stable.
-- When the layout knows the destination, prepare its work frame before selecting it: Home uses `home-main` with no pane header and an 8px tab row (40px with a hidden sidebar or window buttons); other spaces use `main` and 40px. Spaces clicks and keys, Go to, agent jumps and new tabs in an existing space share this arrival step. The first frame with the destination's content uses that frame and its [saved panel](space-panel.md#column).
+- When the layout knows the destination, prepare its work frame before selecting it: Home uses `home-main` with no pane header and an 8px tab row (40px with a hidden sidebar or window buttons); other spaces use `main` and 40px. Spaces clicks and keys, Go to, agent jumps and new tabs in an existing space share this arrival step. The first frame with the destination's content uses that frame and its [saved panel](space-panel.md#column). Hiding or showing the sidebar is the same step: `t3-tabs.toggle-sidebar` (`cmd-b` and both sidebar buttons) sends the row's height with `layout.toggle`, since a render after the toggle lands a frame late. Herdr's own `layout.toggle:sidebar` still works, a frame late.
 
 ## Close landing
 

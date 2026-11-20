@@ -15,6 +15,7 @@ async function check(checking) {
     theme: () => ({ background: "#000" }), settings: () => ({ theme: "test", zoom: 2 }),
     shared: key => key === "layout" ? "herdr-t3" : undefined, layout: () => ({ titlebar: "none", traffic_lights: [16, 12] }),
     window: () => ({ platform: "macos", active: true }),
+    sidebarParts: () => ({}), toggleLeft: () => 8, BRAND_FIXED: 17,
     exec: async (...args) => { effects.push(["exec", ...args]); return { code: 0, stdout: "", stderr: "" }; },
     hc: async (...args) => { effects.push(["hc", ...args]); return { code: 0, stdout: '{"machines":[]}' }; },
     readTextFile: async () => '{"titlebar":"none","traffic_lights":[16,12]}',
@@ -48,7 +49,7 @@ async function check(checking) {
   const exporter = load("extras/mods/t3-theme-export/main.js"), exportView = new exporter.Mod();
   exportView.init(); assert.ok(exportView.render(), "theme exporter still renders");
   const chrome = load("mods/t3-chrome/main.js"), chromeView = new chrome.Mod();
-  chromeView.alignLights(cx); chromeView.probeReview(cx);
+  chromeView.alignLayout(cx); chromeView.probeReview(cx);
   const spaces = load("mods/t3-spaces/main.js"), spacesView = new spaces.Mod();
   spacesView.reconnecting = {}; spacesView.refreshMachines(cx);
   const targets = load("shared/open-in.js");

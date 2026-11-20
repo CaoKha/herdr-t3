@@ -4,7 +4,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "sidebar.js"), "utf8").replace(/^export /gm, "");
-const { sidebarParts } = vm.runInNewContext(source + "\n({ sidebarParts });");
+const { sidebarParts, toggleLeft } = vm.runInNewContext(source + "\n({ sidebarParts, toggleLeft });");
 
 for (const active of ["inbox", "lists"]) {
   for (const hidden of [false, true]) {
@@ -29,4 +29,12 @@ for (const root of [undefined, null, {}]) {
   assert.deepEqual([found.rail, found.stack], [undefined, undefined]);
 }
 
-console.log("ok: sidebar parts: Inbox, Lists, visibility, missing stack and missing rail.");
+// The sidebar's toggle stands in one place, shown or hidden, as T3's: past the macOS window buttons when the layout draws
+// them (traffic lights 16 in: the last ends at 68, unzoomed), else 8 in.
+const mac = { platform: "macos", titlebar: "none" }, lit = { traffic_lights: [16, 12] };
+assert.equal(toggleLeft(mac, lit, 1), 78);
+assert.equal(toggleLeft(mac, lit, 2), 37, "the buttons are screen points; the inset is logical");
+for (const [w, root] of [[{ ...mac, fullscreen: true }, lit], [{ platform: "macos" }, lit], [mac, {}], [{ platform: "linux", titlebar: "none" }, lit], [undefined, undefined]])
+  assert.equal(toggleLeft(w, root, 1), 8, "no window buttons of the layout's: 8 in");
+
+console.log("ok: sidebar parts: Inbox, Lists, visibility, missing stack and missing rail; the toggle's one place.");

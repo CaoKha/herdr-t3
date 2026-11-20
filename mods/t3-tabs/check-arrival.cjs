@@ -27,6 +27,7 @@ function fixture(from, { hidden = false, buttons = false } = {}) {
       if (cmd === "layout.resize" && args.id === "window-end") end = args.px;
       if (args?.id === "panel") open = cmd === "layout.show";
       if (args?.id === "work") wide = cmd === "layout.hide";
+      if (cmd === "layout.toggle" && args.id === "sidebar") hidden = !hidden;
       if (cmd === "space.select") active = args.id;
       if (cmd === "tab.select") active = args.id.replace(/^t-/, "");
       if (cmd === "pane.focus") active = args.pane.replace(/^p-/, "");
@@ -48,7 +49,7 @@ function fixture(from, { hidden = false, buttons = false } = {}) {
   const scope = vm.createContext(globals);
   vm.runInContext(`${navigation}\n${panel}\n${mod("main.js", "Tabs")}\n${mod("../t3-spaces/main.js", "Spaces")}\nglobalThis.jump = { focusPane, focusAgent };`, scope);
   const keys = new scope.Tabs(); keys.init(null, cx); keys.render(); paint();
-  return { frames, keys, paint, saved, commands, press: cmd => keys.navigation.handle(cmd, cx),
+  return { frames, keys, paint, saved, commands, hidden: () => hidden, press: cmd => keys.navigation.handle(cmd, cx),
     go: space => scope.jump.focusPane(`p-${space}`), agent: space => scope.jump.focusAgent(`k-${space}`),
     click: (id, keyboard) => {
       const w = spaces().find(s => s.id === id), row = new scope.Spaces().row({ w }, {}, panes(), false);
@@ -90,5 +91,13 @@ function fixture(from, { hidden = false, buttons = false } = {}) {
     await f.press("space:1"); f.paint();
     assert.deepEqual(f.frames.at(-1), closed, "an ordinary space switch does not briefly inherit an open wide panel");
   }
+  // ⌘B and both sidebar buttons: Home's row height comes in the same layout change, not a frame after the sidebar (two jumps).
+  for (const [from, hidden, row] of [["h", false, 40], ["h", true, 8], ["b", false, 40], ["b", true, 40]]) {
+    const f = fixture(from, { hidden });
+    f.keys.toggleSidebar(); f.paint();
+    assert.equal(f.hidden(), !hidden, "the sidebar toggles");
+    assert.equal(f.frames.at(-1)[2], row, `${from === "h" ? "at Home" : "away"}, ${hidden ? "showing" : "hiding"} the sidebar: the row is ${row} in its first frame`);
+  }
+  assert.equal(JSON.parse(read("../../keys.json"))["layout:herdr-t3"]["cmd-b"], "t3-tabs.toggle-sidebar", "cmd-b is the same action as the buttons");
   console.log("ok: known space arrivals have their work frame and panel before the first destination paint");
 })().catch(e => { console.error(e); process.exit(1); });

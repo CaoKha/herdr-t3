@@ -84,9 +84,19 @@ key_changes=$(jq -r --slurpfile new "$src/keys.json" '
 ' "$keys_input")
 
 # Stop on a competing save even though the updater lock excludes other updater processes.
+# $4 compares the snapshot with the file now: byte for byte unless given.
+same_bytes() { cmp -s "$1" "$2"; }
+# t3-chrome writes two fields of the installed layout itself, fitted to the brand row: the macOS window buttons' height and the
+# sidebar's minimum (docs/internals/storage.md). Its new copy loads while this runs and writes them, which is no save of the
+# person's: the replacement takes the repo's values and it fits them again. A save is a difference in anything else.
+same_layout() {
+  same_bytes "$1" "$2" && return 0
+  own='del(.traffic_lights[1]?) | (.. | objects | select(.id? == "sidebar")) |= del(.min)'
+  was=$(jq -cS "$own" "$1" 2>/dev/null) && now=$(jq -cS "$own" "$2" 2>/dev/null) && [ "$was" = "$now" ]
+}
 check_unchanged() {
   if [ -f "$2" ]; then
-    if [ -f "$1" ] && cmp -s "$2" "$1"; then return 0; fi
+    if [ -f "$1" ] && "${4:-same_bytes}" "$2" "$1"; then return 0; fi
   elif [ ! -e "$1" ] && [ ! -L "$1" ]; then
     return 0
   fi
@@ -167,7 +177,7 @@ for t in "$src"/extras/themes/*.json; do [ ! -f "$app/themes/$(basename "$t")" ]
 
 config_pending='Layout and keys were not replaced.'
 check_unchanged "$keys" "$staging/keys.old" "$config_pending"
-check_unchanged "$layout" "$staging/layout.old" "$config_pending"
+check_unchanged "$layout" "$staging/layout.old" "$config_pending" same_layout
 mv "$layout_tmp" "$layout"
 layout_tmp=
 # A save to keys.json may still land while the layout is being replaced.

@@ -17,7 +17,7 @@ I'd worked this way in T3 Code: what's running stays out of sight, what needs me
 ## Features
 
 - **Inbox search** shows matching agents in a compact list. Use ↑ and ↓ to choose a result and Enter to open it.
-- **Inbox and Lists**: two sidebars, switched with their header button. Inbox sorts agents by attention, with Settle and Snooze. **Settled** holds put-away agents, and **Filter by space** lists only spaces with Inbox entries or spaces already selected. Lists shows spaces and agents by project.
+- **Inbox and Lists**: two sidebars, switched with `cmd-shift-l` or in Layout Settings. Inbox sorts agents by attention, with Settle and Snooze. **Settled** holds put-away agents, and **Filter by space** lists only spaces with Inbox entries or spaces already selected. Lists shows spaces and agents by project.
 - **Switching spaces** brings the destination tab bar, terminal and saved right panel into view together, including when returning from Home.
 - **Home**: putting away the agent you're looking at lands on a quiet page, not the next card. What to look at next is yours to pick. Settings (`cmd-shift-,`) can make it go on to the next card instead, or make Home a terminal or a mod of your own.
 - **One name, one set of marks**: cards, lists, tabs and pane headers name and mark each terminal the same way.
@@ -44,7 +44,7 @@ Only want the Inbox? It is also published alone: [herdr-t3-inbox](https://github
 
 ## Quick start
 
-1. The sidebar header button switches Inbox and Lists; `cmd-shift-b` opens Details.
+1. `cmd-shift-l` switches Inbox and Lists; `cmd-shift-b` opens Details.
 2. In Inbox, hover a finished card and click `✓ Settle` to put it away; new work brings it back. `cmd-shift-s` settles the agent you're looking at and goes Home.
 3. From Home, `cmd-]` opens the top card, so you can work down them one by one.
 4. Hover a card and click the clock to Snooze it until a time you pick.

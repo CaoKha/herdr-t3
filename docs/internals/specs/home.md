@@ -33,5 +33,5 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 - If its shell starts an agent, that space is released in place as an ordinary folder-named space, without moving the agent; the next Home creates a clean one.
 - A busy non-agent shell stays, and Home gets a new tab beside it.
 - A shell exit can remove Home; it is recreated when needed.
-- `cmd-shift-h` or the brand mark goes Home; pressing there changes nothing. Herdr starts where it was left, not at Home.
+- `cmd-shift-h` or the brand bar's mark goes Home; pressing either there changes nothing. With the sidebar hidden there is no mark, as T3's. Herdr starts where it was left, not at Home.
 - Next agent and `cmd-]` use the same target rule: read the selected sidebar's rows, even while it is hidden. On arrival at Home, start at the first row even if the sidebar still reports the previous view. Elsewhere, start at the first row if there is no view and stop if the viewed row is missing or last. The button is disabled without a target; execution reads the rows again.

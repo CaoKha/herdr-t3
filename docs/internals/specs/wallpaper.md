@@ -8,7 +8,8 @@ The optional Home mod `extras/mods/asciicn-wallpaper`: its controls, waits, fram
 - Saved and previewed pictures take one path: glyphs composed into one image in theme colours (ANSI16 slots, opacity steps).
 - Light themes draw added pictures on paper (marks where the photo is dark). Built-ins keep their tones.
 - Only the shape modes are offered (Dots, Braille, Blocks, Quadrants): their glyphs match asciicn's own `mapTones` cell for cell, while letter ramps (Classic, Dense) would need glyph outlines the tiles don't draw.
-- Without a saved framing, a picture covers Home from the bottom with its subject anchored across; a narrower one fills the width. A smaller Home height counts only once stable for 250ms.
+- A picture is framed against the window, not Home: its bottom right is Home's, and Home shows the part of it over Home. Hiding the sidebar or unfolding the tab row uncovers or covers its edge and moves nothing; the space panel, which takes from Home's right, still moves it with that edge.
+- Without a saved framing, a picture covers the window from the bottom with its subject anchored across; a narrower one fills the width.
 
 ## Switcher
 
@@ -48,7 +49,7 @@ Rows, each a fixed height:
 
 ## Framing input
 
-- Fill crops to cover; Fit shows all at 1×. Zoom is 100–400% of that base.
+- Fill crops to cover the window; Fit shows all of it in the window at 1×, its left part under the sidebar while that shows. Zoom is 100–400% of that base.
 - − + and `-` `=` step through presets about Home's centre. A notched wheel (6 notches double) and ⌘/Ctrl-scroll (200px doubles) zoom about the pointer.
 - Trackpad two-finger scroll and Shift-wheel pan; momentum after lift-off is ignored.
 - Drag and arrows move 10px, with Shift 50px. A drag also ends once the pointer is seen outside the window or the window is no longer in front, as no release comes then. `0` or Reset: 1×, subject in view, Fill/Fit kept.

@@ -28,7 +28,7 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 ### 侧栏框架
 
-品牌栏先给 macOS 窗口按钮留位置，再放 Herdr 官方标记和 `Herdr`，两者合成回 Home 的按钮。右侧两个相接的 28px 按钮切模式（图标表示点击后去哪：`inbox` 或 `layout-list`）和隐藏侧栏。窗口按钮挪到与这条栏的中线对齐。底栏的 32px 控件间隔 4px，依次是 Herdr Settings、布局设置（sliders）和 Clean up（trash），都是图标按钮。Clean up 运行 `t3-tabs.cleanup`，打开它的对话框。空位显示 Undo，下载好更新后多一个 `Update` 胶囊。规格：[sidebar](docs/internals/specs/sidebar.md)。
+品牌栏先给 macOS 窗口按钮留位置，接着照 T3 的侧栏开关放一个 28px 的隐藏侧栏按钮，隔 8（侧栏图标之间统一的间距）放 Herdr 的应用图标和暗色的 `Herdr`，图标和侧栏按钮的图标一样大，两者合起来是回 Home 的按钮；它只有一个样子，在 Home 和悬停时都不提亮，栏太窄时名字整个让出。侧栏隐藏时标签栏从同样的内边距开始，开关位置不动，只有图标；照 T3 收起的侧栏，标签前面不放别的东西，也没有品牌。这一行不报 agent 的状态：状态归侧栏，有 agent 需要人时由 Herdr 自己的通知提醒。品牌栏没有切模式按钮：用 `cmd-shift-l` 和布局设置在 Lists、Inbox 之间切换。窗口按钮挪到与这条栏的中线对齐；侧栏照 T3 不会窄过这一行，所以窗口窄时 `Herdr` 的末尾和下面 Inbox 筛选按钮的图标右边对齐。底栏的 32px 控件间隔 4px，依次是 Herdr Settings、布局设置（sliders）和 Clean up（trash），都是图标按钮。Clean up 运行 `t3-tabs.cleanup`，打开它的对话框。空位显示 Undo，下载好更新后多一个 `Update` 胶囊。规格：[sidebar](docs/internals/specs/sidebar.md)。
 
 ### Inbox
 
@@ -92,7 +92,7 @@ Space 标记用项目 favicon，没有则取名字首字母，颜色按名字哈
 
 ### Inbox 与 Lists 的边界
 
-品牌按钮切模式，侧栏隐藏也可切且保持隐藏。两个模式共享名字、pin 和 Settle/Snooze 的含义；注意力策略只在选中 Inbox 时生效，无论侧栏显隐：
+`cmd-shift-l`（或布局设置的 Sidebar shows）切模式，侧栏隐藏也可切且保持隐藏。两个模式共享名字、pin 和 Settle/Snooze 的含义；注意力策略只在选中 Inbox 时生效，无论侧栏显隐：
 
 | 规则 | Inbox | Lists |
 | --- | --- | --- |
@@ -163,7 +163,7 @@ Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设
 
 ### Home 与设置
 
-收起当前 agent（Settle、Snooze、拖动、划选）默认回 Home，下一步交给人决定；布局设置可改为走到下一张卡片。关闭当前 agent 的整个标签仍回 Home。`cmd-shift-h` 或品牌标记去 Home。
+收起当前 agent（Settle、Snooze、拖动、划选）默认回 Home，下一步交给人决定；布局设置可改为走到下一张卡片。关闭当前 agent 的整个标签仍回 Home。`cmd-shift-h` 或品牌栏的标记去 Home。
 
 Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只靠记住的 id 或确切名字 `Home\u200b` 认领，所有列表都不显示它。里面是一个 mod（默认 `t3-home`）或 shell；这个 shell 起了 agent，就原地变成普通 space，下次 Home 重新创建。
 
@@ -176,7 +176,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 
 ### 可选 asciicn 壁纸 Home
 
-装 `extras/mods/asciicn-wallpaper` 并在 Home shows 选它，Home 就是一张静态、按主题上色的 ASCII 画。内置画来自 [asciicn](https://asciicn.dev)（MIT）。右下角的切换器在悬停时出现，可以换画、给当前画取景，用 `+` 添加：选图片（Windows 上没有）或打开壁纸文件夹；把图片拖到 Home 上也行。新画打开取景卡：模式（Dots、Braille、Blocks、Quadrants）、Fill/Fit、缩放和 Apply/Cancel。Home 不会空白：上一张画一直留到下一张加载好，另一明暗的画在切换前就备好，等待超过 150ms 显示进度。规格：[wallpaper](docs/internals/specs/wallpaper.md)。
+装 `extras/mods/asciicn-wallpaper` 并在 Home shows 选它，Home 就是一张静态、按主题上色的 ASCII 画。内置画来自 [asciicn](https://asciicn.dev)（MIT）。右下角的切换器在悬停时出现，可以换画、给当前画取景（按整个窗口取景，隐藏侧栏或展开标签行都不会让画移动），用 `+` 添加：选图片（Windows 上没有）或打开壁纸文件夹；把图片拖到 Home 上也行。新画打开取景卡：模式（Dots、Braille、Blocks、Quadrants）、Fill/Fit、缩放和 Apply/Cancel。Home 不会空白：上一张画一直留到下一张加载好，另一明暗的画在切换前就备好，等待超过 150ms 显示进度。规格：[wallpaper](docs/internals/specs/wallpaper.md)。
 
 ### 键盘与焦点
 
@@ -186,7 +186,7 @@ Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只
 | --- | --- |
 | `cmd-shift-b` | `t3-tabs.details`，切详情；侧栏用原按钮 |
 | `cmd-alt-b` | `t3-tabs.panel`，隐藏／恢复space面板 |
-| `cmd-b` | `layout.toggle:sidebar` |
+| `cmd-b` | `t3-tabs.toggle-sidebar` |
 | `cmd-shift-l` | `t3-tabs.sidebar`，Lists ↔ Inbox |
 | `cmd-shift-g`／`cmd-shift-e` | `t3-tabs.review`／`t3-tabs.files`，Review／Files 开关 |
 | `cmd-shift-s` | `t3-tabs.settle`，当前 Inbox agent/mod 卡 |
@@ -279,7 +279,7 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 1. `wc -c RECIPE.md RECIPE.zh-CN.md` 各 ≤60,000，覆盖一致，本地链接和预览图存在。`scripts/check.sh` 输出 `all checks passed`（之前跑 `scripts/sync.sh`，它会写仓库外）：共享副本、mod 检查与类型、图标、overlay、render 和 update 守卫。
 2. `layout.switch {"name":"herdr-t3"}` 成功，`herdr-app status` 无缺 mod 和重绘警告。在独立 demo 窗口（`scripts/demo/stage.sh up`、`scene <name>`、`do herdr-app shot <file>`、`down`）里，默认 256px 侧栏、窄窗、浅色、深色和 zoom 的整窗截图各区域无裁切，窗口按钮位置正确。
 3. Inbox：Settle、Un-settle、Undo、新工作、两种模式的 pin、拖动、划选和取消都符合前述行为。Settled 标题行只显示名称、数量和折叠箭头。Filter by space 跳过只有 shell 且无 Inbox 条目的 space，已选中的 space 在最后一个 Inbox 条目消失后仍留在筛选里。收起后的去处遵循偏好；后台动作不跳；Lists 的 Settle 键无作用；侧栏隐藏时顺序、不循环和 5s Undo 照旧。
-4. Snooze working 和置顶的 agent、权限询问、失败或查看时的新轮（Inbox 未启动时也一样）、前后台到期：隐藏计数、Needs you、`Woke` 和 pin 都符合规则；Custom 输入无效时保持打开；取消不改任何东西。
+4. Snooze working 和置顶的 agent、权限询问、失败或查看时的新轮（Inbox 未启动时也一样）、前后台到期：Needs you、`Woke` 和 pin 都符合规则；Custom 输入无效时保持打开；取消不改任何东西。
 5. 面包屑的 current、held、away、fresh 状态，子 agent 和 zoom 与点亮的卡片、焦点一致。关闭前后台标签、最后 pane 和分屏 pane 按描述落点，保留未读邻居，停止程序前先问；弹层上的关闭键不关下面的标签。
 6. 在 Home 的 shell 里起 agent，留下带该 agent 的普通 space，下次 Home 干净，项目编号稳定。Go to 优先显示上一个窗格和名字命中的结果，显示远程信息，支持键盘且终端保有 Tab 键。在 New 选已打开的 space，在其当前位置新建标签。关闭项目的最后一个终端，在已打开的 space 下方找到它，并在原机器和目录重新打开。打开后只在已打开的 space 里出现一次。worktree 折叠保持分组和编号。
 7. Actions 增、改、删，在各位置和目录运行：必填项、确认、上次选择、shell 保留。

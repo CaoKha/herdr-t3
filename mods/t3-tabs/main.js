@@ -12,7 +12,7 @@ import { registerSpaceArrival } from "./space-arrival.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { litProp } from "./list.js";
-import { sidebarParts } from "./sidebar.js";
+import { sidebarParts, toggleLeft } from "./sidebar.js";
 import { navigation } from "./navigation.js";
 import { newTab, projectMark } from "./project.js";
 import { KEY, closedKey } from "./store.js";
@@ -30,18 +30,6 @@ const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
 const ROW_PX = 40;
 // A Review bar with `toggle` in its props draws the panel's toggle as its last part, beside its counts: one control, not two.
-
-// What the hidden sidebar's toggle counts, as the selected sidebar shows it. In the Inbox an agent settled there isn't news
-// while it stays settled, and a snoozed one, until it wakes, isn't news either, working or done; while it or what's under it
-// needs the person it shows there, so it counts here too. In Lists either only loses its done dot.
-function awake(st, under, inbox) {
-  const now = Date.now(), byAddress = new Map(terminals().map((k) => [k.address, k]));
-  return agents().filter((a) => {
-    const k = byAddress.get(a.address), s = st(a);
-    if (!inbox) return !(s === "done" && notNews(k, a.status, under(a.address)));
-    return s === "blocked" || (!stillSettled(k, a.status, under(a.address)) && !(Number(k?.labels?.snoozed) > now));
-  });
-}
 
 const TAB_GAP = 4;
 // A tab's name gives way to T3's 144px at most, the active one's to 240px; past that the strip scrolls.
@@ -124,6 +112,7 @@ export default class Tabs extends View {
         const command = await nextCommand();
         // One at a time: a second press finds the first's pane gone.
         if (command === "sidebar") run("layout.select", { stack: "sidebar-lists", child: inboxShown() ? "lists" : "inbox" });
+        else if (command === "toggle-sidebar") this.toggleSidebar();
         else if (command === "settle") await this.settle(cx);
         // The space panel (docs/adr/0017), keyed as VS Code's: a surface opens on it, or puts away the panel showing it; `panel` keeps it as it was.
         else if (command === "files") togglePanel("files");
@@ -284,18 +273,16 @@ export default class Tabs extends View {
       ready: shown.every(c => c.rule || c.group || this.nameW[`tab-${c.id}`]), fromEnd });
   }
 
-  // With the sidebar hidden, its toggle also says how the agents are doing, with the sidebar's own marks.
-  // Idle agents aren't counted: nothing to look at. The counts are 12, the tab bar's, in the 28px button's 14.
-  sidebarToggle(t, stopPress, live, st) {
-    const counts = ["blocked", "working", "done"].map(s => [s, live.filter(a => st(a) === s).length]).filter(([, n]) => n > 0);
-    const words = { blocked: "needing you", working: "working", done: "done" };
-    const summary = counts.map(([s, n]) => `${n} ${words[s]}`).join(" · ");
+  // With the sidebar hidden, its toggle: the icon alone, where the brand bar has it, and nothing else in the row, as T3's
+  // collapsed sidebar leaves only its trigger: Home is ⇧⌘H. How the agents are doing is the sidebar's to show, and Herdr's own
+  // notice says when one needs the person, so neither it nor the row says anything of them (2026-11-20, docs/adr/0010). 4 on
+  // its right: what follows is another group, 8 away (the row's 4 and these 4, t3-tokens P3).
+  sidebarToggle(t, stopPress) {
     return tip(this, t, "sidebar-toggle", "Show sidebar", stop(this, t, "sidebar-toggle", drawButton(t, "sidebar-toggle", {
-      size: "sm", wide: counts.length > 0, icon: "mods/t3-tabs/icons/panel-left.svg", label: summary ? `Show sidebar, ${summary}` : "Show sidebar", hot: this.hot === "sidebar-toggle" })
-      .mr(8).on_hover(glow(this, "sidebar-toggle"))
+      size: "sm", icon: "mods/t3-tabs/icons/panel-left.svg", label: "Show sidebar", hot: this.hot === "sidebar-toggle" })
+      .mr(4).on_hover(glow(this, "sidebar-toggle"))
       // It goes when the sidebar shows, before the pointer can report leaving it.
-      .on_mouse_down("left", stopPress).on_click(() => { this.hot = null; run("layout.toggle", { id: "sidebar" }); })
-      .children(counts.map(([s, n]) => h_flex().id(`agents-${s}`).gap(4).items_center().child(statusMark(t, s, 14)).child(div().text_size(12).text_color(t.muted).child(String(n))))), radiusOf("sm")), { action: "layout.toggle:sidebar", below: true });
+      .on_mouse_down("left", stopPress).on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true });
   }
 
   // With props.block, sizes that block to `size`: layout.resize, which Herdr keeps with the layout's clicks.
@@ -312,13 +299,21 @@ export default class Tabs extends View {
   // sidebar hidden (the row holds its toggle and the macOS window buttons) nor with window buttons of the bar's own. A layout
   // click, so it reads the row's size and corrects it whatever left it so (a quit at Home, another layout). Home's pane shows in
   // `home-main`, the same frame with no header: a blank header still took its 28px, a strip over Home's terminal.
-  fitRow(w, atHome, force = false) {
+  fitRow(w, atHome, force = false, hidden = sidebarParts(layout()).rail?.hidden) {
     const root = layout(), row = layoutNode(root, "tabs-row"), work = layoutNode(root, "work-main");
     const child = atHome ? "home-main" : "main";
     if (work && (force || work.active !== child)) run("layout.select", { stack: "work-main", child });
     if (!row) return;
-    const px = atHome && !sidebarParts(root).rail?.hidden && !w?.buttons ? 8 : ROW_PX;
+    const px = atHome && !hidden && !w?.buttons ? 8 : ROW_PX;
     if (force || row.size?.px !== px) run("layout.resize", { id: "tabs-row", px });
+  }
+
+  // ⌘B and both sidebar buttons. With Herdr's layout.toggle alone, Home's row followed in a later frame (fitRow in render), so
+  // the work area jumped twice; the row's height goes in the same layout change.
+  toggleSidebar() {
+    const hidden = !sidebarParts(layout()).rail?.hidden, space = spaces().find(s => s.active)?.id;
+    run("layout.toggle", { id: "sidebar" });
+    this.fitRow(window(), Boolean(space) && space === shared(KEY.home), false, hidden);
   }
 
   // Another layout's bar shouldn't stay compact because this one was narrow when it went.
@@ -378,7 +373,7 @@ export default class Tabs extends View {
           .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, w.platform === "windows" ? undefined : "□"))
           .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close")))))));
     const space = spaces().find(p => p.active);
-    // At Home, none: the brand bar's lit mark tells where this is.
+    // At Home, none: Home itself tells where this is.
     const { tabs: shown, context: ctx } = this.navigation.frame(), inbox = inboxShown();
     // With the Inbox, the breadcrumb holds the tab in view and the parent's: the strip has the rest.
     const strip = ctx ? [...ctx.kin, ...ctx.programs] : shown;
@@ -469,7 +464,8 @@ export default class Tabs extends View {
     // Old saved rails and a dragged-narrow sidebar can be smaller than the window buttons.
     // Hidden, leave room for the window controls before the sidebar toggle's padded 28px button.
     const lights = w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights;
-    const lightsPadding = sidebar?.hidden ? (lights ? (root.traffic_lights[0] + 66) / settings().zoom - 4 : 10)
+    // Hidden, the toggle stands where the brand bar has it (sidebar.js toggleLeft), as T3's stays put shown or hidden.
+    const lightsPadding = sidebar?.hidden ? toggleLeft(w, root, settings().zoom)
       : lights ? Math.max(8, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.size?.px ?? 0)) : 8;
     const notice = sidebar?.hidden && this.undoNotice(t);
     return focusRoot(this, h_flex().size_full().min_w(0).pl(lightsPadding).pr(4).gap(4).items_center().bg(t.chrome)
@@ -491,7 +487,7 @@ export default class Tabs extends View {
         stripWheel(this.tabStrip, e);
         cx.notify();
       })
-      .when(Boolean(sidebar?.hidden), el => el.child(this.sidebarToggle(t, stopPress, awake(st, under, inbox), st)))
+      .when(Boolean(sidebar?.hidden), el => el.child(this.sidebarToggle(t, stopPress)))
       .when(Boolean(notice), el => el.child(notice))
       // The tabs' row, measured whole: with the Inbox the breadcrumb and the strip share it.
       .child(h_flex().id("tab-area").flex_1().min_w(0).h_full().items_center().gap(8)

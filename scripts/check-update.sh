@@ -261,7 +261,9 @@ fi
 HERDR_APP_HOME="$other" "$src/scripts/update.sh" >/dev/null
 ok test -f "$other/layouts/herdr-t3.json"
 is '.["layout:herdr-t3"]["cmd-p"]' "$other/keys.json" mod.open:t3-picker
-jq '.theme = "win98" | (.. | objects | .focus? | objects | .color) = "accent"' "$held/layouts/herdr-t3.json" > "$tmp/saved-layout.json"
+
+# A save stops it, even with t3-chrome's own write (below) riding along.
+jq '.theme = "win98" | (.. | objects | .focus? | objects | .color) = "accent" | .traffic_lights[1] = 14' "$held/layouts/herdr-t3.json" > "$tmp/saved-layout.json"
 cp "$tmp/saved-layout.json" "$held/layouts/herdr-t3.json"
 expect_conflict layouts/herdr-t3.json "$tmp/saved-layout.json" 'Layout and keys were not replaced.'
 ok test -f "$held/mods/t3-home/main.js"
@@ -285,4 +287,20 @@ is .theme "$held/layouts/herdr-t3.json" win98
 is '[.. | objects | .focus? | objects | .color][0]' "$held/layouts/herdr-t3.json" accent
 is .global.new "$held/keys.json" 'late binding'
 is '.["layout:herdr-t3"]["cmd-p"]' "$held/keys.json" mod.open:t3-picker
+
+# t3-chrome fits the window buttons and the sidebar's minimum to the brand row itself, as soon as its new copy loads:
+# its write, reformatted here, isn't the person's save. The update goes on and the repo's values go in, which it fits again.
+hold_update
+jq '.traffic_lights[1] = 14 | (.. | objects | select(.id? == "sidebar")) .min = 239' "$held/layouts/herdr-t3.json" > "$tmp/aligned.json"
+cp "$tmp/aligned.json" "$held/layouts/herdr-t3.json"
+touch "$tmp/release"
+if ! wait "$worker"; then
+  echo "FAIL check-update: t3-chrome's own layout write stopped the update"
+  cat "$tmp/held.out"
+  fail=1
+fi
+worker=
+is '.traffic_lights' "$held/layouts/herdr-t3.json" "$(jq -c .traffic_lights "$src/layouts/herdr-t3.json")"
+is '[.. | objects | select(.id? == "sidebar") | .min][0]' "$held/layouts/herdr-t3.json" 208
+is .theme "$held/layouts/herdr-t3.json" win98
 exit "$fail"
