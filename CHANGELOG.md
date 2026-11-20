@@ -9,6 +9,7 @@ English · [中文](CHANGELOG.zh-CN.md)
 - Right-click an idle agent that has finished a turn (or open its menu from the breadcrumb title) with Inbox selected to **Mark unread**. It puts the agent back to Done in place without switching routes (showing its unread dot on the Inbox card, pane header and space menu, as well as Agents and tabs in Lists), brings a settled or snoozed agent back to Active, and works with the sidebar hidden.
 - Files follows a space's live working folder when the space started in your local home folder or moved outside its saved folder, while staying anchored to the project root as terminals enter subfolders or switch tabs. When the root changes, Files clears old file and folder tabs (keeping Review and falling back to generic Files), resets search and closes stale menus.
 - Review opened outside a repository now loads automatically once the tab's terminal moves into a Git repository, instead of staying on "Not a git repository".
+- Fixed a small vertical scroll jitter in the Inbox sidebar when its cards fit on screen without overflowing.
 
 ## 2026-11-20
 

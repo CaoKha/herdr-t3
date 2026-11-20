@@ -2655,3 +2655,16 @@ test("a card and a settled row measure as T3's, and the lists stack as its does"
   assert.equal(num(shelfChildren(f.tree, "settled").find((n) => find(n, "slim-B")), "mt"), 1, "gap-px between a shelf header and its rows");
   assert.deepEqual(["h", "px", "gap"].map((k) => num(find(f.tree, "inbox-top"), k)), [32, 8, 4], "the search field alone, its middle on the pane headers'");
 });
+
+test("Inbox scroll containers keep vertical padding as child spacers so an un-overflowed list cannot scroll", () => {
+  const f = fixture(); f.add("A", "idle", 100); f.add("B", "idle", 200); f.render();
+  const list = find(f.tree, "inbox-list");
+  assert.deepEqual([list.style.pt, list.style.pb], [undefined, undefined], "inbox-list has no pt/pb on overflow_y_scroll");
+  assert.deepEqual([find(list, "inbox-top-pad")?.style.h, find(list, "inbox-bottom-pad")?.style.h], [[8], [8]], "inbox-list top/bottom spacing lives in flex_none spacers");
+  assert.equal(list.items.at(-1).key, "inbox-bottom-pad", "bottom spacer sits after the last shelf");
+  f.mod.inlineInput.set_value("A"); f.mod.inlineInput.heard.change({}, f.cx); f.render();
+  const results = find(f.tree, "inbox-search-results");
+  assert.deepEqual([results.style.pt, results.style.pb], [undefined, undefined], "inbox-search-results has no pt/pb on overflow_y_scroll");
+  assert.deepEqual([find(results, "inbox-search-top-pad")?.style.h, find(results, "inbox-search-bottom-pad")?.style.h], [[7], [7]], "search list spacers account for gap(1) to equal 8px");
+  assert.equal(results.items.at(-1).key, "inbox-search-bottom-pad");
+});

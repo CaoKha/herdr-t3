@@ -56,7 +56,7 @@ macOS 菜单的 `File > New Tab`、`File > Close Tab`、`Window > Go to Tab…` 
 
 `on_size_change` 返回乘 zoom 后像素；布局 resize 用逻辑像素，要除 `settings().zoom`。Actions/end 自定 block 宽，`tabs-row` 不可拖。Compact 在不受标签控件宽度影响的 `bar-measure` 测工作列；在标签区测会因控件收缩而反复开合。macOS traffic lights 是未缩放屏幕点，文件热加载补偿与并发安全写见 storage。
 
-Herdr 0.1.15 起普通滚动区可用 `track_scroll(handle)` 和 `ScrollHandle.scroll_to_item(index)` 显示指定的直接子项。标签条由 `tab-scroll` 裁切、`tab-strip.ml()` 偏移；零高全名副本量完整宽，只有 active/room 改变才修正。手动偏移同时控制滚轮位置和两端渐隐。搜索/树用可控虚拟列表。Agents 列表超过 50 行时窗口化（`mods/t3-agents/main.js`）：行高取自 `planMotion` 已有的条目高度和 y，只画视口内的行及上下各两行，滚轮自己移动，`leavingRows(view, top)` 跟着偏移；首次测量前按 800 高画。宿主的 `v_virtual_list` 行里不能挂处理函数，所以没用它。代价：窗口化时 Tab 只走到已画出的行。200 个 agent、5,000 终端时窗口化一帧约 427 个元素，全画是 13,219。
+Herdr 0.1.15 起普通滚动区可用 `track_scroll(handle)` 和 `ScrollHandle.scroll_to_item(index)` 显示指定的直接子项；不要把 `pt`/`pb` 直接写在 `overflow_y_scroll()` 容器上（尤其是含 `flex_1()` 占位子项的 Inbox 列表），否则 GPUI 会额外算出 `pt + pb` 的可滚动余量，未溢出时也能上下晃动，纵向留白改用首尾 `flex_none()` 占位块。标签条由 `tab-scroll` 裁切、`tab-strip.ml()` 偏移；零高全名副本量完整宽，只有 active/room 改变才修正。手动偏移同时控制滚轮位置和两端渐隐。搜索/树用可控虚拟列表。Agents 列表超过 50 行时窗口化（`mods/t3-agents/main.js`）：行高取自 `planMotion` 已有的条目高度和 y，只画视口内的行及上下各两行，滚轮自己移动，`leavingRows(view, top)` 跟着偏移；首次测量前按 800 高画。宿主的 `v_virtual_list` 行里不能挂处理函数，所以没用它。代价：窗口化时 Tab 只走到已画出的行。200 个 agent、5,000 终端时窗口化一帧约 427 个元素，全画是 13,219。
 
 导航列不用宿主 `h_resizable`：它按 id 留各块大小并随页面等比缩放，面板变宽时会先错误缩放一帧再弹回。共用 `shared/nav-column.js` 自绘边缘，拖动只改本页、释放才保存。`holdWidth` 共用算法但每页独立状态：宽稳定 300ms 后重排；Files 在此之前固定旧 Editor 宽并裁切，Review 保留旧折行列数。Editor 的 soft wrap 配置创建时取，切换后绘制外重建。Files 超过 16KB 的文件被改写或切换 Wrap 时先建纯文本 Editor，着色由 `colorLater` 的 `cx.timer.after` 换上：每次推迟换一个 stamp，旧计时器到点即作废；到点时文件不在显示就不换，等 render 看到仍未着色再排一次，所以隐藏的页面不着色。Files/Review 刷新与缓存生命周期由 storage 定义。
 

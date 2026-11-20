@@ -9,6 +9,7 @@
 - 选中 Inbox 时，右键已结束过一轮的空闲 agent（或从面包屑标题打开它的菜单）新增 **Mark unread**：原地把该 agent 重新标回 Done、不切换路由（Inbox 卡片、窗格头、space 切换菜单以及 Lists 下的 Agents 和标签栏都会重新显示未读圆点），已 Settle 或 Snooze 的 agent 会随之回到 Active，侧栏隐藏时也可用。
 - 当 space 起在本机主目录，或终端所在目录与 space 保存的目录不一致时，Files 会跟随该 space 终端的实时工作目录；在项目子目录内移动或切换标签时仍锚定在项目根。真正换根时清理旧文件／目录标签（保留 Review，原活动标签被清时落回通用 Files）、重置搜索并关闭失效菜单。
 - 在非仓库目录打开 Review 看到「Not a git repository」后，终端 `cd` 进 Git 仓库时会自动恢复并加载该仓库，不再一直停在空状态。
+- 修复 Inbox 侧栏在卡片未满屏时仍能上下小幅滚动的问题。
 
 ## 2026-11-20
 

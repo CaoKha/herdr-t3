@@ -16,12 +16,14 @@ export const STACK = 1, CARD_GAP = 5, LIST_TOP = 8;
 export function searchList(view, t, model, results) {
   const { sp, ps, inView, since, now } = model;
   const spaces = new Map(sp.map((s) => [s.id, s])), indices = new Map();
+  // Vertical padding lives in child spacers: pt/pb on an overflow_y_scroll container adds pt+pb of spurious scroll in GPUI.
   const list = v_flex().id("inbox-search-results").role("list_box").accessibility_label("Inbox search results")
-    .flex_1().min_h(0).px(8).pt(LIST_TOP).pb(8).gap(STACK).overflow_y_scroll()
+    .flex_1().min_h(0).px(8).gap(STACK).overflow_y_scroll()
     .when(Boolean(view.searchScroll), (el) => el.track_scroll(view.searchScroll))
     .on_scroll_wheel(() => view.cancelReveal());
+  list.child(div().id("inbox-search-top-pad").flex_none().h(LIST_TOP - STACK));
   for (const [i, { a, title }] of results.entries()) {
-    indices.set(a.address, i);
+    indices.set(a.address, i + 1);
     const active = a.address === view.inline.at, current = a.address === inView;
     const space = spaces.get(a.space) ?? { name: a.space_name ?? "" }, time = since(a);
     list.child(h_flex().id(`search-result-${a.address}`).h(SLIM).px(8).gap(10).flex_none().items_center().rounded(6)
@@ -34,6 +36,7 @@ export function searchList(view, t, model, results) {
       .when(time > 0, (el) => el.child(div().flex_none().text_size(12).text_color(t.dim).child(ago(time, now)))));
   }
   if (!results.length) list.child(div().px(8).py(24).text_center().text_size(12).text_color(t.dim).child("No matching cards."));
+  list.child(div().id("inbox-search-bottom-pad").flex_none().h(8 - STACK));
   view.clockAt = Infinity;
   view.revealDrawn(inView, indices, view.inline.query);
   return { top: inboxTop(view, t, model), list };
@@ -137,7 +140,8 @@ export function inboxList(view, t, model, drag, draw, cx) {
       })
       .child(undoLabel("t3-tabs.undo", "t3-inbox.undo"))));
   const top = inboxTop(view, t, model);
-  const body = v_flex().id("inbox-list").relative().flex_1().min_h(0).px(8).pt(LIST_TOP).pb(8).overflow_y_scroll()
+  // Vertical padding lives in child spacers: pt/pb on an overflow_y_scroll container with a flex_1 filler adds pt+pb of spurious scroll in GPUI.
+  const body = v_flex().id("inbox-list").relative().flex_1().min_h(0).px(8).overflow_y_scroll()
     .when(Boolean(view.listScroll), (el) => el.track_scroll(view.listScroll))
     .on_scroll_wheel(() => view.cancelReveal())
     .on_size_change((size) => { view.listH = size.height / zoom; });
@@ -152,6 +156,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
   const addLane = (section, agents, drawRow, gap, append) =>
     lane(section, agents, drawRow, gap).forEach((el, i) => append(el, agents[i].address));
   add(div().absolute().left(0).right(0).top(0).children(view.motion.exits.map(leaving).filter(Boolean)));
+  add(div().id("inbox-top-pad").flex_none().h(LIST_TOP));
   add(boundary("pinned", "Pinned", "pinned", pinTo(others(pinned)[0]?.address)));
   add(gap("head-pinned"));
   addLane("pinned", pinned, card, CARD_GAP, add);
@@ -222,6 +227,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
       .child(svg("mods/t3-inbox/icons/chevron-down.svg").size(16).flex_none())
       .child(`Show ${Math.min(MORE, put.length - view.limit)} more`))));
   }
+  add(div().id("inbox-bottom-pad").flex_none().h(8));
   view.revealDrawn(model.inView, indices);
   return { top, list: body };
 }
