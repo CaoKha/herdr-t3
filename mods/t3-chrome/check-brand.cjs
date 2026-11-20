@@ -21,8 +21,7 @@ const cx = { notify() {}, stop_propagation() {} };
 const view = {};
 const mark = (el) => walk(el).find((n) => n.kind === "image");
 
-// As T3's SidebarBrandMark: 28 high, no padding, 4 between, 14px medium. The mark is an icon, not a wordmark, so it is as big as
-// the 16px icons beside it: the tile's PNG is 80% tile, so 16 draws a 12.8 tile, as their drawn ~12.7; centred.
+// As T3's SidebarBrandMark, but the mark is an icon as big as the 16px icons beside it: its PNG is 80% tile; centred.
 let el = brand(view, t, { named: true, zoom: 1 });
 assert.equal(el.key, "home");
 assert.deepEqual([el.style.h, el.style.px, el.style.gap, el.style.text_size], [28, undefined, 4, 14]);

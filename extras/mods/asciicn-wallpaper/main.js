@@ -1,22 +1,7 @@
-// Home as a still picture in asciicn's style (https://asciicn.dev, MIT, see LICENSE-asciicn): one of its own, or one of the
-// person's images drawn in Dots/Braille/Blocks/Quadrants, in the theme's colours.
-// Every picture, saved or previewed, is drawn one way: its tiles put together in the theme's colours as one image
-// (library.js), which GPUI rasterises once off the UI thread and scales on the GPU. A new theme makes another, and until it
-// is ready the old one stays up; the layout's other appearance's is made ahead (warm()), so light/dark switches at once.
-// The pointer near the bottom-right corner shows the switcher: ‹ › step, the crop button frames the picture shown, `+` opens
-// a menu of where a new one comes from; an image dropped on Home is one too. A new or reframed picture is edited across Home
-// with the framing card in the switcher's place; only Apply publishes an import's .ans, and any picture's framing.
-// The picture picked is the person's, shared under KEY.wallpaper, so a new Home shows it too.
-// With props.menu this mod is + 's menu, opened as a popup: its picks go back to the Home that opened it as commands.
-//
-// A picture is framed against the window (stage()), not the pane: Home shows the part of it over Home, the window's bottom
-// right on Home's, which the sidebar and the tab row leave where they are. Hiding the sidebar or unfolding the row then only
-// uncovers or covers its edge; nothing moves or rescales. Without saved framing it covers the window, its subject (`focus`)
-// pinned by a percentage; saved framing (cover/contain, zoom, alignment) is relative to the window too.
-// Reaching Home other than by t3-tabs (which lays it out first), the pane shows for a frame or two 60px short (still under
-// `main`'s header and the unfolded tab row, see t3-tabs' fitRow) before it takes its height; that dip moves nothing either.
-// shortcut: imports go through sh, cp, rm, cksum and base64, the dialog through osascript (macOS) or zenity (Linux), an image
-// through sips (macOS) or ImageMagick (Linux); on Windows the menu offers no file dialog, until Herdr gives mods a file picker.
+// Home as a still picture in asciicn's style (https://asciicn.dev, MIT, see LICENSE-asciicn), framed against the window,
+// not the pane (docs/internals/specs/wallpaper.md). With props.menu this mod is + 's menu, opened as a popup.
+// Reached other than by t3-tabs, the pane shows a frame or two 60px short (t3-tabs' fitRow); window framing hides that dip.
+// shortcut: files go through sh, images through sips/ImageMagick, the dialog through osascript/zenity until mods get a picker.
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
 import { checking, appHome, closeOverlay, exec, focused, nextCommand, notify, openOverlay, panes, props, run, settings, setShared, shared, spaces, theme, themes, watchFolder, window } from "herdr";
@@ -674,7 +659,6 @@ export default class Wallpaper extends View {
     return stop(this, t, id, drawButton(t, id, { variant: /** @type {"primary" | "outline" | "danger"} */ (variant), size: "compact", text: label, act, disabled }), radiusOf("compact"));
   }
 
-  // An icon button on the card.
   tool(t, id, name, label, act, disabled = false) {
     return stop(this, t, id, ghostButton(this, t, id, { icon: icon(name), label, act, disabled }), radiusOf("xs"));
   }
@@ -684,11 +668,9 @@ export default class Wallpaper extends View {
     return drawButton(t, id, { ...o, size: "xs", surface: "card" }).when(!o.disabled, (el) => el.on_click((_e, cx) => act(cx)));
   }
 
-  // The framing card, T3's popover in the switcher's place (docs/internals/specs/wallpaper.md). Name, then until the picture shows only how far
-  // it has got; once shown it opens out upward: mode (an image's), Fill/Fit and Reset, Zoom. Its footer never moves: a status
+  // The framing card, T3's popover in the switcher's place (docs/internals/specs/wallpaper.md). Its footer never moves: a status
   // slot, then Cancel and Apply, which become Close and Choose another… when the file can't be read. `waits`: which of the
-  // card's waits show now (track()); before one does, nothing says so. Applying, every control is off at once, as none would
-  // act; only Apply's words wait to read Applying….
+  // card's waits show now (track()). Applying, every control is off at once; only Apply's words wait to read Applying….
   card(t, waits) {
     const d = this.draft, p = d.placement, broken = d.phase === 'broken', busy = d.phase === 'applying';
     const open = !!d.scene && !!d.shown && !waits.load;

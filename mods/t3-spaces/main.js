@@ -1,7 +1,5 @@
-// Workspace spaces: stable colored avatars, worktrees under their checkout,
-// grouped by machine when more than one is known. After a space's name, the repo
-// its first terminal is in now, only where unusual: branch, ahead/behind. Agent state lives in the agents list, not here. Click to
-// switch, right-click for its menu, drag to reorder.
+// Workspace spaces: stable colored avatars, worktrees under their checkout, grouped by machine when more than one is known.
+// After a space's name, its repo only where unusual (branch, ahead/behind); agent state lives in the agents list, not here.
 
 import { View, div, svg } from "gpui-kit";
 import { foldArrow, planMotion, flying, leavingRows } from "./motion.js";
@@ -181,7 +179,7 @@ export default class Spaces extends View {
       const rebuilt = this.rebuilt(machine) || !!repair;
       const folded = this.folded.has(m);
       const id = m ?? "local";
-      // Drawn as the agents list's shelves, T3's: 2 and 8 in, the chevron at the row's end and its + as T3's folder has it, 24 and 2 before.
+      // Drawn as the agents list's shelves, T3's: the chevron at the row's end and its + as T3's folder has it.
       // By the row's id: this computer's m is null, which a cleared field would equal. Kept as Agents' headings are, as a leave can go missing.
       const head = hoverKept(this, "overMachine", `machine-${id}`, h_flex().id(`machine-${id}`).h(ROW).flex_none().mx(2).px(8).gap(8).items_center()
         .text_size(12).font_medium().text_color(t.dim)
@@ -212,7 +210,7 @@ export default class Spaces extends View {
             .on_click((_e, cx) => { cx.stop_propagation(); this.reconnect(machine, cx); })
             .child(repair?.busy ? "Connecting…" : "Connect"), 4))))
         // T3's folder sizes: a 24px + with a 14px icon (icon-xs) and a 12px chevron, in the heading buttons' two columns, 50 and
-        // 22px from the sidebar's edge. The -2 sits on the group: on the chevron's own box it threw the whole group past the edge.
+        // 22px from the sidebar's edge. The -2 sits on the group: on the chevron's own box it pushes the whole group past the edge.
         .child(h_flex().flex_none().mr(-2).gap(10).items_center()
           .when(connected, el => el.child(tip(this, t, `machine-add-${id}`, "New space here", stop(this, t, `machine-add-${id}`, button(t, `machine-add-${id}`, { icon: "mods/t3-spaces/icons/plus.svg", label: "New space here", surface: "row", hot: this.hot === `machine-add-${id}` })
             .on_hover(glow(this, `machine-add-${id}`))
@@ -370,7 +368,7 @@ export default class Spaces extends View {
       });
     }
     d.moved = true;
-    // shortcut: measured from the press in window coordinates, so scrolling the list mid-drag isn't followed; take the rows' local_position if that matters.
+    // shortcut: measured from the press in window coordinates, so scrolling mid-drag isn't followed; use the rows' local_position if that matters.
     d.dy = dy;
     cx.notify();
   }

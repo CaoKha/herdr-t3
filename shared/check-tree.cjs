@@ -35,8 +35,8 @@ assert.deepEqual(kidTree(deep, "top").map((r) => [r.k.address, r.depth, r.lines.
 const loop = [agent("x", "y"), shell("y", "x")];
 assert.deepEqual(names(descendants(loop, "x")), []);
 
-// Every agent's sub-agents, as Tabs, Agents and the Inbox ask each render, read the list a bounded number of times: one filter of
-// every terminal per agent was 5000 × 200 reads and ran past Herdr's script limit (performance-audit.md).
+// Every agent's sub-agents, as Tabs, Agents and the Inbox ask each render, read the list a bounded number of times: a filter of
+// every terminal per agent runs past Herdr's script limit.
 {
   const big = [];
   for (let i = 0; i < 200; i++) big.push(agent(`top${i}`, null));

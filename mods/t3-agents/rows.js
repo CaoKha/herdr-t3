@@ -17,7 +17,7 @@ import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
 
-// T3's one-line row and shelf or folder header, its folders 8 apart and its list's 1px between items (gap-px).
+// T3's one-line row and shelf or folder header, and its list's 1px between items (gap-px).
 const ROW = 36, HEAD = 32, HEAD_GAP = 8;
 export const STACK = 1;
 export const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
@@ -245,7 +245,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
   if (!groups.some((g) => g.id === view.overGroup)) view.overGroup = null;
   const chevron = (g, open, ghost) => {
     const color = !ghost && view.overGroup === g.id ? t.foreground : t.dim;
-    // 12px, as T3's section chevron; -2: its middle 22px from the sidebar's edge, under the headings' last button.
+    // As T3's section chevron; -2: its middle 22px from the sidebar's edge, under the headings' last button.
     return div().flex_none().mr(-2).text_color(color).child(foldArrow("t3-agents", ghost ? null : `chevron-${g.id}`, open, 12, color));
   };
   // Drawn as Inbox's shelves, T3's: a dim label, then at the far edge the count and the chevron, an indicator that lights with its row.

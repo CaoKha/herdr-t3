@@ -13,7 +13,7 @@ const context = vm.createContext({ KEY: { panels: 't3.panels' }, GROUP_GAP: 4, l
   run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (cmd === 'layout.resize' && a.id === 'window-end') ui.end = a.px; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
 });
 // Each step that shows or hides the panel sizes the tab bar's window part for that state in the same go (t3-tabs draws the
-// closed panel's 28 toggle 4 after Details (P3), then the window's buttons 8 on, three of 28; nothing while the panel is open): the frame that
+// closed panel's toggle after Details (P3), then the window's buttons; nothing while the panel is open): the frame that
 // shows the change has Details and the toggle where they end up. Checked at every step below.
 const endFits = () => assert.equal(ui.end, ui.open ? 0 : 4 + 28 + (ui.buttons ? 8 + 3 * 28 : 0), `window-end for a panel ${ui.open ? 'open' : 'closed'}`);
 for (const f of ['terminal-context.js', 'surfaces.js', 'panel.js']) vm.runInContext(fs.readFileSync(`${__dirname}/${f}`, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), context);

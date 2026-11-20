@@ -24,7 +24,7 @@ const count = (svg, s) => svg.split(s).length - 1;
 const E = (codes) => `\x1b[${codes}m`;
 const markOf = (style) => `\x1b]777;asciicn-wallpaper;image-v4;${style}\x07`;
 
-// New images use eight brightness steps and all sixteen nearest VGA slots, not the old hue buckets.
+// New images use eight brightness steps and all sixteen nearest VGA slots.
 assert.deepEqual(JSON.parse(JSON.stringify(tintOf({ rgb: [255, 255, 255] }))), { tint: "ansi15", step: 7 });
 
 // Only a frame made here converts: an unmarked one, or one from before modes (v3), is refused, before anything is drawn.

@@ -1,5 +1,5 @@
 // A closable tab, as T3's panel tab: the tab bar's terminal tabs and the space panel head's surface tabs (docs/internals/specs/
-// tab-bar.md, space-panel.md). scripts/sync.sh copies this to both mods.
+// tab-bar.md, space-panel.md).
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { tip, glow, keptHover } from "./tip.js";
@@ -8,12 +8,10 @@ import { button, tint as ghostTint } from "./button.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
 
 /**
- * 24 high, radius 6, 6 in on the left and 8 on the right, 2 between, 12px words; the tab shown on `chrome`'s on fill, another
- * hovered on its hover fill (t3-tokens「按钮」). A 16 slot leads with the 12px `icon`; hovered or keyboard-focused, × covers
- * it, as T3's. `mark` (a status) sits in a 16 slot at the end and stays there hovered; `slot` keeps that slot with no mark, so
- * the tab's width doesn't move with its state. × and a middle press call `close`, a right press `menu(cx)`. A name cut short
- * says itself whole in a label below (t3-tokens P5); any press hides it, `quiet` keeps it down (a drag). `mod` is the mod's
- * folder, holding icons/x.svg. `extend(el)` adds what only one bar does (a size, a drag, a click) before the wrappers.
+ * The tab shown on `chrome`'s on fill, another hovered on its hover fill (t3-tokens「按钮」). Hovered or keyboard-focused, ×
+ * covers the leading `icon`, as T3's; `mark` stays at the end, and `slot` keeps its room with no mark, so the width doesn't move.
+ * × and a middle press call `close`, a right press `menu(cx)`. A cut name shows whole in a label below (t3-tokens P5); `quiet`
+ * keeps it down (a drag). `mod` holds icons/x.svg. `extend(el)` adds what only one bar does before the wrappers.
  * @param {any} view @param {any} t @param {string} id
  * @param {{ mod: string, label: string, icon: any, active?: boolean, width?: number, maxW?: number, mark?: any, slot?: boolean, close: () => void, menu: (cx: any) => void, closeLabel?: string, closeAction?: string, quiet?: boolean, enter?: () => void, dragMove?: (event: any, cx: any) => void }} o
  * @param {(el: any) => any} [extend]

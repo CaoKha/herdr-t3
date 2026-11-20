@@ -1,6 +1,5 @@
-// The space panel's shared Files view (docs/adr/0017): the active space's folder, read-only, as
-// one block: the file picked on the left, the tree on the right by the window's edge, the split between them dragged.
-// One copy serves every space, here or on another machine: what each one shows is kept by its id.
+// The space panel's Files view (docs/adr/0017): the active space's folder, read-only, the picked file beside its tree.
+// One copy serves every space, here or on another machine, each one's state kept by its id.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from "gpui-base";
 import { checking, spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
@@ -26,17 +25,13 @@ import { alpha } from "./color.js";
 
 const MOD = "mods/t3-files";
 const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
-// Expand all lists at most this many folders, Git-ignored ones left closed, as T3's: ignored by the repository each folder is in,
-// a clone inside a space's folder that isn't one too; folders in no repository open.
+// Expand all opens at most this many folders, leaving closed the ones Git ignores in their own repository (a nested clone's too), as T3's.
 // shortcut: a folder past it stays closed; list more in batches if a big repo wants it all.
 const EXPAND_MAX = 200;
-// Asked again while it shows: here every 5 s, another machine every 10; a refresh that took long, 10 times as long, a minute at
-// most. Event-driven refresh is a separate change; a hidden page runs nothing.
 const LOCAL_EVERY = 5000, REMOTE_EVERY = 10000, SLOWEST = 60000;
 const TREE_WAIT = 150;
-// Herdr runs each exec as a process with two pipes and doesn't raise a GUI app's 256 open files (launchd's soft limit): a refresh
-// listing every folder Expand all opened, all at once, had dozens fail to start ("Too many open files"). Listing reads go
-// READ_AT_ONCE at a time, across every space this copy reads.
+// Herdr runs each exec with two pipes and leaves a GUI app at launchd's 256 open files, so listing every folder Expand all opened
+// at once fails with "Too many open files". Reads go READ_AT_ONCE at a time, across every space this copy reads.
 const READ_AT_ONCE = 8;
 let reading = 0;
 const waiting = [];
@@ -46,13 +41,11 @@ const limited = async (fresh, read) => {
   reading++;
   try { return await read(); } finally { reading--; waiting.shift()?.(); }
 };
-// Herdr colors code on the UI thread, the whole file each time, ~1.5 ms a KB (research large-file-highlight.md), and a new
-// editor starts at the top. Opened, a file up to AUTO_MAX is colored at once: a stall, not a jump. Where it's back at the top
-// anyway, a file over SYNC_MAX (~25 ms) shows plain first and is colored once left alone: rewritten text once it has held
-// SETTLED, Wrap switched after IDLE; never once scrolled while plain. Past AUTO_MAX only when asked. Counted in characters.
+// Herdr colors code on the UI thread, the whole file each time (~1.5 ms a KB), and a new editor starts at the top. Up to AUTO_MAX
+// characters a file is colored when opened; over SYNC_MAX it shows plain first and is colored once left alone, never once scrolled.
 // shortcut: it only moves the stall; drop it once the host colors off the UI thread.
 const SYNC_MAX = 16 * 1024, AUTO_MAX = 256 * 1024, IDLE = 300, SETTLED = 10000;
-// The active surface of a space, and what names one pick of it: its instance and how many times it was picked.
+// tabKey names one pick: the surface's instance and how many times it was revealed.
 const activeTab = (space) => { const s = surfacesFor(space); return s.tabs.find(t => t.id === s.active) ?? null; };
 const tabKey = (tab) => tab ? `${tab.id}:${tab.born}:${tab.reveal ?? 0}` : "";
 const FULL = 3; // the spaces last shown that keep all they read; older ones keep their file, open folders and search
@@ -64,7 +57,6 @@ const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads
 
 const zoom = () => Number(settings()?.zoom) || 1;
 
-// What one space's page knows and shows.
 function blank(sp) {
   return { id: sp.id, root: sp.folder, on: sp.machine ?? null, git: undefined, entries: new Map(), expanded: new Set(), ignored: new Set(),
     version: 0, file: null, folder: null, trail: null, view: null, previews: new Map(), selected: null, focus: null, query: "", found: null, paths: null, loading: new Set(), errors: new Map() };
@@ -218,7 +210,6 @@ export default class Files extends View {
     this.awake = null; this.gen++;
   }
 
-  // The page in the open panel, the window in front.
   inPanel() { const p = panelState(); return p.open && p.page === "files"; }
   shown() { return this.inPanel() && Boolean(window()?.active); }
   // Whether what started now may go on: `st` still the one worked for and in view, without having gone out of it since. It
@@ -238,6 +229,7 @@ export default class Files extends View {
   live(st) { return this.states.get(st.id) === st; }
   changed(st) { st.version++; st.rows = null; }
 
+  // Whether what the folder's rows draw moved; `quiet`, a poll's, shows no spinner.
   async list(st, rel) {
     const fresh = this.fresh(st, `list:${rel}`), dir = join(st.root, rel);
     if (!fresh()) return;
@@ -265,8 +257,6 @@ export default class Files extends View {
     this.changed(st);
   }
 
-  // While it shows (sync), asked again: every LOCAL_EVERY here or REMOTE_EVERY on another machine from the last refresh's end,
-  // 10 times as long as that refresh took if longer, SLOWEST at most.
   poll(cx) {
     const st = this.awake;
     if (!st || st.git === undefined || st.expanding) return;
@@ -353,7 +343,6 @@ export default class Files extends View {
       if (!go()) return;
       for (const p of parents) st.expanded.add(p);
       this.changed(st);
-      // The space's folder is the tree's top.
       const id = `t3-files-tree-${st.id}`;
       if (path) revealRow(this, id, path); else this.scrollTop = { ...this.scrollTop, [id]: 0 };
       if (focus) this.treeHandle.focus();
@@ -490,7 +479,6 @@ export default class Files extends View {
     old?.release();
   }
 
-  // Colored without asking: up to AUTO_MAX, or once asked (force).
   fits(v) { return Boolean(v.force || v.text.length <= AUTO_MAX); }
   // Colored at once even where plain would do: a few ms.
   small(v) { return v.text.length <= SYNC_MAX; }
@@ -576,7 +564,6 @@ export default class Files extends View {
     });
   }
 
-  // What the search field's words found, once they're searched.
   found(st) { return st.query.trim() && st.found?.query === st.query ? st.found : null; }
 
   // The menus' place: the space and tab they act on (menus.js closes one once they don't show).
@@ -658,16 +645,13 @@ export default class Files extends View {
         : v_flex().size_full().min_h(0).child(treeHead("t3-files-head", this.searchHead(st, t))).child(div().flex_1().min_h(0).child(this.tree(st, t))))));
   }
 
-  // Only a file has a subheader; Markdown uses one icon toggle, not a segmented text control. 12 in, as the panel head above
-  // (t3-tokens「规则」R1); 32 high, not T3's 40: its row's centre is the work column's pane header's (specs/files.md). Its controls
-  // centred, as Review's bar, so Tree stays put between the pages. Open in, then
-  // the three switches a group's gap apart, 8 between the two (P3); its buttons on chrome, as the head's (P7), their icons 14, as T3's file toolbar.
+  // 32 high, not T3's 40, so its centre is the work column's pane header's (specs/files.md); its controls centred, as Review's bar,
+  // so Tree stays put between the pages.
   toolbar(st, t) {
     const md = kindOf(st.file ?? "") === "markdown", code = shared(MARKDOWN) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
     const crumb = (label, path, last) => {
-      // The first, the root's, has its box at 12 and its words a sm button's 10 in, where Review's scope button has them, so
-      // switching pages doesn't move the first letter (t3-tokens「规则」R1); its right stays a crumb's 2, before its ›.
+      // The root's words sit where Review's scope button has them, so switching pages doesn't move the first letter (t3-tokens「规则」R1).
       const id = `crumb-${path}`, el = div().id(id).flex_none().max_w(160).truncate().px(2).when(path === "", el => el.pl(10)).rounded(4).text_color(last ? t.foreground : t.dim).when(last, el => el.font_medium())
         .when(!last, el => el.cursor_pointer().role("button").accessibility_label(`Go to ${label}`).hover(s => s.text_color(t.foreground)).on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => this.navigate(st, path, cx)))
         .child(label);
@@ -728,7 +712,7 @@ export default class Files extends View {
               .child(this.control(t, "t3-files-retry-file", "refresh-cw", "Try reading the file again", cx => { st.view = { loading: true }; cx.notify(); this.loadPreview(st, st.file, cx, true); }))
               .child(this.control(t, "t3-files-locate", "folder-tree", "Locate the file in Files", cx => { this.navOpen = true; this.reveal(st, st.file, cx, true); })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
-          // 12 in, the page's edge (t3-tokens「规则」R1), not T3's px-6.
+          // The page's edge (t3-tokens「规则」R1), not T3's px-6.
           : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
           // Laid out at the width its room last held (nav-column.js holdWidth), cut off or short of it while the room moves.
           : v.code && v.lang && !v.colored && !this.fits(v) ? v_flex().size_full().min_h(0)
@@ -749,7 +733,7 @@ export default class Files extends View {
         holdWidth(hold, width, (ms, f) => cx.timer.after(ms, f));
         cx.notify();
       })
-      // Always at the held width once known: switching between it and w_full laid the file out again, as long as the drag's step.
+      // Always at the held width once known: switching to w_full lays the file out again at every step of a drag.
       .child(Editor.new(code).h_full().when(hold.at != null, (el) => el.w(hold.at)).when(hold.at == null, (el) => el.w_full()));
   }
 
@@ -757,7 +741,7 @@ export default class Files extends View {
   searchHead(st, t) {
     this.rows(st);
     const folders = st.index.folders;
-    // Buttons and the field 8 apart (t3-tokens「规则」P3).
+    // t3-tokens「规则」P3.
     return h_flex().id("t3-files-search").flex_1().min_w(0).h_full().gap(8).items_center()
       .on_key_down((e, cx) => {
         if (e.key !== "escape") return;
@@ -855,7 +839,6 @@ export default class Files extends View {
       .on_mouse_down("left", (_e, cx) => { this.treeKeys = false; this.treeHandle.focus(); cx.stop_propagation(); })
       .on_key_down((e, cx) => {
         const at = rows.findIndex((r) => r.path === (st.focus ?? st.file));
-        // Shift+F10 opens the row's menu, as a right-click on it.
         if (e.keystroke === "shift-f10") { const row = rows[at]; if (row) this.rowMenu(st, row.path, true); cx.stop_propagation(); cx.notify(); return; }
         const k = treeKey(e.key, rows, at);
         if (!k) return;

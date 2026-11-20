@@ -1,4 +1,4 @@
-// The real shared button, rendered at each bar site: clicks, children and platform glyphs survive the migration.
+// The real shared button, rendered at each bar site: clicks, children and platform glyphs.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -101,8 +101,8 @@ panelOpen = false;
     const el = load(__dirname).render(), drawn = (find(el, "panel-toggle") ? 4 + 28 : 0) + (find(el, "minimize") ? 8 + 3 * 28 : 0);
     assert.equal(scope.windowEndPx(open), drawn, `${p}, panel ${open ? "open" : "closed"}${atHome ? ", at Home" : ""}`);
   }
-  // At Home the panel's toggle isn't drawn, as +: the row folds to 8 there, and a 28 toggle squeezed into it still took the
-  // pointer. ⌥⌘B still opens the panel. Window buttons stay, the row not folding while they show.
+  // At Home the panel's toggle isn't drawn, as +: the row folds there, too short for it. ⌥⌘B still opens the panel. Window
+  // buttons stay, the row not folding while they show.
   panelOpen = false; home = true;
   for (const p of ["macos", "windows"]) {
     env.window = () => ({ platform: p, buttons: p !== "macos" });

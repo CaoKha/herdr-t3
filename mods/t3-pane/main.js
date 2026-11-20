@@ -1,9 +1,5 @@
-// A pane's header, for layouts that frame their panes:
-//   { "tab": "active", "pane": { "header": { "content": { "mod": "t3-pane" } } } }
-// Shows the program's icon (the app's program table), the agent's name or
-// the terminal's title, the folder, and the agent's status; buttons split, zoom and close
-// this pane. Props from the app: { pane, terminal }. Click: focus the pane.
-// Its sub-agents: a count in the header that opens their list, this mod again as a popup with { kids: terminal }.
+// A pane's header, for layouts that frame their panes (`"pane": { "header": { "content": { "mod": "t3-pane" } } }`): the program's icon,
+// the agent's name or the terminal's title, its folder and status, and split, zoom and close; with props { kids: terminal }, its sub-agents' list.
 
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
@@ -202,7 +198,7 @@ export default class Pane extends View {
     const now = Date.now(), nap = away && Number(k.labels?.snoozed) > now ? Number(k.labels.snoozed) : 0;
     this.napping = inbox && nap > 0;
     const pane = p.pane;
-    // A mark takes the last button's 24px, so it, the × and the tab bar's + share one column: this header's pr(2), the frame's 2 and the block's 8 are the bar's 12.
+    // A mark takes the last button's 24px, so it, the × and the tab bar's + share one column: pr(2), the frame's 2 and the block's 8 are the bar's 12.
     const slot = (mark) => div().min_w(24).flex_none().flex().items_center().justify_center().child(mark);
     // The buttons show with the keyboard on the header or one of them, as they do hovered: the header's the stop that gets there.
     const head = `pane-head-${pane}`, tools = ["r", "d", "z", "x"].map((k) => `ph-${k}-${pane}`);

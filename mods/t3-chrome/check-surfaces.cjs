@@ -40,8 +40,7 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   assert.ok(tips.some(([, label]) => label === problem), 'a greyed Review says why');
   key('down'); key('enter'); assert.deepEqual(calls.pop(), ['add', 'files']);
   // Its tab's terminal moves into a repository: Review is offered, read where that terminal works, though the space folder isn't one.
-  // Asked as it draws (Herdr draws again when a terminal's folder or focus moves), never on a clock: a 250 ms poll per copy ran
-  // while the window sat idle (performance-audit.md).
+  // Asked as it draws (Herdr draws again when a terminal's folder or focus moves), never on a clock that runs while the window idles.
   problem = ''; folder = '/repo/sub'; view.render(cx); await flush();
   key('r'); assert.deepEqual(calls.pop(), ['add', 'review']);
   s.pages = ['files', 'panel-empty']; assert.equal(find(view.surfaceView(t), 'surface-option-1'), null, 'uninstalled Review is absent');
@@ -68,10 +67,8 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   };
   let root = head.panelHead(t); measure(root); root = head.panelHead(t);
   {
-    // One edge (t3-tokens R1): the head's first and last boxes 12 inside the panel column, from the layout's padding and what
-    // the head draws, so the toggle stands 12 from the window edge as the closed panel's does (t3-tabs check-buttons). The
-    // pages start at the column's edge, their rows putting themselves 12 in, and the panel is one surface: the pages on the
-    // head's colour, down to the window's bottom.
+    // One edge (t3-tokens R1): the head's first and last boxes 12 inside the panel column, so the toggle stands where the closed
+    // panel's does (t3-tabs check-buttons); the pages start at the column's edge, on the head's colour, down to the window's bottom.
     const real = JSON.parse(require('node:fs').readFileSync(__dirname + '/../../layouts/herdr-t3.json', 'utf8'));
     const node = (n, id) => n?.id === id ? n : (n?.children ?? []).map(k => node(k, id)).find(Boolean), side = n => [].concat(n?.padding ?? 0).at(-1);
     const panel = node(real, 'panel'), body = node(real, 'panel-body'), paint = n => n.background ?? panel.background;

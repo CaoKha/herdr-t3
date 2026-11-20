@@ -9,19 +9,14 @@ import { stop } from "./focus.js";
 export const BRAND_FIXED = 16 + 4;
 /**
  * From the sidebar toggle to the tile: the sidebar's one gap between icons, as the hidden tab row's 4 + 4 after the same toggle,
- * so hiding the sidebar puts the next mark where the tile was. T3 has 12 here (`--workspace-titlebar-content-left`); 8 is the
- * user's (2026-11-20).
+ * so hiding the sidebar puts the next mark where the tile was. T3 has 12 here (`--workspace-titlebar-content-left`).
  */
 export const BRAND_GAP = 8;
 
 /**
- * As T3's SidebarBrandMark: 28 high, no padding, 4 between, radius 6.
- * The mark is Herdr's app tile in its own colours. T3's is a wordmark as tall as the name's capitals; an icon that small reads
- * small, so this is as big as the 16px icons beside it: its PNG is 80% tile, so 16 draws a 12.8 tile, as their drawn ~12.7.
- * Centred, its middle is the toggle's. `Herdr` at 14px medium, `muted`. One look always, as T3's: no fill, no hover, nothing
- * lit at Home, no tooltip; only the keyboard focus ring.
- * Short of room (`named` false) the name gives way whole, never cut to "Her…". The name's width, unzoomed, is kept in
- * `view.brandNameW` for the caller's next frame.
+ * As T3's SidebarBrandMark, but the mark is Herdr's tile in its own colours, as big as the 16px icons beside it (its PNG is 80%
+ * tile): a wordmark-sized icon reads small. One look always: no fill, no hover, nothing lit at Home, no tooltip; only the focus ring.
+ * Short of room (`named` false) the name gives way whole, never cut to "Her…"; its unzoomed width goes in `view.brandNameW`.
  * @param {any} view @param {any} t @param {{ named: boolean, zoom: number }} o
  */
 export function brand(view, t, { named, zoom }) {

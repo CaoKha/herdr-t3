@@ -1952,7 +1952,7 @@ async function checkInbox() {
     }
     // A machine's row is T3's shelf with its folder's +. The + and the chevron stand in the heading's two button columns:
     // in 8 + 2 + 8, the group 2 past the edge puts a 12px chevron's middle 22 from the sidebar's, and a 24px + 10 before it, 50.
-    // Not on the chevron's own box: there Herdr drew the whole group past the sidebar's edge.
+    // Not on the chevron's own box: there Herdr draws the whole group past the sidebar's edge.
     const lists = f.load("t3-spaces", menu), row = find(lists.render(cx), "machine-local");
     const add = find(row, "machine-add-local").style, slots = row.items.at(-1).style;
     assert.deepEqual([row.style.h, row.style.mx, row.style.px, add.h, add.w, add.rounded, slots.gap, slots.mr, find(row, "machine-fold-local").style.mr], [32, 2, 8, 24, 24, 8, 10, -2, undefined]);
@@ -2507,9 +2507,8 @@ async function checkInbox() {
     assert.ok(find(find(root, "peer-A"), "crumb-menu"), "the one in view has its tab's menu, its ⌄ part of the title, as T3's");
     assert.equal(find(root, "crumb-menu").style.opacity, 0, "shown only hovered or with the keyboard on it, as T3's");
     assert.equal(find(root, "crumb").style.gap, 12, "T3's breadcrumb gap (sm:gap-3)");
-    // The breadcrumb whole first: it takes its own width, the strip beside it gives way and scrolls, down to a tab's width, and
-    // only then do its names shorten. No cap on the space's or the parent's name.
-    // Where you are shows whole first: the crumb never shrinks for the strip, the strip gives way to nothing and scrolls.
+    // Where you are shows whole first: the crumb takes its own width, the strip beside it gives way and scrolls, down to a tab's
+    // width, and only then do its names shorten. No cap on the space's or the parent's name.
     assert.deepEqual([find(root, "crumb").style.flex_shrink, find(root, "tab-scroll").style.min_w], [0, 0], "the strip gives way, the crumb doesn't");
     assert.equal(find(root, "crumb-space").style.max_w, undefined, "the space's name has no cap");
     fire(find(root, "tab-scroll"), "on_size_change", { width: 300 }, cx);

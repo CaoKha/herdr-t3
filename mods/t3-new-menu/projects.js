@@ -1,5 +1,5 @@
 // Remembered project folders (t3.projects, docs/internals/storage.md): a closed space stays in New without keeping a live
-// terminal behind to hold its place. scripts/sync.sh copies this to t3-tabs and t3-new-menu.
+// terminal behind to hold its place.
 import { placeOf } from "./project.js";
 
 export const PROJECT_CAP = 50;

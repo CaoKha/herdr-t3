@@ -1,11 +1,5 @@
-// The demo's stagehand, in a 0px block: opens what only a click opens, the way that click does.
-// `herdr-app do demo-stage.actions-menu:<bounds>` asks Actions to open its standalone menu at synthetic chevron bounds (window px);
-// `demo-stage.actions-last:<id>` makes that the action the bar's button runs, as running it does.
-// `demo-stage.setting:<key>=<value>` picks that in the layout's settings, as its dialog (t3-chrome/settings.js) does.
-// `demo-stage.menu:{"at":{"x":…,"y":…},"tab":…,"target":…}` opens a right-click menu there, as openMenu (shared/menu.js) does at the pointer.
-// `demo-stage.submenu:{"row":…,"rules":…,"tab":…,"target":…}` opens a submenu beside row `row` (`rules` rules above it) of the menu
-// `menu` opened last, as t3-menu's does when the pointer rests on that row (its openSub and submenu.js's subPlace).
-// `demo-stage.shared:<key>=<json>` sets a shared value, as a mod's write does: a Review page's request (`review`), its prefs.
+// The demo's stagehand, in a 0px block: `herdr-app do demo-stage.<command>:<arg>` opens what only a click opens, the way that click does.
+// `submenu:{row, rules, tab, target}` hangs beside row `row` (`rules` rules above it) of the last `menu`, as t3-menu's openSub and submenu.js's subPlace do.
 import { View, div } from "gpui-kit";
 import { nextCommand, openOverlay, run, setShared, settings, shared } from "herdr";
 import { KEY } from "./store.js";

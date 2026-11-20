@@ -30,7 +30,7 @@ const view = { hot: null };
 const draw = (options = {}) => scope.tab(view, t, "tab-a", { mod: "mods/x", label: "Task", icon: Object.assign(element(), { src: "glyph" }),
   close: () => calls.push("close"), menu: () => calls.push("menu"), ...options });
 
-// T3's panel tab: 24 high, radius 6, 6 in on the left and 8 on the right, 2 between; the one shown at 7%, another hovered at 4%.
+// T3's panel tab: its box, the one shown's fill and another's when hovered.
 let el = draw({ active: true, mark: Object.assign(element(), { src: "mark" }) });
 assert.deepEqual([el.style.h, el.style.rounded, el.style.pl, el.style.pr, el.style.gap], [24, 6, 6, 8, 2]);
 assert.equal(el.style.bg, "#ffffff12", "the tab shown: 7%");

@@ -1,8 +1,5 @@
-// Preloaded by check.sh into every mod check: while a mod's render() runs, the cx it was given refuses what Herdr refuses
-// there (gpui-kit.d.ts: notify, new, focus_handle; InputState.new, VirtualListScrollHandle.new), and a FocusHandle made from
-// it refuses focus(), so a check fails where Herdr would keep the view's last frame and show "This view could not be
-// re-rendered". A check's fake cx doesn't know it's drawing; this does.
-// It finds each view class a bundle run in a vm context sets (`Mod`, or whatever the check names it).
+// Preloaded by check.sh into every mod check: while render() runs, its cx refuses what Herdr refuses there (gpui-kit.d.ts), so a check
+// fails where Herdr would keep the last frame and show "This view could not be re-rendered". It finds each view class a vm bundle sets.
 const vm = require("node:vm");
 
 // How many renders are running: a handle's focus() then throws, as Herdr's does during render or layout.

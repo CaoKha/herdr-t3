@@ -1,13 +1,5 @@
-// Context menus, one per thing (docs/internals/specs/menus.md). Opened as a popup with
-// props { tab: "pane" | "tab" | "space" | "space-switch" | "agent" | "snooze" | "checkout" | "machine", target }: which thing, not what it offers.
-// The agent's Snooze opens its times beside it, as T3's MenuSub (docs/internals/specs/menus.md#submenus): a second popup with
-// props { tab: "snooze", target, parents, lit }, `parents` the menus it hangs off, `lit` the row lit when keys opened it.
-// ↑/↓, Home, End and typeahead move, Enter runs, Esc closes. An item is [label, command, args, hint, group];
-// a command "worktree" opens the worktree dialog instead.
-// t3-menu: Herdr's menu (mod.clone), with a tab's and a pane's Close going through the tab bar (t3-tabs), which asks first
-// while a program runs and leaves first, so Herdr's pick of a neighbour never shows. Beyond the shipped one: T3's measures and
-// groups, the list's moves (shared/list.js, the one way every popup's list moves), Copy address and path, close()'s stamp,
-// the breadcrumb space switcher, and the agent's, a checkout's and a machine's menus with the Snooze times.
+// Context menus, one per thing (docs/internals/specs/menus.md): props { tab, target } say which thing, not what it offers; Snooze's submenu adds { parents, lit }.
+// Herdr's menu (mod.clone), a tab's and a pane's Close going through t3-tabs, which asks first while a program runs and leaves first, so Herdr's neighbour pick never shows.
 
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
@@ -35,8 +27,7 @@ import { ghostButton } from "./button.js";
 const SUB_CLOSED = closedKey("t3-menu", "submenu");
 const SPACE_CLOSED = closedKey("t3-menu", "space");
 
-// A menu's measures, as T3's: 220 wide, padding 4, rows 28, a rule 9 (4 above and below it).
-// The space switcher matches the sub-agent list's 280 width and 10-row scroll cap so names, durations and marks fit cleanly.
+// A menu's measures, as T3's, a rule 4 above and below. The space switcher's 280 width and 10-row cap match the sub-agent list's, so names, durations and marks fit.
 const WIDTH = 220, PAD = 4, ROW = 28, RULE = 9, SPACE_SHOWN = 10;
 // Where row `i` starts below the menu's top, its rules included.
 const rowTop = (list, i) => PAD + i * ROW + list.slice(1, i + 1).filter((it, j) => it[4] !== list[j][4]).length * RULE;

@@ -1,10 +1,10 @@
 // The layout's keycaps (Home, the panel's empty page, Go to and New) and the command palettes' footer (Go to, New), as T3's
-// Kbd (`ui/kbd.tsx`) and CommandPalette's footer. scripts/sync.sh copies this to the mods that use it.
+// Kbd (`ui/kbd.tsx`) and CommandPalette's footer.
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { alpha } from "./color.js";
 
-/** T3's Kbd, one for the whole layout: 20 high and at least as wide, 4 in, radius 4, 12 medium, on a faint wash of the text. */
+/** T3's Kbd, one for the whole layout, on a faint wash of the text. */
 export const keycap = (t, label) => div().min_w(20).h(20).px(4).flex().flex_none().items_center().justify_center().rounded(4)
   .bg(alpha(t.foreground, "12")).text_size(12).font_medium().text_color(alpha(t.foreground, "bf")).child(label);
 

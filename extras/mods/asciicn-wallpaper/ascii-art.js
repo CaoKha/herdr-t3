@@ -1,15 +1,7 @@
-// A picture made here (an image drawn in a mode, saved as `.ans` text) as one-colour SVG tiles the theme tints. Plain
-// JavaScript, no host calls. The built-in pictures are tiles already, in the mod's scenes/.
-//
-// Each glyph is drawn as shapes, never as text: a mod's text collapses runs of spaces and its newlines. The shapes are
-// asciicn's own (lib/ascii/glyphs.ts, MIT, LICENSE-asciicn): Braille as its 2×4 dots, blocks, quadrants and shades as
-// rectangles, halftone dots as dots. Units: a cell is 1 tall and ASPECT wide; a dot's radius is in cell widths.
-//
-// A cell's colour picks the nearest VGA theme slot and its brightness a step of opacity (tintOf). Cells of one colour and step are one layer, cut into tiles of at most TILE cell heights
-// across and down, each its own small SVG; picture() puts them together, in the theme's colours, as the one image Home draws.
+// A picture made here (an image drawn in a mode, saved as `.ans` text) as one-colour SVG tiles the theme tints.
+// Glyphs are asciicn's shapes (lib/ascii/glyphs.ts, MIT, LICENSE-asciicn), never text: a mod's text collapses spaces.
 
-// Part of each import's cache key: raise it whenever a frame or its cache would come out differently, and every import
-// converts again. 6: only frames made here convert; another .ans in the folder fails once, with a notice.
+// Part of each import's cache key: raise it whenever a frame or its cache would come out differently.
 export const VERSION = 6;
 const IMAGE_STEPS = [0.1, 0.18, 0.28, 0.4, 0.55, 0.7, 0.85, 1];
 // The non-drawing header a frame made here starts with: its mode, so it can turn over for light themes (`paper`) without
@@ -47,7 +39,6 @@ for (let mask = 1; mask < 256; mask++) {
   define(String.fromCodePoint(0x2800 + mask), BRAILLE_BITS.flatMap((bits, row) =>
     bits.flatMap((bit, column) => mask & bit ? [dot(column === 0 ? 0.3 : 0.7, (row + 0.5) / 4, 0.17)] : [])));
 }
-// Halftone dots.
 for (const [g, r] of Object.entries({ "·": 0.07, "∙": 0.13, "•": 0.24, "⦁": 0.33, "●": 0.42 })) define(g, [dot(0.5, 0.5, r)]);
 const shapeOf = (g) => SHAPES.get(g) ?? [];
 
@@ -187,8 +178,6 @@ export function picture(tiles, colour, width, height, side = 4096) {
         + svg.replace(/^\s*<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "").replaceAll('fill="#000"', `fill="${c}"`) + "</g>";
     }).join("") + "</svg>\n";
 }
-
-// ---- An image: the frame asciicn's default for an image in Braille and true colour would make.
 
 /** 96 rows of half-width cells. Each style requests its own samples per cell. */
 export function imageGrid(width, height, style = "braille") {

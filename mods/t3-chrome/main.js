@@ -69,8 +69,7 @@ export default class WorkspaceChrome extends View {
     if (w?.platform !== "macos" || w.fullscreen || root?.titlebar !== "none" || !root.traffic_lights || this.layoutWriting) return;
     // Native buttons are unzoomed, centered 8px below y; the brand row's center is 20 logical px.
     const y = Math.round((12 + 20 * (zoom - 1)) * 1000) / 1000;
-    // The toggle's inset, 28 and BRAND_GAP, the tile and the name, then T3's 4 + 2 × 28 + 12 after it; never under T3's 208. Only once
-    // the name is measured: before that there is no row to fit.
+    // After the name, T3's 4 + 2 × 28 + 12; never under T3's 208. Only once the name is measured: before that there is no row to fit.
     const { rail } = sidebarParts(root);
     const min = this.brandNameW && rail ? Math.max(208, Math.ceil(toggleLeft(w, root, zoom) + 28 + BRAND_GAP + BRAND_FIXED + this.brandNameW + 72)) : undefined;
     // Once per value: an update that rewrites the layout is aligned again, a failure isn't retried.
@@ -122,9 +121,8 @@ export default class WorkspaceChrome extends View {
     if (props()?.footer) {
       // As T3's footer: a row of 32px icon buttons, and at its end, once Herdr has downloaded an update, its restart.
       const ready = updates().app.ready;
-      // T3's undo notice, the inbox's (t3-inbox.notice), in this row's free space so it covers nothing: "Settled," or
-      // "Settled 2," then Undo, which the inbox does. It fades in and out over 200ms, Undo inert while it goes. One older than
-      // its 5s and the fade is left from before a restart.
+      // T3's undo notice (t3-inbox.notice), in this row's free space so it covers nothing; Undo is inert while it fades. One older than
+      // its 5s plus the fade is left from before a restart.
       const undo = shared(KEY.notice), undoLive = Boolean(undo?.live && Date.now() - undo.at < 5000);
       const undoButton = undo && h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
         .when(undoLive, (el) => el.hover((s) => s.underline()).on_hover(glow(this, "undo-notice-undo")).role("button")
@@ -132,7 +130,7 @@ export default class WorkspaceChrome extends View {
           .on_click(() => run("t3-tabs.undo")))
         .child(undoLabel("t3-tabs.undo"))
         .when(undoLive, (el) => stop(this, t, "undo-notice-undo", el, 4));
-      // Short of room the summary is cut, never Undo: GPUI's flex doesn't do T3's two wraps, which squeezed Undo to nothing.
+      // Short of room the summary is cut, never Undo: GPUI's flex can't do T3's two wraps.
       const notice = undo && Date.now() - undo.at < 6000 && h_flex().id(`undo-notice-${undo.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
         .text_size(11).text_color(t.dim).opacity(undo.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
         .child(div().min_w(0).truncate().child(`${undo.action}${undo.count === 1 ? "" : ` ${undo.count}`},`))
@@ -143,8 +141,7 @@ export default class WorkspaceChrome extends View {
         .on_hover(glow(this, id))
         // Each opens over its button, before the pointer can report leaving it.
         .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); }), radiusOf("default")), { action: key });
-      // T3's footer: 8 in and 4 above its row, whatever height the layout gives the block. Its buttons a group's gap apart,
-      // 8 to what follows (docs/internals/t3-tokens.md「规则」P3).
+      // T3's footer, whatever height the layout gives the block (docs/internals/t3-tokens.md「规则」P3).
       return focusRoot(this, div().size_full().bg(t.chrome).px(8).pt(4).child(h_flex().h(32).gap(8).items_center()
         .child(h_flex().id("footer-buttons").flex_none().gap(GROUP_GAP).items_center()
           .child(button("settings", "mods/t3-chrome/icons/settings.svg", "Settings", () => run("app.settings"), "app.settings"))
@@ -161,10 +158,8 @@ export default class WorkspaceChrome extends View {
     // (t3-tabs draws it there then, sidebar.js toggleLeft), then BRAND_GAP on Herdr's tile and name, then a place to drag the window. Which
     // mode the sidebar shows is a setting (settings.js) and ⌘⇧L, not a button here.
     const w = window(), zoom = settings().zoom || 1, left = toggleLeft(w, layout(), zoom);
-    // One look always, as T3's (brand.js): a click goes Home, which has no row of its own. Only here: with the sidebar hidden the
-    // tab row keeps the toggle alone, as T3's collapsed sidebar.
-    // What the name has past the left inset: less the 8 at the right, the 28px toggle and the BRAND_GAP after it, and the rest of the
-    // button. Short of room the name gives way whole; never the tile or the toggle.
+    // One look always, as T3's (brand.js): a click goes Home. The name gets what's left past the inset, the right padding, the toggle,
+    // BRAND_GAP and the rest of the button; short of room it gives way whole, never the tile or the toggle.
     const named = !this.brandW || this.brandW - left - 8 - 28 - BRAND_GAP - BRAND_FIXED >= (this.brandNameW || 0);
     return focusRoot(this, h_flex().id("brand").size_full().bg(t.chrome).pl(left).pr(8).items_center()
       .on_size_change((size, cx) => { this.brandW = size.width / zoom; cx.notify(); })
@@ -207,10 +202,8 @@ export default class WorkspaceChrome extends View {
     openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(rows), ...(at ? { at } : {}), props: { part: "surface-menu", ...litProp(!press) } });
   }
 
-  // The space panel's head (docs/internals/specs/space-panel.md): its tabs as T3's, + after them in the same scrolled strip,
-  // T3's arrows together after it while it overflows, then widen and put away; each group's buttons touch, groups 8 apart,
-  // and the ends 12 inside the column, over its pages' rows (「规则」P3, R1), by the layout's padding. The rest of the row drags
-  // the window.
+  // The space panel's head (docs/internals/specs/space-panel.md): T3's tabs, + after them in the same scrolled strip, T3's arrows
+  // while it overflows, then widen and put away; its ends over its pages' rows (「规则」P3, R1). The rest of the row drags the window.
   panelHead(t) {
     const s = panelState(), space = spaces().find(p => p.active), z = zoomOf();
     // Review's run for this space, marked as a tab's agent is.

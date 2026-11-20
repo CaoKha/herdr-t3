@@ -1,7 +1,5 @@
-// Go to a pane, drawn as T3's command palette and the New menu (t3-new-menu): a row a pane, agents and programs
-// alike, named and marked as its pane header is, so lazygit beside an agent is found as itself. From the shipped
-// picker (mod.clone). The panes you were in lately lead, as T3's recent threads, so ⌘P, Enter goes back and forth.
-// ↑/↓ and Enter to go, ctrl+d to close a pane (asking first while a program runs), Esc to leave.
+// Go to a pane (the shipped picker's mod.clone), drawn as T3's command palette: a row a pane, named and marked as its pane header is,
+// so lazygit beside an agent is found as itself. The panes you were in lately lead, as T3's recent threads, so ⌘P, Enter goes back and forth.
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { theme, spaces, panes, agents, terminals, focused, run, closeOverlay, props, window, shared, setShared } from "herdr";

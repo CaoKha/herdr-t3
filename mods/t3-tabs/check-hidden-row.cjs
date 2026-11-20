@@ -1,7 +1,5 @@
-// With the sidebar hidden the tab row starts with its toggle, where the brand bar has it, and then the tabs: as T3's collapsed
-// sidebar leaves only its trigger, no brand (Home is ⇧⌘H), and nothing of the agents. Who needs the person is the sidebar's to say, and Herdr's own notice's
-// when one asks: the row lists no Inbox cards at Home and no blocked agents elsewhere, in either mode (2026-11-20 user decision,
-// docs/adr/0010).
+// With the sidebar hidden the tab row starts with its toggle, where the brand bar has it, then the tabs, as T3's collapsed
+// sidebar leaves only its trigger. It says nothing of the agents, in either mode: that's the sidebar's and Herdr's notice's (docs/adr/0010).
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");

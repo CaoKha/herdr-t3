@@ -1,5 +1,5 @@
 // A row of tabs wider than its room: the tab bar's and the space panel's. Herdr's scroll areas can't be moved or read from a
-// script, so the row is clipped and offset by `at`, kept in `state` between frames. scripts/sync.sh copies it to those mods.
+// script, so the row is clipped and offset by `at`, kept in `state` between frames.
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { settings } from "herdr";
@@ -45,7 +45,7 @@ export function stripPage(state, dir, room) {
   state.at = Math.max(0, Math.min(state.over ?? 0, (state.at ?? 0) + dir * room / 2));
 }
 
-/** A cut end fades into `bg`: 16px of it in steps, there being no gradient fill. Laid over the clipped row's ends. */
+/** A cut end fades into `bg` in steps, there being no gradient fill. Laid over the clipped row's ends. */
 export function stripFades(bg, state) {
   const fade = (start) => h_flex().id(start ? "strip-fade-start" : "strip-fade-end").absolute().top(0).bottom(0).w(16)
     .when(start, (el) => el.left(0)).when(!start, (el) => el.right(0))

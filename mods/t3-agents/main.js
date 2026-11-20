@@ -259,8 +259,8 @@ export default class Agents extends View {
     else if (this.inView !== undefined && target !== this.inView) this.requestReveal(target === this.hovered ? null : target, cx);
     this.inView = target;
     if (this.reveal && (!target || this.reveal.key !== target || this.hovered === target)) this.cancelReveal();
-    // A long list draws only the rows in view, scrolled by the wheel (windowed): a frame that built every row of 200 agents
-    // made some 13,000 elements. shortcut: windowed, Tab reaches only the rows drawn; switch to a host virtual list when its rows can hold handlers.
+    // A long list draws only the rows in view, scrolled by the wheel (windowed). shortcut: windowed, Tab reaches only the rows drawn;
+    // switch to a host virtual list when its rows can hold handlers.
     const windowed = entries.length > WINDOW_AT;
     const z = Number(settings()?.zoom) || 1, at = /** @type {any} */ (this).motion.at, total = entries.reduce((sum, e) => sum + e.h, 0);
     const seen = this.listH ?? FIRST_H;

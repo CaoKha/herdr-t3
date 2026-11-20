@@ -71,7 +71,7 @@ const posters = {
     const piece = (x, y, w, h, l, t) => { const p = document.createElement("div"); p.style.cssText = "position:absolute;left:" + l * s + "px;top:" + t * s + "px;width:" + w * s + "px;height:" + h * s + "px;background:url(../actions.png) " + -x * s + "px " + -y * s + "px / " + W * s + "px " + H * s + "px no-repeat;"; win.append(p); };
     piece(0, 0, W, 165, 0, 0);
     piece(0, 165, 563, 1235, 0, 165);
-    // Right of x 2700 (the open menu starts at 2728, a word gap before it) the shot has the open menu down to y 430, and a line under its edge: that part starts below both, as the menu is drawn larger on its own.
+    // Right of x 2700 (the open menu starts at 2728) the shot has the menu down to y 430 and a line under it: that part starts below both.
     piece(563, from, 2700 - 563, cut - from, 563, 165);
     piece(2700, 460, W - 2700, cut - 460, 2700, 460 - gap);
     piece(563, cut + skip, W - 563, H - cut - skip, 563, cut - gap);

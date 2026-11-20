@@ -7,8 +7,6 @@
 #   stage.sh key     copy your OpenCode Go key in (only that entry of ~/.pi/agent/auth.json); down deletes it
 #   stage.sh down    close it and delete $DEMO
 # Pi runs on OpenCode Go (deepseek-v4.1-flash). Nothing of yours goes in but the OpenCode Go key, which you copy in yourself.
-# Actions uses the same shared store as the product menu. The Actions scene requires its Retro entry before changing the stage.
-# Layout and Review scenes show the ordinary Review counts.
 # Review shuts down through its authenticated daemon command in the demo HOME. The PID file alone grants no authority to signal.
 set -eu
 src=$(cd "$(dirname "$0")/../.." && pwd)

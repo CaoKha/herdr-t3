@@ -78,7 +78,6 @@ export async function rankPaths(paths, words, limit = Infinity, pause = async ()
   return top.map((x) => x.p);
 }
 
-// What a file is shown as.
 const IMAGES = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 const extOf = (name) => name.includes(".") ? name.split(".").pop().toLowerCase() : "";
 export const kindOf = (name) => IMAGES.has(extOf(name)) ? "image" : /^(md|markdown|mdx)$/.test(extOf(name)) ? "markdown" : "text";

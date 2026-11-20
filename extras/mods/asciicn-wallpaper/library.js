@@ -1,9 +1,5 @@
-// What the wallpaper keeps on disk, under <appHome>/asciicn-wallpaper/ (docs/internals/storage.md): the `.ans` file of each
-// picture the person added, each one's `.tiles/<name>/scene.json` once it converts, and the pictures Home draws: a wallpaper's tiles put
-// together in the theme's colours as one image (picture() in ascii-art.js), one per appearance, made again for a new palette
-// from the uncoloured one kept beside it (templateOf).
-// Module state is shared by every copy of the mod: two Homes don't convert one file twice, and a confirmed deletion stops
-// another Home's conversion or Apply of that file.
+// What the wallpaper keeps under <appHome>/asciicn-wallpaper/ (docs/internals/storage.md) and the pictures Home draws.
+// Module state is shared by every copy of the mod: one file converts once, and a deletion stops another Home's work on it.
 import { checking, appHome, exec, notify, readTextFile, setShared, settings, shared, theme, writeTextFile } from "herdr";
 import { VERSION, convert, picture, pictureSize } from "./ascii-art.js";
 
@@ -41,9 +37,8 @@ let previewsReady;
 const pictures = new Map();
 /**
  * The px a picture's SVG declares on its long edge, for `n` device px as Home shows it: up to the next STEP, so a window
- * dragged larger makes few; never past MAX, the size every picture had before. Herdr rasterises an SVG at twice the size
- * it declares (GPUI's SMOOTH_SVG_SCALE_FACTOR): that 2× keeps marks smaller than a pixel as bold as they were, where a
- * texture at the device px drew them visibly softer.
+ * dragged larger makes few; never past MAX. Herdr rasterises an SVG at twice the size it declares
+ * (GPUI's SMOOTH_SVG_SCALE_FACTOR), which keeps marks smaller than a pixel bold.
  */
 const STEP = 512, MAX = 4096;
 export const pictureSide = (n) => (Number.isFinite(n) && n > 0 ? Math.min(MAX, Math.ceil(n / STEP) * STEP) : MAX);
@@ -79,10 +74,9 @@ const hex = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(c ?? "") ? c : null);
 
 /**
  * Makes the scene's picture for theme `t` once, however many Homes ask: `{ path, width, height, px, paper }`, its path
- * relative to appHome as image() takes it. `fit(width, height)`: the px wanted on its long edge (pictureSide); one made at
- * least that size serves. While a larger one is made the smaller stays the key's, so Homes keep it up. One at a time per
- * key: a larger ask meanwhile gets that one, and asks again. Null if `current()` turns false first (the next ask starts
- * again); rejects if it fails.
+ * relative to appHome. `fit(width, height)`: the px wanted on its long edge; one at least that size serves, the smaller kept
+ * up while a larger one is made, one at a time per key (a larger ask meanwhile gets that one, then asks again). Null if
+ * `current()` turns false first; rejects if it fails.
  */
 export function makePicture(scene, t, light, fit, cx, current = () => true) {
   if (checking()) return Promise.resolve(null);
@@ -349,7 +343,6 @@ export class Library {
     await writeTextFile(`${scene.dir}/scene.json`, JSON.stringify({ sum: scene.sum, focus: 0.5, width, height, ...(paper ? { paper } : {}) }), null).catch(() => null);
   }
 
-  /** Saves `id`'s framing and shows it. */
   frame(id, framing) {
     placementsVersion++;
     setShared(KEY.placements, { ...shared(KEY.placements), [id]: { ...framing } });

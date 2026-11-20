@@ -111,7 +111,7 @@ vm.runInContext(src, otherScope);
 assert.equal(otherScope.nav.navWidth(681), 220);
 assert.equal(navWidth(681), 310, "the pages retain different widths");
 
-// A changing room keeps the old width, then applies only the latest one after 300ms, independently on each page.
+// A changing room keeps the old width, then applies only the latest one after a pause, independently on each page.
 {
   const hold = {}, second = {}, timers = [], cx = { notified: 0, notify() { this.notified++; } };
   const after = (ms, run) => timers.push([ms, run]);

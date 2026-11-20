@@ -79,7 +79,7 @@ const shown = (list) => list.items.map((n) => [n.key, n.style.top]);
 }
 
 // Not known, it's measured, in zoomed pixels: a tall screen's rows until then, none scrolled. A review's file tree runs to a
-// thousand rows, and drawing them all ran its render past Herdr's limit; interrupted, it was never measured, and drew them all again.
+// thousand rows, and drawing them all runs a render past Herdr's limit, so it would never be measured.
 {
   const v = {}, list = () => scrollList(v, "l", { count: 20, row: 10, at: 9, draw, wheeled() {} });
   assert.equal(list().items.length, 20);

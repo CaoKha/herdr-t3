@@ -1,6 +1,5 @@
 // Details (cmd-shift-b): a native popup, never a layout column, so opening it can't resize a terminal (docs/adr/0019).
-// This draws its card and its own menus; details-popup.js opens it and hangs the menus off it. Only Details watches its
-// source: a menu acts on it after a last check, and goes with Details when it goes.
+// Only Details watches its source: a menu acts on it after a last check, and goes with Details when it goes.
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { checking, props, settings, closeOverlay, exec, notify, theme, window, shared, setShared } from "herdr";

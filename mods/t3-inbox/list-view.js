@@ -184,7 +184,6 @@ export function inboxList(view, t, model, drag, draw, cx) {
       view.workOpen = !view.workOpen;
       localStorage.setItem("working.open", String(view.workOpen));
     }).on_mouse_move((_e, cx) => aim(null, cx))));
-    // The original Working group had 2px padding around its cards, with no padding when folded empty.
     busyRows.forEach((a, i) => addShelf(fly(a.address, "work", card(a)), a.address,
       i === 0 ? STACK + 2 : CARD_GAP, i === busyRows.length - 1 ? 2 : 0));
   }

@@ -12,7 +12,7 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
     b: { tabs: [{ id: "files", born: 1 }], active: "files", open: true, wide: true },
   }, "t3.settings": { homeMod: home === "terminal" ? null : home === "split" ? "t3-home" : home } };
   let active = from, child = from === "h" ? "home-main" : "main", row = from === "h" && !hidden && !buttons ? 8 : 40;
-  // Home's own branch, whole, for one mod's pane; a Terminal or split Home keeps today's framed one (docs/adr/0021).
+  // Home's own branch, whole, for one mod's pane; a Terminal or split Home keeps the framed one (docs/adr/0021).
   let view = from === "h" && home === "t3-home" ? "work-home" : "work-away";
   const caption = buttons ? 8 + 3 * 28 : 0;
   let open = from === "b", wide = open, page = open ? "files" : "panel-empty", end = open ? 0 : caption + (from === "h" ? 0 : 32);
@@ -128,8 +128,8 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
     assert.equal(f.frames.at(-1)[2], row, `${from === "h" ? "at Home" : "away"}, ${hidden ? "showing" : "hiding"} the sidebar: the row is ${row} in its first frame`);
   }
   assert.equal(JSON.parse(read("../../keys.json"))["layout:herdr-t3"]["cmd-b"], "t3-tabs.toggle-sidebar", "cmd-b is the same action as the buttons");
-  // The layout's two branches: today's framed work for away and a Terminal or split Home, and Home whole: a 40 row to drag the
-  // window by, drawn by t3-tabs, over a surface with no frame (docs/adr/0021). The ids the scripts look up stay as they were.
+  // The layout's two branches: framed work for away and a Terminal or split Home, and Home whole: a 40 row to drag the window
+  // by, drawn by t3-tabs, over a surface with no frame (docs/adr/0021).
   {
     const root = JSON.parse(read("../../layouts/herdr-t3.json")), node = (n, id) => n?.id === id ? n : (n?.children ?? []).reduce((hit, c) => hit ?? node(c, id), null);
     const work = node(root, "work"), view = node(root, "work-view");

@@ -1,5 +1,4 @@
-// The Files page's logic outside Herdr: git's answers, ignored marks, the tree's rows, the search, sorting, file kinds, the
-// icons' order and files, and the shell scripts it runs, for real, in a throwaway repo.
+// The Files page's logic outside Herdr, and the shell scripts it runs, for real, in a throwaway repo.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -96,7 +95,6 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
   view.init({}, cx);
   const render = view.render.bind(view);
   view.render = (cx) => { w.drawing = true; try { return render(cx); } finally { w.drawing = false; } };
-  // One of its menus: another copy, opened with these props.
   // One of its menus: another copy, opened with these props; they stay the app's props until `w.props = null`.
   const menu = (p) => { w.props = { overlay: "m1", ...p }; const v = new ctx.Mod(); v.init({}, cx); return v; };
   const show = (p) => { body.active = p; };
@@ -134,8 +132,8 @@ async function page() {
   root = view.render(cx);
   assert.ok(find(root, "row-a.js") && find(root, "row-b.js"), "the folder's files in the tree");
   assert.equal(find(root, "t3-files-toolbar"), null, "generic Files starts directly at the tree search, with no root-name toolbar");
-  // Its search row is the page's first, under the panel head: its centre on the work column's pane header's, as Review's and a
-  // file's 32 bars; the tree still starts 40 under the row's top, where it did and where it does under a nav column's head.
+  // Its search row is the page's first: its centre on the work column's pane header's, the tree under it where it is under a nav
+  // column's head.
   {
     const holds = (n, id) => n && typeof n === "object" && n.items && (n.key === id || n.items.some((c) => holds(c, id)));
     const head = walk(root).filter((n) => n.style.h && holds(n, "t3-files-search-field") && n.key !== "t3-files-search-field").pop().style;
@@ -159,15 +157,15 @@ async function page() {
   const bar = find(root, "t3-files-toolbar").style.h[0];
   assert.ok(bar === 32 && !find(root, "t3-files-toolbar").style.mb, "Review's 32 bar, nothing under it");
   assert.equal(paneHeadCentre.head + bar / 2, paneHeadCentre.left, "its row's centre on the pane header's");
-  // Its first crumb's box at 12, under the panel head's first tab's box; its words a sm button's 10 in, where Review's scope
-  // button has its words (check-pane.cjs), so switching pages doesn't move the first letter.
+  // Its first crumb's box under the panel head's first tab's, its words where Review's scope button has them (check-pane.cjs), so
+  // switching pages doesn't move the first letter.
   {
     const first = find(root, "crumb-").style, crumbs = find(root, "t3-files-breadcrumbs").style, box = find(root, "t3-files-toolbar").style.px[0] + (crumbs.pl?.[0] ?? 0) + (first.ml?.[0] ?? 0);
     assert.equal(box, paneHeadCentre.tabEdge, "the first crumb's box on the panel head's first tab's");
     assert.equal(box, 12);
     assert.equal(box + (first.pl ?? first.px)[0], 12 + 10, "its words 10 in, as a sm button's");
   }
-  // Its icons 14 in their 28 buttons, as T3's file toolbar (the panel head's stay 16).
+  // Icons as T3's file toolbar; the panel head's stay 16.
   assert.equal(find(root, "t3-files-switches").style.gap[0], 4, "Preview, Wrap and Tree 4 apart (P3), each its own fill");
   for (const id of ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"]) assert.deepEqual(find(root, id).items.map((n) => n.style.size?.[0]), [14], `${id}: a 14 icon`);
   // As T3's: the tree column's left rule at 60% of the border, no rule under its head, the search with no hover fill.
@@ -359,11 +357,8 @@ async function menus() {
   w.props = null;
 }
 
-// Herdr colors a file on the UI thread, ~1.5 ms a KB (large-file-highlight.md), and a new editor starts at the top. Opened,
-// a file up to 256 KB is colored at once: a stall, never a jump. Where the text goes back to the top anyway (rewritten, Wrap
-// switched), one over 16 KB shows plain and is colored once left alone: 10 s unchanged, 300 ms; not once scrolled, until
-// opened again; a smaller one is colored at once, as it costs a few ms.
-// Past 256 KB, only when asked.
+// Herdr colors a file on the UI thread, ~1.5 ms a KB, and a new editor starts at the top: a large file shows plain where its text
+// goes back to the top anyway and is colored once left alone, never once scrolled; past the limit, only when asked.
 async function largeFiles() {
   const big = "let x = 1;\n".repeat(20000), huge = "y".repeat(1024 * 1024);
   const { view, cx, w, settle, fire, show } = makePage();
@@ -460,9 +455,8 @@ async function collapseDuringExpansion() {
   assert.ok(visited < 1000, `a warm render must only inspect visible rows, not scan all ${rows.length}: visited ${visited}`);
 }
 
-// Expand all on a big folder, then the page's refresh, which lists every open folder again. Herdr runs each exec as a process
-// with two pipes, under a GUI app's 256 open files: dozens at once failed to start (Too many open files) and every folder said
-// it couldn't be listed. Reads go a few at a time. One that fails says so on its folder's row; the tree stays.
+// Expand all on a big folder, then a refresh listing every open folder again: each Herdr exec takes two pipes under a GUI app's
+// 256 open files, so reads go a few at a time. One that fails says so on its folder's row; the tree stays.
 async function manyFolders() {
   const listing = new Map(), names = Array.from({ length: 60 }, (_, i) => `f${i}`);
   listing.set("/r", names.map((n) => `d\0${n}\0`).join(""));
@@ -1012,8 +1006,8 @@ async function latePreview() {
   assert.deepEqual(plain(await m.rankPaths(["docs/indexing/x.md", "src/a/index.ts", "a/index.js", "index.md", "b/index.js"], m.terms("index"))),
     ["index.md", "a/index.js", "b/index.js", "src/a/index.ts", "docs/indexing/x.md"]);
   assert.deepEqual(plain(await m.rankPaths(["shared/file-menu.js", "docs/file/menu.md"], m.terms("file menu"))), ["shared/file-menu.js", "docs/file/menu.md"], "every term in the name");
-  // Only the shown ones are kept in order, and a search matching most of a big repo pauses as the filter does: sorting
-  // 110k matches in one go ran past Herdr's script limit (performance-audit.md).
+  // Only the shown ones are kept in order, and a search matching most of a big repo pauses as the filter does, under Herdr's
+  // script limit.
   pauses = 0;
   const ranked = await m.rankPaths(paths, m.terms("src"), 200, pause);
   assert.equal(pauses, 2, "12000 matches: two pauses");

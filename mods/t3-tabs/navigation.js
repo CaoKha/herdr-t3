@@ -103,7 +103,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     else if (to) focusAgent(to);
   }
   // A space by the keys. Out of view Herdr may have moved its active tab to a closed one's neighbour, and being shown costs an
-  // agent its unread done: return to the tab last shown there. tab.select brings the space along; the space first would show its active tab for that step.
+  // agent its unread done: return to the tab last shown there. tab.select brings the space along, so its active tab never shows.
   function showSpace(s) {
     const back = trail[s.id]?.find(id => s.tabs.some(c => c.id === id));
     api.arrive?.(s.id);
@@ -520,9 +520,9 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     return k && listed(k) ? k.address : null;
   }
 
-  // Who the Inbox's bar is about: the agent in view, the card the Inbox lights. With none (a program has the focus), the one
-  // last looked at in the tab that holds the work, so the way back stays in reach: the shown tab, else, in a tool's tab, the one
-  // last shown here with an agent. Started something new (fresh), a tab with no agent holds none: the space alone. The tab's heads are its agents whose own parent isn't in it; a sub-agent split beside its parent goes under it.
+  // Who the Inbox's bar is about: the agent in view, the card the Inbox lights. With none (a program has the focus), the one last
+  // looked at in the tab holding the work: the shown tab, else, in a tool's tab, the one last shown here with an agent. After
+  // something new was started (fresh), a tab with no agent holds none. A tab's heads are its agents whose parent isn't in it.
   function work({ space, every, all, looked, home }) {
     if (!space || home) return null;
     const byAddress = new Map(all.map(k => [k.address, k]));
@@ -601,7 +601,6 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       else if (command === "close-pane") await closePane(focused()?.pane, cx);
       else if (command.startsWith("close-tab:")) await closeTab(command.slice("close-tab:".length), cx);
       else if (command.startsWith("close-pane:")) await closePane(command.slice("close-pane:".length), cx);
-      // What a close's dialog runs, once the person has said yes.
       else if (command.startsWith("close-tab-now:")) {
         const answer = tabAnswer;
         if (answer?.command === command) {

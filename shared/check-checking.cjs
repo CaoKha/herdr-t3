@@ -79,6 +79,7 @@ async function check(checking) {
     bar.cx = { ...cx, timer: { every(_ms, fn) { fn(cx); } } };
     vm.runInContext("watchReview({}, cx)", bar);
   }
+  // Every fake here settles by promise alone, so one macrotask turn lets the started chains drain.
   await new Promise(r => setTimeout(r, 10));
   if (checking) assert.deepEqual(effects, [], "checking must not execute commands or write files");
   else {

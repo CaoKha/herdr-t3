@@ -111,7 +111,7 @@ const flush = async () => { for(let i=0;i<50;i++) await Promise.resolve(); };
   assert.equal(picked.length, 0, 'empty in the fresh read: nothing asked');
   assert.equal(api.scopeRows(later).find(r => r.id === 'scope-push').detail, '0 commits', 'and the fresh count shows');
   ab = '+2 -0';
-  // Another base has no read yet: the rows' names, their counts blank and not greyed as empty; past 150ms, `…` in their place.
+  // Another base has no read yet: the rows' names, their counts blank and not greyed as empty; once slow, `…` in their place.
   state.set('review.bases',{s:'origin/dev'});
   const timers = [], timed = {...cx, timer: { after(ms, fn) { timers.push({ms, fn}); return { cancel() {} }; } }};
   const fresh = view(); api.openScope(fresh,timed); await flush();

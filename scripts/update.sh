@@ -160,7 +160,8 @@ if [ -n "$missing" ]; then
 fi
 
 mkdir -p "$app/mods" "$app/layouts"
-# Stage on the destination filesystems before copying any mod, so a failure here leaves the install as it was. Check both originals before publishing either replacement.
+# Stage on the destination filesystems before copying any mod, so a failure here leaves the install as it was.
+# Check both originals before publishing either replacement.
 layout_tmp=$(mktemp "$app/layouts/.herdr-t3-update.XXXXXX")
 keys_tmp=$(mktemp "$app/.herdr-t3-keys.XXXXXX")
 prepare_replacement "$staging/layout.new" "$staging/layout.old" "$layout_tmp"

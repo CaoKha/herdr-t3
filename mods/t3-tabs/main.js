@@ -29,16 +29,14 @@ import { tab } from "./tab.js";
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
 const ROW_PX = 40;
-// A Review bar with `toggle` in its props draws the panel's toggle as its last part, beside its counts: one control, not two.
 
 const TAB_GAP = 4;
 // A tab's name gives way to T3's 144px at most, the active one's to 240px; past that the strip scrolls.
-// Unlike T3's, a tab is 96px at least: a short name (`Pi`) left one too small to aim at.
+// Unlike T3's, a tab has a floor, so a short name (`Pi`) stays big enough to aim at.
 const TAB_FLOOR = 144, TAB_ACTIVE = 240, TAB_MIN = 96;
 // A tab around its name: padding, the icon's slot (× covers it hovered, tab.js), the gaps and the end slot its status mark keeps.
 const TAB_CHROME = 51;
-// With the Inbox, the tools at the right hug their icon and name: padding, the icon's slot and the gap. Their tabs have no status
-// mark (docs/adr/0002), so they keep no end slot, which would only ever be empty. Nothing kept empty, they sit flush and evenly against Actions.
+// With the Inbox, the tools at the right hug their icon and name: they have no status mark (docs/adr/0002), so no end slot.
 const SNUG_CHROME = 32;
 // A zoomed tab's pane segment around its name: a tab's padding, icon slot and gap, with no ×. The rule between the Inbox's groups.
 const SEG_CHROME = 32, RULE_W = 9;
@@ -67,10 +65,9 @@ function fairCap(wants, room) {
   return Infinity;
 }
 
-// One navigation for every copy: where the person has been (navigation.js) is one memory, so what the strip draws and what the
-// keys do can't disagree. The `keys` copy, a floating block over the whole window that draws nothing, shows whatever else is
-// hidden (the sidebar, `work` under a wide panel): it answers every t3-tabs command and lays the window out. Navigation
-// advances when the strip needs a model too; the two blocks need no draw order (check-navigation.cjs).
+// One navigation for every copy (navigation.js), so what the strip draws and what the keys do can't disagree. The `keys` copy, a
+// floating block that draws nothing and always shows, answers every t3-tabs command and lays the window out; the blocks need no
+// draw order (check-navigation.cjs).
 let brain = null;
 const nav = () => brain ??= navigation();
 
@@ -280,10 +277,8 @@ export default class Tabs extends View {
       ready: shown.every(c => c.rule || c.group || this.nameW[`tab-${c.id}`]), fromEnd });
   }
 
-  // With the sidebar hidden, its toggle: the icon alone, where the brand bar has it, and nothing else in the row, as T3's
-  // collapsed sidebar leaves only its trigger: Home is ⇧⌘H. How the agents are doing is the sidebar's to show, and Herdr's own
-  // notice says when one needs the person, so neither it nor the row says anything of them (2026-11-20, docs/adr/0010). 4 on
-  // its right: what follows is another group, 8 away (the row's 4 and these 4, t3-tokens P3).
+  // With the sidebar hidden the row holds only its toggle, where the brand bar has it, as T3's collapsed sidebar leaves its trigger.
+  // How agents are doing is the sidebar's and Herdr's notice's to show, so the row says none of it (docs/adr/0010).
   sidebarToggle(t, stopPress) {
     return tip(this, t, "sidebar-toggle", "Show sidebar", stop(this, t, "sidebar-toggle", drawButton(t, "sidebar-toggle", {
       size: "sm", icon: "mods/t3-tabs/icons/panel-left.svg", label: "Show sidebar", hot: this.hot === "sidebar-toggle" })
@@ -292,11 +287,9 @@ export default class Tabs extends View {
       .on_mouse_down("left", stopPress).on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true });
   }
 
-  // The Home row (part "home", `home-row` in `work-home`): Home's own colour, so the row and Home are one surface, and when Home
-  // is the wallpaper its shown picture's part over the row: the wallpaper says where on Home it has it (KEY.homeShown, Home's
-  // px), and the row, 40 above Home with the same right edge, draws the same picture 40 lower, cut to itself. Only Home's own:
-  // a value of another Home's, or Home now another mod or split, draws nothing. With the sidebar hidden the toggle floats on it,
-  // alone as in the tab row, and the Undo notice gets a chrome pill, a toast's ground; shown, those are the sidebar's.
+  // Home's row (`home-row` in `work-home`) wears Home's colour so the two are one surface; with the wallpaper as Home it draws the
+  // same picture, offset by the row's height and cut to itself, from where Home reports it (KEY.homeShown). Another Home's value,
+  // or Home now another mod or split, draws nothing. Sidebar hidden, the toggle floats here and the Undo notice gets a chrome pill.
   homeRow(t, w, stopPress, windowButtons) {
     const home = shared(KEY.home), shown = shared(KEY.homeShown), lone = homeLone(home);
     const pic = shown?.path && shown.home === home && lone?.mod === "asciicn-wallpaper" ? shown : null;
@@ -322,13 +315,10 @@ export default class Tabs extends View {
     run("layout.resize", { id, px });
   }
 
-  // At Home the bar has nothing to show, so its row folds to the panes' 8px gap and Home's mod takes the height. Not with the
-  // sidebar hidden (the row holds its toggle and the macOS window buttons) nor with window buttons of the bar's own. A layout
-  // click, so it reads the row's size and corrects it whatever left it so (a quit at Home, another layout). Home's pane shows in
-  // `home-main`, the same frame with no header: a blank header still took its 28px, a strip over Home's terminal.
-  // A Home of one mod's pane (t3-home, the wallpaper) is the whole right side instead: `work-home`, its own row and a frameless
-  // surface (docs/adr/0021). A Terminal or split Home stays framed, in `work-away` with the rest; that branch keeps its row and
-  // frame set for Home too, so leaving or splitting changes only the branch.
+  // At Home the bar has nothing to show, so its row folds to the panes' gap, unless the sidebar is hidden (it holds the toggle and the
+  // macOS window buttons) or the bar has its own window buttons. Run on layout clicks, so it corrects the row whatever left it so.
+  // Home's pane shows in `home-main`, a frame with no header, since a blank one still takes 28px; a Home of one mod's pane is the
+  // whole right side, `work-home` (docs/adr/0021). `work-away` keeps its row and frame set for Home, so leaving changes only the branch.
   fitRow(w, atHome, force = false, hidden = sidebarParts(layout()).rail?.hidden) {
     const root = layout(), row = layoutNode(root, "tabs-row"), work = layoutNode(root, "work-main"), stack = layoutNode(root, "work-view");
     const branch = atHome && homeWhole(shared(KEY.home)) ? "work-home" : "work-away";
@@ -340,8 +330,7 @@ export default class Tabs extends View {
     if (force || row.size?.px !== px) run("layout.resize", { id: "tabs-row", px });
   }
 
-  // ⌘B and both sidebar buttons. With Herdr's layout.toggle alone, Home's row followed in a later frame (fitRow in render), so
-  // the work area jumped twice; the row's height goes in the same layout change.
+  // ⌘B and both sidebar buttons: the row's height goes in the same layout change as the toggle, so the work area moves once.
   toggleSidebar() {
     const hidden = !sidebarParts(layout()).rail?.hidden, space = spaces().find(s => s.active)?.id;
     run("layout.toggle", { id: "sidebar" });
@@ -379,17 +368,14 @@ export default class Tabs extends View {
       return div();
     }
     const stopPress = (_e, cx) => cx.stop_propagation();
-    // 28, as T3's titlebar controls; on the 40px bar, chrome's hover and on, as the brand bar's.
+    // As T3's titlebar controls, with the brand bar's chrome hover and on.
     const button = (id, icon, label, action, key, glyph = undefined) => tip(this, t, id, label, stop(this, t, id,
       drawButton(t, id, { icon, label, size: "sm", surface: "chrome", hot: this.hot === id, on: id === "panel-toggle" && panelState().open })
         .on_hover(glow(this, id)).on_mouse_down("left", stopPress).on_click(action)
         .when(Boolean(glyph), el => el.child(glyph)), radiusOf("sm")), { action: key, below: true });
-    // The work header's end: Lists' terminal + before Details (t3-actions' block), so it never moves Details; after Details the
-    // `window` part: the panel's toggle while no panel head owns it, in the window's corner, then the window's buttons 8 on. Each
-    // stands a group's gap from Details, its own side carrying it; the layout's tabs-end-inset puts the end 12 from the column's,
-    // so the toggle stays where the open panel's head puts it (docs/internals/t3-tokens.md「规则」P3, R1).
-    // At Home neither: its row folds to 8 (fitRow); ⌥⌘B still opens the panel there.
-    // Windows/Linux: the window's own buttons, 8 on from what comes before them.
+    // The work header's end: Lists' terminal + before Details (t3-actions' block), so it never moves Details; after Details the panel's
+    // toggle while no panel head owns it, then the window's buttons. tabs-end-inset keeps the toggle where the open panel's head puts
+    // it (t3-tokens「规则」P3, R1). At Home neither: its row folds (fitRow); ⌥⌘B still opens the panel there.
     const windowButtons = () => h_flex().flex_none().ml(8).items_center()
       .child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, w.platform === "windows" ? undefined : "−"))
       .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, w.platform === "windows" ? undefined : "□"))
@@ -398,7 +384,7 @@ export default class Tabs extends View {
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
       .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
         // With the Inbox, the breadcrumb's space is the way to a new tab.
-        // 28 as the panel toggle beside it: one size in a group (「规则」R2).
+        // One size with the panel toggle beside it (「规则」R2).
         .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => newTab(spaces().find(s => s.active)), "t3-tabs.new")))));
     if (props()?.part === "window") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
       .child(h_flex().id("window-end").flex_none().items_center().when(toggleShown, el => el.pl(GROUP_GAP)).on_size_change((size) => this.fit(size))
@@ -542,16 +528,13 @@ export default class Tabs extends View {
           .children(stripFades(t.chrome, this.tabStrip)))));
   }
 
-  // With the Inbox showing, who's in view, as T3's thread header: the space, a sub-agent's parent, then the tab's agents side by
-  // side with the one in view lit, the card the Inbox lights (docs/internals/specs/tab-bar.md). Held, a program there has the
-  // focus: the one last looked at is outlined. Away, in a tab of programs: it all dims, and leads back. The title's ⌄ is the
-  // tab's menu. A zoomed tab's panes come back by the pane header's zoom: the bar has no button for it.
+  // With the Inbox showing, who's in view, as T3's thread header: the space, a sub-agent's parent, then the tab's agents with the one
+  // in view lit (docs/internals/specs/tab-bar.md). Held, the program last looked at is outlined; away, it all dims and leads back.
   crumb(t, ctx, { every, ps, name, narrow, stopPress }) {
     const space = ctx.space, dim = ctx.held || ctx.away, agentOf = (address) => every.find(a => a.address === address);
     const nameOf = (address) => { const a = agentOf(address); return a ? name(a) : address; };
-    // The title's menu: the agent's (t3-menu's "agent", the same wherever it's opened), as T3's thread actions. It hangs 4 under
-    // the title, left edges together, as T3's (rect.left, rect.bottom + 4) and the layout's other menus. A click while it's open
-    // closes it. The space's menu opens the same way under the space crumb, with its own close stamp so the two never block each other.
+    // The title's menu is the agent's (t3-menu's "agent"), hung under the title as T3's thread actions; a click while it's open closes
+    // it. The space crumb's menu has its own close stamp, so the two never block each other.
     const titled = ctx.sub ?? ctx.head, spaceClosed = closedKey("t3-menu", "space");
     const menu = (b) => {
       openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...hang(b, 220, { align: "start" }), props: { tab: "agent", target: { address: titled }, ...litProp(!b) } });
@@ -580,7 +563,7 @@ export default class Tabs extends View {
         onMove: e => detailsAt(this, id, e),
       }), radius);
     };
-    // As T3's title: its ⌄ is part of it, 4 after the name, 14px, there only while the item is hovered, focused or open.
+    // As T3's title: its ⌄ is part of it, there only while the item is hovered, focused or open.
     const chevron = (id) => {
       const shown = this.hot === id || within(this, [id]) || menuOn(id);
       return div().id("crumb-menu").flex_none().opacity(shown ? 1 : 0).transition("opacity", { duration: 150, easing: "ease-out" })
@@ -600,7 +583,7 @@ export default class Tabs extends View {
       .text_color(dim ? t.muted : t.foreground).child(text(`peer-${ctx.sub}`, nameOf(ctx.sub)))
       .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : null, { agent: ctx.sub });
     const spaceLit = this.hot === "crumb-space" || within(this, ["crumb-space"]) || menuOn("crumb-space");
-    // Its own width and no less (flex weighting alone let the strip win): capped at the row, where its names shorten.
+    // Its own width and no less, as flex weighting alone lets the strip win; capped at the row, where its names shorten.
     return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(14).font_medium()
       .child(named("crumb-space", space.name, h_flex().h(24).gap(6).rounded(6).items_center().min_w(0).flex_shrink(1)
         .text_color(spaceLit ? t.foreground : t.muted)

@@ -1,8 +1,6 @@
 #!/bin/sh
-# Builds what the mods carry from outside, at pinned versions; the output is committed, so installing needs no bun:
-#   - extras/mods/review/vendor/char-width.js: each code point's columns, from get-east-asian-width (package.json's version)
-#     and Unicode's mark and default-ignorable properties, for rows.js's charWidth.
-# Run it only to move a version; then scripts/sync.sh and scripts/check.sh.
+# Builds what the mods carry from outside (extras/mods/review/vendor/char-width.js) at pinned versions; the output is committed,
+# so installing needs no bun. Run it only to move a version; then scripts/sync.sh and scripts/check.sh.
 set -eu
 src=$(cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)

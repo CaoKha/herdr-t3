@@ -732,7 +732,6 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   target = { ...target, target: { id: "s0" } };
   assert.ok(!find(sm.render(), "space-item-t9"), "global pane data excludes a foreign child even before its first report");
 
-  // Restore globals for anything after.
   keyList = []; agentList = []; terms = [{ address: "t1", labels: {} }];
   spaceList = [{ id: "s1", folder: "/work/p1", tabs: [{ id: "b1" }] }];
   paneList = [{ pane: "p1", tab: "b1", terminal: "t1", cwd: "/work/s1" }];
