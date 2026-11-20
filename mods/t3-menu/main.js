@@ -8,7 +8,6 @@ import { menuKeys, scrollList, propsLit } from "./list.js";
 import { menuRow, menuRule, menuHint, MENU_ROW } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
 import { openBeside, closeSub, subGone, closeChain, menuClosed } from "./popup-menu.js";
-import { placeOf } from "./project.js";
 import { presets } from "./snooze-presets.js";
 import { agentKids, kidStatus, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { namer, programOf } from "./name.js";
@@ -16,7 +15,6 @@ import { programIcon } from "./program.js";
 import { statusMark, took } from "./status-mark.js";
 import { alpha } from "./color.js";
 import { focusAgent, focusPane } from "./zoom.js";
-import { prepareSpace } from "./space-arrival.js";
 import { pinList } from "./pins.js";
 import { sidebarParts } from "./sidebar.js";
 import { closedKey } from "./store.js";
@@ -64,6 +62,11 @@ function paneAncestors(byAddress, byAgent) {
 }
 
 const terminalPane = (address) => panes().find((p) => p.terminal === address);
+
+// New tab goes through t3-tabs, which opens it and has the Inbox bar read it as something started there (`fresh`).
+// The key acts on the space in view alone, so it shows only there.
+const startTab = (sp) => run(`t3-tabs.new:${sp.id}`);
+const newTabKey = (sp) => sp?.active ? shortcut("t3-tabs.new") : "";
 
 // An agent's menu, wherever it's right-clicked (an Inbox card, an Agents row, the tab bar's title): what it can do now, as
 // T3's thread actions. Settle and Snooze are the Inbox's (docs/adr/0002): with Lists chosen they aren't offered.
@@ -143,12 +146,12 @@ function items(p, git) {
       );
     }
     case "tab": {
-      // Where its space is now, as the space's mark and folder say; with no space named, tab.new takes the active one.
+      // With no space named, the one in view.
       const all = spaces();
       if (!all.some((s) => (!tg.space || s.id === tg.space) && s.tabs?.some((tab) => tab.id === tg.id))) return [];
       const sp = all.find((s) => (tg.space ? s.id === tg.space : s.active));
       return grouped(
-        [["New tab", "tab.new", { space: tg.space, folder: sp && placeOf(sp, panes()) }]],
+        [["New tab", "tab.new", { space: tg.space }, newTabKey(sp)]],
         [["Rename", "tab.rename", { id: tg.id }]],
         [["Close", "tab.close", { id: tg.id }]],
       );
@@ -164,7 +167,7 @@ function items(p, git) {
       if (!s) return [];
       const folder = place(s);
       return grouped(
-        [["New tab", "tab.new", { space: tg.id, folder }]],
+        [["New tab", "tab.new", { space: tg.id }, newTabKey(s)]],
         [["Rename", "space.rename", { id: tg.id }], ...(folder ? [["Copy path", "copy", { text: folder }]] : [])],
         git ? [["New worktree", "worktree", { space: tg.id, action: "new" }], ["Open worktree", "worktree", { space: tg.id, action: "open" }]] : [],
         [...(git === "linked" ? [["Remove worktree", "worktree", { space: tg.id, action: "remove" }]] : []), ["Close", "space.close", { id: tg.id }]],
@@ -197,11 +200,12 @@ function menuIcon(command, label, args) {
 }
 
 // The key bound to a command, for the hint on the right, written as tooltips and New write keys (tip.js keyLabel): ⇧⌘D.
-function shortcut(name, args) {
+// `bound`: keys(), read once by a caller that asks for each row.
+function shortcut(name, args, bound = keys()) {
   // `pane.split:right` binds pane.split with { direction: "right" }.
   const value = args && Object.values(args)[0];
   // A layout's own keys too: Settle's is the herdr-t3 layout's.
-  const k = keys().find((b) => (b.section === "global" || b.section?.startsWith("layout:")) && (b.action === name || b.action === `${name}:${value}`));
+  const k = bound.find((b) => (b.section === "global" || b.section?.startsWith("layout:")) && (b.action === name || b.action === `${name}:${value}`));
   return k ? keyLabel(k.keys) : "";
 }
 
@@ -219,7 +223,7 @@ function spaceSwitchEntries(spaceId, now) {
   const space = spaces().find((s) => s.id === spaceId);
   if (!space) return [];
   const tabs = space.tabs ?? [];
-  const all = terminals(), every = agents(), ps = panes(), f = focused(), name = namer();
+  const all = terminals(), every = agents(), ps = panes(), f = focused(), name = namer({ terminals: all, agents: every });
   const byAddress = new Map(all.map((k) => [k.address, k]));
   /** @type {Map<string, Pick<import("herdr").AgentInfo, "address" | "pane" | "tab" | "title" | "program" | "status" | "focused">>} */
   const byAgent = new Map(every.map((a) => [a.address, a]));
@@ -372,10 +376,8 @@ export default class Menu extends View {
     else if (it[1] === "copy") cx.write_to_clipboard(it[2].text);
     else if (wake !== null) run(`t3-tabs.snooze:${it[2].address}:${wake}`, {});
     else if (it[1] === "custom-snooze") openOverlay({ mod: "t3-inbox", kind: "dialog", frame: "none", width: 384, props: { customSnooze: it[2].address, answer: "t3-tabs.snooze" } });
-    else {
-      if (it[1] === "tab.new") prepareSpace(it[2].space);
-      run(it[1], it[2]);
-    }
+    else if (it[1] === "tab.new") { const sp = spaces().find((s) => it[2].space ? s.id === it[2].space : s.active); if (sp) startTab(sp); }
+    else run(it[1], it[2]);
   }
 
   spaceSwitchView(t, p, cx) {
@@ -390,12 +392,8 @@ export default class Menu extends View {
     const pick = (i) => {
       closeChain();
       if (i === 0) {
-        const active = spaces().find((s) => s.active);
-        if (active?.id === spaceId) run("t3-tabs.new");
-        else {
-          const sp = spaces().find((s) => s.id === spaceId);
-          if (sp) { prepareSpace(sp.id); run("tab.new", { space: sp.id, folder: place(sp) }); }
-        }
+        const sp = spaces().find((s) => s.id === spaceId);
+        if (sp) startTab(sp);
         return;
       }
       const entry = entries[i - 1];
@@ -435,11 +433,11 @@ export default class Menu extends View {
             clockAt = Math.min(clockAt, entry.since + (Math.floor(elapsed / unit) + 1) * unit);
           }
           const time = entry.since > 0 ? h_flex().flex_none().gap(4).items_center().children(took(entry.since, now).split(" ").map((part) => menuHint(t, part).font_family(mono))) : null;
-          mark = time ? h_flex().flex_none().gap(4).items_center().child(statusMark(t, "working")).child(time) : statusMark(t, "working");
+          mark = time ? h_flex().flex_none().gap(4).items_center().child(statusMark("mods/t3-menu", t, "working")).child(time) : statusMark("mods/t3-menu", t, "working");
         } else if (entry.status === "blocked" || entry.status === "error") {
-          mark = statusMark(t, entry.status);
+          mark = statusMark("mods/t3-menu", t, entry.status);
         } else if (entry.newsDone) {
-          mark = statusMark(t, "done");
+          mark = statusMark("mods/t3-menu", t, "done");
         } else if (entry.snoozed) {
           mark = svg("mods/t3-menu/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent);
         }
@@ -515,7 +513,7 @@ export default class Menu extends View {
   render(cx) {
     const t = theme(), p = props() ?? {};
     if (p.tab === "space-switch") return this.spaceSwitchView(t, p, cx);
-    const list = this.liveItems(p), ids = list.map(itemId);
+    const list = this.liveItems(p), ids = list.map(itemId), bound = keys();
     // Its target went (a tab or space closed under it): nothing left to pick, so it goes, after this frame.
     if (!list.length && cx && !this.emptied) this.emptied = cx.timer.after(0, () => { if (!this.liveItems(props() ?? {}).length) closeChain(); });
     if (this.selected === undefined) this.selected = ids[this.at] ?? null;
@@ -555,7 +553,7 @@ export default class Menu extends View {
               at: [selection, "at", i], label: it[0], open: ids[i] === this.sub?.row, icon: menuIcon(it[1], it[0], it[2]) || null, sub: it[1] === "snooze" && "mods/t3-menu/icons",
               // Only what deletes something is red, in words, as T3's destructive item: a Close asks first while a program runs.
               color: it[1] === "worktree" && it[2].action === "remove" ? t.ansi1 : null,
-              trail: it[1] === "snooze" ? null : menuHint(t, it[3] ?? shortcut(it[1], it[2])),
+              trail: it[1] === "snooze" ? null : menuHint(t, it[3] ?? shortcut(it[1], it[2], bound)),
               pick: (cx) => this.choose(ids[i], cx),
               also: (el) => el.on_mouse_move((e, cx) => {
                 const id = i === snooze ? ids[i] : null;

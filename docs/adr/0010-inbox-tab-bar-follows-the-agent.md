@@ -14,7 +14,7 @@ Inbox 的单位是 agent，Herdr 的标签却可以装几个 pane、几个同级
 ## Consequences
 
 - 标签栏多了一份记忆：每个标签最后看的 agent（`navigation.js` 的 `lastIn`），只在内存里，重启后回退到标签里的第一个 agent。
-- 焦点在程序或 Inbox 列出的 mod 卡片上时，面包屑留着这个标签最后看的 agent，不亮。不含 agent 的标签按进入方式分：从标签条进入的工具标签属于这份工作，面包屑留着这个 space 最后看的 agent，变暗，点它回去；点面包屑的 space 菜单里的 New tab 或按 `cmd-t` 开始新的事之后只有 space，直到再看某个 agent。两头都试过：一律沿用会把上一个 agent 的名字带进新开的终端，一律只显示 space 会让点一下工具就丢掉上下文。
+- 焦点在程序或 Inbox 列出的 mod 卡片上时，面包屑留着这个标签最后看的 agent，不亮。不含 agent 的标签按进入方式分：从标签条进入的工具标签属于这份工作，面包屑留着这个 space 最后看的 agent，变暗，点它回去；开了新标签、开始新的事之后只有 space，直到再看某个 agent；不管从哪里开（`cmd-t`、Lists 的 `+`、New、各菜单的 New tab）都一样。两头都试过：一律沿用会把上一个 agent 的名字带进新开的终端，一律只显示 space 会让点一下工具就丢掉上下文。
 - Inbox 下 agent 的窗格单独显示时，窗格标题不再写名字，名字只在面包屑里说一次。
 - zoom 中的标签展开成各个窗格在两种模式下相同，这不是 Inbox 的规则（[0002](0002-inbox-rules-stay-in-inbox.md)）。
 - 面包屑的 space 项是与右侧标题一致的下拉菜单，列出 `New tab` 和当前 space 下的全部 agent（含子 agent）及非 agent 终端程序；这不把其他顶层 agent 放回标签条或面包屑行内，仍保持“标签栏只跟随当前查看的 agent、切换其他工作有明确入口”的分工。

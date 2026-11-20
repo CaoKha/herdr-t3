@@ -13,8 +13,8 @@ const scope = vm.createContext({
   run: (...a) => ran.push(a),
   stop: (_v, _t, _id, el) => el, glow: () => () => {},
 });
-vm.runInContext(kit.strip(fs.readFileSync(path.join(__dirname, "brand.js"), "utf8")) + "\nglobalThis.b = { brand, BRAND_FIXED };", scope);
-const { brand, BRAND_FIXED } = scope.b;
+vm.runInContext(kit.strip(fs.readFileSync(path.join(__dirname, "brand.js"), "utf8")) + "\nglobalThis.b = { brand };", scope);
+const { brand } = scope.b;
 
 const t = { foreground: "#ffffff", muted: "#777777" };
 const cx = { notify() {}, stop_propagation() {} };
@@ -29,7 +29,6 @@ assert.equal(mark(el).source, "frame/welcome/herdr.png", "Herdr's own tile, its 
 assert.deepEqual([mark(el).style.size, mark(el).style.rounded], [16, 4]);
 assert.equal(mark(el).style.top, undefined, "centred, not nudged");
 assert.equal(walk(el).find((n) => n.kind === "svg"), undefined, "no one-colour mark");
-assert.equal(BRAND_FIXED, 16 + 4, "what it takes besides the name");
 
 // One look, as T3's: the tile in its own colours, the name muted; no fill, no hover, nothing lit.
 assert.equal(el.style.text_color, t.muted);

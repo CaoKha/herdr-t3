@@ -23,6 +23,7 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
     : home === "split" ? [{ tab: "t-h", pane: "p-h", mod: "t3-home" }, { tab: "t-h", pane: "p-h2", terminal: "k-h2" }]
     : [{ tab: "t-h", pane: "p-h", mod: home }]);
   const commands = [], frames = [];
+  let layouts = 0;
   const values = () => [active, child, row, page, open, wide, end, view];
   function paint() {
     for (const [cmd, args] of commands.splice(0)) {
@@ -46,7 +47,7 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
     View: class {}, div: el, h_flex: el, v_flex: el, theme: () => ({}), props: () => ({ part: "keys" }), settings: () => ({}),
     shared: key => saved[key], setShared: (key, val) => { saved[key] = val; }, window: () => ({ buttons }),
     spaces, panes, agents: () => [], terminals: () => [], machines: () => [], focused: () => null,
-    layout: () => ({ children: [{ id: "sidebar", hidden, children: [{ id: "sidebar-lists", active: "lists" }] },
+    layout: () => ++layouts && ({ children: [{ id: "sidebar", hidden, children: [{ id: "sidebar-lists", active: "lists" }] },
       { id: "work", hidden: wide, children: [{ id: "work-view", active: view, children: [{ id: "work-away", children: [{ id: "tabs-row", size: { px: row } },
         { id: "window-end", size: { px: end } }, { id: "work-main", active: child }] }, { id: "work-home", children: [{ id: "home-row", size: { px: 40 } }, { id: "home-surface" }] }] }] },
       { id: "panel", hidden: !open, children: [{ id: "panel-body", active: page, children: ["panel-empty", "files", "review"].map(id => ({ id })) }] }] }),
@@ -56,7 +57,7 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
   const scope = vm.createContext(globals);
   vm.runInContext(`${navigation}\n${panel}\n${mod("main.js", "Tabs")}\n${mod("../t3-spaces/main.js", "Spaces")}\nglobalThis.jump = { focusPane, focusAgent };`, scope);
   const keys = new scope.Tabs(); keys.init(null, cx); keys.render(); paint();
-  return { frames, keys, paint, saved, commands, hidden: () => hidden, setHome: (h) => { home = h; }, press: cmd => keys.navigation.handle(cmd, cx),
+  return { frames, keys, paint, saved, commands, layouts: () => layouts, hidden: () => hidden, setHome: (h) => { home = h; }, press: cmd => keys.navigation.handle(cmd, cx),
     go: space => scope.jump.focusPane(`p-${space}`), agent: space => scope.jump.focusAgent(`k-${space}`),
     click: (id, keyboard) => {
       const w = spaces().find(s => s.id === id), row = new scope.Spaces().row({ w }, {}, panes(), false);
@@ -126,6 +127,12 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
     f.keys.toggleSidebar(); f.paint();
     assert.equal(f.hidden(), !hidden, "the sidebar toggles");
     assert.equal(f.frames.at(-1)[2], row, `${from === "h" ? "at Home" : "away"}, ${hidden ? "showing" : "hiding"} the sidebar: the row is ${row} in its first frame`);
+  }
+  {
+    // The keys block fits the row on every draw: one read of the layout, which copies the whole tree.
+    const f = fixture("a"), before = f.layouts();
+    f.keys.fitRow({ buttons: false }, false);
+    assert.equal(f.layouts() - before, 1, "fitRow reads the layout once");
   }
   assert.equal(JSON.parse(read("../../keys.json"))["layout:herdr-t3"]["cmd-b"], "t3-tabs.toggle-sidebar", "cmd-b is the same action as the buttons");
   // The layout's two branches: framed work for away and a Terminal or split Home, and Home whole: a 40 row to drag the window

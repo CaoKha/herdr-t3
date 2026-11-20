@@ -31,13 +31,14 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 - The viewed and attention-needing agents stand out; others recede until hovered, working ones at 70%.
 - Before the status, time in state (`<1m`, `5m`, `3h`, `2d`, 12px). Hover cross-fades it to a pin control over 150ms.
 - No inline machine mark: the hover details card carries it.
+- With no space header above the row (sorted by priority, or pinned), the space's name follows the agent's, dim 12px, only where it fits whole; short of room it isn't drawn and the name takes the width.
 
 ### Sorting and groups
 
 - Sort by space or by priority. Pinned is a shared group in either sort.
 - Priority headers use the Inbox shelves' 32px form. Space headers use T3's project-folder form: 8 above, a 16px mark, the medium name, and a right-click space menu.
 - A closed group shows its hidden count and urgency mark, and keeps the viewed row outside the fold.
-- Each draw or one-second tick observes the current agents, terminals, focus and pins. It updates history and drops fold choices and pins for ended agents on machines it has heard from, before grouping. The same group member order feeds both `setAgentOrder` and `t3-agents.rows`, even with the sidebar hidden. Lists publishes only when selected or when Agents is docked alone.
+- Each draw or one-second tick observes the current agents, terminals and pins (`observe`): it updates history and drops fold choices and pins for ended agents on machines it has heard from. With Lists selected or Agents docked alone, shown or hidden, it then groups, and the same group member order feeds both `setAgentOrder` and `t3-agents.rows`. Behind the Inbox the tick stops after observing: nothing is sorted, grouped or published.
 - Next and Previous include members of closed groups. A sub-agent without a top-level row is represented by its listed ancestor. If focus reports a terminal but no agent, use that terminal to find its ancestor.
 - The sort menu hangs right-aligned 4px below its button, fades in over 150ms, 28px rows; the same button closes it.
 - Motion is the Inbox's ([inbox](inbox.md#motion)) for sorting and folding; fold chevrons cross-fade their direction.
@@ -57,4 +58,4 @@ Spaces and Agents share the column equally, each at least 90px. Each heading is 
 
 - A top-level row runs `agent.focus`; a sub-agent row peeks (`terminal.peek`).
 - Pin buttons share the Inbox's pins (`shared/pins.js`) and end Snooze; unpin uses the global Undo notice.
-- Settled and snoozed agents keep their order and working spinner in Lists; only unread done is suppressed. There is no Settled group here.
+- Settled and snoozed agents keep their order and working mark in Lists; only unread done is suppressed. There is no Settled group here.

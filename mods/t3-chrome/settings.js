@@ -8,17 +8,18 @@ import { stopsInit, stop, focusRoot } from "./focus.js";
 import { menuKeys, openLit } from "./list.js";
 import { menuRow } from "./menu-row.js";
 import { sidebarParts } from "./sidebar.js";
+import { keyOf } from "./tip.js";
 
 const SECTIONS = [
   { id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" },
   { id: "sidebar", title: "Sidebar", icon: "mods/t3-chrome/icons/panel-left.svg" },
 ];
 // A row's value is t3.settings' `key`, unless it has `get` and `set`: what the sidebar shows is the layout's own stack, which
-// ⌘⇧L (t3-tabs.sidebar) switches too, so it's read from there each time and never copied into t3.settings.
+// its key (`also`, named in the hint as keys.json binds it) switches too, so it's read from there each time and never copied into t3.settings.
 const ROWS = [
   { section: "home", key: "afterAway", title: "After putting away", about: "Settling, snoozing or dragging away the agent in view.", options: () => [["home", "Home"], ["next", "Next card"]] },
   { section: "home", key: "homeMod", title: "Home shows", about: "A terminal, or a mod that offers itself with \"home\": true in its mod.json.", options: (view) => view.homeMods },
-  { section: "sidebar", key: "sidebarShows", title: "Sidebar shows", about: "The Inbox, or the Spaces and Agents lists. ⌘⇧L switches it too.", options: () => [["inbox", "Inbox"], ["lists", "Lists"]],
+  { section: "sidebar", key: "sidebarShows", title: "Sidebar shows", about: "The Inbox, or the Spaces and Agents lists.", also: "t3-tabs.sidebar", options: () => [["inbox", "Inbox"], ["lists", "Lists"]],
     get: () => sidebarParts(layout()).stack?.active ?? "lists", set: (child) => run("layout.select", { stack: "sidebar-lists", child }) },
 ];
 // Home as a shell, not a mod (homeMod null): an agent started there turns that space into an ordinary one (t3-tabs/navigation.js).
@@ -57,11 +58,14 @@ export function settingsView(view) {
     if (key === "homeMod") run("t3-tabs.home-mod");
   };
   // Herdr's row: what it is on the left, the control on the right.
-  const row = (r) => h_flex().w_full().gap(16).py(12).items_center().border_b(1).border_color(t.border)
+  const row = (r) => {
+    const key = r.also && keyOf(r.also);
+    return h_flex().w_full().gap(16).py(12).items_center().border_b(1).border_color(t.border)
       .child(v_flex().flex_1().min_w(0).gap(3)
         .child(div().text_size(14).text_color(t.foreground).child(r.title))
-        .child(div().text_size(12.5).line_height("18px").text_color(t.dim).child(r.about)))
+        .child(div().text_size(12.5).line_height("18px").text_color(t.dim).child(key ? `${r.about} ${key} switches it too.` : r.about)))
       .child(menu(r));
+  };
   // The layout's menu, as the agents list's sort menu, on the kit's Select as the Snooze unit's: hung 4px under the button, as
   // wide; nothing lit until a key or the pointer gets there; ↑/↓, Home, End, typeahead, Enter or Space, Esc; the one in use ticked.
   const menu = (r) => {

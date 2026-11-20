@@ -16,9 +16,9 @@ Herdr 0.1.16 的 `checking()` 在整个检查期间为真；检查仍执行 `ini
 
 ## 隐藏副本与常驻入口
 
-隐藏 stack 子节点/列里的 mod 不绘制、不收 `<mod>.<command>`；启动后的 timer 继续，首次显示前则尚未启动。Inbox/Agents 的行计算独立于 `render()`，由每秒 timer 也调用，只有当前模式写 agent order。必须随时工作的命令/Snooze 维护在根浮动、视觉为空的 `t3-tabs {part:"keys"}`；不能依赖可被面板放大藏住的标签条。
+隐藏 stack 子节点/列里的 mod 不绘制、不收 `<mod>.<command>`；启动后的 timer 继续，首次显示前则尚未启动。Inbox/Agents 的行计算独立于 `render()`，由每秒 timer 也调用，只有当前模式写 agent order；Agents 排在 Inbox 后面时，它的每秒 timer 只更新状态历史、丢掉已结束 agent 的置顶和折叠（`observe`），不排序、不分组。必须随时工作的命令/Snooze 维护在根浮动、视觉为空的 `t3-tabs {part:"keys"}`；不能依赖可被面板放大藏住的标签条。
 
-子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。`tree.js` 对每份 `terminals()` 列表只建一次索引（`WeakMap`，按父地址分组的存活终端、按地址的终端）：Herdr 每次调用都返回新列表，所以按列表对象做键不会过期；同一次绘制内把同一份列表传下去才能复用索引。逐层 `filter` 整份列表是 O(agent × 终端)，5,000 个终端时 Tabs/Agents/Inbox 的一次绘制在 QuickJS 里会 `interrupted`；建索引后约 19ms。检查里的假 `terminals()` 也要每次返回新数组，原地改同一数组会读到旧索引。
+子 agent 弹层（`t3-pane` 的 `kidsMenu`）每次绘制现读 `terminals()` 建树（`shared/tree.js` 的 `kidTree`），不留快照，快照只会让状态晚到 1 秒。每秒 timer 只为时长刷新，后代全结束时关闭弹层。`tree.js` 对每份 `terminals()` 列表只建一次索引（`WeakMap`，按父地址分组的存活终端、按地址的终端）：Herdr 每次调用都返回新列表，所以按列表对象做键不会过期；同一次绘制内把同一份列表传下去才能复用索引。逐层 `filter` 整份列表是 O(agent × 终端)，5,000 个终端时 Tabs/Agents/Inbox 的一次绘制在 QuickJS 里会 `interrupted`；建索引后约 19ms。检查里的假 `terminals()` 也要每次返回新数组，原地改同一数组会读到旧索引。`shared/project.js` 对每份 `panes()` 列表同样只建一次索引，并把这次绘制读到的 space 图标和字体随它留着：调用方传入这次绘制自己读的那份列表，检查里的假 `panes()` 也每次返回新数组。
 
 面板的 `surface-*` 副本在 render 里判断 Review 能否读取（`probeReview`，key 不变即返回），不开周期定时器：隐藏副本的 timer 不停，250ms 轮询会在窗口空闲时一直读宿主列表。
 
@@ -80,7 +80,7 @@ Herdr 0.1.16 的 `watchFolder()` 返回可取消的 Promise（`FolderWatch.cance
 
 Dots/Blocks每格1×1采样，Quadrants为2×2，Braille为2×4；autoLevels两端各裁0.5%，色调夹到[0,1]。Dots是**6档**（空白加5个点），阈值0.1/0.3/0.5/0.7/0.9；Blocks是` ░▒▓█`5档；两种packed字形严格大于0.5才亮。每格颜色平均保留上游gradeRgb默认浮点运算及Uint8ClampedArray取偶行为。颜色取VGA16的OKLab最近槽，不用RGB欧氏距离或6个色相桶；不透明度按HSV value分8档。完整画布和空白边都保留，不按内容裁切。
 
-字符用SVG而非text：宿主text吞空格/换行，字体可能把`##`连写。几何字形沿上游glyph，其他字符以暗度条近似（Classic/Dense留待字形支持）。格宽比取头部标记的0.5（见storage）。图块按40格切，与内置画 `scenes/` 的图块文件一致，合成时逐块拼进一张图。采样、色调、映射生成器分块yield，调用方在6ms预算内批处理便宜yield，再让input/paint运行；取消在下一块前结束生成器。切模式先立即绘制选中和spinner，独立代次目录防止迟到写入污染新scene。每个画好的模式（字符和合成图）按模式留在草稿里，切回不再计算；画失败退回上一个画好的模式。
+字符用SVG而非text：宿主text吞空格/换行，字体可能把`##`连写。几何字形沿上游glyph，其他字符以暗度条近似（Classic/Dense留待字形支持）。格宽比取头部标记的0.5（见storage）。图块按40格切，与内置画 `scenes/` 的图块文件一致，合成时逐块拼进一张图。采样、色调、映射生成器分块yield，调用方在6ms预算内批处理便宜yield，再让input/paint运行；取消在下一块前结束生成器。切模式先立即绘制选中和加载标记，独立代次目录防止迟到写入污染新scene。每个画好的模式（字符和合成图）按模式留在草稿里，切回不再计算；画失败退回上一个画好的模式。
 
 壁纸只有一条绘制路径：图块按主题色合成一张 SVG（`ascii-art.js` 的 `picture`），交给原生 `image()`。不逐块用 `svg()`：宿主的 SVG mask 缓存键含绘制尺寸，切换、改高度或 Zoom 每遇一个新尺寸，就在绘制帧里同步解析、栅格化全部图块（实测50–570ms）。`image()` 在后台线程栅格化一次，之后 GPU 缩放同一纹理，所以拖动、Zoom、方向键只改几何。不透明度写在 `stroke-opacity`／`fill-opacity` 上，不用 `<g opacity>`：后者要离屏合成，慢约4倍。`image()` 没有加载完成回调，新路径的图在后台栅格化期间是空的：换主题时同一张画先留旧路径，直到新图做好并加载好；换画也是（见下段）。主题只有在 render 里读得到，所以 render 发现当前键没图时用 `timer.after(0)` 起一次合成（`pictureOf`，同键只起一次），不在 render 里直接写文件。GPUI 把 SVG `image()` 按声明尺寸的 2 倍栅格化（`SMOOTH_SVG_SCALE_FACTOR`），所以 SVG 声明 Home 显示它的设备像素，纹理是设备像素的 2 倍（尺寸、档位和重做规则见 [wallpaper spec](specs/wallpaper.md)「Picture size」）：纹理只到设备像素时，比像素小的点在 1x 上明显发灰发虚，2 倍才接近原来。已解码的图按路径留在宿主缓存里（mod 无法释放），本运行看过的画、长大前的小图都留着。VM 实测 footprint（显示中的画加预载的另一张，900×560 窗口）：16:9 照片 1x 107MB、2x 289MB，一律声明 4096 时约 700MB；2.5:1 的 Braille 宽图 1x 335MB、2x 575MB，铺满时本来就宽，按设备像素省得少。屏幕缩放没有给 mod 的 API：`screenScale` 用 `osascript` 问 NSScreen，按窗口中线的 x 对屏（GPUI 的窗口 y 是相对自己那块屏的）。
 

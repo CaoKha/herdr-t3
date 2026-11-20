@@ -20,7 +20,7 @@
 - **P1 一列一条边**：同一列上下相邻的两行，首个图标或文字用同一条左缘，末个控件用同一条右缘。对的是所在列的内容边，不是窗口边。截图量，误差 ≤1px。
 - **P2 中心一致**：同一条栏里的元素垂直中心相同（40px 栏是 20）；图标在按钮框里居中；同一组按钮尺寸相同。
 - **P3 同组 4，组间 8**：同一组相邻的按钮间距 4，取 `shared/button.js` 的 `GROUP_GAP`（T3 `PanelLayoutControls`、`DiffPanel` 的 `gap-1`），每个按钮的悬停和 on 底各是一块完整的圆角方块；组与组之间、按钮与文字或输入框之间 8。本来就是一个控件的才相接：分体按钮（`split()`，含 Actions 的 ▶|⌄）和分段切换。窗口按钮（最小化、最大化、关闭）照系统相接。侧栏头照 T3 侧栏头：Inbox 顶行和 Lists 两个标题行的按钮组相接，顶行 Search 框和按钮组之间 4。全布局只有一个组内间距：T3 面板头 ‹ › 的 `gap-0.5`、文件头的 `gap-2` 都取 4。品牌栏见 [sidebar](specs/sidebar.md#brand-bar)。
-- **P4 一套笔画**：UI 图标用 Lucide 24 网格、1.75px 笔画，并排图标的视觉重量相近。`scripts/check.sh` 拦其他笔画（Pierre 图标和 Windows 窗口按钮除外），借用的 Herdr `workspace-chrome` 图标也照查（读 Herdr 自带的那份；只豁免 spinner：加载动画，不是 Lucide 图标），运行时拼出的借用路径直接判失败。Herdr 自带的是 2px，要用就在 mod 自己的 `icons/` 放 1.75 的副本；共享模块要用的（`menu-row.js` 的 `›`、`project.js` 的文件夹）放在 `shared/icons/ui/`，由 `scripts/sync.sh` 复制给用到的 mod。
+- **P4 一套笔画**：UI 图标用 Lucide 24 网格、1.75px 笔画，并排图标的视觉重量相近。`scripts/check.sh` 拦其他笔画（Pierre 图标和 Windows 窗口按钮除外），借用的 Herdr `workspace-chrome` 图标也照查（读 Herdr 自带的那份），运行时拼出的借用路径直接判失败。Herdr 自带的是 2px，要用就在 mod 自己的 `icons/` 放 1.75 的副本；共享模块要用的（`menu-row.js` 的 `›`、`project.js` 的文件夹、`status-mark.js` 的工作圈、`panel-states.js` 的加载弧）放在 `shared/icons/ui/`，由 `scripts/sync.sh` 复制给用到的 mod。
 - **P5 不写自明或重复的字**：提示只补控件自己说不出的东西（动作名、按键、被截掉的全文、禁用原因）；说明文字不重复标签已说过的话。
 - **P6 打开弹层的按钮一种做法**：照侧栏 Filter by space，用 `shared/trigger.js`。提示是布局自己的卡片，可带第二行说明；弹层开着时提示收起，按钮保持 on；再点一次是关闭。见下文「按钮」。
 - **P7 静止时安静，颜色只表达状态**：ghost 按钮和详情卡里的 split（`row`）静止时无底、无分隔线；栏上的 split（`xs`）照 T3 头部是 outline，静止时只有描边和中线，没有底；同一条栏上的按钮用同一种悬停面和 on 面；`accent` 不做按钮的底。
@@ -128,6 +128,7 @@
 - 文件树没有折叠箭头：目录图标开合两态已经表示展开，再加 chevron 是同一件事说两遍；T3 的 Pierre 树是 chevron。Files 与 Review 两棵树是同一种行。
 - Spaces 行之间 1，T3 的文件夹之间 8：space 多了太占高度。
 - 子 agent 的 Failed 用 `!` 徽章，`ansi1` 的 15% 底，和 Needs you 同形只换颜色：两者共用一个标记（`shared/status-mark.js`），12px 的底不会成一块粉色。
+- 加载标记是 T3 `ui/spinner.tsx` 的 `LoaderCircleIcon`，画成静止：T3 只在看得见时转，宿主没有这道开关，转动的 svg 让整个窗口每帧重绘。工作中的 `CircleDashedIcon` 在 T3 本来就是静止的。
 
 ## 做不到
 

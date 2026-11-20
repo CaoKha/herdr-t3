@@ -31,9 +31,13 @@ export function repoFacts({ exec, watchFolder, cx }) {
   // command or an agent's turn just ended (a checkout, a commit, edits), those on
   // a machine that is back, and repos in view whose fallback is due.
   function due({ spaces: sp, panes: ps, machines, active, visible, folded }, now) {
+    // Each space is placed from its own panes: asked of the whole list, every space would walk it, four times a second.
+    const spaceOf = {}, own = {};
+    for (const s of sp) { own[s.id] = []; for (const t of s.tabs ?? []) spaceOf[t.id] = s; }
+    for (const p of ps) own[spaceOf[p.tab]?.id]?.push(p);
     // Moved there: what it knew of that place may be old.
     const next = {};
-    for (const s of sp) next[s.id] = where(s, ps);
+    for (const s of sp) next[s.id] = where(s, own[s.id]);
     const keys = new Set(Object.values(next).filter((k) => JSON.parse(k)[1]));
     // Where no space is any more: forgotten, so a commit looks only where spaces are and a repo none is in isn't watched.
     for (const k of Object.keys(git)) if (!keys.has(k)) { delete git[k]; unsure.delete(k); }
@@ -46,13 +50,11 @@ export function repoFacts({ exec, watchFolder, cx }) {
     const due = new Set([...keys].filter((k) => !(k in git) && !(k in checked)));
     for (const [id, k] of Object.entries(next)) if (at[id] && at[id] !== k && keys.has(k)) due.add(k);
     at = next;
-    const spaceOf = {};
-    for (const s of sp) for (const t of s.tabs ?? []) spaceOf[t.id] = s;
     const nextBusy = {};
-    for (const p of ps) {
-      if (!p.terminal || !spaceOf[p.tab]) continue;
+    for (const s of sp) for (const p of own[s.id]) {
+      if (!p.terminal) continue;
       nextBusy[p.pane] = p.status === "working" || !(p.program?.shell || p.program?.agent);
-      if (busy[p.pane] && !nextBusy[p.pane]) sameRepo(at[spaceOf[p.tab].id], keys).forEach((k) => due.add(k));
+      if (busy[p.pane] && !nextBusy[p.pane]) sameRepo(at[s.id], keys).forEach((k) => due.add(k));
     }
     busy = nextBusy;
     for (const m of machines) {

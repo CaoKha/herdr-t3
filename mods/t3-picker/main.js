@@ -35,14 +35,14 @@ export default class Picker extends View {
 
   // Every pane: the ones you were in lately first, newest first (the tab bar keeps them, t3-tabs.recent); then the current
   // space's, then its machine's, as New orders spaces, each space's in tab order; the pane you're in last. Typing, a name that
-  // matches goes before a folder or space that does.
-  items() {
-    const q = this.filter.toLowerCase(), ps = panes(), all = terminals(), name = namer(), kids = subAgents(agents(), all);
-    const mine = spaces().find((s) => s.active)?.machine ?? null;
+  // matches goes before a folder or space that does. `ps`, `all`: panes() and terminals(), read once a draw (each read copies them).
+  items(ps = panes(), all = terminals()) {
+    const q = this.filter.toLowerCase(), every = spaces(), runs = agents(), name = namer({ terminals: all, spaces: every, agents: runs }), kids = subAgents(runs, all), home = shared(KEY.home);
+    const mine = every.find((s) => s.active)?.machine ?? null;
     const rank = (s) => (s.active ? 0 : (s.machine ?? null) === mine ? 1 : 2);
-    const rows = [...spaces()].sort((a, b) => rank(a) - rank(b) || (a.machine ?? "").localeCompare(b.machine ?? "")).flatMap((s) => s.tabs.flatMap((c) =>
-      // Home has its own key and nothing to find.
-      ps.filter((p) => p.tab === c.id && s.id !== shared(KEY.home)).map((p) => {
+    // Home has its own key and nothing to find.
+    const rows = every.filter((s) => s.id !== home).sort((a, b) => rank(a) - rank(b) || (a.machine ?? "").localeCompare(b.machine ?? "")).flatMap((s) => s.tabs.flatMap((c) =>
+      ps.filter((p) => p.tab === c.id).map((p) => {
         const under = p.terminal ? kids(p.terminal) : [];
         return {
           key: `pane:${p.pane}`, p, s, label: name(p), program: programOf(p), team: under.length, under, here: s.active && c.active && p.focused,
@@ -72,9 +72,9 @@ export default class Picker extends View {
     else focusPane(pane);
   }
 
-  row(item, selection, ps) {
+  row(item, selection, ps, all) {
     const pane = item.p.pane, t = theme(), on = selection.pane === pane, s = item.s, st = item.status;
-    const mark = st === "done" && notNews(terminals().find(k => k.address === item.p.terminal), item.p.status, item.under) ? null : statusMark(t, st, 14);
+    const mark = st === "done" && notNews(all.find(k => k.address === item.p.terminal), item.p.status, item.under) ? null : statusMark("mods/t3-picker", t, st, 14);
     return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(item.label)
       .when(on, (el) => el.bg(t.selected))
@@ -97,7 +97,7 @@ export default class Picker extends View {
   }
 
   render() {
-    const t = theme(), ps = panes(), items = this.items();
+    const t = theme(), ps = panes(), all = terminals(), items = this.items(ps, all);
     // Opens on the first row: the pane you were in before, or another; never the one you're in, where Enter would go nowhere.
     // Editing the query replaces this token. A missing pane clears the highlight instead of choosing the new first row.
     const selection = this.selection ??= { pane: undefined };
@@ -122,7 +122,7 @@ export default class Picker extends View {
       // No heading: there is one kind of row, and the room goes to the list.
       .child(div().flex_none().mt(8).mb(8).px(8)
         .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ROW, at, height: Math.min(items.length * ROW, LIST_MAX),
-          draw: (i) => this.row(items[i], selection, ps), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
+          draw: (i) => this.row(items[i], selection, ps, all), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
         .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
       // New work goes through New, which picks the space (and for a new space, the machine).
       .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"], ["Esc", "Close"]],

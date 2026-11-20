@@ -91,7 +91,7 @@ const exists = async p => fs.stat(p).then(() => true, e => { if (e.code === "ENO
         }
         assert.equal(scans, 1, "a pending drawing keeps directory scans serial");
         release.resolve();
-        const listed = await r.settle(() => waiter && h.lib.imported.length === 3, 3000).then(() => true, () => false);
+        const listed = await r.settle(() => waiter && h.lib.imported.length === 3).then(() => true, () => false);
         const names = Array.from(h.lib.imported, s => s.name);
         record({ names, scans });
         assert.deepEqual(names, ["A", "B", "C"], "files copied after enumeration appear without another write");

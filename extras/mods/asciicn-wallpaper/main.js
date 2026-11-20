@@ -203,11 +203,9 @@ export default class Wallpaper extends View {
     return this.startPreview(from, base, cx);
   }
 
-  /**
-   * A draft across Home: of an image file (drawn in any mode), or `saved`, a picture already there (built in or added) to
-   * frame again, as it is drawn. `phase`: loading, converting, ready, applying, or broken
-   * (nothing drawn to apply); `message`, what went wrong; `frames`, each mode drawn so far, `{ scene, text }`.
-   */
+  /** A draft across Home: of an image file (drawn in any mode), or `saved`, a picture already there (built in or added) to
+   *  frame again, as it is drawn. `phase`: loading, converting, ready, applying, or broken (nothing drawn to apply);
+   *  `message`, what went wrong; `frames`, each mode drawn so far, `{ scene, text }`. */
   async startPreview(from, name, cx, saved = null) {
     const cancelled = this.cancelPreview(cx), request = this.previewRequest = {};
     await cancelled;
@@ -360,14 +358,13 @@ export default class Wallpaper extends View {
     } });
   }
 
-  /**
-   * The picture for the theme now: made, being made (the last one of this scene stays up meanwhile), or failed. `small`:
-   * the one made is smaller than `fit` (makePicture) wants, so a larger one is being made, the smaller one up meanwhile.
-   */
+  /** The picture for the theme now: made, being made (the last one of this scene stays up meanwhile), or `failed`, which
+   *  nothing waits on. `small`: the one made is smaller than `fit` (makePicture) wants, so a larger one is being made, the
+   *  smaller one up meanwhile. */
   pictureOf(scene, t, fit, cx) {
     const light = isLight(), key = pictureKey(scene, t, light), made = madePicture(key);
     const small = !!made?.path && !made.error && made.px < fit(made.width, made.height);
-    if (made?.path && !small) return { path: made.path, small };
+    if (made?.path && !small) return { path: made.path, small, failed: false };
     if (!made?.error && !made?.promise && this.asked !== key) {
       this.asked = key;
       const d = this.draft;
@@ -382,14 +379,12 @@ export default class Wallpaper extends View {
         if (!this.closed) cx.notify();
       }));
     }
-    return { path: made?.path ?? null, small };
+    return { path: made?.path ?? null, small, failed: !!made?.error };
   }
 
-  /**
-   * The backing scale of the screen the window is on (2 on Retina), null while macOS is asked; off macOS, 2.
-   * shortcut: matched by the window's middle x alone (GPUI gives its y on its own screen), taking the largest of screens
-   * stacked there, and asked again only for a place no screen known covers; upgrade once mods can read Window::scale_factor.
-   */
+  /** The backing scale of the screen the window is on (2 on Retina), null while macOS is asked; off macOS, 2.
+   *  shortcut: matched by the window's middle x alone (GPUI gives its y on its own screen), taking the largest of screens
+   *  stacked there, and asked again only for a place no screen known covers; upgrade once mods can read Window::scale_factor. */
   screenScale(cx) {
     if (checking()) return 2;
     if (window()?.platform !== "macos") return 2;
@@ -517,7 +512,7 @@ export default class Wallpaper extends View {
     // A picture being drawn again (library.js refresh) has no files to show meanwhile, nor one before the screen's scale is
     // known: the last one stays up.
     const scale = this.scaleNow = this.screenScale(cx) ?? this.scaleNow, fit = (w, h) => this.need(w, h, p, scale);
-    const { path, small } = this.picture = scene.redrawing || !scale ? { path: null, small: false } : this.pictureOf(scene, t, fit, cx);
+    const { path, small, failed } = this.picture = scene.redrawing || !scale ? { path: null, small: false, failed: false } : this.pictureOf(scene, t, fit, cx);
     const loaded = !!path && this.loaded.has(path);
     this.warmed = !d && loaded ? this.warm(scene, fit, !small, cx) : null;
     if (d) {
@@ -525,27 +520,27 @@ export default class Wallpaper extends View {
       // The waits the card shows: the first picture (read, drawn, loaded), a mode or theme redrawing, a larger one for a zoom
       // (the picture not dimmed meanwhile), Apply.
       const waits = { load: this.track(`load:${d.id}`, !d.shown && ['loading', 'converting', 'ready'].includes(d.phase), cx),
-        draw: this.track(`draw:${d.id}`, !!d.shown && (d.phase === 'converting' || !loaded), cx),
+        draw: this.track(`draw:${d.id}`, !!d.shown && (d.phase === 'converting' || (!loaded && !failed)), cx),
         larger: this.track(`larger:${d.id}`, !!d.shown && small, cx),
         apply: this.track(`apply:${d.id}`, d.phase === 'applying', cx) };
       return focusRoot(this, root.children(this.layers(scene, p, path, waits.draw))
         .when(Boolean(d.scene), (el) => el.child(this.compositionCanvas(t))).child(this.card(t, waits)));
     }
-    const picture = this.layers(scene, p, path, false), waiting = this.track("picture", !loaded || small, cx);
+    const picture = this.layers(scene, p, path, false), waiting = this.track("picture", !failed && (!loaded || small), cx);
     if (this.warmed) picture.push(this.probe(this.warmed, "wallpaper-warm"));
     const button = (id, name, label, act, disabled = false) => tip(this, t, id, label,
       stop(this, t, id, ghostButton(this, t, id, { icon: icon(name), label, act, disabled, surface: "chrome" }), radiusOf("xs")));
     const go = (by) => () => setShared(KEY.wallpaper, all[(i + by + all.length) % all.length].id);
     const menuUp = popupOpen(this, "wallpaper-add", MENU_CLOSED);
     const shown = this.over || this.opening || menuUp || Date.now() < (this.shownUntil ?? 0) || /** @type {any} */ (this).fs.keyboard;
-    const spinner = (size) => svg("mods/workspace-chrome/spinner.svg").size(size).flex_none().text_color(t.dim).spin(900);
+    const loader = (size) => svg(icon("loader-circle")).size(size).flex_none().text_color(t.dim);
     const switcher = h_flex().id("wallpaper-switcher").absolute().right(12).bottom(12).p(4).gap(4).items_center()
       .rounded(8).bg(t.chrome).text_size(12).text_color(t.dim)
       .opacity(shown ? 1 : 0).transition("opacity", FADE)
       .child(button("wallpaper-back", "chevron-left", "Previous wallpaper", go(-1), all.length < 2))
-      // A picture still loading spins inside the name's fixed slot, so no button moves.
+      // A picture still loading puts the loader inside the name's fixed slot, so no button moves.
       .child(h_flex().w(Math.min(160, Math.max(0, (this.width ?? 304) - 144))).flex_none().gap(6).justify_center().items_center()
-        .when(waiting, (el) => el.child(spinner(12)))
+        .when(waiting, (el) => el.child(loader(12)))
         .child(div().min_w(0).truncate().child(this.opening ? "Choosing…" : this.lib.importing ? `Importing ${this.lib.importing}…` : scene.name)))
       .child(button("wallpaper-next", "chevron-right", "Next wallpaper", go(1), all.length < 2))
       .child(button("wallpaper-frame", "crop", `Frame ${scene.name}`, (cx) => cx.spawn((cx) => this.startPreview(null, scene.name, cx, scene)), !!scene.redrawing))
@@ -554,9 +549,9 @@ export default class Wallpaper extends View {
     const corner = div().id("wallpaper-corner").absolute().right(0).bottom(0).w(CORNER.w).h(CORNER.h)
       .on_hover((on, cx) => { this.over = on; if (!on) this.hot = null; cx.notify(); })
       .child(switcher);
-    // With the switcher away, the spinner sits where its right end is.
+    // With the switcher away, the loader sits where its right end is.
     const chip = h_flex().id("wallpaper-wait").absolute().right(12).bottom(12).size(32).justify_center().items_center().rounded(8).bg(t.chrome)
-      .role("status").accessibility_label(`Loading ${scene.name}`).opacity(shown ? 0 : 1).transition("opacity", FADE).child(spinner(14));
+      .role("status").accessibility_label(`Loading ${scene.name}`).opacity(shown ? 0 : 1).transition("opacity", FADE).child(loader(14));
     return focusRoot(this, root.children(picture).when(waiting, (el) => el.child(chip)).child(corner));
   }
 
@@ -674,16 +669,16 @@ export default class Wallpaper extends View {
   card(t, waits) {
     const d = this.draft, p = d.placement, broken = d.phase === 'broken', busy = d.phase === 'applying';
     const open = !!d.scene && !!d.shown && !waits.load;
-    const spinner = (size) => svg("mods/workspace-chrome/spinner.svg").size(size).flex_none().text_color(t.dim).spin(900);
+    const loader = (size) => svg(icon("loader-circle")).size(size).flex_none().text_color(t.dim);
     const drawing = `Drawing ${d.image ? styleName(d.style) : "picture"}…`;
     let rows = [div().id("wallpaper-card-name").h(20).flex_none().truncate().text_size(13).font_semibold().text_color(t.foreground).child(d.name)];
     if (!open) {
       rows.push(broken
         ? div().id("wallpaper-card-error").flex_none().max_h(48).overflow_hidden().text_size(12).text_color(t.ansi1).child(d.message ?? "")
-        : waits.load ? this.progress(t, d, d.phase === 'loading' ? "Reading image…" : drawing)
+        : waits.load ? this.progress(t, d, d.phase === 'loading' ? "Reading image…" : drawing, loader)
         : div().h(26).flex_none());
     } else {
-      if (d.pixels) rows.push(this.modes(t, d, spinner, waits.draw));
+      if (d.pixels) rows.push(this.modes(t, d, loader, waits.draw));
       const reset = this.resetOf(d), atRest = p.zoom === reset.zoom && p.x === reset.x && p.y === reset.y;
       rows.push(h_flex().h(28).flex_none().gap(8).items_center()
         .child(h_flex().h(28).flex_1().min_w(0).p(2).gap(2).rounded(8).bg(t.raised).children([['cover', 'Fill'], ['contain', 'Fit']].map(([mode, text]) =>
@@ -696,7 +691,7 @@ export default class Wallpaper extends View {
     }
     // Broken, the reason is the card's body already.
     const status = broken ? null : d.message ? div().truncate().text_color(t.ansi1).child(d.message)
-      : open && (waits.draw || waits.larger) ? h_flex().gap(6).items_center().child(spinner(12)).child(d.phase === 'converting' ? drawing : "Loading picture…")
+      : open && (waits.draw || waits.larger) ? h_flex().gap(6).items_center().child(loader(12)).child(d.phase === 'converting' ? drawing : "Loading picture…")
       : open && d.saved?.id.startsWith("file:") && !busy ? this.action(t, "wallpaper-delete", "Delete", () => this.askRemove(d.saved), { variant: "danger" })
       : null;
     const footer = h_flex().id("wallpaper-card-footer").h(28).flex_none().gap(8).items_center()
@@ -717,27 +712,28 @@ export default class Wallpaper extends View {
   cardWidth() { return Math.min(300, Math.max(0, (this.width ?? 324) - 24)); }
 
   // What the compact card says while the first picture comes: the step and a bar. An image's steps are known, so the bar
-  // shows how far (eased to each, and over FILL to the end while Home loads the picture); with none known, it sweeps.
-  progress(t, d, label) {
+  // shows how far (eased to each, and over FILL to the end while Home loads the picture); with none known, the still
+  // loader stands by the step and there is no bar, which would claim an amount.
+  progress(t, d, label, loader) {
     const w = this.cardWidth() - 32, f = d.progress == null ? null : d.phase === 'ready' ? 1 : d.progress;
-    const bar = div().id("wallpaper-progress-bar").absolute().top(0).h_full().rounded(4).bg(t.foreground);
+    const step = div().h(16).min_w(0).truncate().text_size(12).text_color(t.dim).child(label);
     return v_flex().id("wallpaper-progress").h(26).flex_none().gap(6).role("progress_indicator")
       .accessibility_label(f == null ? label : `${label} ${Math.round(f * 100)}%`)
-      .child(div().h(16).truncate().text_size(12).text_color(t.dim).child(label))
-      .child(div().relative().h(4).w_full().rounded(4).bg(t.border).overflow_hidden()
-        .child(f == null ? bar.w(w * 0.3).loop("left", { from: -w * 0.3, to: w, period: 1600 })
-          : bar.left(0).w(w * f).transition("width", { duration: d.phase === 'ready' ? FILL : 300, easing: d.phase === 'ready' ? "linear" : "ease-out" })));
+      .child(f == null ? h_flex().h(16).gap(6).items_center().child(loader(12)).child(step) : step)
+      .when(f != null, (el) => el.child(div().relative().h(4).w_full().rounded(4).bg(t.border).overflow_hidden()
+        .child(div().id("wallpaper-progress-bar").absolute().top(0).left(0).h_full().w(w * f).rounded(4).bg(t.foreground)
+          .transition("width", { duration: d.phase === 'ready' ? FILL : 300, easing: d.phase === 'ready' ? "linear" : "ease-out" }))));
   }
 
-  // T3's segmented ToggleGroup; the mode being drawn spins.
-  modes(t, d, spinner, drawing) {
+  // T3's segmented ToggleGroup; the mode being drawn carries the loader.
+  modes(t, d, loader, drawing) {
     const off = d.phase === 'applying';
     const styles = h_flex().id('wallpaper-styles').h(28).w_full().p(2).gap(2).rounded(8).bg(t.raised).role('group').accessibility_label('Image processing')
       .children(STYLES.map(([style, text], index) => stop(this, t, `wallpaper-style-${style}`,
         this.toggle(t, `wallpaper-style-${style}`, { text: style === 'quadrants' && (this.width ?? 324) < 324 ? 'Quads' : text,
           label: `${text}${d.style === style ? ', selected' : ''}`, on: d.style === style, disabled: off },
           cx => cx.spawn(cx => this.setStyle(style, cx))).px(3).rounded(6).flex_1().min_w(0).whitespace_nowrap()
-          .when(drawing && d.phase === 'converting' && d.style === style, (el) => el.child(spinner(12).id("wallpaper-style-spinner")))
+          .when(drawing && d.phase === 'converting' && d.style === style, (el) => el.child(loader(12).id("wallpaper-style-loading")))
           .on_key_down((e, cx) => {
             if (off || !plainKey(e) || !ARROWS.includes(e.key)) return;
             const next = STYLES[(index + (['right', 'down'].includes(e.key) ? 1 : STYLES.length - 1)) % STYLES.length][0];

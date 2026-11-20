@@ -38,7 +38,8 @@ function fixture(spaces = [space("s0", "/work/s0"), space("s1", "/work/p1"), spa
     snapshot, repos, commands, watches,
     answer: fn => { answer = fn; },
     update(at = now) { now = at; repos.update(snapshot, now); },
-    fact: s => plain(repos.forSpace(s, snapshot.panes)),
+    // A new list each ask, as panes() gives (project.js indexes each list once).
+    fact: s => plain(repos.forSpace(s, [...snapshot.panes])),
     looks: () => commands.filter(([, args]) => args.includes("status")).map(([, , { cwd, on }]) => [on, cwd]),
     wake(dir) { for (const watch of [...watches]) if (watch.dir === dir) watch.resolve([]); },
     async flush() { await flush(); assert.deepEqual(errors, []); },
@@ -275,6 +276,16 @@ async function check() {
     assert.deepEqual(f.looks(), [[null, "/work/main"], [null, "/work/linked"]], "a machine back re-asks its places");
     const other = fixture([main]);
     assert.deepEqual(other.fact(main), { git: null, answered: false }, "Spaces copies never share facts or queues");
+  }
+  {
+    // A look runs four times a second: each space is placed from its own panes, not by walking every pane for every space.
+    const list = Array.from({ length: 20 }, (_, i) => space(`s${i}`, `/work/s${i}`)), f = fixture(list);
+    let asked = 0;
+    f.snapshot.panes = list.map((s, i) => ({ pane: `p${i}`, terminal: `t${i}`, get tab() { asked++; return `b-${s.id}`; }, cwd: `/work/s${i}/src`, program: { shell: true } }));
+    f.update();
+    assert.ok(asked <= 4 * list.length, `a look asks each pane's tab a few times, not once per space: ${asked} for ${list.length} panes`);
+    await f.flush();
+    assert.deepEqual(f.looks().at(-1), [null, "/work/s19/src"], "and still finds where each space is");
   }
   console.log("ok: repository facts, per-machine queues, trusted results, retries, local watches and fallback.");
 }

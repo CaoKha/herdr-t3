@@ -65,22 +65,25 @@ export default class Spaces extends View {
     cx.timer.every(250, (cx) => this.checkNew(cx));
   }
 
-  machinesNow() {
-    return JSON.stringify(machines().map((m) => [m.name, m.layout]));
+  machinesNow(list = machines()) {
+    return JSON.stringify(list.map((m) => [m.name, m.layout]));
   }
 
   checkNew(cx) {
     if (checking()) return;
     const now = Date.now();
-    const sp = spaces();
+    const sp = spaces(), known = machines();
     // A machine came or went: its heading needn't wait for the next poll.
-    const seen = this.machinesNow();
+    const seen = this.machinesNow(known);
     if (seen !== this.machinesSeen) {
       this.machinesSeen = seen;
       this.refreshMachines(cx);
     }
-    this.repos.update({ spaces: sp, panes: panes(), machines: machines(), active: window().active, visible: listInView(), folded: this.folded }, now);
-    if (sp.some((s) => !this.shown.has(s.id)) || this.order.due(now)) cx.notify();
+    const active = window().active, draw = sp.some((s) => !this.shown.has(s.id)) || this.order.due(now);
+    // layout() copies the whole tree: where the list is matters only to the fallback and to a draw. Out of view nothing draws.
+    const visible = Boolean(active || draw) && listInView();
+    this.repos.update({ spaces: sp, panes: panes(), machines: known, active, visible, folded: this.folded }, now);
+    if (draw && visible) cx.notify();
   }
 
   refreshMachines(cx) {
@@ -156,16 +159,18 @@ export default class Spaces extends View {
 
   // The list's rows, each { key, h, el, ghost, m (its machine), r (a space's or repo's row) }; ghost() draws one
   // without the ids, handlers and labels the list uses.
-  grouped(t) {
-    const rows = this.order.rows(), ps = panes(), lifting = Boolean(this.drag?.moved);
+  // `sp`, `ps`: the draw's one read of spaces() and panes().
+  grouped(t, sp, ps) {
+    const rows = this.order.rows(sp, ps), lifting = Boolean(this.drag?.moved), here = sp.find(s => s.active)?.machine ?? null;
     const draw = (r, ghost) => r.head ? this.repoHead(r, t, ps, ghost) : this.row(r, t, ps, ghost);
     const entry = (r) => ({ key: r.head ? r.w.id : `space-${r.w.id}`, h: PITCH, m: r.w.machine ?? null, r, el: draw(r), ghost: () => draw(r, true) });
     const plain = (key, m, draw) => ({ key, h: PITCH, m, el: draw(false), ghost: () => draw(true) });
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.filter(m => !m.temporary).map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
+    let known;
     const loading = m => {
-      const layout = machines().find(k => k.name === m)?.layout;
+      const layout = (known ??= machines()).find(k => k.name === m)?.layout;
       return layout === "loading" || (!layout && this.machines.some(k => k.name === m && k.state === "connected"))
-        || spaces().some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
+        || sp.some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
     };
     const loadingRow = m => plain(`machine-loading-${m ?? "local"}`, m, ghost => div().when(!ghost, el => el.id(`machine-loading-${m ?? "local"}`))
       .h(ROW).flex_none().px(8).flex().items_center().text_color(t.dim).child("Loading…"));
@@ -216,7 +221,7 @@ export default class Spaces extends View {
             .on_hover(glow(this, `machine-add-${id}`))
             .on_click((_e, cx) => { cx.stop_propagation(); run("space.new", { machine: m ?? "" }); }), radiusOf()),
             // The key makes a space on the current space's machine: it names this + only on that one.
-            { action: (spaces().find(s => s.active)?.machine ?? null) === m ? "space.new" : null })))
+            { action: here === m ? "space.new" : null })))
           // An indicator, not a button: the whole row folds, so it lights with the row and has no label of its own.
           .child(div().id(`machine-fold-${id}`).flex_none()
             .text_color(this.overMachine === `machine-${id}` ? t.foreground : t.dim)
@@ -392,13 +397,13 @@ export default class Spaces extends View {
 
   render(cx) {
     const t = theme();
-    const sp = spaces();
+    const sp = spaces(), ps = panes();
     // While a row's lifted, nothing under the pointer lights or labels itself.
     if (this.drag?.moved) this.hot = this.overMachine = null;
     // The shipped mods (the Terminals picker) still color spaces from "space.colors": the same color, from the name.
     const colors = Object.fromEntries(sp.filter(p => p.name !== "~").map(p => [p.id, monogramColor(p.name, false)]));
     if (JSON.stringify(colors) !== JSON.stringify(shared("space.colors") ?? {})) setShared("space.colors", colors);
-    const rows = this.rows = this.grouped(t);
+    const rows = this.rows = this.grouped(t, sp, ps);
     // New space here goes as the space it made arrives, with no leave to say so: it would come back lit.
     if (this.hot?.startsWith("machine-new-") && !rows.some((e) => e.key === this.hot)) this.hot = null;
     // A row that left the list (closed, folded away) can't be dropped.
@@ -428,7 +433,7 @@ export default class Spaces extends View {
         .child(div().text_color(t.muted).child("Spaces"))
         // The same two as Inbox's top row, so switching modes moves nothing.
         .child(h_flex().flex_none().items_center()
-          .child(tool("space-new", "New space", "folder-plus", newSpaceButton(props()?.newMenu)))
+          .child(tool("space-new", "New space", "folder-plus", newSpaceButton(props()?.newMenu, sp)))
           .child(tool("space-new-tab", "New tab in…", "square-pen", { closed: closedKey(props()?.newMenu ?? "new-menu"), onOpen: () => run("mod.open", { name: props()?.newMenu ?? "new-menu" }) }))))
       .child(v_flex().id("space-list").flex_1().min_h(0).overflow_y_scroll()
         .on_mouse_move((e, cx) => this.dragTo(e, cx))

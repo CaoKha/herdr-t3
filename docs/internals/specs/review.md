@@ -55,7 +55,7 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 
 ## Refresh and memory
 
-- While visible in the active window and space, refresh every 15s. Page, row, base-commit and whole-file reads check the live view before sending and before applying the result, even before the visibility timer sees a hide. Hidden replies do not change the diff, folds, or errors. Pending refreshes merge into one catch-up page read on return.
+- While visible in the active window and space, refresh every 15s. A page with no review read yet does its first read while it shows in the active space, even with the window behind another; every later read waits for the window. Page, row, base-commit and whole-file reads check the live view before sending and before applying the result, even before the visibility timer sees a hide. Hidden replies do not change the diff, folds, or errors. Pending refreshes merge into one catch-up page read on return.
 - After that page read, resume any pending whole-file opens for the same files and revisions. A rerun need not wait for the old reply. Independent whole-file opens do not supersede each other or a page or row read. Closing the Review tab, evicting the space's data, or changing scope discards unfinished opens; closing and re-adding starts at the default range. In Herdr's own layout there is no tab instance; hiding its Review page still defers reads.
 - A running analysis still reports progress and completion while Review is hidden. Its completion or start acknowledgement defers the page refresh until Review returns.
 - Full data, rows and layout caches only for the last three shown spaces; eviction releases them and late reads can't refill them. Analysis status stays light, per space.

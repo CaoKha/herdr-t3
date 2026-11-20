@@ -6,7 +6,7 @@ tmp=$(mktemp -d)
 worker=
 trap '
   if [ -n "$worker" ]; then
-    touch "$tmp/release"
+    release
     wait "$worker" || :
   fi
   rm -rf "$tmp"
@@ -191,14 +191,10 @@ cat > "$tmp/bin/rsync" <<'EOF'
 #!/bin/sh
 set -eu
 gate=$CHECK_UPDATE_GATE
-if [ "${CHECK_UPDATE_ROLE:-}" = hold ] && [ ! -e "$gate/ready" ]; then
-  touch "$gate/ready"
-  tries=0
-  while [ ! -e "$gate/release" ]; do
-    if [ "$tries" -ge 300 ]; then echo 'check-update: timed out waiting for competing update' >&2; exit 1; fi
-    tries=$((tries + 1))
-    sleep 0.05
-  done
+if [ "${CHECK_UPDATE_ROLE:-}" = hold ] && [ ! -e "$gate/held" ]; then
+  touch "$gate/held"
+  echo ready > "$gate/ready"
+  read -r _ < "$gate/release"
 fi
 if [ "${CHECK_UPDATE_ROLE:-}" = compete ]; then touch "$gate/competed"; fi
 exec "$CHECK_UPDATE_REAL_RSYNC" "$@"
@@ -212,23 +208,29 @@ case "${CHECK_UPDATE_ROLE:-}:$2" in
 esac
 EOF
 chmod +x "$tmp/bin/rsync" "$tmp/bin/mv"
+# The held update and this check wake each other through two FIFOs, never by looking again after a while. Both stay open
+# both ways here: neither side waits for the other to open one, and a line written is kept until it is read.
 hold_update() {
-  rm -f "$tmp/ready" "$tmp/release"
-  PATH="$tmp/bin:$PATH" CHECK_UPDATE_ROLE=hold HERDR_APP_HOME="$held" "$src/scripts/update.sh" > "$tmp/held.out" 2>&1 &
+  rm -f "$tmp/ready" "$tmp/release" "$tmp/held"
+  mkfifo "$tmp/ready" "$tmp/release"
+  exec 7<>"$tmp/ready" 8<>"$tmp/release"
+  (
+    code=0
+    PATH="$tmp/bin:$PATH" CHECK_UPDATE_ROLE=hold HERDR_APP_HOME="$held" "$src/scripts/update.sh" > "$tmp/held.out" 2>&1 || code=$?
+    echo ended > "$tmp/ready"
+    exit "$code"
+  ) &
   worker=$!
-  attempt=0
-  while [ ! -e "$tmp/ready" ]; do
-    if [ "$attempt" -ge 100 ] || ! kill -0 "$worker" 2>/dev/null; then
-      cat "$tmp/held.out"
-      echo "FAIL check-update: update never reached its first copy"
-      exit 1
-    fi
-    attempt=$((attempt + 1))
-    sleep 0.05
-  done
+  read -r reached <&7
+  if [ "$reached" != ready ]; then
+    cat "$tmp/held.out"
+    echo "FAIL check-update: update never reached its first copy"
+    exit 1
+  fi
 }
+release() { echo go >&8 || :; } 2>/dev/null
 expect_conflict() {
-  touch "$tmp/release"
+  release
   if wait "$worker"; then
     echo "FAIL check-update: update succeeded despite a concurrent save to $1"
     fail=1
@@ -293,7 +295,7 @@ is '.["layout:herdr-t3"]["cmd-p"]' "$held/keys.json" mod.open:t3-picker
 hold_update
 jq '.traffic_lights[1] = 14 | (.. | objects | select(.id? == "sidebar")) .min = 239' "$held/layouts/herdr-t3.json" > "$tmp/aligned.json"
 cp "$tmp/aligned.json" "$held/layouts/herdr-t3.json"
-touch "$tmp/release"
+release
 if ! wait "$worker"; then
   echo "FAIL check-update: t3-chrome's own layout write stopped the update"
   cat "$tmp/held.out"

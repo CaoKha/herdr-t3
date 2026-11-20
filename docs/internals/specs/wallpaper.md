@@ -41,7 +41,7 @@ Rows, each a fixed height:
 | Footer | 28 | status slot flex (12px `dim`, errors `ansi1` truncated); Cancel `outline`, Apply `primary` at least 72, both `compact`; Delete a `compact` `danger` on the left for added pictures, as the Actions editor's, its box on the card's content edge (R1) |
 
 - Expanded: 208 high, 168 without the mode row. Compact (while reading): name, then the progress block (step name and bar, see Waits) or a red reason up to 48 high, then the footer; for an unreadable file the footer is Close and Choose another…. The card is bottom-anchored, so the footer stays put between compact and expanded, and the card opens upward.
-- Mode and Fill/Fit are T3 ToggleGroups: `raised` background, padding 2, gap 2, radius 8; equal-width `xs` segments of radius 6; mode segments padded 3. The segment being drawn carries a 12px spinner.
+- Mode and Fill/Fit are T3 ToggleGroups: `raised` background, padding 2, gap 2, radius 8; equal-width `xs` segments of radius 6; mode segments padded 3. The segment being drawn carries a 12px loader (Lucide `loader-circle`, still).
 - The slider (T3 has none): 4 high track, radius 4, `border` with the chosen part `foreground`, 16px `foreground` knob; logarithmic. Disabled, the whole control is at 0.64.
 - Zoom presets 100 / 125 / 150 / 200 / 250 / 300 / 400%.
 - Reset and − + are `ghostButton`s (`card` surface).
@@ -69,14 +69,14 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 
 ## Waits
 
-- Nothing shows for waits under 150ms; once shown, an indicator stays at least 300ms (`main.js` `track`).
+- Nothing shows for waits under 150ms; once shown, an indicator stays at least 300ms (`main.js` `track`). A picture that fails to draw ends its wait: no loader stays on Home, and a draft's last picture isn't left dimmed.
 - The last picture stays up until the next one has loaded, then the next replaces it whole in one frame, without fading in, so Home never blanks. Meanwhile the last one keeps its own framing, a new draft's included. How the mod knows it has loaded: [layout implementation](../layout-implementation.md)「壁纸转换」.
 - **Light/dark**: once the picture shows, the one for the layout's other appearance (its `theme_light` or `theme_dark`) is made and loaded out of sight, so switching shows it in the same frame as the new background. Another theme only recolours the picture, then loads it: its uncoloured tiles are kept on disk beside it, one set per side, so this holds after a restart too; the last picture stays up meanwhile. Going back to a palette whose file a newer one replaced makes it again.
-- **Compact card progress**: under the name, a 26 high block: the step name (12px `dim`, 16 high), 6 gap, a 4 high bar (track `border`, radius 4, `overflow_hidden`, progress `foreground`). Images have steps, so progress is determinate: the width follows the steps over 300ms ease-out, the last part linear to full within `FILL` (400ms). A picture framed again has none: a segment 30% of the track sweeps back and forth with `loop("left")`, every 1600ms. Before the indicator shows, the block is an empty 26 so the card's height doesn't change. Texts: *Reading image…*, *Drawing Dots…*.
-- **Mode switch**: the previous mode's picture stays at opacity 0.7 (150ms ease-out); the segment being drawn spins; the footer status reads a 12px spinner and "Drawing Braille…", then "Loading picture…" while it loads.
+- **Compact card progress**: under the name, a 26 high block: the step name (12px `dim`, 16 high), 6 gap, a 4 high bar (track `border`, radius 4, `overflow_hidden`, progress `foreground`). Images have steps, so progress is determinate: the width follows the steps over 300ms ease-out, the last part linear to full within `FILL` (400ms). A picture framed again has no steps, so no bar, which would claim an amount: a 12px loader stands before the step name, gap 6. Before the indicator shows, the block is an empty 26 so the card's height doesn't change. Texts: *Reading image…*, *Drawing Dots…*.
+- **Mode switch**: the previous mode's picture stays at opacity 0.7 (150ms ease-out); the segment being drawn carries the loader; the footer status reads a 12px loader and "Drawing Braille…", then "Loading picture…" while it loads.
 - **Apply**: pressed, every control on the card is disabled at once (modes, Fill/Fit, Reset, Zoom, Cancel, Apply), since none would act while it saves; only after 150ms does Apply read "Applying…".
-- **Zoom past the picture's size while framing**: the footer status reads a 12px spinner and "Loading picture…"; the picture isn't dimmed.
-- **Switching pictures, theme or light/dark, after Apply, or a larger picture (Picture size)**: with the switcher shown, a 12px spinner left of the name in its fixed slot, gap 6. With the switcher hidden, a 32 square `chrome` block, radius 8, 12 from the right and bottom (the switcher's end), with a 14px spinner, fading opposite to the switcher over 150ms.
+- **Zoom past the picture's size while framing**: the footer status reads a 12px loader and "Loading picture…"; the picture isn't dimmed.
+- **Switching pictures, theme or light/dark, after Apply, or a larger picture (Picture size)**: with the switcher shown, a 12px loader left of the name in its fixed slot, gap 6. With the switcher hidden, a 32 square `chrome` block, radius 8, 12 from the right and bottom (the switcher's end), with a 14px loader, fading opposite to the switcher over 150ms.
 
 ## Apply, Cancel, Delete
 

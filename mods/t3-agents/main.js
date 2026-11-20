@@ -7,7 +7,7 @@ import { agents, terminals, panes, spaces, focused, theme, layout, shared, setSh
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { stopsInit, stopsEnd, focusRoot, enter } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
-import { menuKeys, litProp, propsLit } from "./list.js";
+import { menuKeys, litOnHover, litProp, propsLit } from "./list.js";
 import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
 import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
@@ -54,7 +54,13 @@ export default class Agents extends View {
     this.folded = JSON.parse(localStorage.getItem("folded") ?? "{}");
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changes") ?? "{}");
-    cx.timer.every(1000, () => this.compute());
+    // Behind the Inbox nothing is drawn or published, so nothing is sorted or grouped: only what outlives the tick is kept.
+    cx.timer.every(1000, () => {
+      const parts = sidebarParts(layout());
+      if (parts.stack?.active !== "inbox") return this.compute(parts);
+      this.observe();
+      this.agentOrder = null;
+    });
     cx.timer.every(30000, (cx) => cx.notify()); // The rows' times move with nothing else changing.
     // Older installs kept pins in this list's storage; move them over once, before the inbox writes any.
     if (shared(KEY.pins) == null && localStorage.getItem("pins")) setPinned(JSON.parse(localStorage.getItem("pins")));
@@ -162,7 +168,7 @@ export default class Agents extends View {
         .text_color(t.foreground)
         .role("button").accessibility_label(s.label)
         .when(i === this.at, el => el.bg(t.selected))
-        .on_hover((over, cx) => { if (over && this.at !== i) { this.at = i; cx.notify(); } })
+        .on_hover(litOnHover(this, "at", i))
         .on_click(() => choose(s))
         .child(svg(`mods/t3-agents/icons/${s.icon}.svg`).size(16).mx(-2).flex_none().text_color(t.muted))
         .child(div().flex_1().child(s.label))
@@ -173,11 +179,18 @@ export default class Agents extends View {
     return agentStatus(this, t, a, note, id);
   }
 
-  compute() {
-    const sort = sortOf(), every = agents(), all = terminals(), f = focused(), sp = spaces(), ps = panes(), now = Date.now();
-    const pins = this.prune(all, pinList()), pinSet = new Set(pins);
+  // What every look owes, drawn or not: each agent's history, the done being read, and ended agents' pins and folds dropped.
+  observe() {
+    const every = agents(), all = terminals(), sp = spaces(), now = Date.now();
+    const pins = this.prune(all, pinList());
     this.track(every, sp, now);
     this.hold(every);
+    return { every, all, sp, now, pins };
+  }
+
+  // `parts`: where the sidebar is, read once a look (layout() copies the whole tree).
+  compute(parts = sidebarParts(layout())) {
+    const sort = sortOf(), { every, all, sp, now, pins } = this.observe(), f = focused(), ps = panes(), pinSet = new Set(pins);
     const listed = new Map(every.map((a) => [a.address, a.status]));
     // A mod pane has no agent of its own, and Herdr's is then the chosen one, else the first of all: it counts only in that tab, as in the inbox.
     const shown = f?.pane && !f.terminal && !every.some((a) => a.tab === f.tab && a.address === f.agent) ? null : f?.agent ?? f?.terminal;
@@ -218,12 +231,12 @@ export default class Agents extends View {
     // Every top-level agent, in its group or not. A sub-agent with no pane can only open as a peek, a popup over the work. A folded group
     // counts: Idle folds by default, and leaving a row there would take it off the walk, with no key back.
     const ordered = groups.flatMap(g => g.members), order = [...new Set(ordered.map(a => a.address))];
-    this.publishRows({ order, view: ancestor });
-    return { sort, list: ordered, all, shown, ancestor, ps, sp, now, byPriority, facts, listed, groups };
+    this.publishRows({ order, view: ancestor }, parts);
+    return { sort, list: ordered, all, shown, ancestor, ps, sp, now, byPriority, facts, listed, groups, parts };
   }
 
-  publishRows(drawn) {
-    if (sidebarParts(layout()).stack?.active !== "inbox") {
+  publishRows(drawn, parts) {
+    if (parts.stack?.active !== "inbox") {
       if (JSON.stringify(drawn) !== JSON.stringify(shared(KEY.agentsRows) ?? null)) setShared(KEY.agentsRows, drawn);
       const key = JSON.stringify(drawn.order);
       if (key !== this.agentOrder || shared(KEY.agentOrder) !== "lists") {
@@ -255,7 +268,7 @@ export default class Agents extends View {
     const target = (data.shown && entries.some((e) => e.key === `sub-${data.shown}`) ? `sub-${data.shown}`
       : data.shown && entries.some((e) => e.key === data.shown) ? data.shown
       : data.ancestor && entries.some((e) => e.key === data.ancestor) ? data.ancestor : null);
-    if (!revealVisible()) this.cancelReveal();
+    if (!revealVisible(data.parts)) this.cancelReveal();
     else if (this.inView !== undefined && target !== this.inView) this.requestReveal(target === this.hovered ? null : target, cx);
     this.inView = target;
     if (this.reveal && (!target || this.reveal.key !== target || this.hovered === target)) this.cancelReveal();

@@ -107,12 +107,9 @@ function svg(cells, aspect, box) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${round(x1 - x0)} ${y1 - y0}" fill="none" stroke="#000" stroke-linecap="round">${paths.join("")}</svg>\n`;
 }
 
-/**
- * Converts the `.ans` text of a frame made here (imageAns). Yields `null` now and then, a place to let the UI breathe, and
- * each tile as `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect, paper: true }`, in cell
- * heights. `paper` turns its tones over for a light theme (each glyph its opposite, blank opaque cells full). Throws for any
- * other text.
- */
+/** Converts the `.ans` text of a frame made here (imageAns); throws for any other. Yields `null` now and then, for the UI to
+ *  breathe, and each tile as `{ file, svg, tint, opacity, x0, x1, y0, y1 }`; returns `{ width, height, aspect, paper: true }`,
+ *  in cell heights. `paper` turns its tones over for a light theme (each glyph its opposite, blank opaque cells full). */
 export function* convert(text, paper = false) {
   const header = text.match(IMAGE_HEADER), aspect = ASPECT;
   if (!header) throw new Error("This isn't a picture made here: add it with Choose image… or by dropping the image on Home.");

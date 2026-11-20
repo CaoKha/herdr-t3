@@ -32,10 +32,10 @@ function duration(ms) {
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
-// `ghost`: drawn for its leaving, without handlers or ids the list uses.
 // A row's right-click: the agent's menu (t3-menu), its details card taken down first.
 const agentMenu = (view, address) => (_e, cx) => { detailsFor(view, null, cx); openMenu(view, "agent", { address }, cx); };
 
+// `ghost`: drawn for its leaving, without handlers or ids the list uses.
 function agentSubRow(view, t, s, st, shown, card, ghost) {
   const k = s.k;
   const pic = programIcon(k.program, 14, t.foreground);
@@ -88,7 +88,7 @@ function agentSubRow(view, t, s, st, shown, card, ghost) {
 
 export function agentStatus(view, t, a, note = "", id) {
   // Idle: a ring. Every mark is 12 wide, as T3's one-line row, flush right, so the column ends where Spaces' git info does.
-  const mark = statusMark(t, a.status) ?? div().size(6).flex_none().rounded_full()
+  const mark = statusMark("mods/t3-agents", t, a.status) ?? div().size(6).flex_none().rounded_full()
     .when(a.status === "idle", (el) => el.border(1.5).border_color(t.idle ?? t.dim));
   const label = (STATUS_WORD[a.status] ?? "Unknown") + note;
   const el = h_flex().size(20).flex_none().items_center().justify_end()
@@ -134,7 +134,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
   };
 
   // A row's detail is what the agent is on, as the inbox, tabs and pane headers name it.
-  const label = namer();
+  const label = namer({ terminals: all, spaces: sp });
   const detail = new Map(list.map(a => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
   const seen = {};
   for (const a of list) { const k = `${a.space_name}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
@@ -182,7 +182,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
           cx.notify();
         }), radiusOf()));
     // A row leads with what the agent is on; an automatic tab number says nothing.
-    // Without a space header above (priority, pinned) the space follows, dim, and gives way first.
+    // Without a space header above (priority, pinned) the space follows, dim: whole, or not at all.
     const full = byPriority || isPinned;
     const name = full ? more ?? (a.space_name || label(a)) : more ?? (/^\d+$/.test(label(a)) ? a.program?.name || label(a) : label(a));
     const where = full && more && a.space_name && a.space_name !== more ? a.space_name : null;
@@ -207,9 +207,11 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
           cx.stop_propagation();
           view.toggleFold(a.address, cx);
         })))
-      .child(h_flex().flex_1().min_w(0).gap(10).items_center()
-        .child(div().min_w(0).truncate().when(on || st === "blocked" || st === "done", (el) => el.font_medium()).text_color(leads ? t.foreground : t.muted).child(name))
-        .when(Boolean(where), el => el.child(div().flex_1().flex_shrink(1000).min_w(0).truncate().text_size(12).text_color(t.dim).child(where))))
+      // Short of room the space wraps under the name, where the row's one line clips it, and the name has the width: never a stub.
+      // The name's line is as tall as the row, so a wrapped line starts outside it.
+      .child(h_flex().flex_1().min_w(0).h(ROW).flex_wrap().overflow_hidden().gap(10).items_center()
+        .child(div().min_w(0).truncate().line_height(`${ROW}px`).when(on || st === "blocked" || st === "done", (el) => el.font_medium()).text_color(leads ? t.foreground : t.muted).child(name))
+        .when(Boolean(where), el => el.child(div().flex_none().whitespace_nowrap().text_size(12).text_color(t.dim).child(where))))
       .child(h_flex().when(!ghost, el => el.id(`controls-${a.address}`)).flex_none().items_center().gap(4)
         .when(subs.length > 0, el => el.child(fold(a, subs, ghost)))
         // The time and the pin share one slot, T3's corner, so hovering moves nothing else.

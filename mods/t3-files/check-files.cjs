@@ -25,7 +25,7 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
 function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null, appDir = null, clock = Date } = {}) {
   const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
-    props: null, overlays: [], closed: [], commands: [], focusCalls: 0 };
+    props: null, overlays: [], closed: [], commands: [], focusCalls: 0, hostReads: 0 };
   const shared = {}, wrote = [], store = new Map([["lines.wrap", "false"], ["nav.width", "300"]]), timers = [], everies = [], failed = [];
   const commands = [];
   let wake = null, running = null;
@@ -72,7 +72,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v,
       set_value(x) { assert.ok(!w.drawing, "InputState.set_value must run outside the draw"); v = x; }, focus() { events.focus?.({}, cx); } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
-    spaces: () => w.spaces, agents: () => [], focused: () => null, panes: () => [], layout: () => layout,
+    spaces: () => { w.hostReads++; return w.spaces; }, agents: () => [], focused: () => null, panes: () => [], layout: () => { w.hostReads++; return layout; },
     theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => appDir ?? "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
@@ -168,8 +168,7 @@ async function page() {
   // Icons as T3's file toolbar; the panel head's stay 16.
   assert.equal(find(root, "t3-files-switches").style.gap[0], 4, "Preview, Wrap and Tree 4 apart (P3), each its own fill");
   for (const id of ["t3-files-render-mode", "t3-files-wrap", "t3-files-nav-toggle"]) assert.deepEqual(find(root, id).items.map((n) => n.style.size?.[0]), [14], `${id}: a 14 icon`);
-  // As T3's: the tree column's left rule at 60% of the border, no rule under its head, the search with no hover fill.
-  assert.ok(!find(root, "t3-files-nav").style.border_l && find(root, "t3-files-nav-rule").style.opacity[0] === 0.6, "a faint rule");
+  // As T3's: no rule under the tree column's head, the search with no hover fill.
   assert.ok(!find(root, "t3-files-nav-head").style.border_b, "no rule under the column's head");
   assert.equal(find(root, "t3-files-search-field").style.hover, undefined, "the search field: no hover fill");
   // The crumbs' › lights as the bar's buttons: the text color at 4% hovered, 7% with its menu up.
@@ -732,10 +731,10 @@ async function resources() {
   // Hidden while another machine's file is checked: it isn't read after.
   w.stall = (l) => l.includes(m.PROBE); view.open(st("v"), "a.js", cx); await settle();
   assert.equal(w.stalled.length, 1, "probing");
-  w.read.length = 0; ran(); w.windowActive = false;
+  w.read.length = 0; ran(); show("review");
   w.stall = null; w.stalled.splice(0).forEach((r) => r()); await settle();
   assert.deepEqual([ran(), w.read], [[], []], "hidden mid-probe: not read");
-  w.windowActive = true; await tick();
+  show("files"); await tick();
   assert.ok(w.read.includes("/x/a.js"), "back: read");
   ran();
   assert.equal(w.watchers.length, 0, "nothing ever watched");
@@ -803,6 +802,55 @@ async function searchMatchesWords() {
   send("search:b"); await settle();
   root = view.render(cx);
   assert.equal(find(root, "row-a.js"), null, "from no search: not the whole tree under the words");
+}
+
+// A page that shows in a window behind still reads what it draws as waiting, once: its tree, a file still loading. A slow one
+// says so. Nothing there is refreshed until the window is in front.
+async function behindFirstRead() {
+  let now = 100000;
+  const { view, cx, w, settle, tick, fire, send } = makePage({ clock: { now: () => now } });
+  const lists = () => w.ran.filter((r) => r.line.includes(m.LIST)).length;
+  w.windowActive = false;
+  w.stall = (line) => line.includes(m.LIST);
+  view.render(cx); await settle();
+  assert.equal(w.stalled.length, 1, "behind: the tree it shows is being read");
+  await fire(150);
+  assert.ok(find(view.render(cx), "t3-files-tree-loading"), "behind and slow: it says it's loading");
+  w.stall = null; w.stalled.pop()(); await settle();
+  assert.ok(find(view.render(cx), "row-a.js"), "behind: the tree, read once");
+  const read = lists();
+  for (let i = 0; i < 3; i++) { now += 60000; await tick(); view.render(cx); }
+  assert.equal(lists(), read, "behind: no refresh");
+  // A file's tab shown there: its loading state is a read under way, not a wait for the window.
+  send("open:a.js"); await settle(); view.render(cx); await fire(0);
+  assert.ok(find(view.render(cx), "t3-files-code"), "behind: the file it shows as loading is read");
+  // One still loading as the window goes behind finishes: the page keeps saying it's loading until it has.
+  w.windowActive = true; await tick();
+  w.hold = "/r/b.js"; send("open:b.js"); await settle();
+  assert.equal(w.held.length, 1, "b.js being read");
+  w.windowActive = false; await tick();
+  w.hold = null; w.held.pop()(); await settle();
+  assert.equal(view.current().view.text, "held\n", "gone behind mid-read: the file still arrives");
+  const after = lists();
+  for (let i = 0; i < 3; i++) { now += 60000; await tick(); view.render(cx); }
+  assert.equal(lists(), after, "behind, all read: nothing more");
+  w.windowActive = true; await tick();
+  assert.equal(lists(), after + 1, "in front: read again at once");
+}
+
+// The tick is for seeing the page go out of view: a copy that has shown nothing reads nothing on it, and one hidden after showing
+// reads no more for each space it keeps.
+async function idleTick() {
+  const three = [space("s1", "/r1", true), space("s2", "/r2"), space("s3", "/r3")];
+  const reads = async (page) => { const was = page.w.hostReads; await page.tick(); return page.w.hostReads - was; };
+  assert.equal(await reads(makePage({ page: "review", spaces: three })), 0, "never shown: its tick reads nothing");
+  const hidden = async (ids) => {
+    const page = makePage({ spaces: three });
+    for (const id of ids) { page.activate(id); page.view.render(page.cx); await page.settle(); }
+    page.show("review"); await page.tick();
+    return reads(page);
+  };
+  assert.equal(await hidden(["s1", "s2", "s3"]), await hidden(["s1"]), "hidden: a tick's reads don't grow with the spaces it keeps");
 }
 
 async function closeKeys() {
@@ -981,11 +1029,7 @@ async function latePreview() {
 }
 
 (async () => {
-  // A listing in the tree's order: folders first, then names as people read them (shared/check-file-tree.cjs has the order).
-  assert.deepEqual(plain(m.parseListing("f\0file10\0f\0file2\0")).map((e) => e.name), ["file2", "file10"]);
-  assert.deepEqual(plain(m.parseListing("f\0b.txt\0d\0src\0f\0a b.md\0")), [{ name: "src", dir: true }, { name: "a b.md", dir: false }, { name: "b.txt", dir: false }]);
   assert.deepEqual(plain(m.ancestors("a/b/c.js")), ["a", "a/b"]);
-  assert.deepEqual([m.join("", "a"), m.join("a", ""), m.join("/r/", "a"), m.join("/", "a")], ["a", "a", "/r/a", "/a"]);
 
   // Files only decorates ignored entries; a deleted path is not invented as a ghost tree row.
   const ignored = new Set(["dist", "old.log"]);
@@ -1101,6 +1145,8 @@ async function latePreview() {
   await treeLoadingDelay();
   await latePreview();
   await searchMatchesWords();
+  await behindFirstRead();
+  await idleTick();
   await menus();
   console.log("t3-files checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

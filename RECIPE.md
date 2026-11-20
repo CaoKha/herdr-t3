@@ -58,7 +58,7 @@ Details (`cmd-shift-b`) is a native popup under its button, 280 wide, up to 420 
 
 ### Panes and sub-agents
 
-A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working spinner before the count while one is at work and the agent itself isn't (a header has one spinner at most); it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
+A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working mark before the count while one is at work and the agent itself isn't (a header has one working mark at most); it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
 
 ### Space panel
 
@@ -68,7 +68,7 @@ One right panel follows the space across its tabs; each space keeps its own surf
 
 Drag a file or folder row into a terminal to paste its path without Enter. Herdr handles quoting, copying local files to remote terminals and rejecting unsupported drops; ordinary clicks and the Insert menu entry remain.
 
-Files shows the space's folder on its machine, read-only: a full-width tree, or with a file open the content on the left and the tree in a resizable column on the right. The file header has breadcrumbs (`›` opens one folder menu that moves through folders in place, Back on top, as T3's), the Open in split, and Preview/Code, Wrap and Tree toggles, their icons 14px as T3's file toolbar. Open in is T3's header split: 24 high, one `input` outline round the icon and the chevron with a full-height rule between them, no fill at rest, each half filling on its own when hovered; Actions' `▶ | ⌄` in a bar is the same control (`shared/button.js` `split()` `xs`), while Details' split rows stay borderless, as T3's panel. The content is on the theme's `background`, the header and the tree's column on the panel's `chrome`, a faint rule where they meet, as T3's code beside its file explorer. The tree has no chevrons: open and closed folder icons, Pierre file icons in theme colours, ignored entries dim. Search filters the same tree. Content is a Markdown preview, the native read-only `Editor`, or an image. Herdr colours code on the UI thread and a new editor starts at the top, so a file is coloured as it opens; in a larger file, text rewritten while it shows goes in plain and is coloured once it holds still, never once scrolled while plain; past a size limit it stays plain under an amber notice with **Highlight anyway**. Spec: [files](docs/internals/specs/files.md).
+Files shows the space's folder on its machine, read-only: a full-width tree, or with a file open the content on the left and the tree in a resizable column on the right. The file header has breadcrumbs (`›` opens one folder menu that moves through folders in place, Back on top, as T3's), the Open in split, and Preview/Code, Wrap and Tree toggles, their icons 14px as T3's file toolbar. Open in is T3's header split: 24 high, one `input` outline round the icon and the chevron with a full-height rule between them, no fill at rest, each half filling on its own when hovered; Actions' `▶ | ⌄` in a bar is the same control (`shared/button.js` `split()` `xs`), while Details' split rows stay borderless, as T3's panel. The content is on the theme's `background`, the header and the tree's column on the panel's `chrome`, a faint rule where they meet, as T3's code beside its file tree. The tree has no chevrons: open and closed folder icons, Pierre file icons in theme colours, ignored entries dim. Search filters the same tree. Content is a Markdown preview, the native read-only `Editor`, or an image. Herdr colours code on the UI thread and a new editor starts at the top, so a file is coloured as it opens; in a larger file, text rewritten while it shows goes in plain and is coloured once it holds still, never once scrolled while plain; past a size limit it stays plain under an amber notice with **Highlight anyway**. Spec: [files](docs/internals/specs/files.md).
 
 ### Optional Review
 
@@ -86,7 +86,7 @@ Home's default page: centred Next agent, Go to and New tab buttons with keycaps,
 
 Cards, Agents rows, tabs and headers use one naming rule: Pi's `pi.session` while Pi runs; then an explicitly named tab for a top-level agent, unless another top-level agent shares it; then a meaningful terminal title with only that program's decorations removed (Pi's `π - … - <folder>`, OpenCode's `OC | `); else the program name. Titles that are only a path, `user@host`, the program or the folder are rejected, as are agent-decorated leftovers on a terminal no longer running an agent. Sub-agents don't inherit their tab's name. An unnamed tab reads as its agent, else its focused pane.
 
-A parent's status rolls up its live descendants: any blocked or error first; then its own unread done; then working if it or a descendant works; else its own state. A sub-agent's own row shows an error as Failed with the same `!` in `ansi1`. A live terminal is an agent if it reports status or its program is marked agent; a command shell isn't, but agents started through one count. Working uses the shipped spinner in `working`; blocked a rounded `!` on 15% `blocked`; done a 6px `done` dot (green `Done` in Inbox); idle a ring in Agents and nothing elsewhere.
+A parent's status rolls up its live descendants: any blocked or error first; then its own unread done; then working if it or a descendant works; else its own state. A sub-agent's own row shows an error as Failed with the same `!` in `ansi1`. A live terminal is an agent if it reports status or its program is marked agent; a command shell isn't, but agents started through one count. Working is a still dashed circle (Lucide `circle-dashed`) in `working`; blocked a rounded `!` on 15% `blocked`; done a 6px `done` dot (green `Done` in Inbox); idle a ring in Agents and nothing elsewhere.
 
 Space marks are the Project's favicon, else the name's first letter in a name-hashed T3 colour.
 
@@ -118,7 +118,7 @@ Dragging a card or slim row previews its result on a badge (Pin, Unpin, Settle, 
 
 ### Snooze
 
-Any card that doesn't need the person offers a clock before Settle: In 1 hour, In 3 hours, This evening, Tomorrow, Next week, or Custom (a date and time, or a duration). The agent waits in Snoozed, wakes where it was (at the top of Active if a run finished meanwhile) and carries `Woke` until viewed. A permission prompt shows it as Needs you meanwhile. Failure in its tree, a new turn in view, Wake, pin or Settle ends it.
+Any card that doesn't need the person offers a clock before Settle: In 1 hour, In 3 hours, This evening, Tomorrow, Next week, or Custom (a date and time, or a duration). The agent waits in Snoozed, wakes where it was (at the top of Active if a run finished meanwhile) and carries `Woke` until viewed with Inbox selected. A permission prompt shows it as Needs you meanwhile. Failure in its tree, a new turn in view, Wake, pin or Settle ends it.
 
 ### Viewed rows and mod cards
 
@@ -128,7 +128,7 @@ A pane mod gets its own card only by opting in with `shared("<mod>.program") = {
 
 ### Tabs, navigation and closing
 
-Clicking a tab selects it, double-click renames, right-click opens its menu, dragging reorders (in Inbox only tabs without agents). Clicking the Inbox breadcrumb's space opens its menu (`280` wide, `10` scrollable rows below pinned New tab) with New tab (`t3-tabs.new`) and the current space's agents (with nested sub-agents) and non-agent terminal panes; right-clicking an item opens its agent or pane menu, and the pointer's `×` or `ctrl-d` on a row closes that pane through the usual confirmation. A no-agent tab entered from the strip keeps the space's last agent dimmed in the breadcrumb; after New tab in the space menu or `cmd-t`, the breadcrumb shows only the space until another agent is viewed.
+Clicking a tab selects it, double-click renames, right-click opens its menu, dragging reorders (in Inbox only tabs without agents). Clicking the Inbox breadcrumb's space opens its menu (`280` wide, `10` scrollable rows below pinned New tab) with New tab (`t3-tabs.new:<space>`) and the current space's agents (with nested sub-agents) and non-agent terminal panes; right-clicking an item opens its agent or pane menu, and the pointer's `×` or `ctrl-d` on a row closes that pane through the usual confirmation. A no-agent tab entered from the strip keeps the space's last agent dimmed in the breadcrumb; after a new tab, the breadcrumb shows only the space until another agent is viewed: every way of opening a tab (`cmd-t`, Lists' `+`, New, a menu's New tab) runs `t3-tabs.new`.
 
 Agent next/previous walks the selected mode's rows without wrapping; tab next/previous wraps through the displayed tabs. Closing the viewed agent's whole tab or last pane lands on Home in Inbox, on the space's last-viewed tab in Lists; background closes never navigate. Every layout close asks `hc get` first and closes at once only when the terminal holds its own shell; otherwise it asks `Close terminal "<name>"?` (`This stops the running process and clears its history.`).
 
@@ -159,7 +159,7 @@ Go to (`cmd-p`) lists every pane, recent first, opening on the previous pane so 
 
 **Clean up** (`t3-tabs.cleanup`) opens a dialog that is also the confirmation, without leaving Inbox. Core-confirmed settled agents and non-agent shells at their prompts outside the current tab fold into one block giving their count and the spaces they empty, opened to list names by space; **Close** ends them, rechecking each and closing spaces emptied this way. Each program left behind, a non-agent terminal still running in a space where no agent is at work and that you're not in, is a card with its space, machine and foreground process: clicking goes there; its `Stop`, a word rather than an `×` because it doesn't ask, or `ctrl-d` on it, stops it at once. A program in a working space is in use and isn't listed. Counts and the spaces that close follow what's still live. The footer says what's skipped: the tab you're on, and programs in the space you're in. With neither, show a toast. See [Clean up](docs/internals/specs/dialogs.md#clean-up) and the [cleanup command](docs/internals/specs/tab-bar.md#t3-tabs-commands).
 
-Actions are global. `▶` reruns the last action, its menu runs another and makes it primary, and a gear edits. An action has a Name, a Command, an optional Folder and icon, and opens in a new Tab, Split right or Split down via `terminal.open { argv: ["sh", "-c", command], name, place, folder? }`; the shell stays after it ends. Without a Folder it runs in the focused terminal's cwd, else the space folder.
+Actions are global. `▶` reruns the last action, its menu runs another and makes it primary, and a gear edits. An action has a Name, a Command, an optional Folder and icon, and Run in (Tab, Right or Down: a new tab or a split) via `terminal.open { argv: ["sh", "-c", command], name, place, folder? }`; the shell stays after it ends. Without a Folder it runs in the focused terminal's cwd, else the space folder.
 
 ### Home and Settings
 
@@ -198,7 +198,7 @@ Every control is a Tab stop clicked by Enter or Space, with a 2px inset `accent`
 | `cmd-shift-w`, `ctrl-alt-x` | `t3-tabs.close-pane` |
 | `cmd-shift-h` | `t3-tabs.home` |
 | `cmd-shift-,` | `t3-tabs.settings` |
-| `cmd-t`, `ctrl-alt-c` | `t3-tabs.new` (New at Home) |
+| `cmd-t`, `ctrl-alt-c` | `t3-tabs.new` (New at Home or with no space open) |
 | `ctrl-1…9`, `ctrl-alt-shift-1…9` | `t3-tabs.space:<n>`, spaces excluding Home |
 | `cmd-alt-]` / `[`, `ctrl-alt-shift-]` / `[` | `t3-tabs.space-next` / `space-prev` |
 | `cmd-1…9`, `ctrl-alt-1…9` | `t3-tabs.tab:<n>`, displayed tabs |
@@ -250,7 +250,7 @@ floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, visually empty
 
 Sidebar, work and panel columns are `resizable:false` inside, keeping their outside dividers. `spaces` gets `{newMenu:"t3-new-menu"}`; `inbox` gets `{newMenu:"t3-new-menu",home:"t3-tabs.home",menu:"t3-menu"}`. `main` and `home-main` share the pane frame settings above. The floating `tabs-keys` copy owns commands, Home and per-space panel sync; other `t3-tabs` copies share navigation.
 
-Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3-pane`, `t3-home`, `t3-files`, `t3-new-menu`, `t3-picker`, `t3-actions`, `t3-menu`. Adapt the matching shipped mods where they exist. Inbox, Home and Files are new. Keep the shipped `workspace-status`, spinner and program artwork. UI icons are Lucide (24 grid, 1.75 stroke) in each mod's own `icons/`; Files and Review trees use T3/Pierre shapes. A mod can't import outside its folder: shared modules live in `shared/` and `scripts/sync.sh` copies them.
+Required mods: `t3-chrome`, `t3-spaces`, `t3-agents`, `t3-inbox`, `t3-tabs`, `t3-pane`, `t3-home`, `t3-files`, `t3-new-menu`, `t3-picker`, `t3-actions`, `t3-menu`. Adapt the matching shipped mods where they exist. Inbox, Home and Files are new. Keep the shipped `workspace-status` and program artwork. UI icons are Lucide (24 grid, 1.75 stroke) in each mod's own `icons/`; Files and Review trees use T3/Pierre shapes. A mod can't import outside its folder: shared modules live in `shared/` and `scripts/sync.sh` copies them.
 
 ### Install
 
