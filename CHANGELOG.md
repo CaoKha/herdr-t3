@@ -4,6 +4,7 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-20
 
+- At Home with a single page or mod, such as the asciicn wallpaper, Home is the whole area right of the sidebar, up to the window's top: no frame, no margin around it. The wallpaper's picture runs under the top row too, as one picture, and with the sidebar hidden its button sits on it. Default's page has its own colour all the way up. A terminal or a split Home keeps its frame. A framing you saved may sit about 8 px differently, as Home's corner is now the window's.
 - Herdr's icon and name at the top left of the sidebar are laid out as T3's brand, after the sidebar button at the same gap as the sidebar's other icons: the icon as big as the sidebar button's and the Inbox buttons' icons, centred on the name, and closer to it. They look the same at all times: the icon is always in full colour and `Herdr` stays dimmed, no longer lighting up on hover or while you're at Home. Click it to go Home, as before. With the sidebar hidden only the sidebar button stays in the tab row, as in T3; go Home with `cmd-shift-h` or the palette.
 - As in T3, the sidebar never gets narrower than its top row, so in a narrow window `Herdr` ends right above the Inbox filter button instead of past it. On macOS the layout file is adjusted for this, as it is for the window buttons.
 - In Inbox, hiding the sidebar puts the space's icon at the start of the tab row where Herdr's icon was, so one icon takes the other's place and the sidebar button stays put.

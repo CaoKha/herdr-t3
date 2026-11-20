@@ -78,7 +78,7 @@ Review is for the [pulls.review fork](https://github.com/JinJieBeWater/pulls.rev
 
 New and Go to are top-centred popups, 576px wide with a 16px radius and a footer of keycaps. New and Go to use 48px two-line rows. Menus, tooltips and buttons follow [t3-tokens](docs/internals/t3-tokens.md). The Actions editor and confirmations are 512px, radius 16; a confirmation's action is red text on a raised button, after Cancel. Layout Settings follows Herdr's own Settings dialog (880×620). Spec: [dialogs](docs/internals/specs/dialogs.md).
 
-Home is one framed pane without a header: centred Next agent, Go to and New tab buttons with keycaps, no names or counts. On Home the tab row has no panel toggle and folds from 40 to 8px unless it must hold window buttons or the hidden sidebar's controls. Spec: [home](docs/internals/specs/home.md).
+Home's default page: centred Next agent, Go to and New tab buttons with keycaps, no names or counts. A Home of one mod (that page, the wallpaper) is the whole right side up to the window's top, in Home's own colour with no frame: a 40px Home row over it holds, with the sidebar hidden, the toggle, the Home button and the Undo notice on a `chrome` pill, and draws its part of the wallpaper's picture so the two read as one ([ADR 0021](docs/adr/0021-home-is-one-surface.md)). A Terminal or split Home is one framed pane without a header, under a tab row with no panel toggle that folds from 40 to 8px unless it must hold window buttons or the hidden sidebar's controls. Spec: [home](docs/internals/specs/home.md).
 
 ## How it behaves
 
@@ -222,17 +222,22 @@ root: row, background=canvas, terminal_menu=t3-menu
 │  │  └─ inbox: t3-inbox
 │  └─ sidebar-footer: t3-chrome {footer:true} [44]
 ├─ work: column, chrome
-│  ├─ tabs-row: row [40], nonresizable
-│  │  ├─ tabs: t3-tabs [weight1]
-│  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [self-sized]
-│  │  ├─ actions: t3-actions {block:"actions",details:true} [self-sized]
-│  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [self-sized]
-│  │  └─ tabs-end-inset: row [12]
-│  ├─ work-body: row, padding[0,8], gap8
-│  │  └─ work-main: stack, active=main
-│  │     ├─ main: active tab, pane header=t3-pane [28, always, top]
-│  │     └─ home-main: same active-tab pane frame, no header
-│  ├─ work-bottom-inset: row [8] → bar-measure:t3-tabs {part:"measure"}
+│  ├─ work-view: stack, active=work-away
+│  │  ├─ work-away: column
+│  │  │  ├─ tabs-row: row [40], nonresizable
+│  │  │  │  ├─ tabs: t3-tabs [weight1]
+│  │  │  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [self-sized]
+│  │  │  │  ├─ actions: t3-actions {block:"actions",details:true} [self-sized]
+│  │  │  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [self-sized]
+│  │  │  │  └─ tabs-end-inset: row [12]
+│  │  │  ├─ work-body: row, padding[0,8], gap8
+│  │  │  │  └─ work-main: stack, active=main
+│  │  │  │     ├─ main: active tab, pane header=t3-pane [28, always, top]
+│  │  │  │     └─ home-main: same active-tab pane frame, no header
+│  │  │  └─ work-bottom-inset: row [8] → bar-measure:t3-tabs {part:"measure"}
+│  │  └─ work-home: column (Home of one mod)
+│  │     ├─ home-row: t3-tabs {part:"home"} [40], window drag
+│  │     └─ home-surface: active tab, background, no frame or header
 │  └─ status: workspace-status [28, hidden]
 └─ panel: column [weight1,min480,hidden], chrome
    ├─ panel-head: t3-chrome {part:"panel"} [40], padding[0,12]

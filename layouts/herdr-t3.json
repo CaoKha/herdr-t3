@@ -86,78 +86,99 @@
       "type": "column",
       "children": [
         {
-          "id": "tabs-row",
-          "type": "row",
-          "size": { "px": 40 },
-          "resizable": false,
-          "background": "chrome",
-          "children": [
-            { "id": "tabs", "type": "block", "size": { "weight": 1 }, "window_drag": true, "content": { "mod": "t3-tabs" } },
-            { "id": "tabs-end", "type": "block", "size": { "px": 32 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "end", "block": "tabs-end" } } },
-            { "id": "actions", "type": "block", "size": { "px": 28 }, "window_drag": true, "content": { "mod": "t3-actions", "props": { "block": "actions", "details": true } } },
-            { "id": "window-end", "type": "block", "size": { "px": 0 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "window", "block": "window-end" } } },
-            { "id": "tabs-end-inset", "type": "row", "size": { "px": 12 }, "window_drag": true, "children": [] }
-          ]
-        },
-        {
-          "id": "work-body",
-          "type": "row",
+          "id": "work-view",
+          "type": "stack",
+          "active": "work-away",
           "children": [
             {
-              "id": "work-main",
-              "type": "stack",
-              "active": "main",
+              "id": "work-away",
+              "type": "column",
               "children": [
-                {
-                  "id": "main",
-                  "type": "block",
-                  "content": {
-                    "tab": "active",
-                    "pane": {
-                      "header": {
+              {
+                "id": "tabs-row",
+                "type": "row",
+                "size": { "px": 40 },
+                "resizable": false,
+                "background": "chrome",
+                "children": [
+                  { "id": "tabs", "type": "block", "size": { "weight": 1 }, "window_drag": true, "content": { "mod": "t3-tabs" } },
+                  { "id": "tabs-end", "type": "block", "size": { "px": 32 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "end", "block": "tabs-end" } } },
+                  { "id": "actions", "type": "block", "size": { "px": 28 }, "window_drag": true, "content": { "mod": "t3-actions", "props": { "block": "actions", "details": true } } },
+                  { "id": "window-end", "type": "block", "size": { "px": 0 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "window", "block": "window-end" } } },
+                  { "id": "tabs-end-inset", "type": "row", "size": { "px": 12 }, "window_drag": true, "children": [] }
+                ]
+              },
+              {
+                "id": "work-body",
+                "type": "row",
+                "children": [
+                  {
+                    "id": "work-main",
+                    "type": "stack",
+                    "active": "main",
+                    "children": [
+                      {
+                        "id": "main",
+                        "type": "block",
                         "content": {
-                          "mod": "t3-pane"
-                        },
-                        "reveal": "always",
-                        "height": 28,
-                        "position": "top"
+                          "tab": "active",
+                          "pane": {
+                            "header": {
+                              "content": {
+                                "mod": "t3-pane"
+                              },
+                              "reveal": "always",
+                              "height": 28,
+                              "position": "top"
+                            },
+                            "background": "background",
+                            "border": {
+                              "width": 2,
+                              "color": "background"
+                            },
+                            "focus": {
+                              "width": 2,
+                              "color": "background"
+                            },
+                            "radius": 8,
+                            "gap": 8,
+                            "lone": true
+                          }
+                        }
                       },
-                      "background": "background",
-                      "border": {
-                        "width": 2,
-                        "color": "background"
-                      },
-                      "focus": {
-                        "width": 2,
-                        "color": "background"
-                      },
-                      "radius": 8,
-                      "gap": 8,
-                      "lone": true
-                    }
+                      {
+                        "id": "home-main",
+                        "type": "block",
+                        "content": {
+                          "tab": "active",
+                          "pane": { "background": "background", "border": { "width": 2, "color": "background" }, "focus": { "width": 2, "color": "background" }, "radius": 8, "gap": 8, "lone": true }
+                        }
+                      }
+                    ]
                   }
-                },
-                {
-                  "id": "home-main",
-                  "type": "block",
-                  "content": {
-                    "tab": "active",
-                    "pane": { "background": "background", "border": { "width": 2, "color": "background" }, "focus": { "width": 2, "color": "background" }, "radius": 8, "gap": 8, "lone": true }
-                  }
-                }
+                ],
+                "padding": [0, 8],
+                "gap": 8
+              },
+              {
+                "id": "work-bottom-inset",
+                "type": "row",
+                "children": [
+                  { "id": "bar-measure", "type": "block", "size": { "weight": 1 }, "content": { "mod": "t3-tabs", "props": { "part": "measure" } } }
+                ],
+                "size": { "px": 8 }
+              }
+              ]
+            },
+            {
+              "id": "work-home",
+              "type": "column",
+              "children": [
+                { "id": "home-row", "type": "block", "size": { "px": 40 }, "window_drag": true, "content": { "mod": "t3-tabs", "props": { "part": "home" } } },
+                { "id": "home-surface", "type": "block", "content": { "tab": "active", "pane": { "background": "background", "lone": true } } }
               ]
             }
-          ],
-          "padding": [0, 8],
-          "gap": 8
-        },
-        {
-          "id": "work-bottom-inset",
-          "type": "row",
-          "children": [
-            { "id": "bar-measure", "type": "block", "size": { "weight": 1 }, "content": { "mod": "t3-tabs", "props": { "part": "measure" } } }
-          ],
-          "size": { "px": 8 }
+          ]
         },
         {
           "id": "status",

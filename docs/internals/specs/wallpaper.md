@@ -8,7 +8,7 @@ The optional Home mod `extras/mods/asciicn-wallpaper`: its controls, waits, fram
 - Saved and previewed pictures take one path: glyphs composed into one image in theme colours (ANSI16 slots, opacity steps).
 - Light themes draw added pictures on paper (marks where the photo is dark). Built-ins keep their tones.
 - Only the shape modes are offered (Dots, Braille, Blocks, Quadrants): their glyphs match asciicn's own `mapTones` cell for cell, while letter ramps (Classic, Dense) would need glyph outlines the tiles don't draw.
-- A picture is framed against the window, not Home: its bottom right is Home's, and Home shows the part of it over Home. Hiding the sidebar or unfolding the tab row uncovers or covers its edge and moves nothing; the space panel, which takes from Home's right, still moves it with that edge.
+- A picture is framed against the window, not Home: its bottom right is Home's, which as a whole Home is the window's, and Home shows the part of it over Home. The Home row above draws its own part from what Home says it shows (`t3.homeShown`, [tab-bar](tab-bar.md#home-row)): the layer drawn, not one still loading, its `right`, `top` from Home's unrounded top, size, opacity and Home's id, written only when one of them changes. Hiding the sidebar or unfolding the tab row uncovers or covers its edge and moves nothing; the space panel, which takes from Home's right, still moves it with that edge.
 - Without a saved framing, a picture covers the window from the bottom with its subject anchored across; a narrower one fills the width.
 
 ## Switcher

@@ -19,7 +19,7 @@
 // through sips (macOS) or ImageMagick (Linux); on Windows the menu offers no file dialog, until Herdr gives mods a file picker.
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
-import { checking, appHome, closeOverlay, exec, nextCommand, notify, openOverlay, props, run, settings, setShared, shared, theme, themes, watchFolder, window } from "herdr";
+import { checking, appHome, closeOverlay, exec, focused, nextCommand, notify, openOverlay, panes, props, run, settings, setShared, shared, spaces, theme, themes, watchFolder, window } from "herdr";
 import { SCENES } from "./scenes.js";
 import { imageAns, sampleImage } from "./ascii-art.js";
 import { KEY, Library, MOD, finish, isLight, madePicture, makePicture, pictureKey, pictureSide, placement, tick } from "./library.js";
@@ -31,7 +31,7 @@ import { FADE, POINTER_WATCH, dragGone, pointerMoved, tip } from "./tip.js";
 import { popupOpen, trigger } from "./trigger.js";
 import { MENU_ROW, menuRow } from "./menu-row.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
-import { closedKey } from "./store.js";
+import { KEY as LAYOUT, closedKey } from "./store.js";
 
 const STYLES = [['dots', 'Dots'], ['braille', 'Braille'], ['blocks', 'Blocks'], ['quadrants', 'Quadrants']];
 const styleName = (style) => STYLES.find(([id]) => id === style)?.[1] ?? style;
@@ -462,6 +462,7 @@ export default class Wallpaper extends View {
     const at = (shown) => ({ ...shown, p: mine(shown.scene) ? p : shown.p }), stage = this.stage();
     const layer = ({ scene: s, path: src, p: pp }) => {
       const [w, h] = this.size(s, pp), bottom = (stage.H - h) * (1 - pp.y), right = (stage.W - w) * (1 - pp.x);
+      this.say({ path: src, w, h, right, top: (this.homeH ?? this.seen ?? this.height ?? 0) - bottom - h, opacity: fade, home: shared(LAYOUT.home) ?? null });
       return div().id(`wallpaper-at:${src}`).absolute().bottom(bottom).right(right).w(w).h(h)
         .opacity(fade).transition("opacity", FADE).child(image(src).id("wallpaper-picture").size_full());
     };
@@ -470,6 +471,18 @@ export default class Wallpaper extends View {
     // appearance's is drawn out of sight (warm).
     for (const had of this.loaded) if (had !== this.held?.path && had !== this.warmed) this.loaded.delete(had);
     return [this.held && layer(at(this.held)), path && !ready && this.probe(path, "wallpaper-probe")].filter(Boolean);
+  }
+
+  // What Home shows, for the Home row above it to draw its part (t3-tabs, docs/adr/0021): the layer drawn, in Home's px from
+  // Home's top-right, under the layout's key (docs/internals/storage.md). Written only when it changes: every mod redraws on it.
+  // Only by the copy the row reads, Home shown and its tab this one pane: a pane mod can't tell its own pane, so two copies
+  // (a split Home, a wallpaper in another tab) would each write their own framing and redraw each other without end.
+  say(shown) {
+    const home = shared(LAYOUT.home), tab = spaces().find((s) => s.id === home)?.tabs?.find((x) => x.active)?.id;
+    const here = panes().filter((p) => p.tab === tab);
+    if (!tab || focused()?.space !== home || here.length !== 1 || here[0].mod !== MOD) return;
+    const was = shared(LAYOUT.homeShown);
+    if (!was || Object.keys(shown).some((k) => was[k] !== shown[k])) setShared(LAYOUT.homeShown, shown);
   }
 
   // A copy of picture `path` at its own size, clipped to nothing: its box reports a size once the image has loaded (layers()).
@@ -505,6 +518,8 @@ export default class Wallpaper extends View {
     const i = Math.max(0, all.findIndex((s) => s.id === shared(KEY.wallpaper))), scene = d?.scene ?? all[i];
     const root = div().id("wallpaper").size_full().relative().overflow_hidden()
       .on_size_change((size, cx) => {
+        // homeH: Home's height unrounded, so the picture's top the Home row is told lands where Home draws it (say()).
+        this.homeH = size.height / zoom();
         const height = this.seen = Math.round(size.height / zoom()), width = Math.round(size.width / zoom());
         if (width !== this.width) { this.drag = null; this.width = width; cx.notify(); }
         if (!this.height || height > this.height) { this.drag = null; this.height = height; cx.notify(); }

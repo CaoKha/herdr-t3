@@ -4,10 +4,11 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 
 ## Look
 
-- One framed pane without a header (`home-main`, the same active-tab frame as `main`).
+- A Home of one mod's pane (`t3-home`, the wallpaper) is the whole right side: `work-view`'s `work-home` branch, `home-row` (t3-tabs part `home`, 40, window drag) over `home-surface`, no frame, padding or radius, Home's `background` colour ([ADR 0021](../../adr/0021-home-is-one-surface.md)). With the sidebar hidden the row holds its toggle and the Undo notice on a `chrome` pill ([tab-bar](tab-bar.md#home-row)).
+- A Terminal or split Home stays one framed pane without a header (`home-main`, the same active-tab frame as `main`) in `work-away`.
 - Default content: centred Next agent (disabled when there is nowhere to go), Go to and New tab. At most 320 wide, 32 high, radius 8; 14px text on the left, keycaps on the right; no names or counts.
 - 40 is added below the group so it sits centred against the whole window, top bar included.
-- The tab row has no tabs, `+`, Actions, Review or panel toggle (`⌥⌘B` still opens the panel), and folds from 40 to 8, except when it must hold the hidden sidebar's controls, macOS window buttons or Windows window buttons. Leaving restores 40.
+- Neither row has tabs, `+`, Actions, Review or panel toggle (`⌥⌘B` still opens the panel). `home-row` is always 40. A framed Home's tab row folds from 40 to 8, except when it must hold the hidden sidebar's controls, macOS window buttons or Windows window buttons. Leaving restores 40.
 - When arriving from another space, Home's first frame already has its frame and its own panel state.
 
 ## Identity

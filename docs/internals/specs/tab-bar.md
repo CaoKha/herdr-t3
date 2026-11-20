@@ -47,6 +47,13 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 - That 8 is the brand bar's from the same toggle to Herdr's tile ([sidebar](sidebar.md#brand-bar), `BRAND_GAP`): in Inbox, hiding the sidebar puts the breadcrumb's 14px space mark where the 16px tile was, left edges together (2026-11-20 user decision: the sidebar has one gap between icons).
 - Nothing else before the tabs or the breadcrumb: no brand, as T3's collapsed sidebar leaves only its trigger (2026-11-20 user decision; Home is `cmd-shift-h`, the palette, or the brand bar once shown), at Home or away, in Inbox or Lists: no Inbox cards, no blocked agents (2026-11-20 user decision, [ADR 0010](../../adr/0010-inbox-tab-bar-follows-the-agent.md)). `check-hidden-row.cjs` holds it.
 
+## Home row
+
+- `home-row`, t3-tabs part `home`: the row over a whole Home (`work-home`, [home](home.md#look)), always 40, a window drag. Its ground is Home's `background`.
+- When Home's tab is one `asciicn-wallpaper` pane and `t3.homeShown` names this Home ([storage](../storage.md)), it draws the same picture at the same size and `right`, `top + 40`, at its opacity, cut to the row, so row and Home read as one picture. Otherwise no picture: never another Home's or a mod's no longer there.
+- Sidebar shown: nothing of its own but window buttons. Hidden: `toggleLeft`, the toggle alone, then the Undo notice on a `chrome` pill (28 high, 8 in, radius 8), as it has a ground over the picture; settling at Home lands here, so Undo must show in this row too.
+- Window buttons of the layout's own (Windows, Linux) at the right end, drawn as `window-end`'s, and as there none while the space panel is open: its head has them (unverified: the demo runs on macOS). `check-home-row.cjs` holds it.
+
 ## Tab tooltips
 
 - Only a clipped name gets a label: `tip.js`'s tooltip, below the tab, with the whole name (t3-tokens P5). Whole names get none, and the state isn't said, as `×` no longer covers the mark. Any press on the tab hides it; it stays down while a drag is held.
@@ -81,7 +88,17 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 - Tab next/previous wraps through the displayed tabs; `cmd-1…9` numbering follows them too.
 - The floating keys block can advance navigation with no strip present. The strip and the tab-number / tab-cycle commands advance from the current Herdr observation before using the same tab order, regardless of which block drew first. Repeating an unchanged observation does not repeat a zoom, end a Snooze twice, or record a temporary close neighbour as a visit.
 - Space keys follow sidebar order, folded worktrees included, skipping Home and synthetic checkout rows; project numbers stay stable.
-- When the layout knows the destination, prepare its work frame before selecting it: Home uses `home-main` with no pane header and an 8px tab row (40px with a hidden sidebar or window buttons); other spaces use `main` and 40px. Spaces clicks and keys, Go to, agent jumps and new tabs in an existing space share this arrival step. The first frame with the destination's content uses that frame and its [saved panel](space-panel.md#column). Hiding or showing the sidebar is the same step: `t3-tabs.toggle-sidebar` (`cmd-b` and both sidebar buttons) sends the row's height with `layout.toggle`, since a render after the toggle lands a frame late. Herdr's own `layout.toggle:sidebar` still works, a frame late.
+- When the layout knows the destination, prepare its work frame before selecting it (`fitRow`):
+
+  | Where | `work-view` | `work-main` | `tabs-row` |
+  | --- | --- | --- | --- |
+  | Home, one mod's pane | `work-home` | `home-main` (unseen) | as for a framed Home (unseen) |
+  | Home, Terminal or split | `work-away` | `home-main` (no pane header) | 8; 40 with a hidden sidebar or window buttons |
+  | Elsewhere | `work-away` | `main` | 40 |
+
+   Herdr closes the mods in the branch not shown and starts them again when it shows: at a whole Home the bar's other parts (`tabs`, `tabs-end`, `window-end`, `bar-measure`), Actions and the pane bar are closed, so their commands answer "need the mod loaded" there, and leaving Home starts them with their measures empty. `bar-measure`'s `close()` writes `compact` false; Actions, its only reader, is closed with it and reads it again once `bar-measure` has measured.
+
+   Spaces clicks and keys, Go to, agent jumps and new tabs in an existing space share this arrival step. The first frame with the destination's content uses that frame and its [saved panel](space-panel.md#column). Hiding or showing the sidebar is the same step: `t3-tabs.toggle-sidebar` (`cmd-b` and both sidebar buttons) sends the row's height with `layout.toggle`, since a render after the toggle lands a frame late. Herdr's own `layout.toggle:sidebar` still works, a frame late.
 
 ## Close landing
 

@@ -1,4 +1,4 @@
-import { View, div, svg } from "gpui-kit";
+import { View, div, image, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
@@ -77,6 +77,13 @@ const nav = () => brain ??= navigation();
 // A tab nobody named reads as its lead pane: the agent in it, else the focused one.
 const leadOf = (mine) => mine.find(p => p.status != null) ?? mine.find(p => p.focused) ?? mine[0];
 const nameOf = (c, lead, name) => c.named ? c.name : lead ? name(lead) : "Terminal";
+
+// Home's shown tab's pane when it is one mod's pane alone, the surface that can take the whole right side; else null.
+function homeLone(home) {
+  const tab = spaces().find((s) => s.id === home)?.tabs?.find((x) => x.active)?.id, here = panes().filter((p) => p.tab === tab);
+  return tab && here.length === 1 && here[0].mod ? here[0] : null;
+}
+const homeWhole = (home) => Boolean(homeLone(home));
 
 export default class Tabs extends View {
   /** @type {{ space?: string }} */
@@ -285,6 +292,26 @@ export default class Tabs extends View {
       .on_mouse_down("left", stopPress).on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true });
   }
 
+  // The Home row (part "home", `home-row` in `work-home`): Home's own colour, so the row and Home are one surface, and when Home
+  // is the wallpaper its shown picture's part over the row: the wallpaper says where on Home it has it (KEY.homeShown, Home's
+  // px), and the row, 40 above Home with the same right edge, draws the same picture 40 lower, cut to itself. Only Home's own:
+  // a value of another Home's, or Home now another mod or split, draws nothing. With the sidebar hidden the toggle floats on it,
+  // alone as in the tab row, and the Undo notice gets a chrome pill, a toast's ground; shown, those are the sidebar's.
+  homeRow(t, w, stopPress, windowButtons) {
+    const home = shared(KEY.home), shown = shared(KEY.homeShown), lone = homeLone(home);
+    const pic = shown?.path && shown.home === home && lone?.mod === "asciicn-wallpaper" ? shown : null;
+    const root = layout(), hidden = Boolean(sidebarParts(root).rail?.hidden), notice = hidden && this.undoNotice(t);
+    return focusRoot(this, h_flex().id("home-row").size_full().min_w(0).relative().overflow_hidden()
+      .pl(hidden ? toggleLeft(w, root, settings().zoom) : 8).pr(4).gap(4).items_center().bg(t.background)
+      .when(Boolean(pic), el => el.child(div().id("home-picture").absolute().right(pic.right).top(pic.top + ROW_PX).w(pic.w).h(pic.h)
+        .opacity(pic.opacity).child(image(pic.path).size_full())))
+      .when(hidden, el => el.child(this.sidebarToggle(t, stopPress)))
+      .when(Boolean(notice), el => el.child(h_flex().id("home-notice").flex_none().h(28).px(8).items_center().rounded(8).bg(t.chrome).child(notice)))
+      .child(div().flex_1())
+      // The panel open, its head has the window buttons, as away (`window-end`).
+      .when(Boolean(w?.buttons) && !panelState().open, el => el.child(windowButtons())));
+  }
+
   // With props.block, sizes that block to `size`: layout.resize, which Herdr keeps with the layout's clicks.
   // on_size_change reports zoomed pixels; a layout's are logical.
   fit(size) {
@@ -299,8 +326,13 @@ export default class Tabs extends View {
   // sidebar hidden (the row holds its toggle and the macOS window buttons) nor with window buttons of the bar's own. A layout
   // click, so it reads the row's size and corrects it whatever left it so (a quit at Home, another layout). Home's pane shows in
   // `home-main`, the same frame with no header: a blank header still took its 28px, a strip over Home's terminal.
+  // A Home of one mod's pane (t3-home, the wallpaper) is the whole right side instead: `work-home`, its own row and a frameless
+  // surface (docs/adr/0021). A Terminal or split Home stays framed, in `work-away` with the rest; that branch keeps its row and
+  // frame set for Home too, so leaving or splitting changes only the branch.
   fitRow(w, atHome, force = false, hidden = sidebarParts(layout()).rail?.hidden) {
-    const root = layout(), row = layoutNode(root, "tabs-row"), work = layoutNode(root, "work-main");
+    const root = layout(), row = layoutNode(root, "tabs-row"), work = layoutNode(root, "work-main"), stack = layoutNode(root, "work-view");
+    const branch = atHome && homeWhole(shared(KEY.home)) ? "work-home" : "work-away";
+    if (stack && (force || stack.active !== branch)) run("layout.select", { stack: "work-view", child: branch });
     const child = atHome ? "home-main" : "main";
     if (work && (force || work.active !== child)) run("layout.select", { stack: "work-main", child });
     if (!row) return;
@@ -357,6 +389,11 @@ export default class Tabs extends View {
     // stands a group's gap from Details, its own side carrying it; the layout's tabs-end-inset puts the end 12 from the column's,
     // so the toggle stays where the open panel's head puts it (docs/internals/t3-tokens.md「规则」P3, R1).
     // At Home neither: its row folds to 8 (fitRow); ⌥⌘B still opens the panel there.
+    // Windows/Linux: the window's own buttons, 8 on from what comes before them.
+    const windowButtons = () => h_flex().flex_none().ml(8).items_center()
+      .child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, w.platform === "windows" ? undefined : "−"))
+      .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, w.platform === "windows" ? undefined : "□"))
+      .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close")));
     const newTabShown = !this.navigation.atHome && !inboxShown(), toggleShown = !this.navigation.atHome && panelState().pages.length > 0 && !panelState().open;
     if (props()?.part === "end") return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
       .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
@@ -368,10 +405,8 @@ export default class Tabs extends View {
         // The space panel's toggle, over where it opens: the sidebar's panel-left, mirrored. Lit while open.
         .when(toggleShown, el => el.child(button("panel-toggle", "mods/t3-tabs/icons/panel-right.svg",
           "Show panel", () => togglePanel(), "t3-tabs.panel")))
-        .when(w?.buttons && !panelState().open, el => el.child(h_flex().flex_none().ml(8).items_center()
-          .child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, w.platform === "windows" ? undefined : "−"))
-          .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, w.platform === "windows" ? undefined : "□"))
-          .child(button("close-window", w.platform === "windows" ? "mods/t3-tabs/icons/win-close.svg" : "mods/t3-tabs/icons/x.svg", "Close window", () => run("window.close")))))));
+        .when(w?.buttons && !panelState().open, el => el.child(windowButtons()))));
+    if (props()?.part === "home") return this.homeRow(t, w, stopPress, windowButtons);
     const space = spaces().find(p => p.active);
     // At Home, none: Home itself tells where this is.
     const { tabs: shown, context: ctx } = this.navigation.frame(), inbox = inboxShown();

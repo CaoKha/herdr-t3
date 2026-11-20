@@ -78,7 +78,7 @@ Review 用于 [pulls.review fork](https://github.com/JinJieBeWater/pulls.review/
 
 New 和 Go to 是顶部居中的弹层，宽 576px、圆角 16px，底部是键帽提示。New 和 Go to 的两行条目高 48px。菜单、提示和按钮照 [t3-tokens](docs/internals/t3-tokens.md)。Actions 编辑器和确认框宽 512、圆角 16；确认框的执行按钮在 Cancel 后，raised 底红字。布局设置照 Herdr 自己的 Settings 对话框（880×620）。规格：[dialogs](docs/internals/specs/dialogs.md)。
 
-Home 是一张带框、无标题的窗格：正中 Next agent、Go to、New tab 三个带键帽的按钮，无名字或计数。在 Home 时标签栏没有面板开关，整行从 40 收成 8，除非要放窗口按钮或隐藏侧栏的控件。规格：[home](docs/internals/specs/home.md)。
+Home 的默认页面：正中 Next agent、Go to、New tab 三个带键帽的按钮，无名字或计数。Home 只放一个 mod（这个页面、壁纸）时，侧栏右边一直到窗口顶边都是 Home，用 Home 自己的底色，没有框：上面 40px 的 Home 行在侧栏隐藏时放开关、回 Home 的按钮，以及放在 `chrome` 圆角块里的 Undo 通知，并画出壁纸那张图在这一行的部分，让两处看起来是一张图（[ADR 0021](docs/adr/0021-home-is-one-surface.md)）。Home 是终端或拆分时，是一张带框、无标题的窗格，上面的标签栏没有面板开关，整行从 40 收成 8，除非要放窗口按钮或隐藏侧栏的控件。规格：[home](docs/internals/specs/home.md)。
 
 ## 它怎么表现
 
@@ -222,17 +222,22 @@ root: row, background=canvas, terminal_menu=t3-menu
 │  │  └─ inbox: t3-inbox
 │  └─ sidebar-footer: t3-chrome {footer:true} [44]
 ├─ work: column, chrome
-│  ├─ tabs-row: row [40], 不可拖
-│  │  ├─ tabs: t3-tabs [weight1]
-│  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [自定宽]
-│  │  ├─ actions: t3-actions {block:"actions",details:true} [自定宽]
-│  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [自定宽]
-│  │  └─ tabs-end-inset: row [12]
-│  ├─ work-body: row, padding[0,8], gap8
-│  │  └─ work-main: stack, active=main
-│  │     ├─ main: active tab, pane header=t3-pane [28,always,top]
-│  │     └─ home-main: 相同 active-tab 框，无标题
-│  ├─ work-bottom-inset: row [8] → bar-measure:t3-tabs {part:"measure"}
+│  ├─ work-view: stack, active=work-away
+│  │  ├─ work-away: column
+│  │  │  ├─ tabs-row: row [40], 不可拖
+│  │  │  │  ├─ tabs: t3-tabs [weight1]
+│  │  │  │  ├─ tabs-end: t3-tabs {part:"end",block:"tabs-end"} [自定宽]
+│  │  │  │  ├─ actions: t3-actions {block:"actions",details:true} [自定宽]
+│  │  │  │  ├─ window-end: t3-tabs {part:"window",block:"window-end"} [自定宽]
+│  │  │  │  └─ tabs-end-inset: row [12]
+│  │  │  ├─ work-body: row, padding[0,8], gap8
+│  │  │  │  └─ work-main: stack, active=main
+│  │  │  │     ├─ main: active tab, pane header=t3-pane [28,always,top]
+│  │  │  │     └─ home-main: 相同 active-tab 框，无标题
+│  │  │  └─ work-bottom-inset: row [8] → bar-measure:t3-tabs {part:"measure"}
+│  │  └─ work-home: column（只放一个 mod 的 Home）
+│  │     ├─ home-row: t3-tabs {part:"home"} [40], 可拖窗口
+│  │     └─ home-surface: active tab, background, 无框无标题
 │  └─ status: workspace-status [28,hidden]
 └─ panel: column [weight1,min480,hidden], chrome
    ├─ panel-head: t3-chrome {part:"panel"} [40], padding[0,12]

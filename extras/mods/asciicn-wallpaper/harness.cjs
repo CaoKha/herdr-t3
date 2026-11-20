@@ -54,6 +54,8 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   // `win.active`: whether the window has focus (window().active).
   // `win.screens`: what macOS says of each screen, [x, y, width, height, backing scale]; `win.bounds`: the window's frame.
   const win = { active: true, screens: [[0, 0, 1440, 900, 1], [1440, 0, 1440, 900, 2]], bounds: { x: 0, y: 0, width: 1000, height: 800 } }, every = [];
+  // `world`: what spaces(), panes() and focused() return; empty, as no Home tab holds this copy.
+  const world = { spaces: [], panes: [], focused: null };
   const state = {}, messages = [], overlays = [], runs = [], hooks = {}, view = { props: null },
     look = { dark: true, colours: { foreground: "#dddddd", ansi1: "#cd3131" }, themes: null, now() { return { ...(this.themes?.[this.dark ? "dark" : "light"] ?? this.colours) }; } };
   const env = {
@@ -67,7 +69,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
     themes: () => look.themes ? [{ name: "Paper", light: true, colors: { ...look.themes.light } }, { name: "Ink", light: false, colors: { ...look.themes.dark } }] : [],
     shared: k => state[k], setShared: (k, v) => { state[k] = v; },
     notify: v => messages.push(v), openOverlay: v => overlays.push(v), closeOverlay: () => null, run: (name, args) => { runs.push([name, args]); return null; },
-    props: () => view.props,
+    props: () => view.props, spaces: () => world.spaces, panes: () => world.panes, focused: () => world.focused,
     nextCommand: () => new Promise(() => {}), watchFolder: dir => hooks.watchFolder?.(dir) ?? new Promise(() => {}),
     readTextFile: async file => {
       try {
@@ -131,7 +133,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   };
   // `ticks()`: each repeating timer (cx.timer.every) fires once.
   const ticks = () => { for (const t of [...every]) t.fn(cx); };
-  return { app, dir, state, messages, overlays, runs, hooks, view, look, win, ticks, cx, home, settle, modules: context.__m };
+  return { app, dir, state, messages, overlays, runs, hooks, view, look, win, world, ticks, cx, home, settle, modules: context.__m };
 }
 
 module.exports = { runtime, find, texts };
