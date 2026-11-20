@@ -27,6 +27,7 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 - Settle, Snooze, the button, key, drag or sweep on the viewed agent go Home by default, leaving the next choice to the person.
 - With After putting away: Next card, they walk the cards cyclically instead and fall back to Home when none remain.
 - Closing a viewed agent's whole tab still lands Home, whatever the preference. Background actions move nothing.
+- Undo goes back from Home only to an agent that was in view when it was put away ([inbox](inbox.md#undo-notice)).
 
 ## Edge rules
 

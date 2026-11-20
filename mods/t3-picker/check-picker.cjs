@@ -20,17 +20,18 @@ const panes = [
   { pane: "p2", tab: "c1", terminal: "t2", program: git, focused: false },
   { pane: "p3", tab: "c1", terminal: "t3", program: zsh, focused: false },
 ];
-const shared = {}, calls = [];
+const shared = {}, calls = [], reads = {};
+const read = (name, list) => () => { reads[name] = (reads[name] ?? 0) + 1; return list(); };
 let terms = [];
 const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }) };
 const context = vm.createContext({
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, Input: { new: element },
   InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, type(v) { value = v; on.change({}, cx); }, submit() { on.submit({}, cx); } }; } },
   settings: () => ({ zoom: 1 }),
-  spaces: () => spaces, panes: () => panes, agents: () => [], terminals: () => terms, window: () => ({ platform: "macos" }),
+  spaces: read("spaces", () => spaces), panes: read("panes", () => panes), agents: () => [], terminals: read("terminals", () => terms), window: () => ({ platform: "macos" }),
   focused: () => ({ pane: panes.find((p) => p.focused && spaces.find((s) => s.active).tabs.some((c) => c.id === p.tab)).pane }),
   run: (name, args) => calls.push([name, args]), theme: () => ({ done: "#done", selected: "#selected" }), props: () => ({ overlay: "o" }), closeOverlay() {},
-  shared: (k) => shared[k], setShared: (k, v) => { shared[k] = v; },
+  shared: (k) => { if (k === "t3-tabs.home") reads.home = (reads.home ?? 0) + 1; return shared[k]; }, setShared: (k, v) => { shared[k] = v; },
   namer: () => (p) => p.program.name, programOf: (p) => p.program, modStatus: () => null, projectMark: element,
 });
 const src = ["color.js", "store.js", "tree.js", "status-mark.js", "list.js", "space-arrival.js", "zoom.js", "focus.js", "program.js", "palette.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ").replace("export default class", "globalThis.Mod = class");
@@ -133,6 +134,15 @@ terms[0].labels.settled = "1:1"; assert.equal(done(), false);
 terms[0].turn = 2; assert.ok(done());
 terms[0].labels = { snoozed: String(Date.now() + 60000) }; assert.equal(done(), false);
 terms[0].labels.snoozed = String(Date.now() - 1); assert.ok(done());
+// A draw reads each of Herdr's lists once, whatever it lists: each read copies the whole list.
+{
+  for (const p of panes) p.status = "done";
+  const m = open();
+  for (const k of Object.keys(reads)) delete reads[k];
+  m.render();
+  assert.deepEqual(reads, { panes: 1, terminals: 1, spaces: 1, home: 1 });
+  for (const p of panes) delete p.status;
+}
 // Tab reaches the footer's New tab in…, as every control in a popup.
 assert.equal(find(open().render(), "picker-new").style.tab_index, 0);
 console.log("ok picker");

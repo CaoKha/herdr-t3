@@ -15,14 +15,14 @@ Geometry and edge rules of the pane header (`t3-pane`) and its sub-agent list. T
 
 ## Sub-agent button
 
-- `3 ⌄`: live descendants only, tinted `blocked` if any need the person (no `!` of its own). While any descendant, at any depth, is working and the agent itself isn't, the 12px `statusMark` spinner stands before the count, 4 apart, so the button grows 16: a header shows at most one spinner, and the agent's own comes first. Tooltip and aria give the total, the attention count and the working count (`3 sub-agents, 1 needs you, 2 working`). The header's state mark stays the agent's own.
+- `3 ⌄`: live descendants only, tinted `blocked` if any need the person (no `!` of its own). While any descendant, at any depth, is working and the agent itself isn't, the 12px `statusMark` working mark stands before the count, 4 apart, so the button grows 16: a header shows at most one working mark, and the agent's own comes first. Tooltip and aria give the total, the attention count and the working count (`3 sub-agents, 1 needs you, 2 working`). The header's state mark stays the agent's own.
 - 24px control, 12px medium text, padding 8, gap 4, 14px chevron, radius 8. A `trigger()`: on while its list is open.
 
 ## Sub-agent list
 
 - A popup 280 wide, 4 below the button, right-aligned to it; padding 4, 28px rows, no heading. Ten rows, then it scrolls. It closes when no descendant is left.
 - Depth-first tree order, never sorted by urgency. Each level indents 16: `menuRow`'s `lead` holds a `16 × depth − 8` spacer (plus the row's gap of 8).
-- Row: program icon (16), name, then the Agents rows' mark in `trail`: spinner and duration; `!` and `Needs you`; `!` and `Failed` in `ansi1` (same badge, see t3-tokens「有意不同」); an unread done dot; idle age (`12m`). Blank before the first report.
+- Row: program icon (16), name, then the Agents rows' mark in `trail`: working mark and duration; `!` and `Needs you`; `!` and `Failed` in `ansi1` (same badge, see t3-tokens「有意不同」); an unread done dot; idle age (`12m`). Blank before the first report.
 - The pointer or arrows light a row; leaving clears it. Click or Enter peeks (`terminal.peek`) and closes. Right-click closes the list and opens the shared `t3-menu` agent menu.
 - The highlight follows the terminal address across changes to tree order. If that sub-agent leaves the tree, clear the highlight rather than moving it to another row. A click, Enter or right-click does nothing if its target has already left the tree, even before the next draw.
 - Command shells aren't agents and are skipped.

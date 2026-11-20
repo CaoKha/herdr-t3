@@ -1,5 +1,5 @@
 // Home's default page: where putting the agent in view away lands, with nothing to look at but what can be done next.
-// t3-tabs owns the place itself (a space of its own); this is only what it shows until someone arranges something else there.
+// t3-tabs owns the place itself (a space of its own); this is only what it shows unless Settings picks another mod or a terminal (docs/adr/0005).
 import { View } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { layout, run, shared, spaces, theme } from "herdr";

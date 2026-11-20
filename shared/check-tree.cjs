@@ -31,9 +31,11 @@ const deep = [agent("top", null), agent("a", "top"), agent("a1", "a"), agent("b"
 assert.deepEqual(kidTree(deep, "top").map((r) => [r.k.address, r.depth, r.lines.join("")]), [["a", 0, "├"], ["a1", 1, "│└"], ["b", 0, "└"]],
   "tree order, each a level in from its parent");
 
-// A loop in the parents ends.
+// A loop in the parents ends, before it comes back to where it was asked from.
 const loop = [agent("x", "y"), shell("y", "x")];
 assert.deepEqual(names(descendants(loop, "x")), []);
+const ring = [agent("top", "grandchild"), agent("child", "top"), agent("grandchild", "child")];
+assert.deepEqual(names(descendants(ring, "top")), ["child", "grandchild"], "a live parent cycle stops before returning the root");
 
 // Every agent's sub-agents, as Tabs, Agents and the Inbox ask each render, read the list a bounded number of times: a filter of
 // every terminal per agent runs past Herdr's script limit.

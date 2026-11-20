@@ -154,7 +154,14 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.equal(pictures(raw), 1, "in the last one's place");
     assert.equal(find(raw, "wallpaper-probe-image"), undefined);
     state[KEY] = "ember";
-    await shown();
+    const lastMade = await shown();
+    // A picture that can't be made says so once and stops waiting: the last one stays, with no loader over it.
+    state[KEY] = "mountain-dusk";
+    hooks.beforeWrite = (file) => { if (file.includes("/.builtin/mountain-dusk/")) throw new Error("No room left"); };
+    await settle(() => { tree(); return r.messages.some(m => m.title === "Couldn't draw the wallpaper"); });
+    hooks.beforeWrite = (file) => { io++; writes.push(file); };
+    tree(); advance(500);
+    assert.deepEqual([at("wallpaper-wait"), at("wallpaper-picture").props.path], [undefined, lastMade], "nothing is being made: no loader");
     delete state[KEY];
     await shown();
 
@@ -221,6 +228,16 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.equal(state[KEY], undefined);
     assert.deepEqual(await ans(), []);
 
+    // A theme the preview can't be coloured for says why in the footer; the picture up isn't dimmed for a drawing that ended.
+    look.colours.ansi1 = "#bb0000";
+    hooks.beforeExec = (cmd, args) => { if (cmd === "sh" && args[1].startsWith("sed ")) throw new Error("Disk is full"); };
+    await settle(() => { tree(); return /Disk is full/.test(h.draft.message ?? ""); });
+    hooks.beforeExec = (cmd, args) => { io++; if (cmd === "cat") cats.push(args[0]); };
+    tree(); advance(500);
+    assert.equal(at(`wallpaper-at:${preview}`).props.opacity, 1, "nothing is drawing");
+    look.colours.ansi1 = "#cd3131";
+    assert.equal(await shown(), preview);
+
     // A mode that can't be drawn goes back to the one before and says why, in the footer.
     hooks.beforeWrite = (file) => { if (/\.preview\//.test(file)) throw new Error("No room left"); };
     await h.setStyle("braille", cx);
@@ -240,7 +257,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     advance(200);
     assert.equal(at("wallpaper-picture").props.path, shownBefore, "still up while drawing");
     assert.match(texts(at("wallpaper-card-status")).join(""), /Drawing Blocks/);
-    assert.ok(find(at("wallpaper-styles"), "wallpaper-style-spinner"), "the mode being drawn spins");
+    assert.ok(find(at("wallpaper-styles"), "wallpaper-style-loading"), "the mode being drawn carries the loader");
     release();
     await drawing2;
     hooks.beforeWrite = (file) => { io++; writes.push(file); };
@@ -613,12 +630,12 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const coastShown = await shown();
     const tilesKept = async () => (await fs.readdir(path.join(dir, ".tiles/Coast"))).filter(n => n.endsWith(".tpl"));
     const tilesBefore = await tilesKept();
-    let drawn_; const redrawn = new Promise(go => { drawn_ = go; });
-    hooks.beforeWrite = async (file) => { io++; writes.push(file); if (file.endsWith("/scene.json")) await redrawn; };
+    let drawn_, marking = false; const redrawn = new Promise(go => { drawn_ = go; });
+    hooks.beforeWrite = async (file) => { io++; writes.push(file); if (file.endsWith("/scene.json")) { marking = true; await redrawn; } };
     await fs.appendFile(path.join(dir, "Coast.ans"), "\n");
     const redrawing = h.lib.refresh(cx);
-    await settle(() => h.lib.importing === "Coast");
-    await settle(null, 200);
+    await settle(() => marking);
+    assert.equal(h.lib.importing, "Coast");
     tree();
     const mid = tree();
     assert.equal(find(mid, "wallpaper-picture").props.path, coastShown, "Home keeps the picture while it's drawn again");

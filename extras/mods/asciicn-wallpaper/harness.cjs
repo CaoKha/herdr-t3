@@ -20,9 +20,13 @@ function link(context, file, source) {
   vm.runInContext(`__m[${JSON.stringify(file)}] = (() => {\n${body}\nreturn { ${exported.map(([k, n]) => `${k}: ${n}`).join(", ")} };\n})();`, context, { filename: file });
 }
 
-// Tasks a timer started (a picture a render asked for), until they end: `idle()` awaits them all.
-const later = new Set();
-const idle = async () => { while (later.size) await Promise.allSettled([...later]); };
+// What the mod has under way: a host call (a file, a process) or a timer's task, until it ends. `idle()` awaits them all;
+// `moved()` wakes whoever waits on one starting or ending, or on a redraw asked for (`settle`).
+const busy = new Set(), wakers = [];
+let moves = 0;
+const moved = () => { moves++; for (const go of wakers.splice(0)) go(); };
+const under = (work, started = true) => { busy.add(work); if (started) moved(); const end = () => { busy.delete(work); moved(); }; work.then(end, end); return work; };
+const idle = async () => { while (busy.size) await Promise.allSettled([...busy]); };
 
 const MODULES = ["ascii-art.js", "scenes.js", "library.js", "source.js", "framing.js", "tip.js", "focus.js", "color.js", "button.js", "list.js", "menu-row.js", "trigger.js", "store.js", "main.js"];
 
@@ -44,12 +48,10 @@ const find = (n, id) => !n || typeof n !== "object" ? undefined : n.key === id ?
 // Every piece of text a tree shows.
 const texts = (n) => typeof n === "string" ? [n] : !n || typeof n !== "object" ? [] : n.items.flatMap(texts);
 
-/**
- * A Home in a temporary app home under `base` (another runtime on the same `base` is a later app run). `hooks` can hold up a
- * step: `afterRead(file)`, `beforeWrite(file, body)`, `beforeExec(cmd, args)`, `afterExec(cmd, args, result)`; `picked`, what
- * the file dialog returns, and `watchFolder(dir)`, the folder watch behind a live Home. `runs`: the commands run().
- * `view.props`: what props() returns. `stubs` replace modules.
- */
+/** A Home in a temporary app home under `base` (another runtime on the same `base` is a later app run). `hooks` can hold up a
+ *  step: `afterRead(file)`, `beforeWrite(file, body)`, `beforeExec(cmd, args)`, `afterExec(cmd, args, result)`; `picked`, what
+ *  the file dialog returns, and `watchFolder(dir)`, the folder watch behind a live Home. `runs`: the commands run().
+ *  `view.props`: what props() returns. `stubs` replace modules. */
 async function runtime(base, { stubs = {}, platform = "macos", clock = false } = {}) {
   const app = path.join(base, "app 'quoted"), dir = path.join(app, "asciicn-wallpaper");
   await fs.mkdir(path.join(app, "mods/asciicn-wallpaper"), { recursive: true });
@@ -75,21 +77,21 @@ async function runtime(base, { stubs = {}, platform = "macos", clock = false } =
     notify: v => messages.push(v), openOverlay: v => overlays.push(v), closeOverlay: () => null, run: (name, args) => { runs.push([name, args]); return null; },
     props: () => view.props, spaces: () => world.spaces, panes: () => world.panes, focused: () => world.focused,
     nextCommand: () => new Promise(() => {}), watchFolder: dir => hooks.watchFolder?.(dir) ?? new Promise(() => {}),
-    readTextFile: async file => {
+    readTextFile: file => under((async () => {
       try {
         const body = await fs.readFile(file, "utf8");
         if (Buffer.byteLength(body) > 1024 * 1024) throw new Error("Text file exceeds 1 MiB");
         await hooks.afterRead?.(file);
         return body;
       } catch (e) { if (e.code === "ENOENT") return null; throw e; }
-    },
-    writeTextFile: async (file, body, expected) => {
+    })()),
+    writeTextFile: (file, body, expected) => under((async () => {
       if (Buffer.byteLength(body) > 1024 * 1024) throw new Error("Text file exceeds 1 MiB");
       await hooks.beforeWrite?.(file, body);
       assert.equal(expected, null, "the mod only creates files");
       await fs.writeFile(file, body, { flag: "wx" });
-    },
-    exec: async (cmd, args = [], options = {}) => {
+    })()),
+    exec: (cmd, args = [], options = {}) => under((async () => {
       if (cmd === "osascript" && args[0] === "-l" && args[3]?.includes("NSScreen")) return { code: 0, stdout: `${JSON.stringify(win.screens)}\n`, stderr: "" };
       if (cmd === "osascript" && args[0] === "-e") return hooks.picked == null ? { code: 1, stdout: "", stderr: "User canceled. (-128)" } : { code: 0, stdout: `${hooks.picked}\n`, stderr: "" };
       await hooks.beforeExec?.(cmd, args);
@@ -103,7 +105,7 @@ async function runtime(base, { stubs = {}, platform = "macos", clock = false } =
       }
       await hooks.afterExec?.(cmd, args, result);
       return result;
-    },
+    })()),
   };
   const context = vm.createContext(env);
   context.__m = {};
@@ -122,9 +124,8 @@ async function runtime(base, { stubs = {}, platform = "macos", clock = false } =
   }
   const Mod = context.__m["main.js"].default;
   let focused = null;
-  const cx = { notify() {}, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => {
-    const end = new Promise(go => setImmediate(() => go(fn(cx)))).then(() => {}, () => {});
-    later.add(end); end.then(() => later.delete(end));
+  const cx = { notify: moved, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => {
+    under(new Promise(go => setImmediate(() => go(fn(cx)))).then(() => {}, () => {}), false);
   },
     every: (_ms, fn) => { const t = { fn, cancel() { every.splice(every.indexOf(t) >>> 0, 1); } }; every.push(t); return t; } },
     focus_handle: () => { const h = { focus: () => { focused = h; }, is_focused: () => focused === h }; return h; } };
@@ -137,10 +138,18 @@ async function runtime(base, { stubs = {}, platform = "macos", clock = false } =
     if (!live) await h.lib.refresh(cx);
     return h;
   };
-  // Lets queued steps run, real files and processes included: until `done()` holds, or a quiet `ms` without one.
-  const settle = async (done = null, ms = done ? 10000 : 150) => {
-    for (const end = Date.now() + ms; Date.now() < end && !done?.();) await new Promise(r => setTimeout(r, 5));
-    if (done) assert.ok(done(), "settled");
+  // Lets the mod's work run, real files and processes included, until `done()` holds or nothing more is under way. Each
+  // step awaits the work itself (`moved`), never a clock; a `done()` that moved something, as a draw does, is asked again.
+  const settle = async (done = null) => {
+    for (;;) {
+      await new Promise(setImmediate);
+      const before = moves;
+      if (done?.()) return;
+      if (moves !== before) continue;
+      if (!busy.size) break;
+      await new Promise(go => wakers.push(go));
+    }
+    assert.ok(!done, "settled");
   };
   // `ticks()`: each repeating timer (cx.timer.every) fires once.
   const ticks = () => { for (const t of [...every]) t.fn(cx); };

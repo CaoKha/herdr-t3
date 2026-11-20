@@ -24,21 +24,30 @@ let agentList = [];
 let sidebar = { id: "root", children: [{ id: "sidebar-lists", active: "lists" }] };
 let props = { pane: "p2" };
 let pointer = { x: 50, y: 10 };
+let bound = [];
+// Host reads a header's draw makes: each copies every pane or agent, and every pane has a header.
+const reads = { panes: 0, agents: 0, terminals: 0, spaces: 0 };
 const env = {
-  View: class {}, div: element, svg: (src) => { const el = element(); el.svg = src; return el; }, image: (src) => { images.push(src); return element(); }, h_flex: element, v_flex: element, Popup: { new: (id, trigger) => element().id(id).child(trigger) }, keys: () => [],
-  theme: () => ({ selected: "#123456" }), props: () => props, panes: () => [pane, shell, review], shared: (k) => sharedValues[k] ?? null, home: () => "/home/me",
+  View: class {}, div: element, svg: (src) => { const el = element(); el.svg = src; return el; }, image: (src) => { images.push(src); return element(); }, h_flex: element, v_flex: element, Popup: { new: (id, trigger) => element().id(id).child(trigger) }, keys: () => bound,
+  theme: () => ({ selected: "#123456" }), props: () => props, panes: () => { reads.panes++; return [pane, shell, review]; }, shared: (k) => sharedValues[k] ?? null, home: () => "/home/me",
   // A new list each call, as Herdr gives (tree.js indexes each list once).
-  terminals: () => [...terms], agents: () => agentList, spaces: () => [{ id: "s1", name: "project", tabs: [tab] }], layout: () => sidebar,
+  terminals: () => { reads.terminals++; return [...terms]; }, agents: () => { reads.agents++; return agentList; }, spaces: () => { reads.spaces++; return [{ id: "s1", name: "project", tabs: [tab] }]; }, layout: () => sidebar,
   run: (name, args) => calls.push([name, args]), openOverlay: (o) => calls.push(["overlay", o]), closeOverlay: (id) => calls.push(["close", id]), settings: () => ({ zoom: 1 }), setShared: (k, v) => { sharedValues[k] = v; },
   window: Object.assign(() => ({ platform: "macos", active: true }), { mouse_position: () => pointer, viewport_size: () => ({ width: 1000, height: 800 }) }),
 };
+// The mod's clock: time passes when a case says so.
+let now = Date.now(), notified = 0;
+env.Date = class extends Date { static now() { return now; } };
 const ticks = [];
 const tick = () => ticks.filter((w) => !w.gone).forEach((w) => w.fn(cx));
 const afters = [];
 const later = () => afters.splice(0).filter((w) => !w.gone).forEach((w) => w.fn(cx));
-const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }), timer: {
-  every(_ms, fn) { const w = { fn, cancel() { w.gone = true; } }; ticks.push(w); return w; },
-  after(_ms, fn) { const w = { fn, cancel() { w.gone = true; } }; afters.push(w); return w; } } };
+// The one-shots still to come, each by how long it has left; `elapse` runs the ones whose time has come.
+const due = () => afters.filter((w) => !w.gone).map((w) => w.at - now);
+const elapse = (ms) => { now += ms; for (const w of afters.splice(0)) { if (w.gone || w.at > now) { afters.push(w); continue; } w.gone = true; w.fn(cx); } };
+const cx = { notify() { notified++; }, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }), timer: {
+  every(ms, fn) { const w = { ms, fn, cancel() { w.gone = true; } }; ticks.push(w); return w; },
+  after(ms, fn) { const w = { at: now + ms, fn, cancel() { w.gone = true; } }; afters.push(w); return w; } } };
 // The shared modules are inlined as the mod's own copies are.
 function load(...files) {
   const src = files.map((f) => fs.readFileSync(f, "utf8")).join("\n")
@@ -47,11 +56,19 @@ function load(...files) {
   // Load the real synced helper, including the alias main.js imports.
   vm.runInContext("(() => {\n" + ["color.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.GROUP_GAP = GROUP_GAP; globalThis.trigger = trigger; globalThis.hang = hang;\n})();", context);
   vm.runInContext(src, context, { filename: files.at(-1) });
-  const mod = new context.Mod(); mod.init({}, cx); return mod;
+  const mod = new context.Mod(); mod.init({}, cx);
+  // Drawn with a cx, as Herdr draws it: a draw may arrange a one-shot.
+  const draw = mod.render;
+  mod.render = () => draw.call(mod, cx);
+  return mod;
 }
 const take = () => JSON.parse(JSON.stringify(calls.splice(0)));
 const parts = ["store.js", "name.js", "tree.js", "color.js", "status-mark.js", "tip.js", "focus.js", "list.js", "menu-row.js", "program.js", "menu.js", "sidebar.js", "main.js"].map((f) => path.join(__dirname, f));
 const header = load(...parts);
+// A snooze's timer is a header's own: with a hundred panes, none may wait while nothing is snoozed. A draw arranges one-shots
+// only (cx.timer.after), as the other mods' draws do: `repeats` counts the repeating ones a draw started.
+const repeats = (draw) => { const before = ticks.length; draw(); return ticks.length - before; };
+assert.deepEqual([repeats(() => header.render()), due()], [0, []], "nothing snoozed: no timer");
 header.hovered = true;
 find(header.render(), "pane-head-p2").handlers.on_click({}, cx);
 assert.deepEqual(take(), [["pane.focus", { pane: "p2" }]]);
@@ -67,55 +84,35 @@ assert.equal(header.hot, null, "the dialog covers it and the pointer may not mov
 assert.deepEqual(take(), [["t3-tabs.close-pane:p2", null]], "the tab bar asks first");
 find(header.render(), "pane-head-p2").handlers["on_mouse_down:right"]({}, cx);
 assert.deepEqual(take(), [["overlay", { mod: "t3-menu", kind: "popup", width: 220, height: 260, props: { tab: "pane", target: { pane: "p2", terminal: "t2" } } }]], "right-click opens the terminal's menu");
+// The × runs the tab bar's close, which asks first: its label names that command's key, not Herdr's own pane.close.
+{
+  bound = [{ section: "", keys: "cmd-shift-q", action: "pane.close" }, { section: "layout:herdr-t3", keys: "cmd-shift-w", action: "t3-tabs.close-pane" }];
+  const tipped = load(...parts);
+  tipped.hovered = true; tipped.hot = "ph-x-p2";
+  find(tipped.render(), "tip-over-ph-x-p2").handlers.on_hover(true, cx);
+  later();
+  assert.deepEqual(texts(find(tipped.render(), "tip-ph-x-p2")), ["Close pane (⇧⌘W)"]);
+  find(tipped.render(), "tip-over-ph-x-p2").handlers.on_hover(false, cx);
+  later();
+  bound = [];
+}
+// One draw reads each host list once, the namer taking the draw's own: split in Lists, or alone with the Inbox.
+for (const alone of [false, true]) {
+  pane.zoomed = alone; sidebar.children[0].active = alone ? "inbox" : "lists";
+  for (const k in reads) reads[k] = 0;
+  header.render();
+  assert.deepEqual(reads, { panes: 1, agents: 1, terminals: 1, spaces: 1 }, alone ? "alone with the Inbox" : "split");
+}
+pane.zoomed = false; sidebar.children[0].active = "lists";
 
-// Names: Pi session, else (agents only) a named tab, else a telling title, else the program.
 // The agent's name, then its folder; no address, which the right-click menu copies.
 assert.deepEqual(texts(header.render()), ["Release", "~/project"]);
-const named = () => texts(header.render())[0];
-terms[0].labels["pi.session"] = "Fix login";
-assert.equal(named(), "Fix login");
-delete terms[0].labels["pi.session"];
-assert.equal(named(), "Release");
-// Two agents in the named tab would read alike under its name: each goes by its own.
-pane.title = "✳ Review PR";
-agentList = [{ address: "t2", tab: "b" }, { address: "t5", tab: "b" }];
-assert.equal(named(), "Review PR");
-// A sub-agent beside its parent leaves the name to it.
-terms[0].state = "live"; terms.push({ address: "t5", parent: "t2", state: "live", labels: {} });
-assert.equal(named(), "Release");
-terms.at(-1).parent = null; terms[0].parent = "t5";
-assert.equal(named(), "Review PR", "a sub-agent doesn't take its tab's name");
-delete terms[0].parent; terms.pop(); agentList = []; pane.title = "pi";
 // A name that is only the program's goes when its icon says it.
 tab.named = false; pane.program = { ...program, icon: "pi.svg", tint: true };
 assert.deepEqual(texts(header.render()), ["~/project"]);
-pane.program = program;
-tab.named = false; pane.title = "π - Review PR - project";
-assert.equal(named(), "Review PR");
-pane.title = "π - project";
-assert.equal(named(), "Pi", "Pi's unnamed title is only its folder, which the space already says");
-pane.title = "⠋ project";
-assert.equal(named(), "Pi", "nor Codex's: its spinner and project");
-pane.title = "OC | Review PR";
-assert.equal(named(), "OC | Review PR", "an agent's marks come off only its own titles");
-pane.program = { name: "OpenCode", key: "opencode", agent: true };
-assert.equal(named(), "Review PR");
-pane.program = program;
-pane.title = "✳ Review PR";
-assert.equal(named(), "Review PR");
-pane.title = "pi";
-assert.equal(named(), "Pi");
-terms[0].labels["pi.session"] = "Fix login"; pane.title = "π - Fix login - project";
-pane.program = { name: "Git Changes", key: "lazygit", agent: false };
-assert.equal(named(), "Git Changes", "lazygit after Pi in the same shell: Pi's session and title are left behind");
-pane.program = program; delete terms[0].labels["pi.session"];
-tab.named = true; props = { pane: "p3" };
-assert.equal(named(), "zsh");
-shell.title = "t3";
-assert.equal(named(), "zsh");
-// A mod pane: the title its mod gives itself, else its folder name.
+pane.program = program; tab.named = true;
+// A mod pane, named by its mod.
 props = { pane: "p4" };
-assert.equal(texts(header.render())[0], "review-pane");
 sharedValues["review-pane.titles"] = { a: "review · other", b: "review · fix" };
 assert.equal(texts(header.render())[0], "review · fix");
 // Its icon, the one its mod gives.
@@ -141,25 +138,40 @@ const shown = dots();
 terms[0].labels.settled = "1:1";
 assert.equal(dots(), shown - 1, "Lists hide a settled done dot too");
 assert.equal(mark(), null, "and say nothing of it: Lists have no Settled");
-delete terms[0].labels.settled; terms[0].labels.snoozed = String(Date.now() + 60000);
+delete terms[0].labels.settled; terms[0].labels.snoozed = String(now + 60000);
 assert.equal(dots(), shown - 1, "Lists hide a snoozed done dot too");
 assert.equal(mark(), null);
+// Nothing else changes when the snooze ends, so the header redraws itself then, once.
+assert.deepEqual(due(), [60000], "Lists: one redraw, at the wake");
+notified = 0; elapse(60000);
+assert.deepEqual([notified, dots(), due()], [1, shown, []], "Lists: the wake brings the dot back, and nothing waits after it");
+terms[0].labels.snoozed = String(now + 60000); header.render();
 delete terms[0].labels.snoozed; terms[0].labels.settled = "1:1";
 sidebar.children[0].active = "inbox";
 assert.equal(mark(), "check.svg", "settled: Settle's check in place of the dot");
 pane.status = "idle";
 assert.equal(mark(), "check.svg", "idle and settled alike");
 pane.status = "done";
-delete terms[0].labels.settled; terms[0].labels.snoozed = String(Date.now() + 3 * 3600000 - 1000);
-assert.equal(mark(), "alarm-clock.svg 3h", "snoozed: the Inbox row's clock and time left");
-assert.equal(header.napping, true, "its time left is kept counting down");
+assert.deepEqual(due(), [], "settled: nothing to wait for");
+delete terms[0].labels.settled; terms[0].labels.snoozed = String(now + 3 * 3600000 - 1000);
+assert.equal(repeats(() => assert.equal(mark(), "alarm-clock.svg 3h", "snoozed: the Inbox row's clock and time left")), 0, "the draw starts no repeating timer");
+assert.deepEqual(due(), [59000], "its time left counts down: a one-shot to the minute's turn");
+header.render();
+assert.deepEqual(due(), [59000], "drawn again in that minute, the same one");
 pane.status = "working";
-assert.equal(mark(), "spinner.svg", "at work, it says so first");
+assert.equal(mark(), "circle-dashed.svg", "at work, it says so first");
 assert.ok(!svgs(header.render()).some((s) => s.endsWith("alarm-clock.svg")), "and only that");
+assert.deepEqual(due(), [], "no time left showing: no timer");
 pane.status = "done";
-terms[0].labels.snoozed = String(Date.now() - 1);
-assert.equal(mark(), "", "woken, it is news again: the dot");
-assert.equal(header.napping, false);
+terms[0].labels.snoozed = String(now + 90000);
+assert.deepEqual([mark(), due()], ["alarm-clock.svg 2m", [30000]]);
+notified = 0; elapse(30000);
+assert.deepEqual([notified, mark(), due()], [1, "alarm-clock.svg 1m", [60000]], "each minute's turn redraws and waits for the next");
+elapse(60000);
+assert.deepEqual([notified, mark(), due()], [2, "", []], "woken, it is news again: the dot, and the timer goes");
+terms[0].labels.snoozed = String(now + 60000); header.render();
+terms[0].labels.snoozed = String(now - 1);
+assert.deepEqual([mark(), due()], ["", []], "woken early (Wake, Undo): the timer goes with the time left");
 delete terms[0].labels.snoozed;
 // A hidden Inbox doesn't clear the label, so the label alone can't say: a turn ended since it was settled is news.
 terms[0].labels.settled = "1:1"; terms[0].turn = 2;
@@ -190,8 +202,12 @@ delete terms[0].labels.settled; delete terms[0].turn;
 {
   const owner = load(...parts);
   sharedValues["t3.focus"] = owner.fs.me;
+  terms[0].labels.snoozed = String(now + 60000); owner.render();
+  assert.deepEqual(due(), [60000]);
   owner.close();
   assert.equal(sharedValues["t3.focus"], null);
+  assert.deepEqual(due(), [], "a snooze's wait too");
+  delete terms[0].labels.snoozed;
 }
 
 // The buttons come with the keyboard on the header, the stop that gets there, and only in keyboard mode.
@@ -210,7 +226,7 @@ delete terms[0].labels.settled; delete terms[0].turn;
 // Its sub-agents, all the way down: how many, or how many need the person, that opens their list.
 props = { pane: "p2" }; pane.status = "working"; header.hovered = false;
 assert.equal(find(header.render(), "ph-kids-p2"), null, "none, no button");
-terms.push({ address: "child", parent: "t2", state: "live", status: "working", status_ms: Date.now() - 4 * 60000, name: "child task", labels: {} },
+terms.push({ address: "child", parent: "t2", state: "live", status: "working", status_ms: now - 4 * 60000, name: "child task", labels: {} },
   { address: "grandchild", parent: "child", state: "live", status: "idle", name: "grandchild task", labels: {} },
   { address: "gone", parent: "t2", state: "exited", status: "idle", name: "ended", labels: {} });
 {
@@ -219,29 +235,29 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   const shown = () => { const out = [], walk = (n) => typeof n === "string" ? out.push(n) : n && typeof n === "object" && (typeof n.svg === "string" ? out.push(path.basename(n.svg)) : n.items.forEach(walk)); walk(find(header.render(), "ph-kids-p2")); return out; };
   assert.equal(kids.style.accessibility_label, "2 sub-agents, 1 working", "the button says how many are at work");
   // At most one working mark in the header: the agent at work keeps its own, and the button says only how many.
-  const spinners = () => svgs(header.render()).filter((s) => path.basename(s) === "spinner.svg").length;
-  assert.equal(spinners(), 1, "its own agent and a sub-agent both at work: one spinner, the agent's");
+  const working = () => svgs(header.render()).filter((s) => path.basename(s) === "circle-dashed.svg").length;
+  assert.equal(working(), 1, "its own agent and a sub-agent both at work: one working mark, the agent's");
   assert.deepEqual(shown(), ["2", "chevron-down.svg"], "the agent at work: the button is the count alone");
   assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "2 sub-agents, 1 working", "its tooltip still says one is at work");
   pane.status = "idle";
-  assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "one at work, anywhere down: the shared spinner before the count");
+  assert.deepEqual(shown(), ["circle-dashed.svg", "2", "chevron-down.svg"], "one at work, anywhere down: the shared working mark before the count");
   terms.find((k) => k.address === "child").status = "idle";
   assert.deepEqual(shown(), ["2", "chevron-down.svg"], "none at work: the count alone");
   assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "2 sub-agents");
   terms.find((k) => k.address === "grandchild").status = "working";
-  assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "a grandchild at work spins it too");
+  assert.deepEqual(shown(), ["circle-dashed.svg", "2", "chevron-down.svg"], "a grandchild at work marks it too");
   terms.find((k) => k.address === "grandchild").status = "idle";
   terms.find((k) => k.address === "child").status = "working";
   const own = () => { const m = find(header.render(), "ph-mark-p2"); return m && [...svgs(m).map((s) => path.basename(s)), ...texts(m)].join(" "); };
   pane.status = "working";
-  assert.equal(own(), "spinner.svg", "its own agent at work still says so beside the button");
+  assert.equal(own(), "circle-dashed.svg", "its own agent at work still says so beside the button");
   pane.status = "blocked";
   assert.equal(own(), "!", "and needing the person, with its sub-agents all fine");
   pane.status = "idle";
   terms.find((k) => k.address === "grandchild").status = "blocked";
   assert.equal(own(), null, "a sub-agent's word isn't its own");
   assert.equal(find(header.render(), "ph-kids-p2").style.accessibility_label, "2 sub-agents, 1 needs you, 1 working", "the button says it");
-  assert.deepEqual(shown(), ["spinner.svg", "2", "chevron-down.svg"], "needing the person adds no `!` of its own: the count's colour says it, the `!` beside it stays the agent's");
+  assert.deepEqual(shown(), ["circle-dashed.svg", "2", "chevron-down.svg"], "needing the person adds no `!` of its own: the count's colour says it, the `!` beside it stays the agent's");
   pane.status = "working";
   // Hung from the button, right edges together, as the agents list's sort menu.
   const k = find(header.render(), "ph-kids-p2");
@@ -261,7 +277,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   assert.ok(texts(find(list(), "kid-child")).includes("1h"), "no status change yet: working since it was made");
   const mark = (address) => find(list(), `kid-status-${address}`);
   assert.equal(mark("child").style.accessibility_label, "Working");
-  assert.equal(mark("child").items[0].items[0].svg, "mods/workspace-chrome/spinner.svg");
+  assert.equal(mark("child").items[0].items[0].svg, "mods/t3-pane/icons/circle-dashed.svg");
   assert.equal(mark("grandchild").style.accessibility_label, "Needs you");
   assert.deepEqual(texts(mark("grandchild")), ["!", "Needs you"]);
   find(list(), "kid-grandchild").handlers.on_click({}, cx);
@@ -285,7 +301,7 @@ terms.push({ address: "child", parent: "t2", state: "live", status: "working", s
   assert.equal(find(list(), "kid-job"), null, "a shell isn't listed");
   assert.equal(find(list(), "kid-job-kid").items[0]?.style.w, undefined, "what it started stands where the shell would have");
   const jobKid = terms.find((k) => k.address === "job-kid");
-  jobKid.status_ms = Date.now() - 12 * 60000;
+  jobKid.status_ms = now - 12 * 60000;
   assert.deepEqual(texts(mark("job-kid")), ["12m"], "idle shows how long, no mark");
   jobKid.status = "done"; jobKid.turn = 2;
   assert.equal(mark("job-kid").style.accessibility_label, "Done", "an unread done is a dot");

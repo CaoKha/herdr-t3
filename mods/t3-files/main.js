@@ -51,7 +51,6 @@ const tabKey = (tab) => tab ? `${tab.id}:${tab.born}:${tab.reveal ?? 0}` : "";
 const FULL = 3; // the spaces last shown that keep all they read; older ones keep their file, open folders and search
 const CACHE = "cache/t3-files"; // under the app's home, where image() can read
 let lastImage = 0; // The host caches decoded images by path, even after the copied file is deleted.
-const MARKDOWN = "t3-files.markdown"; // "code" once someone picked it; Preview otherwise
 
 const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads from updating the index or filesystem-monitor state
 
@@ -91,8 +90,8 @@ export default class Files extends View {
     // The state being worked for, and a count that moves each time that changes (going).
     this.awake = null; this.gen = 0;
     if (!checking()) cx.spawn(async () => { await exec("rm", ["-rf", `${appHome()}/${CACHE}`]).catch(() => null); });
-    // A hidden copy isn't drawn, so this is what sees it go out of view.
-    cx.timer.every(1000, (cx) => { this.sync(cx); this.poll(cx); });
+    // A hidden copy isn't drawn, so this is what sees it go out of view. One that has shown nothing has nothing to see go.
+    cx.timer.every(1000, (cx) => { if (!this.states.size) return; this.sync(cx); this.poll(cx); });
     // `t3-files.open:<path from the space's folder>` and `t3-files.search:<words>`, for keys and scripts (the demo's);
     // `t3-files.close`, cmd-w while it has the keyboard, closes the active surface, never the terminal behind it. `pick:<path>`
     // is a breadcrumb menu's file (menus.js): the person's own pick, so the tree takes the keyboard.
@@ -152,46 +151,46 @@ export default class Files extends View {
     return Object.assign(blank({ id: st.id, folder: st.root, machine: st.on }), { file: st.file, folder: st.folder, trail: st.trail, fileBorn: st.fileBorn, seen: st.seen, expanded: new Set(st.expanded), selected: st.selected, focus: st.focus, query: st.query });
   }
 
-  // It works only while it shows: the page in the open panel, the window in front, for the active space. Shown, it reads at
-  // once; hidden, answers still under way are dropped and nothing more is asked. A closed space's state goes.
-  sync(cx, focus = false) {
+  // It works only while it shows (works): the page in the open panel, for the active space. Shown, it reads at once; hidden,
+  // answers still under way are dropped and nothing more is asked. A closed space's state goes.
+  sync(cx, focus = false, all = spaces()) {
     if (checking()) return;
-    const all = spaces(), sp = all.find((s) => s.active);
+    // The layout read once (panelState), not again for each space kept.
+    const sp = all.find((s) => s.active), panel = panelState();
     for (const [id, st] of this.states) {
       if (!all.some((s) => s.id === id)) { this.drop(st); this.states.delete(id); continue; }
-      const tabs = surfacesFor(id).tabs;
+      const tabs = surfacesFor(id, panel.pages).tabs;
       for (const [path, kept] of st.previews) if (!tabs.some(t => t.path === path && t.born === kept.born)) { this.releasePreview(kept.view); st.previews.delete(path); if (st.view === kept.view) st.view = null; }
       if (st.file && !tabs.some(t => t.path === st.file && t.born === st.fileBorn)) { st.file = null; st.view = null; }
     }
-    const st = sp && this.inPanel() ? this.stateFor(sp) : null;
-    const awake = window()?.active ? st : null, returning = awake !== this.awake;
+    const st = sp && panel.open && panel.page === "files" ? this.stateFor(sp) : null;
+    const tab = st && (panel.tabs.find(t => t.id === panel.active) ?? null), key = tabKey(tab);
+    const file = tab?.folder ? null : tab?.path ?? null, folder = tab?.folder ? tab.path ?? "" : null;
+    if (st && (st.seen !== key || st.file !== file || st.folder !== folder)) {
+      // Bind the tab, its cached preview and tree selection before drawing. Only the work that needs the host waits.
+      st.seen = key;
+      if (file) this.showPreview(st, file, tab);
+      else { st.file = null; st.view = null; st.folder = folder; st.trail = tab?.trail ?? folder; }
+      const path = file ?? folder;
+      if (path !== null) { this.clearSearch(st); st.focus = path || null; }
+      const latest = this.select(st, path || null);
+      st.pick = path === null ? null : { latest, focus, queued: false };
+      this.changed(st);
+    }
+    // After the tab is bound: a file it just began to show is something unread.
+    const awake = st && this.works(st, true) ? st : null, returning = awake !== this.awake;
     if (returning) { this.sleep(); this.awake = awake; }
-    if (st) {
-      const tab = activeTab(sp.id), key = tabKey(tab);
-      const file = tab?.folder ? null : tab?.path ?? null, folder = tab?.folder ? tab.path ?? "" : null;
-      if (st.seen !== key || st.file !== file || st.folder !== folder) {
-        // Bind the tab, its cached preview and tree selection before drawing. Only the work that needs the host waits.
-        st.seen = key;
-        if (file) this.showPreview(st, file, tab);
-        else { st.file = null; st.view = null; st.folder = folder; st.trail = tab?.trail ?? folder; }
-        const path = file ?? folder;
-        if (path !== null) { this.clearSearch(st); st.focus = path || null; }
-        const latest = this.select(st, path || null);
-        st.pick = path === null ? null : { latest, focus, queued: false };
-        this.changed(st);
-      }
-      const pick = st.pick;
-      if (awake && pick && !pick.queued) {
-        pick.queued = true;
-        cx.timer.after(0, (cx) => {
-          pick.queued = false;
-          if (st.pick !== pick || !this.going(st)() || tabKey(activeTab(st.id)) !== key) return;
-          st.pick = null;
-          if (file) this.loadPreview(st, file, cx);
-          // A later tree move, too, owns the selection and any scroll or focus it requested.
-          if (pick.latest()) this.reveal(st, file ?? folder, cx, pick.focus);
-        });
-      }
+    const pick = awake?.pick;
+    if (pick && !pick.queued) {
+      pick.queued = true;
+      cx.timer.after(0, (cx) => {
+        pick.queued = false;
+        if (st.pick !== pick || !this.going(st)() || tabKey(activeTab(st.id)) !== key) return;
+        st.pick = null;
+        if (file) this.loadPreview(st, file, cx);
+        // A later tree move, too, owns the selection and any scroll or focus it requested.
+        if (pick.latest()) this.reveal(st, file ?? folder, cx, pick.focus);
+      });
     }
     if (returning && awake?.root) {
       if (!awake.entries.has("") && !awake.errors.has("")) {
@@ -212,6 +211,10 @@ export default class Files extends View {
 
   inPanel() { const p = panelState(); return p.open && p.page === "files"; }
   shown() { return this.inPanel() && Boolean(window()?.active); }
+  // What `st` draws as waiting and only a read fills: its first tree, a file still loading.
+  unread(st) { return st.refreshed === undefined || Boolean(st.file && (!st.view || st.view.loading)); }
+  // In the panel, with the window in front or something unread: a window behind gets that one read and no refresh (poll).
+  works(st, inPanel = this.inPanel()) { return inPanel && (Boolean(window()?.active) || this.unread(st)); }
   // Whether what started now may go on: `st` still the one worked for and in view, without having gone out of it since. It
   // asks the layout itself, as sync sees a hide only at its next tick; one it finds puts the page to sleep, so showing again
   // reads again.
@@ -219,7 +222,7 @@ export default class Files extends View {
     const gen = this.gen;
     return () => {
       if (this.gen !== gen || this.awake !== st || !this.live(st)) return false;
-      if (this.shown() && spaces().find((s) => s.active)?.id === st.id) return true;
+      if (this.works(st) && spaces().find((s) => s.active)?.id === st.id) return true;
       this.sleep();
       return false;
     };
@@ -229,7 +232,7 @@ export default class Files extends View {
   live(st) { return this.states.get(st.id) === st; }
   changed(st) { st.version++; st.rows = null; }
 
-  // Whether what the folder's rows draw moved; `quiet`, a poll's, shows no spinner.
+  // Whether what the folder's rows draw moved; `quiet`, a poll's, shows no loader.
   async list(st, rel, quiet = false) {
     const fresh = this.fresh(st, `list:${rel}`), dir = join(st.root, rel);
     if (!fresh()) return false;
@@ -262,7 +265,7 @@ export default class Files extends View {
 
   poll(cx) {
     const st = this.awake;
-    if (!st || st.git === undefined || st.expanding) return;
+    if (!st || !window()?.active || st.git === undefined || st.expanding) return;
     const every = Math.min(SLOWEST, Math.max(st.on ? REMOTE_EVERY : LOCAL_EVERY, 10 * (st.took ?? 0)));
     if (Date.now() - (st.refreshed ?? 0) >= every) this.recheck(st, cx, false, true);
   }
@@ -392,7 +395,7 @@ export default class Files extends View {
     };
     if (!fresh()) return;
     if (!again && kind !== "image" && !st.view.loading) {
-      if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(MARKDOWN) === "code")) {
+      if (st.view.text !== undefined && !st.view.code && (kind === "text" || shared(KEY.markdown) === "code")) {
         this.editor(st.view, rel, this.fits(st.view)); cx.notify();
       }
       // Plain, picked again: colored now, as it's opened.
@@ -412,7 +415,7 @@ export default class Files extends View {
       if (old?.image && old.image !== view.image) this.uncache(old.image);
       // Asked to color, or scrolled while plain: still so for its new text, until it's opened again.
       view.force = again && old?.force; view.scrolled = again && old?.scrolled;
-      if (view.text !== undefined && (kind === "text" || shared(MARKDOWN) === "code")) this.editor(view, rel, (!old?.code || this.small(view)) && this.fits(view));
+      if (view.text !== undefined && (kind === "text" || shared(KEY.markdown) === "code")) this.editor(view, rel, (!old?.code || this.small(view)) && this.fits(view));
       if (old?.code) old.code.release();
       st.view = view; this.keepPreview(st, rel, view);
       // Rewritten: colored again only once it holds, so an agent writing it stalls the window once, not every read.
@@ -472,7 +475,7 @@ export default class Files extends View {
     fs.unlink(`${appHome()}/${name}`).catch(() => null);
   }
 
-  // The view's code, wrapped as the layout's Lines choice says (store.js), which it notes: the editor takes it only when made.
+  // The view's code, wrapped as this page's Wrap choice says (store.js), which it notes: the editor takes it only when made.
   // Colored if `color` and it has a language; else plain, for colorLater. Its old editor goes.
   editor(view, rel, color) {
     const t = theme(), old = view.code;
@@ -628,9 +631,9 @@ export default class Files extends View {
 
   render(cx) {
     if (props()?.files) return menuView(this);
-    const t = theme(), sp = spaces().find((s) => s.active);
+    const t = theme(), all = spaces(), sp = all.find((s) => s.active);
     if (!sp) return div().id("t3-files").size_full();
-    this.sync(cx);
+    this.sync(cx, false, all);
     const st = this.stateFor(sp);
     // Lines changed: the editor made again, just after this draw, as an editor can't be made in one.
     const v = st.view;
@@ -654,7 +657,7 @@ export default class Files extends View {
   // 32 high, not T3's 40, so its centre is the work column's pane header's (specs/files.md); its controls centred, as Review's bar,
   // so Tree stays put between the pages.
   toolbar(st, t) {
-    const md = kindOf(st.file ?? "") === "markdown", code = shared(MARKDOWN) === "code";
+    const md = kindOf(st.file ?? "") === "markdown", code = shared(KEY.markdown) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
     const crumb = (label, path, last) => {
       // The root's words sit where Review's scope button has them, so switching pages doesn't move the first letter (t3-tokens「规则」R1).
@@ -678,11 +681,11 @@ export default class Files extends View {
         .child(h_flex().id("t3-files-switches").flex_none().gap(GROUP_GAP).items_center()
           .child(this.control(t, "t3-files-render-mode", md && !code ? "code-xml" : "eye", md ? code ? "Show preview" : "Show code" : "Preview is not available for this file", cx => {
             if (!code && st.view?.text !== undefined && !st.view.code) this.editor(st.view, st.file, this.fits(st.view));
-            setShared(MARKDOWN, code ? "preview" : "code"); cx.notify();
+            setShared(KEY.markdown, code ? "preview" : "code"); cx.notify();
           }, { on: md && !code, disabled: !md, size: "sm", iconSize: 14 }))
           // Wrap or scroll long lines, this page's own choice.
           .child(this.control(t, "t3-files-wrap", "text-wrap", st.view?.code && (!md || code) ? wrapLines() ? "Disable word wrap" : "Enable word wrap" : "Word wrap is only available in code", (cx) => { setWrapLines(!wrapLines()); cx.notify(); }, { on: wrapLines(), disabled: !st.view?.code || md && !code, size: "sm", iconSize: 14 }))
-          .child(this.control(t, "t3-files-nav-toggle", "folder-tree", !st.file ? "File explorer is always visible for folders" : this.navOpen ? "Hide file explorer" : "Show file explorer", cx => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, { on: !st.file || this.navOpen, disabled: !st.file, size: "sm", iconSize: 14 })));
+          .child(this.control(t, "t3-files-nav-toggle", "folder-tree", !st.file ? "The file tree is always visible for folders" : this.navOpen ? "Hide the file tree" : "Show the file tree", cx => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, { on: !st.file || this.navOpen, disabled: !st.file, size: "sm", iconSize: 14 })));
   }
 
   // T3's OpenInPicker in its header, outlined: the app's icon opens the file or folder there; ⌄ picks the app (menus.js,
@@ -694,7 +697,7 @@ export default class Files extends View {
     const hot = this.hot === id || within(this, [id]) ? "main" : this.hot === moreId || within(this, [moreId]) ? "more" : null;
     // The keyboard walks only an enabled half.
     const kept = (key, el) => available ? stop(this, t, key, el, 8) : el;
-    return split(t, { id: "t3-files-open-group", mainId: id, moreId, chevron: `${MOD}/icons/chevron-down.svg`, size: "xs", surface: "chrome", hot, on: popupOpen(this, moreId, MENU_CLOSED), disabled: !available, label: `Open in ${target}`, moreLabel: "Choose editor" },
+    return split(t, { id: "t3-files-open-group", mainId: id, moreId, chevron: `${MOD}/icons/chevron-down.svg`, size: "xs", surface: "chrome", hot, on: popupOpen(this, moreId, MENU_CLOSED), disabled: !available, label: `Open in ${target}`, moreLabel: "Choose application" },
       main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 14)).on_hover(hover(id))
         .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target); })))),
       more => kept(moreId, more.on_hover(hover(moreId)).when(available, opener(this, { id: moreId, closed: MENU_CLOSED, onOpen: (b, cx) => {
@@ -707,9 +710,9 @@ export default class Files extends View {
 
   // The file: Preview or Code for Markdown, the code, an image or why there's none. Only drawn with a file open.
   content(st, t) {
-    const v = st.view, md = kindOf(st.file ?? "") === "markdown", code = shared(MARKDOWN) === "code";
+    const v = st.view, md = kindOf(st.file ?? "") === "markdown", code = shared(KEY.markdown) === "code";
     return div().id("t3-files-content").size_full().min_h(0).min_w(0).on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-        .child(!v || v.loading ? loadingState(t, "t3-files-loading", "Loading the file…")
+        .child(!v || v.loading ? loadingState(MOD, t, "t3-files-loading", "Loading the file…")
           // A file there's nothing to show of says why, as an empty page, with T3's Try again and a way to it in the tree.
           : v.problem ? v_flex().id("t3-files-problem").size_full().p(24).gap(12).items_center().justify_center().text_center().text_size(12).role("alert")
             .child(div().text_color(t.ansi1).child(v.problem))
@@ -763,7 +766,7 @@ export default class Files extends View {
         .child(this.search.value() === st.query ? Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files")
           : div().h_full().flex().items_center().truncate().text_size(12).text_color(st.query ? t.foreground : t.dim).child(st.query || "Search files"))
         .when(Boolean(this.searchFocused), el => el.child(div().id("t3-files-search-ring").absolute().inset_0().rounded(6).border(3).border_color(alpha(t.accent, "3d")))), 6, { enter: () => this.search.focus() }))
-      .when(folders > 0, el => el.child(this.control(t, "t3-files-fold-all", this.allExpanded(st) ? "chevrons-down-up" : "chevrons-up-down", this.allExpanded(st) ? "Collapse all folders" : "Expand all folders", cx => this.foldAll(st, cx))));
+      .when(folders > 0, el => el.child(this.control(t, "t3-files-fold-all", this.allExpanded(st) ? "chevrons-down-up" : "chevrons-up-down", this.allExpanded(st) ? "Collapse all" : "Expand all", cx => this.foldAll(st, cx))));
   }
 
   // Collapse all while any folder is open; else open every folder, Git-ignored ones aside, EXPAND_MAX at most.
@@ -818,7 +821,7 @@ export default class Files extends View {
       .child("This folder can't be listed. Click to retry.").on_click((_e, cx) => retry("", cx));
     const found = this.found(st);
     if (found?.error) return div().p(16).text_size(12).text_color(t.ansi1).cursor_pointer().on_click((_e, cx) => this.find(st, st.query, cx)).child(found.error);
-    if (st.query.trim() && !found || !st.entries.has("") && st.treeWaiting && this.shown()) return div().id("t3-files-tree-loading").px(12).py(4).text_size(12).text_color(t.dim).child("Loading files…");
+    if (st.query.trim() && !found || !st.entries.has("") && st.treeWaiting) return div().id("t3-files-tree-loading").px(12).py(4).text_size(12).text_color(t.dim).child("Loading files…");
     if (!st.entries.has("")) return div();
     const rows = this.rows(st);
     if (!rows.length) return st.query.trim() ? div().id("t3-files-no-matches").px(12).py(16).text_size(12).text_color(t.dim).child("No matching files.") : div();
@@ -837,7 +840,7 @@ export default class Files extends View {
         drag: { path: join(st.root, r.top), on: st.on },
         guides: this.treeHot === "tree",
         trailing: r.dir && st.errors.has(r.path) ? this.retryMark(st, t, r.path, retry)
-          : r.dir && r.open && st.loading.has(r.path) ? svg("mods/workspace-chrome/spinner.svg").size(14).text_color(t.dim).spin(900) : null })
+          : r.dir && r.open && st.loading.has(r.path) ? svg("mods/t3-files/icons/loader-circle.svg").size(14).text_color(t.dim) : null })
         .on_click((_e, cx) => this.chooseRow(st, r, cx))
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.rowMenu(st, r.path); cx.notify(); });
     };

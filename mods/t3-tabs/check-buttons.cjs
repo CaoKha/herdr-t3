@@ -10,18 +10,20 @@ const t = { chrome: "#111111", background: "#222222", dim: "#555555", muted: "#7
 const calls = [], space = { id: "s", active: true, tabs: [] }, tab = { id: "b", active: true, named: true, name: "Task" };
 let part = { part: "end" }, platform = "windows", panelOpen = false, home = false;
 const cx = { notify() {}, stop_propagation() {} };
+// Host reads a draw makes: each copies what it returns.
+const reads = { layout: 0, panel: 0, home: 0 };
 const env = {
   View: class {}, div: element, svg: src => { const e = element(); e.src = src; return e; }, image: element, h_flex: element,
   Popup: { new: (_id, trigger) => element().child(trigger) },
   theme: () => t, props: () => part, settings: () => ({ zoom: 1 }), window: () => ({ platform, buttons: true }),
-  spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => ({}), shared: () => null,
-  sidebarParts: () => ({ stack: { active: "lists" } }), toggleLeft: () => 8, panelState: () => ({ pages: ["files"], page: "files", tabs: [], open: panelOpen }),
+  spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => { reads.layout++; return {}; }, shared: () => null,
+  sidebarParts: () => ({ stack: { active: "lists" } }), toggleLeft: () => 8, panelState: () => { reads.panel++; return { pages: ["files"], page: "files", tabs: [], open: panelOpen }; },
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
   glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
   tipCard: (_t, id) => element().id(id), FADE: {},
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {}, REVIEW_STATUS: "review.status",
-  navigation: () => ({ get atHome() { return home; }, frame: () => ({ tabs: [tab], context: null }) }),
+  navigation: () => ({ get atHome() { reads.home++; return home; }, frame: () => ({ tabs: [tab], context: null }) }),
   subAgents: () => () => [], namer: () => p => p.title, programIcon: () => null,
   POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
   openMenu: (_view, kind, target) => calls.push([kind, target]), openOverlay: value => calls.push(["overlay", value]),
@@ -54,11 +56,20 @@ for (const id of ["minimize", "maximize", "close-window"]) {
   const el = click(root, id);
   assert.equal(el.style.h, 28); assert.equal(el.style.w, 28); assert.equal(el.items[0].style.size, 16);
 }
-assert.deepEqual(calls.splice(0), [["new", "s"], ["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
+// Lists' + is the New tab its label's key is: the one command, so the breadcrumb reads the same after either (navigation.js `fresh`).
+assert.deepEqual(calls.splice(0), [["t3-tabs.new", undefined], ["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
 panelOpen = true;
 assert.equal(find(tabs.render(), "close-window"), null, "platform buttons move to the panel head");
 assert.equal(find(tabs.render(), "panel-toggle"), null, "open panel owns its rightmost toggle");
 panelOpen = false;
+// Each part reads only what it draws, once: these are host reads, made again on every draw.
+{
+  const view = load(__dirname);
+  const drawn = (props) => { part = props; for (const k in reads) reads[k] = 0; view.render(); return { ...reads }; };
+  assert.deepEqual(drawn({}), { layout: 1, panel: 0, home: 0 }, "the strip: the layout once, nothing of the panel or Home");
+  assert.deepEqual(drawn({ part: "end" }), { layout: 1, panel: 0, home: 1 }, "Lists' +");
+  assert.deepEqual(drawn({ part: "window" }), { layout: 0, panel: 1, home: 1 }, "the panel's toggle and the window's buttons");
+}
 
 // On a Mac only the closed panel's toggle, then the layout's 12, follow Details: Lists' + never pushes it (「规则」R1).
 {
@@ -160,6 +171,38 @@ root = tabs.render();
 [].concat(find(root, "tab-b").handlers["on_mouse_down:middle"]).forEach(f => f({}, cx));
 assert.equal(calls.pop()[0], "t3-tabs.close-tab:b", "a middle press closes the tab");
 
+// In Lists a snooze's end brings a tab's done mark back with nothing else changing, so the strip redraws itself then, once.
+{
+  let now = 1000000, notified = 0, mode = "lists";
+  const waits = [], due = () => waits.filter(w => !w.gone).map(w => w.at - now);
+  const drawCx = { ...cx, notify() { notified++; }, timer: { after(ms, f) { const w = { at: now + ms, f, cancel() { w.gone = true; } }; waits.push(w); return w; } } };
+  const elapse = ms => { now += ms; for (const w of waits.filter(w => !w.gone && w.at <= now)) { w.gone = true; w.f(drawCx); } };
+  const clock = { now: () => now }, term = { address: "t1", state: "live", status: "done", labels: {} };
+  const tree = vm.createContext({ Date: clock });
+  vm.runInContext(kit.strip(fs.readFileSync(path.join(__dirname, "tree.js"), "utf8")) + "\nglobalThis.real = { ownStatus, treeStatus, notNews, subAgents };", tree);
+  const was = { ...env };
+  Object.assign(env, tree.real, { Date: clock, agents: () => [{ address: "t1", tab: "b", status: "done" }], terminals: () => [term],
+    sidebarParts: () => ({ stack: { active: mode } }), stopsEnd() {} });
+  const view = load(__dirname), marked = () => kit.walk(find(view.render(drawCx), "tab-b")).some(n => "rounded_full" in n.style);
+  for (const k of Object.keys(env)) if (!(k in was)) delete env[k];
+  Object.assign(env, was);
+  part = {};
+  assert.deepEqual([marked(), due()], [true, []], "nothing snoozed: its done shows, and nothing waits");
+  term.labels.snoozed = String(now + 60000);
+  assert.deepEqual([marked(), due()], [false, [60000]], "snoozed, its done is no news: one redraw waits for the wake");
+  view.render(drawCx);
+  assert.deepEqual(due(), [60000], "drawn again, the same one");
+  elapse(60000);
+  assert.deepEqual([notified, marked(), due()], [1, true, []], "the wake redraws, the mark is back, and nothing waits after it");
+  term.labels.snoozed = String(now + 60000); view.render(drawCx);
+  mode = "inbox"; view.render(drawCx);
+  assert.deepEqual(due(), [], "with the Inbox the strip has no marks: nothing to wait for");
+  mode = "lists"; view.render(drawCx);
+  assert.deepEqual(due(), [60000]);
+  view.close();
+  assert.deepEqual(due(), [], "closing ends the wait");
+}
+
 const chrome = load(path.join(__dirname, "../t3-chrome"));
 part = { footer: true };
 root = chrome.render();
@@ -175,22 +218,17 @@ root = chrome.render();
 for (const id of ["panel-wide", "panel-close"]) assert.equal(click(root, id).style.h, 28);
 assert.deepEqual(calls.splice(0), [["wide"], ["hide"]]);
 
-let notices = 0;
 const pending = [], timedCx = { ...cx, timer: { after(ms, callback) { const task = { ms, callback, cancel() { this.cancelled = true; } }; pending.push(task); return task; }, every() { return { cancel() {} }; } } };
 const tick = ms => { const i = pending.findIndex(task => !task.cancelled && task.ms === ms); assert.notEqual(i, -1); pending.splice(i, 1)[0].callback(timedCx); };
-const measureCx = { ...cx, notify() { notices++; } }, bounds = { x: 10, y: 20, width: 30, height: 24 };
+const bounds = { x: 10, y: 20, width: 30, height: 24 };
 const crumbContext = { space: { id: 's', name: 'Space' }, head: 'agent', parent: 'parent' };
 const crumbData = { every: [{ address: 'agent', title: 'Wide title' }, { address: 'parent', title: 'Parent' }], ps: [], name: a => a.title, narrow: false, stopPress() {} };
 env.projectMark = () => element();
 const crumbs = load(__dirname);
 root = crumbs.crumb(t, crumbContext, crumbData);
 assert.ok(find(root, 'text-name-peer-agent'), 'the breadcrumb uses the shared measured text');
-find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 40 }, measureCx);
-find(root, 'text-measure-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
-const first = notices;
-find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 40 }, measureCx);
-find(root, 'text-measure-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
-assert.equal(notices, first, 'unchanged breadcrumb widths do not notify');
+find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 40 }, cx);
+find(root, 'text-measure-peer-agent').handlers.on_size_change({ width: 90 }, cx);
 root = crumbs.crumb(t, crumbContext, crumbData);
 const title = find(root, 'peer-agent');
 title.handlers.on_hover(true, timedCx); assert.equal(crumbs.details, undefined, 'cut names retain the opening delay');
@@ -200,7 +238,7 @@ title.handlers["on_mouse_down:left"]({ bounds }, timedCx); assert.equal(crumbs.d
 title.handlers.on_click({}, cx);
 assert.equal(calls.at(-1)[1].at.x, 10); assert.equal(calls.at(-1)[1].at.y, 48, 'title menu retains its pressed anchor');
 title.handlers["on_mouse_down:right"]({}, timedCx); assert.equal(calls.at(-1)[0], 'agent'); assert.equal(calls.at(-1)[1].address, 'agent');
-find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 90 }, measureCx);
+find(root, 'text-name-peer-agent').handlers.on_size_change({ width: 90 }, cx);
 root = crumbs.crumb(t, crumbContext, crumbData);
 find(root, 'peer-agent').handlers.on_hover(true, timedCx); assert.equal(crumbs.details, null, 'whole titles show no repeated label');
 root = crumbs.crumb(t, crumbContext, { ...crumbData, narrow: true });

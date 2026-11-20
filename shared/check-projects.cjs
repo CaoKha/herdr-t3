@@ -1,4 +1,4 @@
-// Project bookmarks (t3.projects): live spaces are remembered without keeping a terminal alive, and New lists dormant ones.
+// Remembered Projects (t3.projects): live spaces are remembered without keeping a terminal alive, and New lists dormant ones.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -35,10 +35,10 @@ const { rememberProjects, dormantProjects } = loadProjects();
     { machine: "box", folder: "/srv/beta", name: "Beta Web", named: true },
     { machine: null, folder: "/work/alpha", name: "alpha" },
   ], "uses the space's root folder rather than a transient subdirectory cwd, active first");
-  assert.equal(rememberProjects(spaces, ps, "h", "/Users/me", saved), null, "no write when the bookmark list is unchanged");
+  assert.equal(rememberProjects(spaces, ps, "h", "/Users/me", saved), null, "no write when the Project list is unchanged");
 }
 
-// Renaming an open space updates its bookmark, closed projects stay behind newly active ones, and the list caps at 50.
+// Renaming an open space updates its Project record, closed projects stay behind newly active ones, and the list caps at 50.
 {
   const prior = Array.from({ length: 50 }, (_, i) => ({
     machine: null, folder: `/work/p${i}`, name: `p${i}`,
@@ -80,4 +80,4 @@ const { rememberProjects, dormantProjects } = loadProjects();
   ]);
 }
 
-console.log("ok: project bookmarks record active spaces without churn and filter dormant entries cleanly.");
+console.log("ok: remembered Projects record active spaces without churn and filter dormant entries cleanly.");

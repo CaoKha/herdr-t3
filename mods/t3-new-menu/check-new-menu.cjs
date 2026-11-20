@@ -8,7 +8,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find } = kit;
 const text = (n) => typeof n === "string" ? n : n?.items ? n.items.map(text).join(" ") : "";
 
-let spaces, machines, panes = [], closed = 0, checking = true;
+let spaces, machines, panes = [], paneReads = 0, closed = 0, checking = true;
 let openProps = {};
 const calls = [], state = {};
 const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }) };
@@ -17,15 +17,15 @@ const context = vm.createContext({
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, Input: { new: element },
   InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, set_value(v) { value = v; }, type(v) { value = v; on.change({}, cx); }, submit() { on.submit(); } }; } },
   settings: () => ({ zoom: 1 }),
-  theme: () => ({ foreground: "#fff" }), spaces: () => spaces, machines: () => machines, panes: () => panes, run: (name, args) => calls.push([name, args]),
+  theme: () => ({ foreground: "#fff" }), spaces: () => spaces, machines: () => machines, panes: () => { paneReads++; return [...panes]; }, run: (name, args) => calls.push([name, args]),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, closeOverlay() { closed++; }, props: () => ({ overlay: "o", ...openProps }), window: () => ({ platform }), keys: () => [{ section: "global", keys: "cmd-n", action: "space.new" }], home: () => "/home/me",
-  checking: () => checking, prepareSpace() {}, exec: async () => { throw new Error("No icon probe in the test"); },
+  checking: () => checking, exec: async () => { throw new Error("No icon probe in the test"); },
 });
 const read = (file) => fs.readFileSync(path.join(__dirname, file), "utf8");
 // Keep project helpers in their module scope so their private keyOf doesn't collide with tip.js.
-const projects = `const { projectMark, placeOf, newTab, dormantProjects } = (() => {
+const projects = `const { projectMark, placeOf, dormantProjects } = (() => {
 ${["project.js", "projects.js"].map((file) => kit.strip(read(file))).join("\n")}
-return { projectMark, placeOf, newTab, dormantProjects };
+return { projectMark, placeOf, dormantProjects };
 })();`;
 const src = ["color.js", "store.js", "list.js", "tip.js", "focus.js", "palette.js", "new-space.js", "main.js"]
   .map((file) => kit.strip(read(file))).join("\n").replace("export default class", "globalThis.Mod = class");
@@ -46,7 +46,10 @@ spaces = [remote("r1"), local("a"), remote("r2", true), local("b")];
 let m = open();
 assert.deepEqual(keysOf(m), ["space:r2", "space:r1", "space:a", "space:b"]);
 press(m, "3", true);
-assert.deepEqual(take(), [["tab.new", { space: "a", folder: "/home/me/a" }]]);
+// A space names itself to t3-tabs, in view or not, so the Inbox bar reads the tab as something started there (`fresh`).
+assert.deepEqual(take(), [["t3-tabs.new:a", null]]);
+press(open(), "1", true);
+assert.deepEqual(take(), [["t3-tabs.new:r2", null]]);
 // A row's number reads as the platform names the key that picks it.
 assert.ok(text(find(list(m), "space:a")).includes("⌘3"));
 platform = "linux";
@@ -79,7 +82,7 @@ m.spaceInput.type("nothing");
 assert.equal(list(m), null);
 press(m, "down"); // no rows: nothing to reach, nothing thrown
 click(open(), "space:r1");
-assert.deepEqual(take(), [["tab.new", { space: "r1", folder: "" }]]);
+assert.deepEqual(take(), [["t3-tabs.new:r1", null]], "another machine's space, the same");
 
 // Bookmarks follow live spaces, and neither the creation folder nor the current folder duplicates a live space.
 spaces = [remote("r1"), { ...local("a", true), tabs: [{ id: "tab-a" }] }];
@@ -128,6 +131,12 @@ assert.equal(repo.style.opacity, undefined);
 press(m, "down");
 m.spaceInput.submit();
 assert.deepEqual(take(), [["space.new", { folder: "/srv/repo", machine: "kvm" }]]);
+
+// A remote Project's folder is its machine's: this computer's home isn't cut out of it.
+state["t3.projects"].push({ machine: "kvm", folder: "/home/me/there", name: "There" });
+m = open(); m.spaceInput.type("there");
+assert.deepEqual(kit.strings(find(list(m), "project:kvm:/home/me/there")).slice(-3, -1), ["kvm ·", "/home/me/there"]);
+state["t3.projects"].pop();
 
 // An unavailable or unreported machine cannot open a bookmark by click, Enter or a numbered shortcut.
 for (const [query, id] of [["away", "project:away:/srv/offline"], ["missing", "project:missing:/srv/gone"]]) {
@@ -186,6 +195,8 @@ find(m.render(), "space-new").handlers.on_click({}, cx);
 assert.deepEqual(take(), [["space.new", { machine: "" }]]);
 assert.ok(text(open().render()).includes("⌘N"), "⌘N beside a button that does the same");
 
+// A draw reads panes() once: each read copies every pane.
+{ const drawn = open(); paneReads = 0; drawn.render(); assert.equal(paneReads, 1); }
 // Its contents are there from the first frame: a fade leaves the popup blank.
 assert.notEqual(typeof open().render().style.opacity, "number");
 // Closing says which step it was on, for the buttons that open each to toggle.

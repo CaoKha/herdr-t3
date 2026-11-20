@@ -25,7 +25,7 @@ demo() {
 }
 mine() { [ "$(demo hc server status --json | jq -r .core.id)" != "$(hc server status --json | jq -r .core.id)" ]; }
 # app.pid outlives the window, and after a restart its number can be another program's: only a Herdr with this app home counts.
-ours() { [ -f "$D/app.pid" ] && ps eww -o command= -p "$(cat "$D/app.pid")" 2>/dev/null | grep -q "HERDR_APP_HOME=$A "; }
+ours() { [ -f "$D/app.pid" ] && ps eww -o command= -p "$(cat "$D/app.pid")" 2>/dev/null | grep -qF "HERDR_APP_HOME=$A "; }
 
 up() {
   [ -e "$D" ] && { echo "$D exists: stage.sh down first" >&2; exit 1; }
@@ -78,7 +78,7 @@ SWIFT
   ( cd "$H"; demo python3 -I -c 'import os, sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' /Applications/Herdr.app/Contents/MacOS/Herdr > "$D/app.log" 2>&1 < /dev/null & )
   for _ in 1 2 3 4 5 6 7 8 9 10; do demo herdr-app status >/dev/null 2>&1 && break; sleep 1; done
   # Its own window only: other Herdr windows (yours, another demo's) have another home.
-  for p in $(pgrep -f 'MacOS/Herdr$'); do ps eww -o command= -p "$p" | grep -q "HERDR_APP_HOME=$A " && echo "$p" > "$D/app.pid"; done
+  for p in $(pgrep -f 'MacOS/Herdr$'); do ps eww -o command= -p "$p" | grep -qF "HERDR_APP_HOME=$A " && echo "$p" > "$D/app.pid"; done
   # OmniWM, if you run it, tiles a new window into the workspace in front of you: send it to the built-in screen's,
   # full width (OmniWM sizes only the focused window, so focus goes there for that and comes back).
   pgrep -qx OmniWM || return 0

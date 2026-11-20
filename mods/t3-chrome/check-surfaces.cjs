@@ -27,7 +27,7 @@ const t = { foreground: '#ffffff', muted: '#888888', dim: '#777777', selected: '
 c.theme = () => t;
 const cx = { notify() {}, stop_propagation() {}, spawn: f => f(cx), timer: { every() {}, after() {} }, focus_handle: () => ({ focus() {} }),
   write_to_clipboard: path => calls.push(['copy', path]) };
-const flush = () => new Promise(r => setTimeout(r, 0));
+const flush = () => new Promise(setImmediate);
 const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v; };
 
 (async () => {
@@ -86,8 +86,14 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   // Buttons of one group stand 4 apart, as T3's PanelLayoutControls (t3-tokens P3): each fill its own rounded square.
   assert.deepEqual([find(root, 'surface-arrows').style.gap, find(root, 'panel-controls').style.gap], [4, 4], '‹ › and ⤢ with the toggle, 4 apart');
   {
-    const foot = mod({ footer: true }).render(cx);
-    assert.equal(find(foot, 'footer-buttons').style.gap, 4, 'the footer\'s two settings, 4 apart');
+    // The window's buttons stand here while the panel is open: named as the tab bar names them, and maximized, the middle one restores.
+    const names = () => ['minimize', 'maximize', 'close'].map(cmd => find(head.panelHead(t), `panel-window-${cmd}`).style.accessibility_label);
+    const was = c.window; let maximized = false;
+    c.window = () => ({ platform: 'windows', buttons: true, maximized });
+    assert.deepEqual(names(), ['Minimize', 'Maximize', 'Close window']);
+    maximized = true;
+    assert.deepEqual(names(), ['Minimize', 'Restore', 'Close window']);
+    c.window = was;
   }
   assert.deepEqual(order(root, ['surface-scroll', 'surface-back', 'surface-next', 'panel-wide']), ['surface-scroll', 'surface-back', 'surface-next', 'panel-wide']);
   assert.equal(find(root, 'surface-back').style.opacity, 0.64, '‹ disabled at the start');

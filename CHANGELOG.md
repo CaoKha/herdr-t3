@@ -8,6 +8,18 @@ English · [中文](CHANGELOG.zh-CN.md)
 - Herdr's icon and name at the top left of the sidebar are laid out as T3's brand, after the sidebar button at the same gap as the sidebar's other icons: the icon as big as the sidebar button's and the Inbox buttons' icons, centred on the name, and closer to it. They look the same at all times: the icon is always in full colour and `Herdr` stays dimmed, no longer lighting up on hover or while you're at Home. Click it to go Home, as before. With the sidebar hidden only the sidebar button stays in the tab row, as in T3; go Home with `cmd-shift-h`.
 - As in T3, the sidebar never gets narrower than its top row, so in a narrow window `Herdr` ends right above the Inbox filter button instead of past it. On macOS the layout file is adjusted for this, as it is for the window buttons.
 - In Inbox, hiding the sidebar puts the space's icon at the start of the tab row where Herdr's icon was, so one icon takes the other's place and the sidebar button stays put.
+- Working and loading marks are still icons, as T3 Code draws them: a dashed circle for an agent at work, a loader arc while something loads. Nothing spins, so the window no longer repaints every frame while agents work. Framing a wallpaper that is still loading shows the still loader beside the step, not a bar sweeping back and forth, and a wallpaper that can't be drawn no longer leaves a loader on Home, or its preview dimmed, after the notice.
+- Looking at a woken agent while Lists is selected no longer clears its `Woke`: it is still marked when you switch back to Inbox.
+- At Home, an agent's menu now settles, un-settles and snoozes it too. Undo goes back only to an agent that was in view when it was put away.
+- Lists' `+` opens a new tab exactly as `cmd-t` does. A new tab opened from New or a right-click menu, in the current space or another, leaves only that space in the Inbox breadcrumb, as `cmd-t` does, instead of the agent last looked at there; the menus show `⌘T` only on the current space's New tab. With no space open, `cmd-t` opens New instead of breaking the layout's keys.
+- In Lists, a snoozed agent's done dot returns on its pane header and tab the moment the snooze ends, not at the next unrelated redraw.
+- The faded ends of a scrolled tab row now draw in themes whose bar colour carries its own transparency.
+- `cmd-shift-b` opens Details at once; it waits only to un-maximize the panel. A pane's × tooltip shows the key bound to the layout's close.
+- Agents, sorted by priority or pinned: the space after an agent's name shows whole or not at all, and the name takes the room. In the Sort agents menu, a row's highlight goes when the pointer leaves.
+- Settings → Sidebar → Sidebar shows: the hint names the key actually bound, and none when unbound. On Windows and Linux, the window buttons in the panel head are named Minimize, Maximize or Restore, and Close window, as in the tab bar.
+- Files reads its tree and the file it shows even when its window isn't in front; it still refreshes only in front. Review opened while the Herdr window is behind another reads its diff, instead of saying "Loading the review…" until the window comes back.
+- Copy path in Details no longer shows a notice. New shows a remote project's folder in full. Files' tree switch and Expand/Collapse all are named as Review's. Review's Language, Agent and Model lists, opened by a key or command, hang beside their row.
+- Less work when nothing changes. With the Inbox showing, the hidden Lists no longer re-sort agents every second and the Spaces poll does less; a card that has worked for over a minute is redrawn once a minute instead of every second. A hidden Inbox reads far less from Herdr each second, a pane header keeps a snooze timer only while a countdown shows, and a Files page never shown does nothing each second. Go to, New, Clean up, the context menus, the tab bar and pane headers read Herdr's lists once per draw, and names, space icons, the New space button and tooltips reuse what the draw already read.
 
 ## 2026-11-19
 
@@ -32,11 +44,11 @@ English · [中文](CHANGELOG.zh-CN.md)
 - When you navigate between spaces or leave Home, the destination terminal opens with its tab bar and saved panel in place.
 - Opening Home for the first time from a project keeps that project visible until the configured Home tab is ready.
 - Files shows a cached file's breadcrumb and preview together as you select its tab. Fast directory reads go straight to the tree.
-- A context menu keeps the command you picked when rows move. Go to and the child-agent menu follow the selected pane or terminal. Reopening a file tab retires its previous tab menu and preview reads. A tab or space menu closes when its tab or space closes under it.
+- A context menu keeps the command you picked when rows move. Go to and the sub-agent menu follow the selected pane or terminal. Reopening a file tab retires its previous tab menu and preview reads. A tab or space menu closes when its tab or space closes under it.
 - In standalone Inbox, Settle acts on the agent in focus when you press the shortcut. Home enables Next agent when the selected sidebar has somewhere to go. New space offers the same machines from Inbox, Spaces and the New menu.
 - Review opens the range you picked for its original space and repository. A full-file read interrupted by hiding Review resumes when you return.
 - Closing a tab asks again if the action would now affect additional terminals or close its space. Inbox Clear waits for the core to confirm Settle. Creating Home matches the explicitly named space on this machine.
-- Files follows the most recent selection when directory reads finish out of order. Review defers full refreshes while hidden. The space menu offers Close for a child agent as soon as it has a pane.
+- Files follows the most recent selection when directory reads finish out of order. Review defers full refreshes while hidden. The space menu offers Close for a sub-agent as soon as it has a pane.
 - Updating checks configuration and mod entries before copying. If the layout or key bindings change during the copy, the updater preserves the edit and reports how to resume. If it can't stage the new layout or key bindings, it stops before copying any mod.
 - Home now picks up wallpapers added during its first conversion. Several changes during one conversion trigger a single follow-up scan.
 - In Files and Review, `cmd-shift-w` and `ctrl-alt-x` dismiss the open menu and keep both the surface tab and the terminal pane open.

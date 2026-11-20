@@ -86,9 +86,10 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 - `t3-tabs`：用 `hc get` 检查 shell 是否空闲、能否纳入 **Clean up**，以及运行中的终端前台是什么进程。
 - `t3-agents`：置顶一个 Snooze 中的 agent、结束它的 Snooze 时，运行 `hc label <agent> snoozed=`。
 - `t3-actions`：读取 ComputerName，用 `open -Ra` 检测编辑器，通过 `open` 打开所选目录；Review 行异步复用Review页的只读Git范围助手，不执行Git写操作。
-- `t3-chrome`：macOS 上缩放变化时，改写已安装的 `layouts/herdr-t3.json` 里的窗口按钮位置，让按钮留在品牌栏的中线上。
-- `t3-files`：只读，在 space 所在的机器上执行：`git rev-parse`、`git status`、`git check-ignore` 和 `git ls-files`（带 `--no-optional-locks`，不会往 `.git` 里写东西），用 `sh` 列文件夹，在其他机器上也用它查文件大小、搜路径；不在 Git 里时用 `find`；其他机器上的图片用 `base64` 传回。显示的图片复制到 `cache/t3-files/`，mod 停止时删掉。右键菜单：Reveal in Finder 和 Open in default app 执行 `open`（Linux 上是 `xdg-open`）；Mention in agent 借剪贴板粘贴进 agent 的终端，然后恢复你原来的剪贴板。
-- `t3-spaces`、`t3-agents`、`t3-inbox`、`t3-new-menu`、`t3-picker`：为每个 space 的图标，在 space 所在的位置（它的机器上）运行 `git rev-parse --show-toplevel`、`sh` 文件检测和 `base64`；找到的图标复制到 `cache/t3-icons/`。
+- `t3-chrome`：macOS 上缩放变化时，改写已安装的 `layouts/herdr-t3.json` 里的窗口按钮位置，让按钮留在品牌栏的中线上；同时改写其中侧栏的最小宽度，让侧栏不窄过它的顶行。
+- `t3-files`：只读，在 space 所在的机器上执行：`git rev-parse`、`git status`、`git check-ignore` 和 `git ls-files`（带 `--no-optional-locks`，不会往 `.git` 里写东西），用 `sh` 列文件夹，在其他机器上也用它查文件大小、搜路径；不在 Git 里时用 `find`；其他机器上的图片用 `base64` 传回。显示的图片复制到 `cache/t3-files/`，mod 停止时删掉。macOS 上的右键菜单：Open、Reveal in Finder 和 Open with 执行 `open`；Insert into agent terminal 借剪贴板粘贴进本标签最后活动的终端，然后恢复你原来的剪贴板。
+- `t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-new-menu`、`t3-picker`、`t3-actions`：为每个 space 的图标，在 space 所在的位置（它的机器上）运行 `git rev-parse --show-toplevel`、`sh` 文件检测和 `base64`；找到的图标复制到 `cache/t3-icons/`。
+- `t3-menu`：在 space 的目录里（它的机器上）运行 `git rev-parse`，为菜单区分链接工作树和仓库自己的 checkout。`t3-chrome`、`t3-tabs`、`t3-files`：在标签所在的目录里（本机）运行 `git rev-parse --show-toplevel`，判断 Review 能不能读。`t3-chrome`：`ls` 已安装的 `mods` 目录，列出设置里可选的 Home。
 
 布局不发送遥测；可选Review扩展使用它配置的分析服务。
 

@@ -205,10 +205,10 @@ export default class WorkspaceChrome extends View {
   // The space panel's head (docs/internals/specs/space-panel.md): T3's tabs, + after them in the same scrolled strip, T3's arrows
   // while it overflows, then widen and put away; its ends over its pages' rows (「规则」P3, R1). The rest of the row drags the window.
   panelHead(t) {
-    const s = panelState(), space = spaces().find(p => p.active), z = zoomOf();
+    const s = panelState(), space = spaces().find(p => p.active), z = zoomOf(), w = window();
     // Review's run for this space, marked as a tab's agent is.
     const word = space && shared(REVIEW_STATUS)?.[space.id];
-    const mark = statusMark(t, word, 14);
+    const mark = statusMark("mods/t3-chrome", t, word, 14);
     const own = (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation());
     const widths = this.surfaceWidths;
     for (const id of Object.keys(widths)) if (!s.tabs.some(tab => tab.id === id)) delete widths[id];
@@ -252,7 +252,8 @@ export default class WorkspaceChrome extends View {
       .child(h_flex().id("panel-controls").flex_none().gap(GROUP_GAP).items_center()
         .child(button("panel-wide", s.wide ? "minimize-2" : "maximize-2", s.wide ? "Restore panel" : "Expand panel", toggleWide))
         .child(button("panel-close", "panel-right", "Hide panel", hidePanel, { key: "t3-tabs.panel" })))
-      .when(Boolean(window()?.buttons), el => el.child(h_flex().flex_none().items_center().children([["minimize", "−", "win-min"], ["maximize", window().maximized ? "❐" : "□", window().maximized ? "win-restore" : "win-max"], ["close", "×", "win-close"]].map(([cmd, text, icon]) => own(drawButton(t, `panel-window-${cmd}`, { size: "sm", label: `${cmd} window`, ...(window().platform === "windows" ? { icon: `mods/t3-chrome/icons/${icon}.svg` } : { text }) }).w(28).px(0).on_click(() => run(`window.${cmd}`))))))));
+      // Named as the tab bar's, which has them while the panel is closed (t3-tabs).
+      .when(Boolean(w?.buttons), el => el.child(h_flex().flex_none().items_center().children([["minimize", "Minimize", "−", "win-min"], ["maximize", w.maximized ? "Restore" : "Maximize", w.maximized ? "❐" : "□", w.maximized ? "win-restore" : "win-max"], ["close", "Close window", "×", "win-close"]].map(([cmd, label, text, icon]) => own(drawButton(t, `panel-window-${cmd}`, { size: "sm", label, ...(w.platform === "windows" ? { icon: `mods/t3-chrome/icons/${icon}.svg` } : { text }) }).w(28).px(0).on_click(() => run(`window.${cmd}`))))))));
   }
 
   // The surface menus: the docked empty page (Open a surface), + 's popup, and a tab's right-click menu.

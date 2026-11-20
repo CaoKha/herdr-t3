@@ -43,12 +43,10 @@ export const terms = (query) => query.toLowerCase().split(/\s+/).filter(Boolean)
 // The candidates a query can start from: the last query's matches while this one only adds to it, else everything.
 export const narrows = (query, last) => Boolean(last) && query.startsWith(last);
 
-/**
- * The indexes into `lower` (lowercased paths) whose path holds every term, from `from` (indexes, or null for all).
- * Every CHUNK candidates it awaits `pause()`: past about 100k paths in one go, Herdr interrupts the script.
- * `alive()` false stops it early (a newer query); it then returns null.
- */
 const CHUNK = 5000;
+/** The indexes into `lower` (lowercased paths) whose path holds every term, from `from` (indexes, or null for all). Every CHUNK
+ *  candidates it awaits `pause()`: past about 100k paths in one go, Herdr interrupts the script. `alive()` false stops it early
+ *  (a newer query); it then returns null. */
 export async function filterPaths(lower, words, from, pause, alive = () => true) {
   const out = [], n = from ? from.length : lower.length;
   for (let start = 0; start < n; start += CHUNK) {

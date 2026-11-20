@@ -12,8 +12,8 @@ export function spaceOrdering({ spaces, panes, machines, run, home, facts, shown
   const due = (now) => Boolean(flight && now - flight.at >= ECHO &&
     (drop || flight.intent || machines().every(m => !flight.machines.includes(m.name) || m.layout === "ready")));
 
-  function snapshot(now) {
-    const all = spaces(), ps = panes(), homeId = home();
+  function snapshot(now, all, ps) {
+    const homeId = home();
     const list = all.map(w => {
       const { git, answered } = w.id === homeId ? { git: null, answered: true } : facts(w, ps);
       if (!shown.has(w.id)) {
@@ -72,8 +72,9 @@ export function spaceOrdering({ spaces, panes, machines, run, home, facts, shown
     return { from, end, to: to >= end ? to - (end - from) : to };
   }
 
-  function reconcile() {
-    const now = Date.now(), { all, out, homeId } = snapshot(now), order = all.map(w => w.id);
+  // `list`, `ps`: spaces() and panes(), when the caller's draw has read them (each read copies the whole list).
+  function reconcile(list = spaces(), ps = panes()) {
+    const now = Date.now(), { all, out, homeId } = snapshot(now, list, ps), order = all.map(w => w.id);
     if (flight) {
       // Additions/removals can share the echo frame; compare the order of IDs that still exist on both sides.
       const actualIds = new Set(order), sentIds = new Set(flight.after);

@@ -2,10 +2,10 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const saved = {}, ui = { open: false, page: 'panel-empty', wide: false, space: 'a', slots: ['files', 'review', 'panel-empty'], end: 28, buttons: false };
 const machines = { a: null, b: null, home: null, far: 'devbox' };
-let cwd = {}, repos = {};
+let cwd = {}, repos = {}, spaceReads = 0;
 const layout = () => ({ id: 'root', children: [{ id: 'work', hidden: ui.wide, children: [{ id: 'window-end', size: { px: ui.end } }] }, { id: 'panel', hidden: !ui.open, children: [{ id: 'panel-body', active: ui.page, children: ui.slots.map(id => ({ id })) }] }] });
 const context = vm.createContext({ KEY: { panels: 't3.panels' }, GROUP_GAP: 4, layout, Map, Date, Math, window: () => ({ buttons: ui.buttons }),
-  spaces: () => Object.keys(machines).map(id => ({ id, active: id === ui.space, folder: '/space', machine: machines[id], tabs: [{ id: `${id}-tab`, active: true }] })),
+  spaces: () => (spaceReads++, Object.keys(machines)).map(id => ({ id, active: id === ui.space, folder: '/space', machine: machines[id], tabs: [{ id: `${id}-tab`, active: true }] })),
   focused: () => cwd[ui.space] ? { space: ui.space, tab: `${ui.space}-tab`, terminal: `${ui.space}-t` } : null,
   panes: () => Object.entries(cwd).map(([s, dir]) => ({ tab: `${s}-tab`, terminal: `${s}-t`, cwd: dir })),
   exec: async (_cmd, args, { cwd: dir }) => { const root = Object.keys(repos).find(r => dir === r || dir.startsWith(r + '/')); return root ? { code: 0, stdout: root + '\n' } : { code: 128, stdout: '' }; },
@@ -40,6 +40,9 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   const view = {}; p.syncPanel(view);
   ui.space = 'b'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, ui.wide, tabs()], [false, false, '']);
   ui.space = 'a'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, ui.wide, ui.page, tabs()], [true, true, 'files', '*file:a.js']);
+  // Settled on a space, the keys copy's draw reads spaces() once: it draws on every change, and each read copies every space.
+  spaceReads = 0; p.syncPanel(view);
+  assert.equal(spaceReads, 1, `${spaceReads} reads of spaces() for a draw that changes nothing`);
   // Fast there and back, before the layout's clicks land: what shows isn't recorded as a choice.
   ui.space = 'b'; p.syncPanel(view); ui.space = 'a'; p.syncPanel(view); p.syncPanel(view);
   assert.deepEqual([ui.open, ui.wide], [true, true]); assert.equal(saved['t3.panels'].a.wide, true);

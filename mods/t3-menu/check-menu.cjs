@@ -34,7 +34,7 @@ let target = {}, calls = [], closed = [], state = {}, list = "inbox", opened = 0
 let terms = [{ address: "t1", labels: {} }], agentList = [], keyList = [];
 let spaceList = [{ id: "s1", active: true, folder: "/work/p1", tabs: [{ id: "b1" }] }];
 let paneList = [{ pane: "p1", tab: "b1", terminal: "t1", cwd: "/work/s1" }];
-let focusState = {};
+let focusState = {}, keyReads = 0;
 let now = Date.now();
 // tip.js's keyLabel, as on a Mac: what every key hint in the layout is written with.
 const tipScope = vm.createContext({ window: () => ({ platform: "macos" }), keys: () => keyList });
@@ -51,12 +51,12 @@ const context = vm.createContext({
   View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, image: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
   run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); context.menuClosed?.(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
   window: { viewport_size: () => view, mouse_position: () => mouse },
-  theme: () => theme, keys: () => keyList, settings: () => ({ zoom }), terminals: () => [...terms], agents: () => [...agentList], spaces: () => spaceList, panes: () => paneList, focused: () => focusState, exec: async () => ({ code: 1 }),
+  theme: () => theme, keys: () => { keyReads++; return keyList; }, settings: () => ({ zoom }), terminals: () => [...terms], agents: () => [...agentList], spaces: () => spaceList, panes: () => paneList, focused: () => focusState, exec: async () => ({ code: 1 }),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, hc: async () => ({ code: 0 }), notify() {},
   layout: () => ({ id: "root", children: [{ id: "sidebar-lists", active: list, children: [] }] }),
   keyLabel: (k) => tipScope.keyLabel(k),
 });
-const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "space-arrival.js", "project.js", "name.js", "program.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "space-arrival.js", "name.js", "program.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Menu = class").replace(/^export /gm, "");
 vm.runInContext(src, context);
 // Timers run when the test says time has passed.
@@ -91,7 +91,15 @@ assert.ok(!vm.runInContext("items", context)({ tab: "pane", target: { pane: "p1"
 const block = vm.runInContext("items", context)({ tab: "pane", target: { pane: "block", terminal: "t1" } }, null).map((it) => it[0]);
 assert.ok(block.includes("Copy address") && !["Split right", "Split down", "Zoom pane", "Close pane"].some((l) => block.includes(l)), "a terminal outside a tab has no pane to split, zoom or close");
 assert.deepEqual(choose({ tab: "tab", target: { id: "b1", space: "s1" } }, "Rename"), [["tab.rename", { id: "b1" }]], "the rest is Herdr's");
-assert.deepEqual(choose({ tab: "tab", target: { id: "b1", space: "s1" } }, "New tab"), [["tab.new", { space: "s1", folder: "/work/s1" }]], "New tab opens where the space's terminals are, not where it was made");
+// New tab names its space to t3-tabs, in view or not, so the Inbox bar reads the tab as something started there (`fresh`).
+for (const active of [true, false]) {
+  spaceList[0].active = active;
+  assert.deepEqual(choose({ tab: "tab", target: { id: "b1", space: "s1" } }, "New tab"), [["t3-tabs.new:s1"]], `a tab's, its space ${active ? "in view" : "elsewhere"}`);
+  assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "New tab"), [["t3-tabs.new:s1"]], `a space's, ${active ? "in view" : "elsewhere"}`);
+}
+spaceList[0].active = true;
+assert.deepEqual(choose({ tab: "tab", target: { id: "b1" } }, "New tab"), [["t3-tabs.new:s1"]], "with no space named, the one in view");
+spaceList[0].active = true;
 assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["space.close", { id: "s1" }]], "a space's Close is Herdr's, which asks itself");
 
 // A pane's menu as drawn: each row's icon t3-menu's own, at the layout's 1.75 (t3-tokens P4), Split down's not Split right's;
@@ -115,6 +123,8 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   assert.notEqual(row("Split down").icon, row("Split right").icon, "the two splits look apart");
   assert.deepEqual([row("Split right").hint, row("Split down").hint, row("Zoom pane").hint], [["⌘D"], ["⇧⌘D"], ["⇧⌘Enter"]], "keys as the layout writes them");
   assert.deepEqual(row("Copy address").hint, [], "no address on the right: only keys go there");
+  keyReads = 0; m.render();
+  assert.equal(keyReads, 1, "a draw reads the bindings once, not for each row");
   keyList = []; target = {};
 }
 
@@ -182,7 +192,6 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   assert.deepEqual(labels({ tab: "space", target: { id: "s1" } }), ["New tab", "Rename", "Copy path", "Close"]);
   assert.deepEqual(labels({ tab: "space", target: { id: "s1" } }, "linked"), ["New tab", "Rename", "Copy path", "New worktree", "Open worktree", "Remove worktree", "Close"]);
   assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Copy path"), [["clipboard", "/work/s1"]], "where it is now");
-  assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "New tab"), [["tab.new", { space: "s1", folder: "/work/s1" }]]);
   assert.deepEqual(labels({ tab: "checkout", target: { folder: "/work/r", machine: null } }), ["Open", "Copy path"]);
   assert.deepEqual(choose({ tab: "checkout", target: { folder: "/work/r", machine: null } }, "Open"), [["space.new", { folder: "/work/r", machine: "" }]]);
   assert.deepEqual(labels({ tab: "machine", target: { machine: "vps", connected: true, connect: false } }), ["New space here"]);
@@ -195,6 +204,17 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   const tree = m.render(), rows = tree.items;
   assert.deepEqual(rows.map((r) => r.items.length), [1, 2, 1, 2, 1, 2, 1], "a rule before Rename, New worktree and Remove worktree");
   assert.deepEqual(rows.map((r) => r.items.at(-1).style.text_color), ["#fg", "#fg", "#fg", "#fg", "#fg", "#red", "#fg"]);
+}
+
+// New tab's key is cmd-t's only where that key acts, the space in view, as Settle's shows only on the agent in view.
+{
+  keyList = [{ section: "global", action: "tab.new", keys: "cmd-t" }, { section: "layout:herdr-t3", action: "t3-tabs.new", keys: "cmd-t" }];
+  const hint = (p) => vm.runInContext("items", context)(p, null).find((it) => it[0] === "New tab")[3];
+  const menus = [{ tab: "space", target: { id: "s1" } }, { tab: "tab", target: { id: "b1", space: "s1" } }];
+  assert.deepEqual(menus.map(hint), ["⌘T", "⌘T"]);
+  spaceList[0].active = false;
+  assert.deepEqual(menus.map(hint), ["", ""], "another space: cmd-t wouldn't open it there");
+  spaceList[0].active = true; keyList = [];
 }
 
 // A tab's menu (New tab, Rename, Close), opened by a right-click, moves as every popup's list (shared/list.js).
@@ -572,7 +592,7 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   assert.equal(row2.style.text_color, theme.muted, "unselected inactive agent uses muted text until hovered");
   const trail1 = row1.items.at(-1);
   assert.ok((trail1.style.pl ?? 0) >= 8, "trailing status adds extra left spacing past the row gap so truncated labels do not crowd it");
-  assert.ok(walk(row1).some((n) => n.style.path === "mods/workspace-chrome/spinner.svg"), "working agent shows spinner");
+  assert.ok(walk(row1).some((n) => n.style.path === "mods/t3-menu/icons/circle-dashed.svg"), "working agent shows the working mark");
   assert.ok(labelsOf(row1).includes("2m"), "working agent shows duration");
   assert.equal(row1a.items[0].style.w, 8, "sub-agent indented one level (16 - 8 lead spacer)");
   assert.ok(walk(row1a).some((n) => n.style.rounded_full && n.style.bg === theme.done), "unread sub-agent shows done dot");
@@ -583,11 +603,11 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   assert.ok(walk(find(sm.render(), "space-item-t2")).some((n) => n.style.path === "mods/t3-menu/icons/alarm-clock.svg"), "snoozed agent shows alarm clock");
   assert.ok(labelsOf(rowSh).includes("Server"), "single-pane named terminal tab uses its tab name");
 
-  // Clicking New tab closes and runs t3-tabs.new on the active space; clicking items focuses/peeks properly.
+  // Clicking New tab closes and runs t3-tabs.new for the menu's space; clicking items focuses/peeks properly.
   const plain = (v) => JSON.parse(JSON.stringify(v));
   calls = []; closed = [];
   find(tree, "space-new-tab").handlers.on_click({}, cx);
-  assert.deepEqual(plain([closed, calls]), [["space-root"], [["t3-tabs.new"]]]);
+  assert.deepEqual(plain([closed, calls]), [["space-root"], [["t3-tabs.new:s0"]]]);
 
   calls = []; closed = [];
   row2.handlers.on_click({}, cx);

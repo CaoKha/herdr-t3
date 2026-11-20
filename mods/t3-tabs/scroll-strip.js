@@ -3,6 +3,7 @@
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { settings } from "herdr";
+import { alpha } from "./color.js";
 
 /**
  * Where the row sits: the `focus` tab in view with the least move, as T3's scrollIntoView({ inline: "nearest" }), only when
@@ -49,7 +50,7 @@ export function stripPage(state, dir, room) {
 export function stripFades(bg, state) {
   const fade = (start) => h_flex().id(start ? "strip-fade-start" : "strip-fade-end").absolute().top(0).bottom(0).w(16)
     .when(start, (el) => el.left(0)).when(!start, (el) => el.right(0))
-    .children((start ? ["ff", "bf", "80", "40"] : ["40", "80", "bf", "ff"]).map((a) => div().w(4).h_full().bg(bg + a)));
+    .children((start ? ["ff", "bf", "80", "40"] : ["40", "80", "bf", "ff"]).map((a) => div().w(4).h_full().bg(alpha(bg, a))));
   const ends = stripEnds(state);
   return [...(ends.back ? [fade(true)] : []), ...(ends.next ? [fade(false)] : [])];
 }

@@ -17,7 +17,7 @@ On a layout jump to a known space, restore the destination's panel slot, visibil
 - Active and hovered tabs take the `chrome` on and hover fills, as the tab bar's (t3-tokens「按钮」); text `foreground` / `muted`, as the tab strip's unselected tabs.
 - `+` follows the last tab, 4 apart, inside the same scrolled strip: `trigger()`, xs ghost (24 square, 14px icon).
 - Overflow: wheel scrolls; T3's `‹ ›` (xs, 4 apart, P3) sit after the strip, greyed at the ends (`DISABLED`). Both ends of the strip fade over 16px (`shared/scroll-strip.js`, shared with the tab bar). The active tab, and a last tab's `+`, scroll into view.
-- Then maximize/restore and panel-right (sm, 4 apart, 16px icons), 8 after the arrows; their `chrome` hover and on are the bar's. Layout controls are rightmost. With the panel open, the window buttons move here too.
+- Then maximize/restore and panel-right (sm, 4 apart, 16px icons), 8 after the arrows; their `chrome` hover and on are the bar's. Layout controls are rightmost. With the panel open, the window buttons move here too, under the tab bar's names (Minimize, Maximize or Restore, Close window).
 - Same names aren't told apart (T3); a clipped name's tooltip gives it whole.
 
 ## Surface menu

@@ -58,7 +58,7 @@ Herdr 原生 zoom 中的标签变为虚线分段组，每 pane 一段。标签�
 
 ### 窗格与子 agent
 
-窗格标题依次是程序图标、有意义的名字（只是程序名、或 Inbox 面包屑已写过时省略）、目录、子 agent 按钮、状态，然后是悬停或键盘聚焦时出现的分屏、zoom、关闭控件。Inbox 标题用 `dim` 勾标已 Settle 的 agent，用闹钟加剩余时间标 Snooze 的。子 agent 按钮写 `3 ⌄`，只数活后代，有需要你的时用 `blocked` 色，有在跑、而 agent 自己没在跑时数字前加工作 spinner（一个窗格头最多一个 spinner）；它打开 280 宽的后代列表，按树序并带状态标记。规格：[pane](docs/internals/specs/pane.md)。
+窗格标题依次是程序图标、有意义的名字（只是程序名、或 Inbox 面包屑已写过时省略）、目录、子 agent 按钮、状态，然后是悬停或键盘聚焦时出现的分屏、zoom、关闭控件。Inbox 标题用 `dim` 勾标已 Settle 的 agent，用闹钟加剩余时间标 Snooze 的。子 agent 按钮写 `3 ⌄`，只数活后代，有需要你的时用 `blocked` 色，有在跑、而 agent 自己没在跑时数字前加工作标记（一个窗格头最多一个工作标记）；它打开 280 宽的后代列表，按树序并带状态标记。规格：[pane](docs/internals/specs/pane.md)。
 
 ### space 面板
 
@@ -86,7 +86,7 @@ Home 的默认页面：正中 Next agent、Go to、New tab 三个带键帽的按
 
 卡片、Agents 行、标签、标题统一命名：Pi 在跑先用 `pi.session`；再用人为命名的标签，但只给顶层 agent，且不能与另一个顶层 agent 共用此标签；然后是有意义的终端标题，只去掉该程序自己的装饰（Pi `π - … - <目录>`，OpenCode `OC | `）；最后程序名。拒绝纯路径／`user@host`／程序／目录标题，以及不再跑 agent 时残留的 agent 装饰标题。子 agent 不继承标签名。未命名标签按里面的 agent，否则按聚焦 pane 命名。
 
-父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent 自身行把 error 写成 Failed（同一个 `!`、`ansi1` 色）。会报告状态或程序标成 agent 的活终端才算 agent；命令 shell 不算，但经过 shell 启动的 agent 算。Working 用自带转圈、`working` 色；blocked 是 15% `blocked` 底的圆角 `!`；done 是 6px `done` 点（Inbox 写绿色 `Done`）；idle 在 Agents 里是环，其他地方不画。
+父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent 自身行把 error 写成 Failed（同一个 `!`、`ansi1` 色）。会报告状态或程序标成 agent 的活终端才算 agent；命令 shell 不算，但经过 shell 启动的 agent 算。Working 是静止的虚线圆（Lucide `circle-dashed`）、`working` 色；blocked 是 15% `blocked` 底的圆角 `!`；done 是 6px `done` 点（Inbox 写绿色 `Done`）；idle 在 Agents 里是环，其他地方不画。
 
 Space 标记用 Project 的 favicon，没有则取名字首字母，颜色按名字哈希取 T3 色板。
 
@@ -97,7 +97,7 @@ Space 标记用 Project 的 favicon，没有则取名字首字母，颜色按名
 | 规则 | Inbox | Lists |
 | --- | --- | --- |
 | Settle／Snooze 控件 | 满足条件时提供 | 不提供；Settle 键无作用 |
-| Snooze 中的 working | 藏进 Snoozed、不计 working 数 | 原有行和顺序继续转圈 |
+| Snooze 中的 working | 藏进 Snoozed、不计 working 数 | 原有行和顺序照样标出工作中 |
 | Settled／snoozed 未读 done | 隐去 | 隐去 |
 | 关闭当前查看的 agent 整标签／最后 pane | Home | space 上一次看的标签 |
 | agent 导航 | 画出的行；折叠收纳区只算当前行 | 全部分组，包括折叠的 |
@@ -118,7 +118,7 @@ Pin 是一份与 Agents 共用的手排顺序；pin 会结束 Snooze。Settle、
 
 ### Snooze
 
-不需要人处理的卡片在 Settle 前提供 clock：In 1 hour、In 3 hours、This evening、Tomorrow、Next week，或 Custom（日期时间或时长）。agent 在 Snoozed 里等到时间，醒来回原位（期间工作结束则排 Active 顶），带 `Woke` 直到被查看。其间权限询问会暂时露成 Needs you。子树失败、查看时开始新轮、Wake、pin、Settle 都会结束它。
+不需要人处理的卡片在 Settle 前提供 clock：In 1 hour、In 3 hours、This evening、Tomorrow、Next week，或 Custom（日期时间或时长）。agent 在 Snoozed 里等到时间，醒来回原位（期间工作结束则排 Active 顶），带 `Woke` 直到在选中 Inbox 时被查看。其间权限询问会暂时露成 Needs you。子树失败、查看时开始新轮、Wake、pin、Settle 都会结束它。
 
 ### 当前行与 mod 卡片
 
@@ -128,7 +128,7 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 ### 标签、导航与关闭
 
-单击标签选中，双击改名，右键打开菜单，拖动排序（Inbox 只能拖不含 agent 的标签）。点击 Inbox 面包屑的 space 打开菜单（宽 `280`，顶置 New tab 后最多滚动 10 行），列出 New tab（`t3-tabs.new`）以及当前 space 下的全部 agent（含嵌套子 agent）与非 agent 终端窗格；右键行项打开对应的 agent 或窗格菜单，悬停行上的 `×` 或高亮后按 `ctrl-d` 经常规确认关闭该窗格。从标签条进入不含 agent 的标签时，面包屑保留该 space 最后看的 agent 并变暗；从 space 菜单点 New tab 或按 `cmd-t` 之后，面包屑只有 space，直到再看某个 agent。
+单击标签选中，双击改名，右键打开菜单，拖动排序（Inbox 只能拖不含 agent 的标签）。点击 Inbox 面包屑的 space 打开菜单（宽 `280`，顶置 New tab 后最多滚动 10 行），列出 New tab（`t3-tabs.new:<space>`）以及当前 space 下的全部 agent（含嵌套子 agent）与非 agent 终端窗格；右键行项打开对应的 agent 或窗格菜单，悬停行上的 `×` 或高亮后按 `ctrl-d` 经常规确认关闭该窗格。从标签条进入不含 agent 的标签时，面包屑保留该 space 最后看的 agent 并变暗；开了新标签之后，面包屑只有 space，直到再看某个 agent：开标签的每个入口（`cmd-t`、Lists 的 `+`、New、各菜单的 New tab）都运行 `t3-tabs.new`。
 
 上／下 agent 按所选模式的行走，不循环；上／下标签在显示的标签间循环。关闭当前查看的 agent 整标签或最后 pane，Inbox 回 Home，Lists 回该 space 最近看的标签；后台关闭不跳。布局发起的每次关闭都先问 `hc get`：只剩自己的 shell 时立即关，否则询问 `Close terminal "<名字>"?`（`This stops the running process and clears its history.`）。
 
@@ -159,7 +159,7 @@ Go to（`cmd-p`）列出所有 pane，最近的在前，打开时选中之前的
 
 **Clean up**（`t3-tabs.cleanup`）不离开 Inbox，打开一个对话框，它本身就是确认框。当前标签之外已由 core 确认为 Settled 的 agent 和停在提示符的非 agent shell 折成一块，写明数量和随之关闭的 space，展开按 space 列名字；**Close** 一起关掉，逐个复查，清空的 space 随之关闭。被落下的程序，也就是所在 space 已没有在工作的 agent、且不是你正在的 space 里仍在运行的非 agent 终端，各是一张卡片，写明 space、机器和前台进程：点卡片跳过去，点 `Stop` 或高亮后按 `ctrl-d` 当场停掉；用文字而不用 `×`，因为它不再询问。还有 agent 在工作的 space 里的程序算在用，不列出。数量和随之关闭的 space 随仍在的终端实时更新。底部说明跳过了什么：当前标签，以及你正在的 space 里的程序。两样都没有时弹出提示。见 [Clean up](docs/internals/specs/dialogs.md#clean-up) 和[清理命令](docs/internals/specs/tab-bar.md#t3-tabs-commands)。
 
-Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设为主动作，齿轮编辑。动作有 Name、Command，可选 Folder 和图标，在新的 Tab、Split right 或 Split down 中运行：`terminal.open { argv: ["sh", "-c", command], name, place, folder? }`，结束后 shell 保留。没填 Folder 时在聚焦终端的 cwd 运行，否则用 space 文件夹。
+Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设为主动作，齿轮编辑。动作有 Name、Command，可选 Folder 和图标，按 Run in（Tab、Right 或 Down：新标签或分屏）运行：`terminal.open { argv: ["sh", "-c", command], name, place, folder? }`，结束后 shell 保留。没填 Folder 时在聚焦终端的 cwd 运行，否则用 space 文件夹。
 
 ### Home 与设置
 
@@ -198,7 +198,7 @@ Home 是按需创建、本机一个隐形 space，不属于任何 Project，各�
 | `cmd-shift-w`、`ctrl-alt-x` | `t3-tabs.close-pane` |
 | `cmd-shift-h` | `t3-tabs.home` |
 | `cmd-shift-,` | `t3-tabs.settings` |
-| `cmd-t`、`ctrl-alt-c` | `t3-tabs.new`，Home 时开 New |
+| `cmd-t`、`ctrl-alt-c` | `t3-tabs.new`，在 Home 或没有打开的 space 时开 New |
 | `ctrl-1…9`、`ctrl-alt-shift-1…9` | `t3-tabs.space:<n>`，不含 Home |
 | `cmd-alt-]`／`[`、`ctrl-alt-shift-]`／`[` | `t3-tabs.space-next/space-prev` |
 | `cmd-1…9`、`ctrl-alt-1…9` | `t3-tabs.tab:<n>`，显示的标签 |
@@ -250,7 +250,7 @@ floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 
 sidebar、work、panel 列内部 `resizable:false`，外分隔线仍可拖。`spaces` 传 `{newMenu:"t3-new-menu"}`；`inbox` 传 `{newMenu:"t3-new-menu",home:"t3-tabs.home",menu:"t3-menu"}`。`main` 与 `home-main` 共用上述窗格框设置。浮动 `tabs-keys` 副本负责命令、Home 和每 space 面板同步；其他 `t3-tabs` 副本共用导航。
 
-必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应官方 mod 的从它改，Inbox、Home 和 Files 新建。保留官方 `workspace-status`、转圈和程序素材。UI 图标是各 mod 自己 `icons/` 里的 Lucide（24 网格、1.75 笔画）；Files 和 Review 的树用 T3／Pierre 图形。mod 不能越出自己目录 import：共享模块放在 `shared/`，由 `scripts/sync.sh` 复制。
+必需 mod：`t3-chrome`、`t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-pane`、`t3-home`、`t3-files`、`t3-new-menu`、`t3-picker`、`t3-actions`、`t3-menu`。有对应官方 mod 的从它改，Inbox、Home 和 Files 新建。保留官方 `workspace-status` 和程序素材。UI 图标是各 mod 自己 `icons/` 里的 Lucide（24 网格、1.75 笔画）；Files 和 Review 的树用 T3／Pierre 图形。mod 不能越出自己目录 import：共享模块放在 `shared/`，由 `scripts/sync.sh` 复制。
 
 ### 安装
 

@@ -35,11 +35,9 @@ let placementsVersion = 0;
 let previewsReady;
 // Pictures by key: { path, px } once made, { error }, or { promise } while making, with the smaller one made before.
 const pictures = new Map();
-/**
- * The px a picture's SVG declares on its long edge, for `n` device px as Home shows it: up to the next STEP, so a window
- * dragged larger makes few; never past MAX. Herdr rasterises an SVG at twice the size it declares
- * (GPUI's SMOOTH_SVG_SCALE_FACTOR), which keeps marks smaller than a pixel bold.
- */
+/** The px a picture's SVG declares on its long edge, for `n` device px as Home shows it: up to the next STEP, so a window
+ *  dragged larger makes few; never past MAX. Herdr rasterises an SVG at twice the size it declares
+ *  (GPUI's SMOOTH_SVG_SCALE_FACTOR), which keeps marks smaller than a pixel bold. */
 const STEP = 512, MAX = 4096;
 export const pictureSide = (n) => (Number.isFinite(n) && n > 0 ? Math.min(MAX, Math.ceil(n / STEP) * STEP) : MAX);
 
@@ -63,21 +61,17 @@ export const pictureKey = (scene, t, light) => [scene.dir, scene.sum ?? VERSION,
 export const madePicture = (key) => pictures.get(key);
 // A folder emptied: what was made in it is gone.
 const dropPictures = (dir) => { for (const key of pictures.keys()) if (key.startsWith(`${dir}\n`)) pictures.delete(key); };
-/**
- * The scene's picture for a side with each tint's name for its colour (`@ansi1@`), kept beside its pictures: a new palette,
- * after a restart too, is one sed over it (draw), never a conversion. Named by source and version like the pictures; one
- * per side, and it goes with its folder.
- */
+/** The scene's picture for a side with each tint's name for its colour (`@ansi1@`), kept beside its pictures: a new palette,
+ *  after a restart too, is one sed over it (draw), never a conversion. Named by source and version like the pictures; one
+ *  per side, and it goes with its folder. */
 const templateOf = (scene, side) => `${scene.dir}/tiles-${side}-${hash([scene.dir, scene.sum ?? VERSION, side].join("\n"))}.tpl`;
 // A theme colour as sed may write it: #hex only.
 const hex = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(c ?? "") ? c : null);
 
-/**
- * Makes the scene's picture for theme `t` once, however many Homes ask: `{ path, width, height, px, paper }`, its path
- * relative to appHome. `fit(width, height)`: the px wanted on its long edge; one at least that size serves, the smaller kept
- * up while a larger one is made, one at a time per key (a larger ask meanwhile gets that one, then asks again). Null if
- * `current()` turns false first; rejects if it fails.
- */
+/** Makes the scene's picture for theme `t` once, however many Homes ask: `{ path, width, height, px, paper }`, its path
+ *  relative to appHome. `fit(width, height)`: the px wanted on its long edge; one at least that size serves, the smaller kept
+ *  up while a larger one is made, one at a time per key (a larger ask meanwhile gets that one, then asks again). Null if
+ *  `current()` turns false first; rejects if it fails. */
 export function makePicture(scene, t, light, fit, cx, current = () => true) {
   if (checking()) return Promise.resolve(null);
   const key = pictureKey(scene, t, light), had = pictures.get(key);

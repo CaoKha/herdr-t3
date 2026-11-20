@@ -52,8 +52,16 @@ export default class Pane extends View {
     }
     this.hovered = false;
     stopsInit(this, cx);
-    // A snooze's time left counts down, and its end brings the done back.
-    this.napWatch = cx.timer.every(30000, (cx) => { if (this.napping) cx.notify(); });
+  }
+
+  // One redraw at `at`, when a snooze's time left or its end changes what's drawn with nothing else changing; 0: none, as
+  // every pane has a header. A one-shot the draw re-arms: a draw arranges work only through cx.timer.after.
+  napClock(at, cx) {
+    if (at === this.napAt) return;
+    this.napWatch?.cancel();
+    this.napAt = at;
+    // A day at most, as the Inbox's wake timer: a longer wait is armed again then.
+    this.napWatch = at ? cx.timer.after(Math.min(at - Date.now(), 86400000), (cx) => { this.napAt = null; cx.notify(); }) : null;
   }
 
   async close() {
@@ -96,7 +104,7 @@ export default class Pane extends View {
     // Its status at the row's end, the Agents rows' mark; needing the person or failed, the word too; working or idle, for how long.
     const trail = (k, st) => STATUS_WORD[st] && h_flex().id(`kid-status-${k.address}`).flex_none().gap(4).items_center()
       .role("status").accessibility_label(STATUS_WORD[st])
-      .when(st !== "idle", (el) => el.child(h_flex().w(12).flex_none().justify_center().child(statusMark(t, st))))
+      .when(st !== "idle", (el) => el.child(h_flex().w(12).flex_none().justify_center().child(statusMark("mods/t3-pane", t, st))))
       .when(st === "blocked" || st === "error", (el) => el.child(menuHint(t, STATUS_WORD[st]).text_color(st === "error" ? t.ansi1 : t.blocked)))
       .when((st === "working" || st === "idle") && since(k) > 0, (el) => el.children(took(since(k), now).split(" ").map((part) => menuHint(t, part).font_family(mono))));
     // As tall as it is: the popup opens with no height, so it grows and shrinks as sub-agents come and go.
@@ -130,10 +138,10 @@ export default class Pane extends View {
     const stuck = kids.filter((s) => s === "blocked").length, busy = kids.filter((s) => s === "working").length;
     const label = [plural(kids.length, "sub-agent", "sub-agents"), stuck && `${stuck} need${stuck === 1 ? "s" : ""} you`, busy && `${busy} working`].filter(Boolean).join(", ");
     // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
-    // One at work spins before the count, inside the button, unless the agent spins in the slot after it: one spinner a header.
+    // One at work puts the working mark before the count, inside the button, unless the agent has it in the slot after it: one a header.
     return trigger(this, t, `ph-kids-${pane}`, { wide: true, label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
       onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal, ...litProp(!b) } }); } },
-    (el) => el.when(busy > 0 && !busyOwn, (b) => b.child(statusMark(t, "working"))).child(String(kids.length))
+    (el) => el.when(busy > 0 && !busyOwn, (b) => b.child(statusMark("mods/t3-pane", t, "working"))).child(String(kids.length))
       .child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 
@@ -154,10 +162,6 @@ export default class Pane extends View {
     cx.notify();
   }
 
-  me() {
-    return panes().find((p) => p.pane === props()?.pane);
-  }
-
   button(t, id, icon, label, action, key) {
     return tip(this, t, id, label, stop(this, t, id, drawButton(t, id, { icon, label, surface: "card", hot: this.hot === id })
       .on_hover(glow(this, id))
@@ -169,34 +173,34 @@ export default class Pane extends View {
       }), radiusOf("xs")), { action: key });
   }
 
-  render() {
+  render(cx) {
     const t = theme();
     if (props()?.kids) return this.kidsMenu(t);
-    const p = this.me();
+    const ps = panes(), p = ps.find((q) => q.pane === props()?.pane), sp = p && spaces();
     // Home has no header, mod or shell (docs/adr/0005): nothing to split, zoom or close, and Home itself tells where this is.
-    if (!p || spaces().find((s) => s.id === shared(KEY.home))?.tabs.some((c) => c.id === p.tab)) return div();
-    const named = namer()(p);
+    if (!p || sp.find((s) => s.id === shared(KEY.home))?.tabs.some((c) => c.id === p.tab)) return div();
+    const every = agents(), all = terminals(), named = namer({ terminals: all, spaces: sp, agents: every })(p);
     const pic = programIcon(programOf(p), 14, t.muted);
     // A name that is only the program's says what its icon already does.
     // With the Inbox the bar's breadcrumb names the agent in view: an agent's pane shown alone (its tab's only one, or zoomed)
     // doesn't say it again. Split, the names tell the panes apart.
-    const alone = p.zoomed || panes().filter((q) => q.tab === p.tab).length === 1;
+    const alone = p.zoomed || ps.filter((q) => q.tab === p.tab).length === 1;
     const inbox = sidebarParts(layout()).stack?.active === "inbox";
-    const crumbed = alone && inbox && agents().some((a) => a.address === p.terminal);
+    const crumbed = alone && inbox && every.some((a) => a.address === p.terminal);
     const name = crumbed || (!p.mod && pic && named === p.program?.name) ? "" : named;
     // Split, the panes beside the focused one recede, as T3's split terminals do, with no ring: their icon, name and folder a
     // step down, back up while hovered. Its status mark (what needs the person) and its buttons stay as they are.
     const quiet = !alone && !p.focused && !this.hovered;
     // Its agent's own status; what it started speaks through the sub-agent button (tree.js).
-    const all = terminals();
-    const kids = subAgents(agents(), all)(p.terminal);
+    const kids = subAgents(every, all)(p.terminal);
     const st = p.mod ? modStatus(p) : ownStatus(p.status, p.terminal, all);
     // Put away, it's no news (no done dot, in either mode). With the Inbox chosen the header says so, as its Inbox row does
     // (docs/adr/0002): a snooze with its clock and time left, else Settle's check. At work or needing the person, that shows first.
     const k = p.terminal && all.find((x) => x.address === p.terminal);
     const away = !p.mod && st !== "working" && st !== "blocked" && notNews(k, p.status, kids);
     const now = Date.now(), nap = away && Number(k.labels?.snoozed) > now ? Number(k.labels.snoozed) : 0;
-    this.napping = inbox && nap > 0;
+    // With the Inbox the time left shows, a minute at a time; in Lists only the wake shows, the done coming back.
+    this.napClock(nap && inbox ? nap - (Math.ceil((nap - now) / 60000) - 1) * 60000 : nap, cx);
     const pane = p.pane;
     // A mark takes the last button's 24px, so it, the × and the tab bar's + share one column: pr(2), the frame's 2 and the block's 8 are the bar's 12.
     const slot = (mark) => div().min_w(24).flex_none().flex().items_center().justify_center().child(mark);
@@ -226,14 +230,14 @@ export default class Pane extends View {
           .child(this.button(t, `ph-r-${pane}`, "mods/t3-pane/icons/square-split-horizontal.svg", "Split right", () => run("pane.split", { direction: "right", pane }), "pane.split:right"))
           .child(this.button(t, `ph-d-${pane}`, "mods/t3-pane/icons/square-split-vertical.svg", "Split down", () => run("pane.split", { direction: "down", pane }), "pane.split:down"))
           .child(this.button(t, `ph-z-${pane}`, `mods/t3-pane/icons/${p.zoomed ? "minimize-2" : "maximize-2"}.svg`, p.zoomed ? "Unzoom pane" : "Zoom pane", () => run("pane.zoom", { pane }), "pane.zoom"))
-          .child(this.button(t, `ph-x-${pane}`, "mods/t3-pane/icons/x.svg", "Close pane", () => { this.hot = null; run(`t3-tabs.close-pane:${pane}`); }, "pane.close")))))
+          .child(this.button(t, `ph-x-${pane}`, "mods/t3-pane/icons/x.svg", "Close pane", () => { this.hot = null; run(`t3-tabs.close-pane:${pane}`); }, "t3-tabs.close-pane")))))
       .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal, kids, st === "working")))
       // The same marks as the agents list and tabs.
-      .when(st === "working" || st === "blocked", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, STATUS_WORD[st], statusMark(t, st, 14)))))
+      .when(st === "working" || st === "blocked", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, STATUS_WORD[st], statusMark("mods/t3-pane", t, st, 14)))))
       .when(inbox && away, el => el.child(slot(nap
         ? tipMark(this, t, `ph-mark-${pane}`, "Snoozed", h_flex().gap(4).items_center().text_size(12).text_color(t.accent)
           .child(svg("mods/t3-pane/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(nap, now)))
         : tipMark(this, t, `ph-mark-${pane}`, "Settled", svg("mods/t3-pane/icons/check.svg").size(14).flex_none().text_color(t.dim)))))
-      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", statusMark(t, "done").mx(3))))), 8));
+      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", statusMark("mods/t3-pane", t, "done").mx(3))))), 8));
   }
 }

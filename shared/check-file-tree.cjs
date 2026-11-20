@@ -4,15 +4,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const src = ["color.js", "file-tree.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["color.js", "file-tree.js", "file-listing.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.tree = { treeRows, pathEntries, rowAt, treeKey, naturalCompare, sortEntries };";
+  + "\nglobalThis.tree = { treeRows, pathEntries, rowAt, treeKey, naturalCompare, sortEntries, parseListing, join };";
 // The row as drawn: each element a tag and what it holds, in order.
 const el = (tag) => { const node = { tag, kids: [], calls: {} }; const p = new Proxy(node, { get: (t, k) => k in t ? t[k] : k === "child" ? (c) => (t.kids.push(c), p)
   : k === "when" ? (c, f) => (c ? f(p) : p) : (...args) => (t.calls[k] = args, p) }); return p; };
 const context = vm.createContext({ div: () => el("div"), svg: (src) => Object.assign(el("svg"), { src }), h_flex: () => el("row"), pierreFileIcon: () => el("svg") });
 vm.runInContext(src.replace("globalThis.tree = { treeRows,", "globalThis.tree = { treeRow, treeRows,"), context);
-const { treeRows, pathEntries, rowAt, treeKey, treeRow, naturalCompare, sortEntries } = context.tree;
+const { treeRows, pathEntries, rowAt, treeKey, treeRow, naturalCompare, sortEntries, parseListing, join } = context.tree;
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const shape = (rows) => plain(rows).map((r) => `${"  ".repeat(r.depth)}${r.dir ? (r.open ? "v " : "> ") : ""}${r.name}`);
 
@@ -26,6 +26,11 @@ const many = Array.from({ length: 12000 }, (_, i) => ({ name: `f${12000 - i}`, d
 const sorted = sortEntries(many);
 assert.equal(sorted.length, many.length);
 assert.ok(sorted.findIndex(e => !e.dir) > 0 && sorted.slice(0, sorted.findIndex(e => !e.dir)).every(e => e.dir));
+
+// A folder's listing (file-listing.js) comes in that order; a path joins the space's folder, either side empty.
+assert.deepEqual(plain(parseListing("f\0file10\0f\0file2\0")).map((e) => e.name), ["file2", "file10"]);
+assert.deepEqual(plain(parseListing("f\0b.txt\0d\0src\0f\0a b.md\0")), [{ name: "src", dir: true }, { name: "a b.md", dir: false }, { name: "b.txt", dir: false }]);
+assert.deepEqual([join("", "a"), join("a", ""), join("/r/", "a"), join("/", "a")], ["a", "a", "/r/a", "/a"]);
 
 // Review's paths, in the diff's order: folders where their first path comes, a chain of lone folders one row.
 const kids = pathEntries(["packages/cli/src/a.ts", "README.md", "packages/cli/src/daemon/b.ts", "gone/c.ts"].map((p) => ({ path: p, missing: p.startsWith("gone") })));

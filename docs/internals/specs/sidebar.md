@@ -44,7 +44,7 @@ The sidebar keeps two icon columns at its right edge, in Inbox and Lists alike: 
 
 `shared/status-mark.js`, the same everywhere:
 
-- Working: the shipped spinner in `working`, with the duration where there is room.
+- Working: T3's still dashed circle (Lucide `circle-dashed`) in `working`, with the duration where there is room.
 - Blocked: a rounded `!` on a 15% `blocked` wash: 14px normally, 16px in the Inbox, 12px in Agents and sub-agent rows. A sub-agent's Failed is the same badge in `ansi1`.
 - Done: a 6px `done` dot until read; the Inbox writes a green `Done`. A sub-agent's done is its own and never becomes the parent's unread result.
 - Idle: a ring in Agents, elapsed time in the sub-agent list, nothing elsewhere.

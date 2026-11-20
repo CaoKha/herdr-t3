@@ -59,6 +59,8 @@ function checkBookmarks() {
   f.navigation(undefined, { checking: () => true }).advance();
   const saved = () => f.state["t3.projects"];
   assert.equal(saved(), undefined, "checking leaves bookmarks alone");
+  f.navigation().frame();
+  assert.equal(saved(), undefined, "the strip's frame leaves bookmarks to the keys block, which draws in the same frame");
 
   view.advance();
   const first = saved();
@@ -252,22 +254,98 @@ async function checkCleanup() {
   }
 }
 
-async function checkCleanupDispatch() {
-  const { f } = cleanupFixture(), pending = [];
+// The floating keys block, main.js over the real navigation; the returned function sends it a command as nextCommand delivers one.
+function keysBlock(f, over = {}) {
+  const pending = [];
   const scope = vm.createContext({
-    ...f, View: class {}, props: () => ({ part: "keys" }), registerSpaceArrival() {},
-    nextCommand: () => new Promise(resolve => pending.push(resolve)),
+    ...f, View: class {}, props: () => ({ part: "keys" }), layoutNode: () => null, restorePanel() {},
+    nextCommand: () => new Promise(resolve => pending.push(resolve)), ...over,
   });
-  vm.runInContext(source + "\n" + kit.strip(read("main.js")).replace("export default class", "globalThis.Mod = class"), scope);
+  vm.runInContext([source, kit.strip(read("pins.js")), kit.strip(read("main.js")).replace("export default class", "globalThis.Mod = class")].join("\n"), scope);
   new scope.Mod().init({}, { ...f.cx, focus_handle() {}, spawn: fn => fn(f.cx) });
-  const send = async name => { pending.shift()(name); await flush(); };
+  return async name => { pending.shift()(name); await flush(); };
+}
+
+async function checkCleanupDispatch() {
+  const { f } = cleanupFixture(), send = keysBlock(f);
   await send("cleanup");
   assert.equal(f.overlays.length, 1, "the keys block dispatches cleanup");
   await send(closeAnswer(f.overlays[0]));
   assert.equal(f.calls[0]?.[0], "tab.close", "the keys block dispatches the confirmation too");
 }
 
+// An agent's menu acts on the agent it names (specs/tab-bar.md). At Home every agent is in the background: its Settle and
+// Snooze still happen, nothing moves, and Undo jumps only to an agent that was in view when it was put away.
+async function checkMenuAtHome() {
+  const f = fixture(), [a, far] = f.agents(), [project] = f.spaces();
+  const home = { id: "h", machine: null, named: true, name: "Home\u200b", active: false, tabs: [{ id: "hp", active: true }] };
+  f.slots.lists = { id: "sidebar-lists", active: "inbox" };
+  f.state["t3-tabs.home"] = "h";
+  f.spaces().push(home);
+  f.panes().push({ pane: "ph", tab: "hp", mod: "t3-home" });
+  a.status = far.status = "idle";
+  const at = (space) => {
+    project.active = space === project; home.active = space === home; a.focused = space === project;
+    Object.assign(f.shown, space === home ? { space: "h", tab: "hp", pane: "ph", terminal: null, agent: null } : { space: "s0", tab: "b0", pane: "p0", terminal: "t0", agent: "t0" });
+  };
+  const send = keysBlock(f), did = () => [f.labelled.splice(0).map(l => l.slice(1).join(" ").replace(/\d{6,}/g, "T")), plain(f.calls.splice(0))];
+  at(home);
+  await send("settle:t0");
+  assert.deepEqual(did(), [["t0 settled=T:0"], []], "Settle in a card's menu at Home settles it, and nothing moves");
+  assert.equal(f.state["t3.notice"]?.action, "Settled", "with its Undo");
+  await send("undo");
+  assert.deepEqual(did(), [["t0 settled="], []], "Undo of one never in view brings it back without going to it");
+  await send(`snooze:vps/t2:${Date.now() + 3600000}`);
+  assert.deepEqual(did(), [["vps/t2 snoozed=T"], []], "Snooze in the menu at Home, another machine's agent too");
+  at(project);
+  await send("settle");
+  assert.deepEqual(did(), [["t0 settled=T:0"], [["t3-tabs.home", {}]]], "the key puts the agent in view away and goes Home");
+  at(home);
+  await send("undo");
+  assert.deepEqual(did(), [["t0 settled="], [["agent.focus", { terminal: "t0" }]]], "its Undo at Home goes back to it");
+}
+
+// The Details key opens it at once. A maximized panel hides the bar that answers, so only then is it un-maximized and waited for.
+async function checkDetailsKey() {
+  const f = fixture();
+  let wide = false;
+  const send = keysBlock(f, { panelState: () => ({ wide }), toggleWide: () => { f.calls.push(["wide"]); } });
+  await send("details");
+  assert.deepEqual([plain(f.calls.splice(0)), f.timers.length], [[["t3-actions.details", {}]], 0], "nothing to wait for: it opens with the press");
+  wide = true;
+  await send("details");
+  assert.deepEqual(plain(f.calls), [["wide"]], "maximized: the work column comes back first");
+  f.timers.pop().fn();
+  assert.deepEqual(plain(f.calls), [["wide"], ["t3-actions.details", {}]]);
+}
+
 async function check() {
+  // One observation reads each of Herdr's lists once (a read copies the whole list), and with no agent snoozed or unread
+  // it searches the terminals for none of them.
+  {
+    const f = fixture(), reads = {};
+    let scans = 0;
+    const counted = Object.fromEntries(["spaces", "panes", "agents", "terminals"].map(name => [name, () => {
+      reads[name] = (reads[name] ?? 0) + 1;
+      const list = f[name]();
+      return name === "terminals" ? Object.assign([...list], { find(...args) { scans++; return Array.prototype.find.apply(this, args); } }) : list;
+    }]));
+    f.state["t3-tabs.home"] = "h";
+    f.spaces().push({ id: "h", machine: null, named: true, name: "Home\u200b", tabs: [{ id: "hp" }] });
+    // A mod's pane has the focus, so who's in view is worked out from the panes.
+    f.spaces()[0].tabs[0].active = true; f.agents()[0].focused = false;
+    f.panes().push({ pane: "pm", tab: "b0", mod: "review" });
+    Object.assign(f.shown, { tab: "b0", pane: "pm", agent: null });
+    f.navigation(undefined, counted).advance();
+    assert.deepEqual([reads, scans], [{ spaces: 1, panes: 1, agents: 1, terminals: 1 }, 0]);
+  }
+  // With no space open there is none to put a tab in: New picks one, as at Home.
+  {
+    const f = fixture(), view = f.navigation();
+    f.spaces().splice(0);
+    await view.handle("new", f.cx);
+    assert.deepEqual(plain(f.calls), [["mod.open", { name: "t3-new-menu" }]]);
+  }
   // A tab command can arrive at a new host observation before either Tabs block draws.
   {
     const f = fixture(), view = f.navigation();
@@ -480,6 +558,13 @@ async function check() {
     assert.deepEqual(plain(view.frame()), { tabs: [], atHome: true, context: null }, "Home has no visible tabs");
     await say("new");
     assert.deepEqual(made(), [["mod.open", { name: "t3-new-menu" }]], "New picks the space");
+    // New's pick, a menu's New tab: the space is named, in view or not.
+    for (const id of ["h", "gone"]) {
+      await say(`new:${id}`);
+      assert.deepEqual(made(), [["mod.open", { name: "t3-new-menu" }]], `new:${id}: Home or a space gone takes no tab, New picks`);
+    }
+    await say("new:s2");
+    assert.deepEqual(made(), [["tab.new", { space: "s2", folder: "/work/s2" }]], "from Home, a tab in the space named, where its terminals are");
     f.shown.tab = "page";
     await say("close-tab");
     assert.deepEqual([made(), f.overlays.length], [[], 0], "a key pressed out of habit doesn't close Home");
@@ -663,6 +748,18 @@ async function check() {
     assert.deepEqual([show("fresh").head, show("prog").head], [null, null], `${command}: the space alone, the tools' tabs too`);
     show("mine", "t0");
     assert.equal(show("prog").head, "t0", "looking at an agent again picks it back up");
+
+    // Started from elsewhere (New's pick at Home or in another space, a space's menu): the same, as the space is named.
+    const [here, other] = f.spaces(), go = (to) => { here.active = to === here; other.active = to === other; };
+    go(other); f.agents()[0].focused = false; Object.assign(f.shown, { tab: "b1", agent: null });
+    view.frame(); f.calls.length = 0;
+    await view.handle("new:s0", f.cx);
+    assert.deepEqual(plain(f.calls), [["tab.new", { space: "s0", folder: "/work/s0" }]], "new:<space>: a tab there");
+    view.frame();
+    go(here);
+    assert.deepEqual([show("fresh").head, show("prog").head], [null, null], "new:<space>: that space alone, once there");
+    show("mine", "t0");
+    assert.equal(show("prog").head, "t0");
   }
 
   {
@@ -1147,11 +1244,11 @@ async function check() {
 }
 
 (async () => {
-  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch };
+  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch, menu: checkMenuAtHome, details: checkDetailsKey };
   if (process.argv[2]) { await additions[process.argv[2]](); return; }
   for (const verify of Object.values(additions)) await verify();
   await check();
   twice = true;
   await check();
-  console.log("ok: navigation, project bookmarks and cleanup; the navigation history checks also tracked twice a frame.");
+  console.log("ok: navigation, project bookmarks, cleanup and the keys block's menu and Details commands; the navigation history checks also tracked twice a frame.");
 })().catch(e => { console.error(e); process.exit(1); });

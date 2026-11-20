@@ -2,7 +2,7 @@
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { theme, spaces, panes, machines, run, closeOverlay, props, home, shared, setShared } from "herdr";
-import { projectMark, placeOf, newTab } from "./project.js";
+import { projectMark, placeOf } from "./project.js";
 import { dormantProjects } from "./projects.js";
 import { newSpacePlan } from "./new-space.js";
 import { step, scrollList } from "./list.js";
@@ -37,13 +37,13 @@ export default class NewMenu extends View {
   // For the buttons that open this: see justClosed in focus.js. New space's and New tab in…'s apart, as each opens the other's step.
   close() { setShared(closedKey("t3-new-menu", this.picking ? "pick" : undefined), Date.now()); }
 
-  // The current space first, then its machine's, so a machine's spaces stay together.
-  items(plan = undefined) {
+  // The current space first, then its machine's, so a machine's spaces stay together. `ps`: panes(), read once a draw.
+  items(plan = undefined, ps = panes()) {
     const q = this.filter.toLowerCase();
     if (this.picking) return (plan ?? newSpacePlan()).candidates.map(({ machine, layout }) => ({
       key: `machine:${machine ?? ""}`, machine, name: machine ?? "This computer", sub: machine ? STATE[layout] : "Local", off: layout !== "ready",
     })).filter((m) => m.name.toLowerCase().includes(q));
-    const ps = panes(), all = spaces(), homeId = shared(KEY.home), here = all.find(s => s.active)?.machine ?? null;
+    const all = spaces(), homeId = shared(KEY.home), here = all.find(s => s.active)?.machine ?? null;
     const rank = (s) => (s.active ? 0 : (s.machine ?? null) === here ? 1 : 2);
     const live = all.filter(s => s.id !== homeId && `${s.name} ${s.machine ?? ""} ${placeOf(s, ps)}`.toLowerCase().includes(q))
       .sort((a, b) => rank(a) - rank(b) || (a.machine ?? "").localeCompare(b.machine ?? ""))
@@ -62,7 +62,8 @@ export default class NewMenu extends View {
     if (!item || item.off) return;
     closeOverlay(props().overlay);
     const p = item.project;
-    if (item.space) newTab(item.space);
+    // Through t3-tabs, which opens the tab and has the Inbox bar read it as something started there (`fresh`).
+    if (item.space) run(`t3-tabs.new:${item.space.id}`);
     else if (p) run("space.new", { folder: p.folder, machine: p.machine ?? "", ...(p.named ? { name: p.name } : {}) });
     else run("space.new", { machine: item.machine ?? "" });
   }
@@ -81,8 +82,8 @@ export default class NewMenu extends View {
     const t = theme(), on = this.at === i, { space, project } = item, entry = space ?? project, h = home();
     const short = (p) => (p && h && p.startsWith(h) ? "~" + p.slice(h.length) : p ?? "");
     const folder = space ? placeOf(space, ps) : project?.folder;
-    // An empty folder on a live remote space is its home.
-    const sub = entry ? (space?.machine ? folder || "~" : short(folder)) : item.sub;
+    // Another machine's folder is said whole: `~` here is this computer's home. An empty one on a live remote space is its home.
+    const sub = entry ? (entry.machine ? folder || "~" : short(folder)) : item.sub;
     return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(entry?.name ?? item.name)
       .when(on, el => el.bg(t.selected))
@@ -104,7 +105,7 @@ export default class NewMenu extends View {
   }
 
   render() {
-    const t = theme(), ps = panes(), plan = newSpacePlan(), items = this.items(plan);
+    const t = theme(), ps = panes(), plan = newSpacePlan(), items = this.items(plan, ps);
     // ⌘N doesn't ask: it only names what this button does when there's nothing to ask.
     const newKey = plan.ask ? "" : keyOf("space.new");
     return focusRoot(this, v_flex().id("new-menu").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")

@@ -33,9 +33,10 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 | A pane mod that didn't opt in | The agent beside it |
 | A program in the same tab (held) | No card lit; the breadcrumb keeps the tab's last-viewed agent, dimmed |
 | A tab with no agent, entered from the strip or tab keys (away) | No card lit; the breadcrumb keeps the space's last agent and family, dimmed |
-| A tab with no agent after New tab in the breadcrumb space menu or `cmd-t` (fresh) | Just the space, until another agent is viewed |
+| A tab with no agent after a new tab was opened in the space (fresh) | Just the space, until another agent is viewed |
 
 - Two memories, in memory only: `trail` (space → last shown tab) and `lastIn` (tab → last-viewed agent). Each frame drops entries whose tab or agent is gone; a tab then falls back to its first agent. Restart loses both.
+- Only `t3-tabs.new` marks a space fresh, so every way the layout offers to start a new tab runs it, never `tab.new` itself: `cmd-t`, Lists' `+`, Home's button, and, as `t3-tabs.new:<space>`, New's pick and New tab in the space, tab and space switcher menus. At Home, or with no space open, it opens New instead.
 - While a close's landing hasn't shown yet (`going`), the neighbour Herdr picked doesn't count as in view.
 - A held or away title returns to its agent on click and has no chevron. The current title opens the agent menu below, left-aligned, its chevron shown only on hover, focus, or while its menu is open; the space crumb brightens on hover, focus, or while open without a chevron (keeping `/` symmetrical and fixed) and opens the space menu below, left-aligned (`280` wide, `closedKey("t3-menu", "space")`).
 - Right-click on the space, title or parent opens that object's menu, dimmed or not.
@@ -80,7 +81,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 - Lists: click selects, double-click renames, right-click opens the tab menu, middle-click closes (the same `t3-tabs.close-tab:<id>` as `×`, so a running program asks first). Drag starts at 6px; Esc or leaving the bar cancels; keyboard focus is held only while dragging. Wheel only scrolls; it never switches tabs.
 - Inbox: only tabs with no agent can be dragged, among themselves.
-- Clicking the breadcrumb's space opens the space menu (`t3-menu` `tab: "space-switch"`, `closedKey("t3-menu", "space")`): New tab (`t3-tabs.new`), then the current space's agents (with nested sub-agents) and non-agent terminal panes.
+- Clicking the breadcrumb's space opens the space menu (`t3-menu` `tab: "space-switch"`, `closedKey("t3-menu", "space")`): New tab (`t3-tabs.new:<space>`), then the current space's agents (with nested sub-agents) and non-agent terminal panes.
 
 ## Navigation keys
 
@@ -119,7 +120,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 
 The floating `tabs-keys` copy handles these even with the sidebar hidden or the panel maximized; the keyed ones are in the RECIPE's key table.
 
-- `t3-tabs.{panel,review,files,home,settings,new,next,prev,settle,undo,details,cleanup}`
+- `t3-tabs.{panel,review,files,home,settings,new,next,prev,settle,undo,details,cleanup}`, `t3-tabs.new:<space>`
 - `t3-tabs.close-tab:<id>`, `t3-tabs.close-pane:<id>`, `t3-tabs.cleanup-now:<serial>`
 - `t3-tabs.pin:<address>`, `unpin:<address>`, `settle:<address>`, `wake:<address>`, `snooze:<address>:<wake-ms>`. Settle and Wake of a background agent don't go Home; the viewed agent leaves as with the key.
 - `t3-tabs.space:<n>`, `space-next`, `space-prev`, `tab:<n>`, `tab-next`, `tab-prev`

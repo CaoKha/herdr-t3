@@ -1,7 +1,8 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 let f = { space: 's', tab: 'b', terminal: 't1', cwd: '/source' }, all = [{ tab: 'b', terminal: 't1' }];
 let space = { id: 's', active: true, folder: '/space', tabs: [{ id: 'b', active: true }] };
-const c = vm.createContext({ focused: () => f, panes: () => all, spaces: () => [space], Map });
+const reads = { panes: 0 };
+const c = vm.createContext({ focused: () => f, panes: () => { reads.panes++; return all; }, spaces: () => [space], Map });
 vm.runInContext(fs.readFileSync(__dirname + '/terminal-context.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { rememberTerminal, terminalFor, workFolder };', c);
 assert.equal(c.api.terminalFor().terminal, 't1');
 f = { space: 's', tab: 'b', terminal: null, cwd: null };
@@ -17,4 +18,15 @@ all = [{ tab: 'b', terminal: 't4', cwd: '/beside' }];
 assert.equal(c.api.workFolder(), '/beside');
 all = [];
 assert.equal(c.api.workFolder(), '/space', 'no terminal: the space folder');
+// A panel head asks on every draw (t3-chrome's probeReview): one read of the panes answers it, each read copying every pane.
+f = { space: 's', tab: 'b', terminal: 't2', cwd: '/old' }; all = [{ tab: 'b', terminal: 't2', cwd: '/repo/sub' }];
+reads.panes = 0;
+assert.equal(c.api.workFolder(), '/repo/sub');
+assert.equal(reads.panes, 1, `${reads.panes} reads of panes() for one work folder`);
+reads.panes = 0;
+assert.equal(c.api.terminalFor().terminal, 't2');
+assert.equal(reads.panes, 1, `${reads.panes} reads of panes() for one terminal`);
+reads.panes = 0;
+assert.equal(c.api.workFolder('s', 'b', all), '/repo/sub');
+assert.equal(reads.panes, 0, 'handed the caller\'s panes, none');
 console.log('ok: last active terminal stays per tab and is removed when closed; a tab works in its last terminal\'s folder');

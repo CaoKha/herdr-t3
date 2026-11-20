@@ -5,9 +5,12 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const src = ["store.js", "menus.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
-  .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.menu = { rowItems, mention };";
+  .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ") + "\nglobalThis.menu = { rowItems, mention, initMenu, closeMenu };";
 const calls = [], notices = [], jobs = []; let clipboard = "original";
-const context = vm.createContext({ checking: () => false, run: (c, a) => calls.push([c, a]), notify: n => notices.push(n), MENU_ROW: 28 });
+const watches = [], closed = [], menuProps = { files: "row", overlay: "o1", source: { space: "s1", tab: "b1" } };
+let shown = [{ id: "s1", active: true, tabs: [{ id: "b1", active: true }] }];
+const context = vm.createContext({ checking: () => false, run: (c, a) => calls.push([c, a]), notify: n => notices.push(n), MENU_ROW: 28,
+  props: () => menuProps, spaces: () => shown, closeOverlay: id => closed.push(id), setShared() {}, stopsInit() {}, stopsEnd() {}, menuClosed() {}, propsLit: () => -1 });
 vm.runInContext(src, context);
 const ids = (o) => [...context.menu.rowItems(o).map((it) => it.id)];
 const agent = { terminal: "t1" };
@@ -17,6 +20,18 @@ assert.deepEqual(ids({ platform: "macos" }), ["open", "reveal", "copy-path", "me
 assert.deepEqual(ids({ platform: "macos", remote: true, editors: ["Zed"] }), ["copy-path", "mention"], "another machine's: nothing opens here");
 assert.deepEqual(ids({ platform: "linux" }), ["copy-path", "mention"]);
 assert.equal(context.menu.rowItems({}).at(-1).disabled, true, "no terminal in the tab: Insert is off");
+
+// A menu acts only while the space and tab it opened on show: it closes itself when they don't, and its watch ends with it.
+{
+  const view = {}, timers = { every: (ms, fn) => { const w = { ms, fn, cancel() { w.gone = true; } }; watches.push(w); return w; } };
+  context.menu.initMenu(view, { focus_handle: () => ({ focus() {} }), timer: timers });
+  assert.equal(watches.length, 1);
+  watches[0].fn(); assert.deepEqual(closed, [], "its source still shows");
+  shown = [{ id: "s2", active: true, tabs: [] }];
+  watches[0].fn(); assert.deepEqual(closed, ["o1"], "another space shows: it closes");
+  context.menu.closeMenu(view);
+  assert.equal(watches[0].gone, true, "closed, it stops watching");
+}
 
 const cx = { read_from_clipboard: () => clipboard, write_to_clipboard: v => { clipboard = v; }, sleep: async () => {}, spawn: f => jobs.push(f) };
 (async () => {

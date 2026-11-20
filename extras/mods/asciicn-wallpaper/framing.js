@@ -26,12 +26,10 @@ export const fromSlider = (s) => 4 ** s;
 /** The next preset up (`dir` 1) or down (-1) from `zoom`. */
 export const nextPreset = (zoom, dir) => dir > 0 ? PRESETS.find((z) => z > zoom + 1e-6) ?? 4 : [...PRESETS].reverse().find((z) => z < zoom - 1e-6) ?? 1;
 
-/**
- * What a scroll does: `{ zoom }`, a factor, or `{ pan: [dx, dy] }` in the event's px; null for a lift or its momentum.
- * A notched wheel reports lines and zooms (6 notches double it), sideways it pans; a trackpad reports none and pans; ⌘ or
- * Ctrl with either zooms (200 px double it), standing in for a pinch Herdr doesn't pass on. After a lift, events less than
- * 100 ms apart are momentum (macOS sends it as more "moved"): framing has to stop where the fingers left it. `g` keeps that.
- */
+/** What a scroll does: `{ zoom }`, a factor, or `{ pan: [dx, dy] }` in the event's px; null for a lift or its momentum.
+ *  A notched wheel reports lines and zooms (6 notches double it), sideways it pans; a trackpad reports none and pans; ⌘ or
+ *  Ctrl with either zooms (200 px double it), standing in for a pinch Herdr doesn't pass on. After a lift, events less than
+ *  100 ms apart are momentum (macOS sends it as more "moved"): framing has to stop where the fingers left it. `g` keeps that. */
 export function scroll(e, g) {
   const now = Date.now();
   if (e.touch_phase === "ended") { g.lifted = now; return null; }

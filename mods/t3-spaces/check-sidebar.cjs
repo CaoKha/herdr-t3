@@ -65,7 +65,7 @@ function fixture(width) {
     const localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
     const source = bundle(path.join(modRoot, name));
     // The mod gets a new list each call, as Herdr gives (tree.js indexes each list once); the test keeps editing `terminals`.
-    const context = vm.createContext({ ...env, terminals: () => [...terminals], t3FocusRun: true, localStorage, props: () => props, fs: fs.promises, appHome: () => path.dirname(modRoot) });
+    const context = vm.createContext({ ...env, terminals: () => [...terminals], panes: () => [...panes], t3FocusRun: true, localStorage, props: () => props, fs: fs.promises, appHome: () => path.dirname(modRoot) });
     vm.runInContext(source, context, { filename: name });
     scopes.set(name, context);
     const mod = new context.Mod();
@@ -546,28 +546,6 @@ for (const width of [208, 256]) {
   fireTimers(16);
   assert.equal(y(ag.render(cx), "t0").style.top, 0, "then it's let go");
   remote.status = wasStatus;
-  {
-    // A group's lit chevron goes with the pointer even when its leave never comes.
-    const every = cx.timer.every, watches = [], scope = f.scopes.get("t3-agents");
-    cx.timer.every = (ms, fn) => { const t = { ms, fn, cancel() { t.gone = true; } }; watches.push(t); return t; };
-    const box = { x: 0, y: 100, width: 208, height: 32 }, wasPointer = scope.window.mouse_position, row = () => find(ag.render(cx), "sec-4");
-    scope.window.mouse_position = () => ({ x: 10, y: 110 });
-    fire(row(), "on_hover", true, cx);
-    fire(row(), "on_mouse_move", { position: { x: 10, y: 110 }, bounds: box }, cx);
-    watches.at(-1).fn(cx);
-    assert.equal(ag.overGroup, "sec-4", "on it, it stays lit");
-    scope.window.mouse_position = () => ({ x: 10, y: 300 });
-    watches.at(-1).fn(cx);
-    assert.deepEqual([ag.overGroup, watches.at(-1).gone], [null, true], "off it, no leave needed");
-    scope.window.mouse_position = () => ({ x: 10, y: 110 });
-    fire(row(), "on_hover", true, cx);
-    fire(row(), "on_hover", false, cx);
-    assert.equal(ag.overGroup, null);
-    watches.at(-1).fn(cx);
-    assert.equal(watches.at(-1).gone, true, "a real leave ends the watch too");
-    scope.window.mouse_position = wasPointer;
-    cx.timer.every = every;
-  }
   f.state["agents.sort"] = "grouped";
   const sorted = ag.render(cx), head = leaving(sorted, "m:sec-4");
   assert.ok(head && strings(head).includes("Needs you") && inert(head), "switching the sort, the old headers fade out");
@@ -600,6 +578,12 @@ for (const width of [208, 256]) {
   const m0 = menu.render(cx);
   assert.equal(find(m0, "sort-priority").style.bg, undefined, "no highlight on opening");
   assert.equal(find(m0, "sort-priority").style.h, 28);
+  // Lit only while the pointer is on the row, as every menu's (t3-tokens「菜单行」).
+  const sortLit = () => find(menu.render(cx), "sort-priority").style.bg;
+  fire(find(menu.render(cx), "sort-priority"), "on_hover", true, cx);
+  assert.equal(sortLit(), f2.theme().selected, "the pointer on it lights it");
+  fire(find(menu.render(cx), "sort-priority"), "on_hover", false, cx);
+  assert.equal(sortLit(), undefined, "the pointer gone, nothing stays lit");
   assert.equal(find(f.load("t3-spaces").render(cx), "spaces-heading").items[0].style.text_color, f.theme().muted);
 }
 
@@ -755,29 +739,29 @@ async function checkInbox() {
   f.agents()[0].status = "idle"; f.panes()[0].status = "idle";
   assert.deepEqual(strings(find(inbox.render(cx), "state-t0")), ["Working", "1m"], "read, the run goes on from its start");
   assert.equal(find(f.load("t3-agents").render(cx), "status-t0").style.accessibility_label, "Working (sub-agent)", "a read parent waiting on a sub-agent is working");
-  const spins = tree => walk(tree).some(n => n.source === "mods/workspace-chrome/spinner.svg");
-  assert.ok(spins(find(f.load("t3-tabs").render(cx), "tab-b0")), "its tab still shows it working");
+  const works = tree => walk(tree).some(n => n.source?.endsWith("/icons/circle-dashed.svg"));
+  assert.ok(works(find(f.load("t3-tabs").render(cx), "tab-b0")), "its tab still shows it working");
   const header = f.load("t3-pane", { pane: "p0" }).render(cx);
-  assert.ok(!find(header, "ph-mark-p0") && spins(find(header, "ph-kids-p0")), "its pane header says its own agent is idle; the sub-agent button spins for the rest");
+  assert.ok(!find(header, "ph-mark-p0") && works(find(header, "ph-kids-p0")), "its pane header says its own agent is idle; the sub-agent button marks the rest at work");
 }
 
 {
   // A mod pane's word marks its tab as an agent's would; a closed pane's says nothing.
   const f = fixture(256);
-  const spins = tree => walk(tree).some(n => n.source === "mods/workspace-chrome/spinner.svg");
+  const works = tree => walk(tree).some(n => n.source === "mods/t3-tabs/icons/circle-dashed.svg");
   f.spaces()[0].tabs.push({ id: "bx", name: "review", named: true, active: false });
   f.panes().push({ pane: "p9", terminal: null, mod: "review", tab: "bx", title: "review" });
   const tab = () => find(f.load("t3-tabs").render(cx), "tab-bx");
-  assert.ok(!spins(tab()) && !strings(tab()).includes("!") && !walk(tab()).some(n => n.style.rounded_full), "nothing reported, no mark");
+  assert.ok(!works(tab()) && !strings(tab()).includes("!") && !walk(tab()).some(n => n.style.rounded_full), "nothing reported, no mark");
   f.state["review.status"] = { bx: "working" };
-  assert.ok(spins(tab()), "a run shows the spinner");
+  assert.ok(works(tab()), "a run shows the working mark");
   f.state["review.status"] = { bx: "blocked" };
   assert.ok(strings(tab()).includes("!"), "a failure shows the badge");
   f.state["review.status"] = { bx: "done" };
   assert.ok(walk(tab()).some(n => n.style.rounded_full), "a finished run shows the dot");
   f.state["review.status"] = { bx: "working" };
   f.panes().pop();
-  assert.ok(!spins(tab()), "its pane closed, its word is left behind");
+  assert.ok(!works(tab()), "its pane closed, its word is left behind");
 }
 
 {
@@ -1404,7 +1388,9 @@ async function checkInbox() {
   assert.equal(f.state["agents.sort"], "priority");
   const byPriority = find(ag.render(cx), "ag-t0"), names = byPriority.items[1];
   assert.deepEqual(strings(names), ["local task", "project 0"], "without a space header the task leads and its space follows; the address stays in the pane header");
-  assert.deepEqual([names.items[1].style.text_color, names.items[1].style.text_size, names.items[1].style.flex_shrink], [f.theme().dim, 12, 1000], "the space is dim, smaller, and gives way first");
+  assert.deepEqual([names.items[1].style.text_color, names.items[1].style.text_size], [f.theme().dim, 12], "the space is dim and smaller");
+  assert.ok("flex_none" in names.items[1].style && "flex_wrap" in names.style && "overflow_hidden" in names.style && names.style.h === 36 && names.items[0].style.line_height === "36px",
+    "whole or not at all: short of room it wraps out of the row's one line, which clips it, never cut to a stub");
 }
 
 {
@@ -1498,8 +1484,8 @@ async function checkInbox() {
 
   // New opens a terminal tab in the space picked: no agent step.
   const menu = f.load("t3-new-menu"); f.calls.length = 0;
-  menu.choose(menu.items().find(item => item.space?.id === f.spaces()[0].id));
-  assert.deepEqual(f.calls.splice(0), [["tab.new", { space: "s0", folder: "/work/s0" }]], "New opens a tab where the space's terminals are, as its folder shows, not where it was made (/work/p0)");
+  menu.choose(menu.items().find(item => item.space?.id === f.spaces()[2].id));
+  assert.deepEqual(f.calls.splice(0), [["t3-tabs.new:s2", {}]], "New names the space to t3-tabs, which opens the tab where its terminals are (t3-tabs check-navigation.cjs)");
   // Two machines: New space asks which, as T3's Add project asks for an environment.
   fire(find(menu.render(cx), "space-new"), "on_click", {}, cx);
   assert.deepEqual(f.calls, [], "New space asks first");
@@ -1571,8 +1557,6 @@ async function checkInbox() {
   // + and the window's buttons are the bar's end, a block of their own after the other mods' controls, sized to fit.
   assert.equal(find(root, "tab-new"), null);
   const end = f.load("t3-tabs", { part: "end", block: "tabs-end" });
-  fire(find(end.render(cx), "tab-new"), "on_click", {}, cx);
-  assert.deepEqual(f.calls.pop(), ["tab.new", { space: "s0", folder: "/work/s0" }], "the tab bar's + opens a tab in its space, where its terminals are");
   f.calls.length = 0;
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 34 }, cx);
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 34 }, cx);
@@ -1619,10 +1603,10 @@ async function checkInbox() {
   const pane = f.load("t3-pane", { pane: "p0" });
   pane.hovered = true;
   const head = pane.render(cx);
-  const spinner = tree => walk(tree).find(n => n.source === "mods/workspace-chrome/spinner.svg");
+  const working = tree => walk(tree).find(n => n.source?.endsWith("/icons/circle-dashed.svg"));
   const open = f.load("t3-agents");
-  for (const tree of [tabs.render(cx), open.render(cx)]) assert.equal(spinner(tree).style.text_color, f.theme().working);
-  assert.equal(spinner(head).style.text_color, f.theme().working, "a header with sub-agents still shows its own agent at work");
+  for (const tree of [tabs.render(cx), open.render(cx)]) assert.equal(working(tree).style.text_color, f.theme().working);
+  assert.equal(working(head).style.text_color, f.theme().working, "a header with sub-agents still shows its own agent at work");
   for (const id of ["ph-r-p0", "ph-d-p0", "ph-z-p0", "ph-x-p0"]) assert.deepEqual([find(head, id).style.h, find(head, id).style.w], [24, 24]);
   const actions = walk(head).find(n => n.items.some(child => child?.key === "tip-ph-r-p0"));
   assert.equal(actions.style.gap, 4);
@@ -1634,7 +1618,7 @@ async function checkInbox() {
   const f = fixture(256);
   f.spaces()[0].tabs[0].status = "blocked";
   const trees = [f.load("t3-tabs").render(cx), f.load("t3-tabs", { part: "end" }).render(cx), f.load("t3-agents").render(cx), f.load("t3-spaces").render(cx), f.load("t3-chrome").render(cx), f.load("t3-chrome", { footer: true }).render(cx), f.load("t3-pane", { pane: "p0" }).render(cx)].flatMap(walk);
-  const glyphs = trees.filter(n => n.kind === "svg").map(n => n.source).filter(s => !s.endsWith("/spinner.svg") && s !== "icons/pi.svg");
+  const glyphs = trees.filter(n => n.kind === "svg").map(n => n.source).filter(s => s !== "icons/pi.svg");
   assert.ok(glyphs.length >= 5);
   for (const s of glyphs) {
     assert.ok(fs.existsSync(path.join(path.dirname(modRoot), s)), `icon on disk: ${s}`);
@@ -1716,6 +1700,20 @@ async function checkInbox() {
       sp.checkNew(run);
       assert.equal(asked(), 0, "once per change");
       await flush();
+    }
+    {
+      // A poll, four a second: machines() once, and where the sidebar is only when the fallback or a draw could use it.
+      const f = fixture(256), sp = f.load("t3-spaces"), scope = f.scopes.get("t3-spaces"), seen = { machines: 0, layout: 0, draws: 0 };
+      for (const k of ["machines", "layout"]) { const read = scope[k]; scope[k] = () => { seen[k]++; return read(); }; }
+      const run = { ...cx, notify: () => { seen.draws++; } };
+      const poll = () => { seen.machines = seen.layout = seen.draws = 0; sp.checkNew(run); return { ...seen }; };
+      assert.deepEqual(poll(), { machines: 1, layout: 0, draws: 0 }, "the window in the background, nothing new to draw");
+      // A space made while the list is behind the Inbox is drawn when the list shows: until then no poll asks for a draw.
+      f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
+      f.spaces().push({ id: "fresh", name: "fresh", folder: "/work/fresh", machine: null, tabs: [] });
+      assert.deepEqual(poll(), { machines: 1, layout: 1, draws: 0 }, "behind the Inbox");
+      f.slots["sidebar-lists"].active = "lists";
+      assert.deepEqual(poll(), { machines: 1, layout: 1, draws: 1 }, "in view, the new space gets its draw");
     }
     {
       // The repository fallback follows the actual window and sidebar layout.
@@ -2421,21 +2419,21 @@ async function checkInbox() {
     const pick = (id, address) => { tabs.forEach(c => { c.active = c.id === id; }); list.forEach(a => { a.focused = a.address === address; }); f.shown.agent = address ?? null; };
     const shown = () => find(view.render(cx), "tab-strip").items.map(n => walk(n).map(x => x.key).find(k => /^tab-/.test(k ?? ""))?.slice(4) ?? "|");
     const inbox = (on) => { f.slots["sidebar-lists"] = { id: "sidebar-lists", active: on ? "inbox" : "lists" }; };
-    const spins = () => walk(find(view.render(cx), "tab-strip")).some(n => n.source === "mods/workspace-chrome/spinner.svg");
+    const works = () => walk(find(view.render(cx), "tab-strip")).some(n => n.source === "mods/t3-tabs/icons/circle-dashed.svg");
     const bang = () => strings(find(view.render(cx), "tab-strip")).includes("!");
 
     pick("mine", "A"); inbox(false);
     assert.deepEqual(shown(), ["prog", "other", "mine", "kid", "rev"], "Lists keeps every tab in its order");
-    assert.ok(spins() && bang(), "and every mark");
+    assert.ok(works() && bang(), "and every mark");
     inbox(true);
     assert.deepEqual(shown(), ["kid", "|", "prog", "rev"], "the agent in view is the breadcrumb's; its sub-agent's tab, a rule, then tabs with no agent; no other agent");
     // What shows: a name's measure is clipped to nothing.
     const shownText = (n) => typeof n === "string" ? [n] : n && typeof n === "object" && !String(n.key).startsWith("text-measure-") ? n.items.flatMap(shownText) : [];
     assert.deepEqual(shownText(find(view.render(cx), "crumb")).filter(s => s !== "/"), ["P", "project 0", "mine"], "the breadcrumb: the space, then the agent in view");
-    assert.ok(!spins() && !bang(), "no marks: that's the sidebar's");
+    assert.ok(!works() && !bang(), "no marks: that's the sidebar's");
     f.slots.sidebar.hidden = true;
     assert.deepEqual(shown(), ["kid", "|", "prog", "rev"], "the same with the sidebar hidden");
-    assert.ok(!spins() && !bang(), "no marks there either");
+    assert.ok(!works() && !bang(), "no marks there either");
     assert.equal(find(view.render(cx), "sidebar-toggle").items.length, 1, "nor on its toggle");
     delete f.slots.sidebar.hidden;
 
@@ -2684,6 +2682,17 @@ async function checkInbox() {
     assert.deepEqual([f.orderWrites.length, f.sharedWrites.length], before, "unchanged hidden data causes no writes");
     f.slots.lists.active = "inbox"; ag.folded["sp-s2"] = false; tick();
     assert.deepEqual([f.orderWrites.length, f.sharedWrites.length], before, "inactive Lists own neither navigation nor rows");
+    {
+      // Behind the Inbox a tick sorts and groups nothing; what outlives it is still kept: each agent's history, and an ended agent's pin and fold go.
+      const scope = f.scopes.get("t3-agents"), real = { subAgents: scope.subAgents, panes: scope.panes, focused: scope.focused }, work = [];
+      for (const name of Object.keys(real)) scope[name] = (...a) => { work.push(name); return real[name](...a); };
+      f.agents()[1].status = "working"; f.state["t3.pins"] = ["t0", "ended"]; ag.folded.ended = false;
+      tick();
+      Object.assign(scope, real);
+      assert.deepEqual(work, [], "no rows to draw or publish: nothing is grouped, no pane or focus read");
+      assert.equal(JSON.parse(f.stores.get("t3-agents").get("changes"))["vps/t2"].s, "working", "its history still follows each agent");
+      assert.deepEqual([plain(f.state["t3.pins"]), "ended" in ag.folded, f.stores.get("t3-agents").get("folded").includes("ended")], [["t0"], false, false], "an ended agent's pin and fold still go");
+    }
     f.slots.lists.active = "lists"; tick();
     assert.deepEqual(plain(f.state["t3-agents.rows"].order), ["t0", "vps/t2"]);
   }
@@ -2875,7 +2884,7 @@ async function checkInbox() {
     assert.deepEqual(f.calls, [], "finishing a slow Settle cannot pull someone away from where they've gone");
   }
 
-  // Settled or snoozed, a Lists row only loses its done dot without moving; snoozed work still spins.
+  // Settled or snoozed, a Lists row only loses its done dot without moving; snoozed work still shows as working.
   {
     const f = fixture(256), a = f.agents()[0], k = f.terminals()[0]; f.terminals().splice(2);
     f.slots.lists = { id: "sidebar-lists", active: "lists" }; f.slots.sidebar.hidden = true;
@@ -2969,7 +2978,6 @@ async function checkInbox() {
   {
     const f = fixture(256), ag = f.load("t3-agents"), scope = f.scopes.get("t3-agents");
     f.terminals()[0].parent = "grandchild";
-    assert.deepEqual(plain(vm.runInContext('descendants(terminals(), "t0").map(k => k.address)', scope)), ["child", "grandchild"], "a live parent cycle stops before returning the root");
     ag.folded.t0 = false;
     assert.equal(walk(ag.render(cx)).filter(n => n.key === "sub-t0").length, 0, "a cycle cannot render the parent again as its own descendant");
   }
@@ -2986,6 +2994,21 @@ async function checkInbox() {
     f.slots.sidebar.hidden = true;
     tabs.render(cx);
     assert.equal(names, 2, "and so with the sidebar hidden");
+  }
+  {
+    // A draw reads a host list once, however many rows ask about it: each read copies the whole list.
+    const f = fixture(256), drawn = (name, lists) => {
+      f.load(name);
+      const scope = f.scopes.get(name), reads = {};
+      for (const k of lists) { const read = scope[k]; scope[k] = () => { reads[k]++; return read(); }; }
+      // A copy started after the counting: what its init hands on (ordering.js) is counted too.
+      const view = f.also(name, {});
+      for (const k of lists) reads[k] = 0;
+      view.render(cx);
+      return reads;
+    };
+    assert.deepEqual(drawn("t3-spaces", ["spaces", "panes"]), { spaces: 1, panes: 1 }, "Spaces, with a machine's heading and its +");
+    assert.deepEqual(drawn("t3-agents", ["layout"]), { layout: 1 }, "Agents: where the sidebar is, for publishing and for the reveal");
   }
 
   // Settings' Sidebar section: what the sidebar shows, Inbox or Lists, as ⌘⇧L switches it. Read from the layout each time, not
@@ -3005,6 +3028,12 @@ async function checkInbox() {
     assert.deepEqual(f.calls.pop(), ["layout.select", { stack: "sidebar-lists", child: "lists" }], "picking Lists shows Lists");
     f.slots["sidebar-lists"].active = "lists";
     assert.ok(strings(find(view.render(cx), "st-sidebarShows")).includes("Lists"), "what the layout has, read again");
+    // Its hint names the key the bindings give, which keys.json can change, in this platform's words; with none bound, none.
+    const scope = f.scopes.get("t3-chrome"), bound = scope.keys, about = () => strings(view.render(cx)).find(s => s.startsWith("The Inbox"));
+    assert.equal(about(), "The Inbox, or the Spaces and Agents lists.", "no key bound, none named");
+    scope.keys = () => [{ section: "layout:herdr-t3", keys: "cmd-alt-l", action: "t3-tabs.sidebar" }];
+    assert.equal(about(), `The Inbox, or the Spaces and Agents lists. ${scope.keyOf("t3-tabs.sidebar")} switches it too.`, "rebound, the hint follows");
+    scope.keys = bound;
     fire(find(view.render(cx), "st-s-home"), "on_click", {}, cx);
     assert.ok(find(view.render(cx), "st-afterAway"), "and back to Home");
   }

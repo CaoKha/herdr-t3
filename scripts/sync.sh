@@ -14,7 +14,7 @@ share name mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker
 share program mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu mods/t3-actions
 share tree mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu
 share status-mark mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review
-share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu mods/t3-actions
+share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-actions
 share projects mods/t3-tabs mods/t3-new-menu
 share new-space mods/t3-inbox mods/t3-spaces mods/t3-new-menu
 share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper
@@ -63,9 +63,12 @@ share check-kit mods/t3-actions mods/t3-chrome mods/t3-files mods/t3-inbox mods/
 for d in mods/t3-files mods/t3-chrome extras/mods/review; do rsync -a --delete "$src/shared/icons/pierre/" "$src/$d/icons/pierre/"; done
 for d in mods/t3-files extras/mods/review; do rsync -a --delete "$src/shared/icons/tree/" "$src/$d/icons/tree/"; done
 # What shared modules draw from the mod's own icons/ (they name `${mod}/icons/…`), for the mods that pass them: menu-row.js's
-# submenu chevron, project.js's plain folder. Herdr's own are drawn at 2, not the layout's 1.75 (check.sh).
+# submenu chevron, project.js's plain folder, status-mark.js's working circle, panel-states.js's loader. The last two also go
+# to the mods that draw them themselves. Herdr's own are drawn at 2, not the layout's 1.75 (check.sh).
 for d in mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/chevron-right.svg" "$src/$d/icons/"; done
 for d in mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/folder.svg" "$src/$d/icons/"; done
+for d in mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review extras/mods/review; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/circle-dashed.svg" "$src/$d/icons/"; done
+for d in mods/t3-files extras/mods/review extras/mods/asciicn-wallpaper; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/loader-circle.svg" "$src/$d/icons/"; done
 # Open in's app artwork, the ones Details uses, copied into Files' own folder.
 for icon in finder vscode vscodium cursor zed app-window; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
 # Review's shared path menu draws the same artwork from its own folder, including the standalone extra.

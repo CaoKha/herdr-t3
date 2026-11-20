@@ -37,7 +37,7 @@ The most common defect is a change that works where you tried it and is missing 
 ## Behaviour
 
 - One action, one name: a control's label, tooltip, menu row and palette entry name the same action on the same object; an icon-only control keeps that meaning.
-- State tells the truth: no spinner once the work has ended, no label that outlives what it names, no animation that repaints while nothing changes.
+- State tells the truth: no loading mark once the work has ended, no label that outlives what it names, no animation that runs without end. A working or loading mark is a still icon.
 - Undo, don't ask: a change that can come back (Unpin, Settle, Snooze) happens at once and offers Undo; only one that can't, such as closing a running program, asks first.
 - Nothing waits on motion: panels and menus open, close and switch at once; motion is only for something arriving or leaving, like the Undo notice.
 - Quiet until needed: running work stays out of the way and doesn't pull the eye; it comes back when it finishes, fails or needs the person.
