@@ -1,0 +1,4 @@
+interface:
+  display_name: "Herdr T3 Demo Window"
+  short_description: "Build, drive and screenshot the demo window"
+  default_prompt: "Use $demo-window to see the change in the demo window and screenshot it at the default sidebar width."
