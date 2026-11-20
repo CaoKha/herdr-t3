@@ -230,10 +230,12 @@ export default class Files extends View {
   changed(st) { st.version++; st.rows = null; }
 
   // Whether what the folder's rows draw moved; `quiet`, a poll's, shows no spinner.
-  async list(st, rel) {
+  async list(st, rel, quiet = false) {
     const fresh = this.fresh(st, `list:${rel}`), dir = join(st.root, rel);
-    if (!fresh()) return;
-    st.loading.add(rel);
+    if (!fresh()) return false;
+    if (!quiet) st.loading.add(rel);
+    const drawn = () => JSON.stringify([st.entries.get(rel), st.errors.get(rel), st.entries.get(rel)?.map(e => st.ignored.has(join(rel, e.name)))]);
+    const before = drawn();
     const inIgnored = [rel, ...ancestors(rel)].some((p) => p && st.ignored.has(p));
     const [r, ig] = await Promise.all([
       limited(fresh, () => exec("sh", ["-c", LIST, "files", dir], { on: st.on })).catch((e) => ({ code: 1, stdout: "", stderr: String(e?.message ?? e) })),
@@ -241,7 +243,7 @@ export default class Files extends View {
       // in none, it says nothing is ignored.
       !inIgnored ? limited(fresh, () => exec("sh", ["-c", IGNORED, "files", dir, ""], { cwd: dir, on: st.on })).catch(() => null) : null,
     ]);
-    if (!fresh()) return;
+    if (!fresh()) return false;
     if (r.code !== 0) {
       // Why, for the folder's row to say on hover: what the shell or the host said.
       st.errors.set(rel, r.stderr?.trim() || `Listing it ended with code ${r.code}.`);
@@ -253,19 +255,20 @@ export default class Files extends View {
         markIgnored(st.ignored, rel, entries, new Set([...parseIgnored(ig.stdout)].map((name) => join(rel, name))));
       }
     }
-    st.loading.delete(rel);
-    this.changed(st);
+    const moved = st.loading.delete(rel) || drawn() !== before;
+    if (moved) this.changed(st);
+    return moved;
   }
 
   poll(cx) {
     const st = this.awake;
     if (!st || st.git === undefined || st.expanding) return;
     const every = Math.min(SLOWEST, Math.max(st.on ? REMOTE_EVERY : LOCAL_EVERY, 10 * (st.took ?? 0)));
-    if (Date.now() - (st.refreshed ?? 0) >= every) this.recheck(st, cx);
+    if (Date.now() - (st.refreshed ?? 0) >= every) this.recheck(st, cx, false, true);
   }
 
   // One batch per space while it shows. A new visibility period can start fresh even when old execs have yet to finish.
-  recheck(st, cx, returning = false) {
+  recheck(st, cx, returning = false, quiet = false) {
     const go = this.going(st);
     if (!go() || st.refresh?.some(task => !task.is_done())) return;
     const readingPick = Boolean(st.pick); // The just-selected tab will load its own preview after the draw.
@@ -281,15 +284,16 @@ export default class Files extends View {
       const began = Date.now();
       const shown = ["", ...st.expanded].filter(p => p === "" || ancestors(p).every(a => st.expanded.has(a)));
       const firstTree = !st.entries.has("") && !st.errors.has("");
+      let moved = false;
       await Promise.all(shown.map(async p => {
-        await this.list(st, p);
+        if (await this.list(st, p, quiet)) moved = true;
         // A restored tree can already show its first rows or its root error while children are still listing.
         if (p === "" && firstTree && shown.length > 1 && go()) cx.notify();
       }));
       if (!go()) return;
       st.refreshed = Date.now(); st.took = st.refreshed - began; st.paths = null;
-      cx.notify();
-      if (st.query) track(this.find(st, st.query, cx));
+      if (moved || !quiet) cx.notify();
+      if (st.query) track(this.find(st, st.query, cx, quiet));
       // Images are copied on selection. Returning also restores a preview that didn't finish or was evicted.
       if (!readingPick && st.file && (kindOf(st.file) !== "image" || returning && !st.view?.image)) track(this.loadPreview(st, st.file, cx, true));
     }));
@@ -404,7 +408,7 @@ export default class Files extends View {
       if (!view) return;
       if (!fresh()) { this.releasePreview(view); return; }
       const old = st.view;
-      if (again && old && view.text !== undefined && view.text === old.text) return;
+      if (again && old && (view.text !== undefined ? view.text === old.text : view.problem && view.problem === old.problem)) return;
       if (old?.image && old.image !== view.image) this.uncache(old.image);
       // Asked to color, or scrolled while plain: still so for its new text, until it's opened again.
       view.force = again && old?.force; view.scrolled = again && old?.scrolled;
@@ -498,20 +502,22 @@ export default class Files extends View {
     });
   }
 
-  // Every term in the path, case aside, ranked (model.js rankPaths): here over the folder's whole list, kept until the next
-  // refresh; on another machine, there. The words go in with what they found, or why not (st.found), so the tree never shows
-  // one search's results under another's words: words not searched yet (hidden, the window behind) show as being searched,
-  // and are once the page shows again (recheck).
-  find(st, query, cx) {
+  // Every term, case aside, ranked (model.js rankPaths): over the folder's whole list here, on the machine itself elsewhere. The words go in
+  // with what they found (st.found), so results never show under another search's words; words not searched yet show as being searched.
+  find(st, query, cx, quiet = false) {
     query = query.slice(0, 256);
     this.setQuery(st, query);
     const words = terms(query), fresh = this.fresh(st, "search");
-    this.changed(st); cx.notify();
+    if (!quiet) { this.changed(st); cx.notify(); }
     if (!words.length || !fresh()) return;
     return cx.spawn(async (cx) => {
       await cx.sleep(200);
       if (!fresh()) return;
-      const done = (found) => { st.found = { query, ...found }; this.changed(st); cx.notify(); };
+      const done = (found) => {
+        const next = { query, ...found };
+        if (quiet && JSON.stringify(next) === JSON.stringify(st.found)) return;
+        st.found = next; this.changed(st); cx.notify();
+      };
       let found, more = false;
       if (st.on) {
         const r = await exec("sh", ["-c", REMOTE_SEARCH, "search", query], { cwd: st.root, on: st.on }).catch(() => null);

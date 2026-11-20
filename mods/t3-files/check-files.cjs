@@ -77,7 +77,7 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
     props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
-    readTextFile: async (p) => { w.read.push(p); return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : w.texts?.[p] ?? "const a = 1;\n"; },
+    readTextFile: async (p) => { w.read.push(p); if (w.texts?.[p] instanceof Error) throw w.texts[p]; return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : w.texts?.[p] ?? "const a = 1;\n"; },
     watchFolder: (p) => new Promise((resolve, reject) => w.watchers.push({ path: p, task: running, resolve, reject })),
     nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise((r) => { wake = r; }),
     fs: { unlink: async (...args) => { if (appDir) fs.unlinkSync(...args); },
@@ -512,6 +512,41 @@ async function slowRefresh() {
   w.hold = null;
   w.held.splice(0).forEach(end => end()); await settle();
   assert.equal(view.current().view.text, "held\n");
+}
+
+// A poll that finds what's drawn unchanged (the open folders, the file, a search's results, a file's problem) draws nothing and
+// shows no folder as loading; one that finds a change draws it. Refresh still shows its folders loading.
+async function quietPoll() {
+  let now = 100000;
+  const listing = new Map([["/r", "d\0src\0f\0a.js\0"], ["/r/src", "f\0x.js\0"]]);
+  const { view, cx, w, settle, tick, send } = makePage({ listing, clock: { now: () => now } });
+  view.render(cx); await tick();
+  const st = view.current();
+  view.toggle(st, "src", cx); await settle();
+  view.open(st, "a.js", cx); await settle();
+  const poll = async () => { now += 5000; await tick(); };
+  const quiet = async (what) => {
+    w.stall = (l) => l.includes(m.LIST); now += 5000; await tick();
+    assert.ok(w.stalled.length > 0, `${what}: a poll is listing`);
+    assert.deepEqual([...st.loading], [], `${what}: a poll shows no folder loading`);
+    const notified = w.notified, version = st.version;
+    w.stall = null; w.stalled.splice(0).forEach((r) => r()); await settle();
+    assert.deepEqual([w.notified, st.version], [notified, version], `${what}: a poll finding it unchanged draws nothing`);
+  };
+  await quiet("tree and file");
+  listing.set("/r/src", "f\0x.js\0f\0y.js\0");
+  let notified = w.notified; await poll();
+  assert.ok(w.notified > notified && find(view.render(cx), "row-src/y.js"), "a poll finding a new file draws it");
+  w.texts = { "/r/a.js": new Error("stream did not contain valid UTF-8") };
+  notified = w.notified; await poll();
+  assert.ok(w.notified > notified && st.view.problem, "a poll finding the file unreadable draws why");
+  await quiet("the same problem");
+  send("search:js"); await settle();
+  await quiet("a search's results");
+  w.stall = (l) => l.includes(m.LIST);
+  find(view.render(cx), "t3-files-refresh").handlers.on_click({}, cx); await settle();
+  assert.ok(st.loading.has("src"), "Refresh shows its open folders loading");
+  w.stall = null; w.stalled.splice(0).forEach((r) => r()); await settle();
 }
 
 async function hideQueuedRefresh() {
@@ -1050,6 +1085,7 @@ async function latePreview() {
   await collapseDuringExpansion();
   await manyFolders();
   await slowRefresh();
+  await quietPoll();
   await hideQueuedRefresh();
   await imagePreview(null);
   await imagePreview("remote");
