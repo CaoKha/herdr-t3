@@ -92,7 +92,7 @@ Space 标记用 Project 的 favicon，没有则取名字首字母，颜色按名
 
 ### Inbox 与 Lists 的边界
 
-`cmd-shift-l`（或布局设置的 Sidebar shows）切模式，侧栏隐藏也可切且保持隐藏。两个模式共享名字、pin 和 Settle/Snooze 的含义；注意力策略只在选中 Inbox 时生效，无论侧栏显隐：
+`cmd-shift-l` 在侧栏显示时切模式；照 T3 的侧栏快捷键，侧栏隐藏时它不起作用。布局设置的 Sidebar shows 显隐都能切，隐藏的侧栏保持隐藏。两个模式共享名字、pin 和 Settle/Snooze 的含义；注意力策略只在选中 Inbox 时生效，无论侧栏显隐：
 
 | 规则 | Inbox | Lists |
 | --- | --- | --- |

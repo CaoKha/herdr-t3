@@ -115,7 +115,7 @@ export default class Tabs extends View {
       for (;;) {
         const command = await nextCommand();
         // One at a time: a second press finds the first's pane gone.
-        if (command === "sidebar") run("layout.select", { stack: "sidebar-lists", child: inboxShown() ? "lists" : "inbox" });
+        if (command === "sidebar") this.switchSidebar();
         else if (command === "toggle-sidebar") this.toggleSidebar();
         else if (command === "settle") await this.settle(cx);
         // The space panel (docs/adr/0017), keyed as VS Code's: a surface opens on it, or puts away the panel showing it; `panel` keeps it as it was.
@@ -335,6 +335,11 @@ export default class Tabs extends View {
     const hidden = !sidebarParts(layout()).rail?.hidden, space = spaces().find(s => s.active)?.id;
     run("layout.toggle", { id: "sidebar" });
     this.fitRow(window(), Boolean(space) && space === shared(KEY.home), false, hidden);
+  }
+
+  switchSidebar() {
+    if (sidebarParts(layout()).rail?.hidden) return; // as T3's sidebar keys: nothing on screen to switch
+    run("layout.select", { stack: "sidebar-lists", child: inboxShown() ? "lists" : "inbox" });
   }
 
   // Another layout's bar shouldn't stay compact because this one was narrow when it went.

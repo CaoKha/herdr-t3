@@ -15,6 +15,7 @@
 - 在 Home 隐藏或显示侧栏（`cmd-b` 或两处侧栏按钮）时，Home 只移动一次；以前顶栏会晚一拍才跟上，Home 会跳两下。asciicn 壁纸则完全不动：它按整个窗口取景，侧栏只是盖住或露出它的左边。保存过的构图改为相对窗口，位置可能稍有不同。
 - 隐藏侧栏的按钮照 T3 放在窗口按钮之后，侧栏隐藏时也留在同一个位置，收起和找回都在一处。隐藏时它只有图标：旁边的 `! 1 ◌ 2` 计数去掉了。侧栏隐藏期间，布局不显示 agent 的状态：有 agent 需要你时，Herdr 自己的通知照样会告诉你；把侧栏找回来就能看到全部。
 - 品牌栏的 Show lists／Show inbox 按钮去掉了：用 `cmd-shift-l` 或设置 → Sidebar → Sidebar shows 切换。设置现在分 Home 和 Sidebar 两页。
+- 侧栏隐藏时 `cmd-shift-l` 不起作用，和 T3 的侧栏快捷键一样：屏幕上没有侧栏可切。设置 → Sidebar → Sidebar shows 照样能切。
 - 文件夹没有变化时，Files 不再每 5 秒重绘一次、闪一下加载标记；只有列表、预览的错误或搜索结果变了才重绘。
 - 几个控件改了名，让名字说清动作：侧栏的方形笔和 Go to 的底栏叫 **New tab in…**，agent 菜单里叫 **Close pane**、**Zoom pane**／**Unzoom pane**，Inbox 里叫 **Clear Woke mark**，详情里叫 **Copy path**。
 - Lists 的 Agents 会把你移到的 agent 滚进视野，指针正停在那一行时除外；滚动滚轮会让它停下。

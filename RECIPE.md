@@ -92,7 +92,7 @@ Space marks are the Project's favicon, else the name's first letter in a name-ha
 
 ### Inbox versus Lists
 
-`cmd-shift-l` (or Layout Settings' Sidebar shows) switches mode, even with the sidebar hidden, leaving it hidden. Both modes share names, pins and what Settle and Snooze mean; attention rules apply only with Inbox selected, visible or hidden:
+`cmd-shift-l` switches mode while the sidebar shows and, as T3's sidebar keys, does nothing while it is hidden; Layout Settings' Sidebar shows switches it either way, leaving a hidden sidebar hidden. Both modes share names, pins and what Settle and Snooze mean; attention rules apply only with Inbox selected, visible or hidden:
 
 | Rule | Inbox | Lists |
 | --- | --- | --- |

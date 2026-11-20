@@ -2221,10 +2221,11 @@ async function checkInbox() {
     f.slots.lists.active = "inbox"; f.slots.sidebar.hidden = true;
     assert.deepEqual(await press("next", { order, view: "t0" }), [["agent.focus", { terminal: "vps/t2" }]], "hidden Inbox keeps its mode");
     assert.deepEqual(await press("prev", { order, view: "t0" }), []);
-    // Busy work cannot be settled; sidebar switching still works while hidden.
-    assert.deepEqual(await press("sidebar"), [["layout.select", { stack: "sidebar-lists", child: "lists" }]]);
+    // Busy work cannot be settled; as T3's sidebar keys, ⌘⇧L does nothing with no sidebar on screen.
+    assert.deepEqual(await press("sidebar"), [], "hidden, nothing to switch");
     assert.deepEqual(await press("settle"), [], "hidden, a busy agent stays");
     delete f.slots.sidebar.hidden;
+    assert.deepEqual(await press("sidebar"), [["layout.select", { stack: "sidebar-lists", child: "lists" }]], "shown, it switches");
     assert.deepEqual(await press("settle"), []);
     f.slots.lists.active = "lists";
     assert.deepEqual(await press("settle"), [], "Lists have no Settle");
