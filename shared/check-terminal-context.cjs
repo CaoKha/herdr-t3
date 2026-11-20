@@ -3,7 +3,7 @@ let f = { space: 's', tab: 'b', terminal: 't1', cwd: '/source' }, all = [{ tab: 
 let space = { id: 's', active: true, folder: '/space', tabs: [{ id: 'b', active: true }] };
 const reads = { panes: 0 };
 const c = vm.createContext({ focused: () => f, panes: () => { reads.panes++; return all; }, spaces: () => [space], Map });
-vm.runInContext(fs.readFileSync(__dirname + '/terminal-context.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { rememberTerminal, terminalFor, workFolder };', c);
+vm.runInContext(fs.readFileSync(__dirname + '/terminal-context.js', 'utf8').replace(/^import .*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { rememberTerminal, terminalFor, workFolder, spaceFolder };', c);
 assert.equal(c.api.terminalFor().terminal, 't1');
 f = { space: 's', tab: 'b', terminal: null, cwd: null };
 assert.equal(c.api.terminalFor().cwd, '/source', 'mod focus keeps the source terminal and cwd');
@@ -29,4 +29,21 @@ assert.equal(reads.panes, 1, `${reads.panes} reads of panes() for one terminal`)
 reads.panes = 0;
 assert.equal(c.api.workFolder('s', 'b', all), '/repo/sub');
 assert.equal(reads.panes, 0, 'handed the caller\'s panes, none');
+// Space-level live folder: first pane in panes() order belonging to any of the space's tabs with a non-empty cwd.
+{
+  const sp = { id: 's', folder: '/wrong', tabs: [{ id: 't-term', active: false }, { id: 't-mod', active: true }, { id: 't-new', active: false }] };
+  const ps = [
+    { tab: 'other-space', terminal: 't0', cwd: '/other' },
+    { tab: 't-new', terminal: 't2', cwd: '' },
+    { tab: 't-term', terminal: 't1', cwd: '/real' },
+    { tab: 't-new', terminal: 't3', cwd: '/later' },
+  ];
+  reads.panes = 0;
+  assert.equal(c.api.spaceFolder(sp, ps), '/real', 'picks the first non-empty cwd among the space\'s tabs, even when another tab is active');
+  assert.equal(reads.panes, 0, 'handed panes, does not call panes()');
+  assert.equal(c.api.spaceFolder({ id: 'empty', tabs: [{ id: 't-mod', active: true }] }, ps), null, 'null when no pane in the space has a cwd');
+  all = ps;
+  assert.equal(c.api.spaceFolder(sp), '/real', 'defaults to panes() when omitted');
+  assert.equal(reads.panes, 1);
+}
 console.log('ok: last active terminal stays per tab and is removed when closed; a tab works in its last terminal\'s folder');

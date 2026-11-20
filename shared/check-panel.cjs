@@ -17,7 +17,7 @@ const context = vm.createContext({ KEY: { panels: 't3.panels' }, GROUP_GAP: 4, l
 // shows the change has Details and the toggle where they end up. Checked at every step below.
 const endFits = () => assert.equal(ui.end, ui.open ? 0 : 4 + 28 + (ui.buttons ? 8 + 3 * 28 : 0), `window-end for a panel ${ui.open ? 'open' : 'closed'}`);
 for (const f of ['terminal-context.js', 'surfaces.js', 'panel.js']) vm.runInContext(fs.readFileSync(`${__dirname}/${f}`, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''), context);
-const p = vm.runInContext('({ panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel, activateSurface, reviewRepo, openReview, reviewShown })', context);
+const p = vm.runInContext('({ panelState, showPage, openFile, closeSurface, togglePanel, toggleWide, restorePanel, syncPanel, activateSurface, resetFilesTabs, reviewRepo, openReview, reviewShown })', context);
 for (const k of ['showPage', 'openFile', 'closeSurface', 'togglePanel', 'toggleWide', 'restorePanel', 'syncPanel', 'activateSurface']) { const f = p[k]; p[k] = (...a) => { const r = f(...a); endFits(); return r; }; }
 const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active ? '*' : '') + t.id).join(' ');
 
@@ -87,6 +87,20 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   assert.equal(p.reviewShown('a'), null);
   // With the window's own buttons (Windows, Linux) the closed part is wider; open, the panel head has them.
   ui.buttons = true; p.togglePanel(); p.togglePanel(); ui.buttons = false; p.togglePanel(); p.togglePanel();
+  // Root change resets file/folder tabs for that space while keeping Review and falling back to generic Files.
+  {
+    ui.space = 'a';
+    saved['t3.panels'].a = { open: true, wide: false, active: 'file:a.js', tabs: [{ id: 'file:a.js', path: 'a.js', born: 1 }, { id: 'file:src', path: 'src', folder: true, born: 2 }, { id: 'review', born: 3 }] };
+    assert.equal(p.resetFilesTabs('a'), true);
+    assert.deepEqual([...saved['t3.panels'].a.tabs.map(t => t.id)], ['review', 'files']);
+    assert.equal(saved['t3.panels'].a.active, 'files');
+    assert.equal(p.resetFilesTabs('a'), false, 'no-op once already clean');
+    // Preserves active Review tab while still pruning stale file tabs.
+    saved['t3.panels'].a = { open: true, wide: false, active: 'review', tabs: [{ id: 'file:a.js', path: 'a.js', born: 4 }, { id: 'review', born: 5 }] };
+    assert.equal(p.resetFilesTabs('a'), true);
+    assert.deepEqual([...saved['t3.panels'].a.tabs.map(t => t.id)], ['review']);
+    assert.equal(saved['t3.panels'].a.active, 'review');
+  }
   // Herdr's own layout docks Review in its stack: a page shown, the panel put away; no tabs kept.
   ui.slots = ['review']; ui.open = false; ui.space = 'b'; const before = JSON.stringify(saved['t3.panels'].b);
   assert.equal(p.openReview({ ...pick, space: 'b' }), 'opened');

@@ -1,7 +1,7 @@
 // surfaces.js: what each step does to a space panel's list, as a table: the list before (ids, `*` the active one), the step, the list after.
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const c = vm.createContext({});
-vm.runInContext(fs.readFileSync(__dirname + '/surfaces.js', 'utf8').replace(/^export /gm, '') + '\nglobalThis.api = { activate: surfaceActivate, add: surfaceAdd, openFile: surfaceOpenFile, navigateFolder: surfaceNavigate, close: surfaceClose };', c);
+vm.runInContext(fs.readFileSync(__dirname + '/surfaces.js', 'utf8').replace(/^export /gm, '') + '\nglobalThis.api = { activate: surfaceActivate, add: surfaceAdd, openFile: surfaceOpenFile, navigateFolder: surfaceNavigate, close: surfaceClose, resetFiles: surfaceResetFiles };', c);
 const S = c.api;
 const id = (w) => w === 'files' || w === 'review' ? w : `file:${w.replace(/\/$/, '')}`;
 // "a.js *b.js files src/" → tabs, a trailing / a folder tab.
@@ -40,8 +40,26 @@ const rows = [
   ['a *b c', s => S.close(s, 'file:b', 'right'), 'a *b'],
   ['a *b c', s => S.close(s, 'file:a', 'all'), ''],
   ['*a', s => S.close(s, 'file:gone'), '*a'],
+  // Resetting Files tabs on a root change: file and folder tabs go, Review and generic Files stay; a removed active tab falls back to generic Files.
+  ['*a.js b.js', s => S.resetFiles(s, 9), '*files'],
+  ['*a.js src/ review', s => S.resetFiles(s, 9), 'review *files'],
+  ['*a.js files review', s => S.resetFiles(s, 9), '*files review'],
+  ['a.js src/ *review', s => S.resetFiles(s, 9), '*review'],
+  ['*files review', s => S.resetFiles(s, 9), '*files review'],
+  ['', s => S.resetFiles(s, 9), ''],
 ];
 for (const [before, step, after] of rows) assert.equal(show(step(parse(before))), after, `${before} → ${after}`);
+
+// Unchanged list returns the same reference; a generic Files tab carrying a breadcrumb trail from the old root is cleaned.
+{
+  const clean = parse('*files review');
+  assert.equal(S.resetFiles(clean, 9), clean, 'no stale file tabs or trail: identity');
+  const trailed = S.navigateFolder(parse('*src/a.ts'), '', 'src/a.ts', true, 5);
+  const reset = S.resetFiles(trailed, 9);
+  assert.equal(show(reset), '*files', 'drops the file tab, keeps generic files');
+  assert.equal(reset.active, 'files', 'switches active to generic files when old active was removed');
+  assert.deepEqual(JSON.parse(JSON.stringify(reset.tabs)), [{ id: 'files', born: 5, reveal: 0 }], 'strips stale folder/trail from generic files');
+}
 
 // Picking reveals again, each time, the tab already active too; opening a file from the tree doesn't.
 let s = parse('*a.js b.js');

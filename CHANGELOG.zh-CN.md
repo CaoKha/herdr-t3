@@ -7,6 +7,8 @@
 - 已命名的标签分屏运行多个顶层 agent 时，没有会话名也没有有效终端标题的 agent（例如未命名会话的 Pi）不再退回程序名，改为继续显示自定义标签名；自带有效终端标题的 agent 仍各自显示自己的标题，带会话名的 Pi 仍优先显示会话名。子 agent 仍不继承标签名，由普通 shell 启动的 agent 按顶层处理。
 - agent 右键菜单里，未由 Pi 会话名命名的顶层 agent 始终提供 **Rename**（与另一顶层 agent 共用标签时显示 **Rename tab**），包括在残留 `pi.session` 的终端里运行的非 Pi agent；子 agent 即使在独立标签里也不显示重命名项。
 - 选中 Inbox 时，右键已结束过一轮的空闲 agent（或从面包屑标题打开它的菜单）新增 **Mark unread**：原地把该 agent 重新标回 Done、不切换路由（Inbox 卡片、窗格头、space 切换菜单以及 Lists 下的 Agents 和标签栏都会重新显示未读圆点），已 Settle 或 Snooze 的 agent 会随之回到 Active，侧栏隐藏时也可用。
+- 当 space 起在本机主目录，或终端所在目录与 space 保存的目录不一致时，Files 会跟随该 space 终端的实时工作目录；在项目子目录内移动或切换标签时仍锚定在项目根。真正换根时清理旧文件／目录标签（保留 Review，原活动标签被清时落回通用 Files）、重置搜索并关闭失效菜单。
+- 在非仓库目录打开 Review 看到「Not a git repository」后，终端 `cd` 进 Git 仓库时会自动恢复并加载该仓库，不再一直停在空状态。
 
 ## 2026-11-20
 

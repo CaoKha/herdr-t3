@@ -12,7 +12,7 @@ const load = (file) => fs.readFileSync(path.join(__dirname, file), "utf8")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (async function|function|const) /gm, "$1 ").replace(/^export \{[\s\S]*?\};?\s*$/m, "");
 const context = vm.createContext({});
 vm.runInContext([load("color.js"), load("file-tree.js"), load("file-listing.js"), load("model.js"),
-  "globalThis.m = { join, LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket };"].join("\n"), context);
+  "globalThis.m = { join, LIST, IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, ancestors, parseListing, parseIgnored, markIgnored, folderEntries, treeRows, terms, narrows, filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket, filesRoot };"].join("\n"), context);
 const m = context.m;
 const { plain } = kit;
 
@@ -23,8 +23,8 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 
 // The page, started in a fake `herdr`: the panel on `page` with Review installed too, every folder holding a.js (changed) and
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
-function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing = null, appDir = null, clock = Date } = {}) {
-  const w = { spaces, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
+function makePage({ page = "files", spaces = [space("s1", "/r", true)], panes = [], home = "/Users/test", listing = null, appDir = null, clock = Date } = {}) {
+  const w = { spaces, panes, home, paneReads: 0, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
     props: null, overlays: [], closed: [], commands: [], focusCalls: 0, hostReads: 0 };
   const shared = {}, wrote = [], store = new Map([["lines.wrap", "false"], ["nav.width", "300"]]), timers = [], everies = [], failed = [];
   const commands = [];
@@ -72,9 +72,9 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], listing 
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v,
       set_value(x) { assert.ok(!w.drawing, "InputState.set_value must run outside the draw"); v = x; }, focus() { events.focus?.({}, cx); } }; } },
     EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
-    spaces: () => { w.hostReads++; return w.spaces; }, agents: () => [], focused: () => null, panes: () => [], layout: () => { w.hostReads++; return layout; },
+    spaces: () => { w.hostReads++; return w.spaces; }, agents: () => [], focused: () => null, panes: () => { w.paneReads++; return w.panes; }, home: () => w.home, layout: () => { w.hostReads++; return layout; },
     theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => appDir ?? "/tmp/none",
-    shared: (k) => shared[k], setShared: (k, v) => { wrote.push(k); shared[k] = v; },
+    shared: (k) => shared[k], setShared: (k, v) => { assert.ok(!w.drawing, "setShared must run outside the draw"); wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
     props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
     readTextFile: async (p) => { w.read.push(p); if (w.texts?.[p] instanceof Error) throw w.texts[p]; return w.hold && p.startsWith(w.hold) ? new Promise((r) => w.held.push(() => r("held\n"))) : w.texts?.[p] ?? "const a = 1;\n"; },
@@ -1028,6 +1028,168 @@ async function latePreview() {
   } finally { fs.rmSync(appDir, { recursive: true, force: true }); }
 }
 
+async function liveRootFollowing() {
+  // Pure filesRoot rules: saved project anchor, home escape + anchor, mismatched sp.folder, and remote safety.
+  assert.equal(m.filesRoot({ folder: "/wrong", machine: null }, null, "/real", "/Users/me"), "/real", "follows live cwd when sp.folder is mismatched");
+  assert.equal(m.filesRoot({ folder: "/Users/me", machine: null }, null, "/Users/me", "/Users/me"), "/Users/me");
+  assert.equal(m.filesRoot({ folder: "/Users/me", machine: null }, "/Users/me", "/Users/me/repo", "/Users/me"), "/Users/me/repo", "leaves local home on cd into repo");
+  assert.equal(m.filesRoot({ folder: "/Users/me", machine: null }, "/Users/me/repo", "/Users/me/repo/src", "/Users/me"), "/Users/me/repo", "stays anchored at ~/repo inside subdirs");
+  assert.equal(m.filesRoot({ folder: "/Users/me", machine: null }, "/Users/me/repo", "/Users/me/repo2", "/Users/me"), "/Users/me/repo2", "sibling prefix is not inside prevRoot");
+  assert.equal(m.filesRoot({ folder: "/repo", machine: null }, "/repo", "/repo/src", "/Users/me"), "/repo", "normal project keeps sp.folder inside subdirs");
+  assert.equal(m.filesRoot({ folder: "/repo/", machine: null }, "/repo/", "/repo/src", "/Users/me"), "/repo/", "trailing slash normalized");
+  assert.equal(m.filesRoot({ folder: "/repo", machine: null }, "/repo", "/repo2", "/Users/me"), "/repo2", "sibling prefix leaves sp.folder");
+  assert.equal(m.filesRoot({ folder: "/repo", machine: null }, "/repo", null, "/Users/me"), "/repo", "no live cwd stays on sp.folder");
+  assert.equal(m.filesRoot({ folder: "/Users/me", machine: null }, "/Users/me/repo", null, "/Users/me"), "/Users/me/repo", "no live cwd keeps a non-home anchor instead of dropping back to local home");
+  assert.equal(m.filesRoot({ folder: "/Users/me", machine: "vps" }, null, "/Users/me/repo", "/Users/me"), "/Users/me", "remote space never compares against local home()");
+  assert.equal(m.filesRoot({ folder: "/srv/wrong", machine: "vps" }, null, "/srv/real", "/Users/me"), "/srv/real", "remote space still follows when leaving sp.folder");
+  assert.equal(m.filesRoot({ folder: "/", machine: null }, null, "/tmp", "/Users/me"), "/", "filesystem root contains everything");
+
+  // 1) Mismatched sp.folder + switching to a mod tab or a new tab without cwd does not flash back.
+  {
+    const listing = new Map([["/wrong", "f\0wrong.js\0"], ["/real", "f\0real.js\0"]]);
+    const sp = { id: "s1", folder: "/wrong", machine: null, active: true, tabs: [{ id: "t-term", active: true }, { id: "t-mod", active: false }, { id: "t-new", active: false }] };
+    const { view, cx, w, settle } = makePage({ spaces: [sp], panes: [{ tab: "t-term", terminal: "term1", cwd: "/real" }], listing });
+    view.render(cx); await settle();
+    assert.equal(view.current().root, "/real");
+    assert.ok(find(view.render(cx), "row-real.js") && !find(view.render(cx), "row-wrong.js"));
+    // Switch active tab to mod tab (no terminal) and new terminal tab (no cwd yet).
+    sp.tabs = [{ id: "t-term", active: false }, { id: "t-mod", active: true }, { id: "t-new", active: false }];
+    view.render(cx); await settle();
+    assert.equal(view.current().root, "/real", "switching to a mod tab keeps the live root");
+    sp.tabs = [{ id: "t-term", active: false }, { id: "t-mod", active: false }, { id: "t-new", active: true }];
+    w.panes = [{ tab: "t-new", terminal: "term2", cwd: "" }, { tab: "t-term", terminal: "term1", cwd: "/real" }];
+    view.render(cx); await settle();
+    assert.equal(view.current().root, "/real", "new tab without cwd yet does not flash back to mismatched sp.folder");
+  }
+
+  // 2) ~ start -> cd ~/repo -> cd ~/repo/src stays anchored on ~/repo without dropping preview or expanded state.
+  {
+    const listing = new Map([["/Users/test", "d\0repo\0"], ["/Users/test/repo", "d\0src\0f\0a.js\0"], ["/Users/test/repo/src", "f\0b.js\0"]]);
+    const sp = space("s1", "/Users/test", true);
+    const { view, cx, w, settle, fire, tick } = makePage({ spaces: [sp], panes: [{ tab: "s1-tab", terminal: "t1", cwd: "/Users/test" }], listing });
+    view.render(cx); await settle();
+    assert.equal(view.current().root, "/Users/test");
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/Users/test/repo" }];
+    view.render(cx); await fire(0); await settle();
+    assert.equal(view.current().root, "/Users/test/repo");
+    view.toggle(view.current(), "src", cx); await settle();
+    view.open(view.current(), "a.js", cx); await settle();
+    const editorBefore = view.current().view.code;
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/Users/test/repo/src" }];
+    view.render(cx); await tick();
+    assert.equal(view.current().root, "/Users/test/repo", "anchored at ~/repo");
+    assert.equal(view.current().expanded.has("src"), true, "keeps expanded folders");
+    assert.equal(view.current().view.code, editorBefore, "keeps cached Editor");
+    assert.equal(editorBefore.released, false);
+  }
+
+  // 3) Normal project /repo -> cd /repo/src & split keeps /repo, Editor, and expanded state; render reads panes() once.
+  {
+    const listing = new Map([["/repo", "d\0src\0f\0a.js\0"], ["/repo/src", "f\0x.js\0"]]);
+    const sp = space("s1", "/repo", true);
+    const { view, cx, w, settle, tick } = makePage({ spaces: [sp], panes: [{ tab: "s1-tab", terminal: "t1", cwd: "/repo" }], listing });
+    view.render(cx); await settle();
+    view.toggle(view.current(), "src", cx); await settle();
+    view.open(view.current(), "a.js", cx); await settle();
+    const editorBefore = view.current().view.code;
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/repo/src" }, { tab: "s1-tab", terminal: "t2", cwd: "/repo/src/deep" }];
+    const readsBefore = w.paneReads;
+    view.render(cx);
+    assert.equal(w.paneReads - readsBefore, 1, "one panes() snapshot per render frame");
+    await tick();
+    assert.equal(view.current().root, "/repo");
+    assert.equal(view.current().view.code, editorBefore);
+    assert.equal(view.current().expanded.has("src"), true);
+  }
+
+  // 4) Real root change /repoA -> /repoB via render(): no setShared/set_value during draw, no stale read under /repoB,
+  //    resets preview/search/treeReveal/scrollTop/t3.panels (keeping review & falling back to generic files), and invalidates menus.
+  {
+    const listing = new Map([["/repoA", "d\0sub\0f\0old.js\0"], ["/repoA/sub", "f\0in.js\0"], ["/repoB", "f\0new.js\0"]]);
+    const sp = space("s1", "/repoA", true);
+    const { view, cx, w, settle, fire, send, shared, ctx, menu } = makePage({ spaces: [sp], panes: [{ tab: "s1-tab", terminal: "t1", cwd: "/repoA" }], listing });
+    w.texts = { "/repoA/old.js": "// old\n", "/repoB/new.js": "// new\n" };
+    view.render(cx); await settle();
+    send("open:old.js"); await settle();
+    ctx.navigateFolder("sub", "old.js", true);
+    ctx.showPage("review");
+    ctx.activateSurface("file:old.js");
+    view.render(cx); await fire(0); await settle();
+    send("search:old"); await settle();
+    const oldEditor = view.current().view.code;
+    view.treeReveal["t3-files-tree-s1"] = "old.js";
+    view.scrollTop = { "t3-files-tree-s1": 120 };
+    // Open a breadcrumb menu anchored to /repoA.
+    Object.assign(ctx.window, { mouse_position: () => ({ x: 10, y: 10 }), viewport_size: () => ({ width: 1200, height: 800 }) });
+    const oldMenu = menu({ files: "folder", source: { space: "s1", tab: "s1-tab", root: "/repoA", on: null }, dir: "", file: "old.js" });
+    await settle();
+    w.props = null;
+    w.read.length = 0;
+
+    // Move terminal to /repoB and render without running timers yet.
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/repoB" }];
+    const frame = view.render(cx);
+    assert.equal(view.current().root, "/repoB");
+    assert.equal(oldEditor.released, true, "old Editor released on root change");
+    assert.equal(find(frame, "crumb-old.js"), null, "draw frame does not render old root's file crumb");
+    assert.equal(view.treeReveal["t3-files-tree-s1"], undefined, "treeReveal cleared for space");
+    assert.equal(view.scrollTop["t3-files-tree-s1"], undefined, "scrollTop cleared for space");
+    assert.ok(!w.read.includes("/repoB/old.js"), "never reads old tab's relative path under new root");
+
+    // Stale menu refuses to pick into the new root and closes itself.
+    w.props = { overlay: "m1", files: "folder", source: { space: "s1", tab: "s1-tab", root: "/repoA", on: null }, dir: "", file: "old.js" };
+    const cmdsBefore = w.commands.length;
+    oldMenu.entries = [{ name: "old.js", dir: false }];
+    oldMenu.render(cx).handlers.on_key_down({ key: "down" }, cx);
+    oldMenu.render(cx).handlers.on_key_down({ key: "enter" }, cx);
+    assert.equal(w.commands.length, cmdsBefore, "stale breadcrumb menu does not send t3-files.pick to new root");
+    assert.ok(w.closed.includes("m1"), "stale breadcrumb menu closes on action");
+    w.props = null;
+
+    await fire(0); await settle();
+    assert.deepEqual(plain(shared["t3.panels"].s1.tabs.map(t => t.id)), ["review", "files"], "file/folder tabs dropped, Review kept, generic Files active");
+    assert.equal(shared["t3.panels"].s1.active, "files");
+    assert.equal(view.search.value(), "", "search input cleared after root change");
+    assert.ok(!w.read.includes("/repoB/old.js"), "still never reads old path under new root");
+    assert.ok(find(view.render(cx), "row-new.js"), "shows new root's tree");
+  }
+
+  // 5) Root change via tick() and nextCommand() (open:/search:) without a prior render.
+  {
+    const listing = new Map([["/repoA", "f\0a.js\0"], ["/repoB", "f\0b.js\0"], ["/repoC", "f\0c.js\0"]]);
+    const sp = space("s1", "/repoA", true);
+    const { view, cx, w, settle, fire, tick, send, shared } = makePage({ spaces: [sp], panes: [{ tab: "s1-tab", terminal: "t1", cwd: "/repoA" }], listing });
+    view.render(cx); await settle();
+    send("open:a.js"); await settle();
+    send("search:a"); await settle();
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/repoB" }];
+    await tick();
+    assert.equal(view.current().root, "/repoB", "tick detects root change");
+    assert.equal(view.search.value(), "", "tick clears search input");
+    assert.deepEqual(plain(shared["t3.panels"].s1.tabs.map(t => t.id)), ["files"]);
+    // Command before next tick/render syncs root first.
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/repoC" }];
+    w.read.length = 0;
+    send("open:c.js"); await settle();
+    assert.equal(view.current().root, "/repoC", "nextCommand syncs live root before open:");
+    assert.ok(w.read.includes("/repoC/c.js"), "opens file from new root, not old");
+    // Opening a new file before the deferred 0ms reset timer fires flushes old tabs first instead of wiping the new file later.
+    w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/repoB" }];
+    view.render(cx);
+    view.open(view.current(), "b.js", cx); await fire(0); await settle();
+    assert.deepEqual(plain(shared["t3.panels"].s1.tabs.map(t => t.id)), ["file:b.js"], "deferred reset does not erase a file opened in the new root");
+  }
+
+  // 6) Remote space whose folder happens to match local home() stays anchored on its folder.
+  {
+    const listing = new Map([["/Users/test", "d\0sub\0f\0remote.js\0"]]);
+    const sp = space("r1", "/Users/test", true, "vps");
+    const { view, cx, settle } = makePage({ spaces: [sp], panes: [{ tab: "r1-tab", terminal: "t1", cwd: "/Users/test/sub" }], home: "/Users/test", listing });
+    view.render(cx); await settle();
+    assert.equal(view.current().root, "/Users/test", "remote space never compares against local home()");
+  }
+}
+
 (async () => {
   assert.deepEqual(plain(m.ancestors("a/b/c.js")), ["a", "a/b"]);
 
@@ -1148,5 +1310,6 @@ async function latePreview() {
   await behindFirstRead();
   await idleTick();
   await menus();
+  await liveRootFollowing();
   console.log("t3-files checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

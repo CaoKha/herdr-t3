@@ -9,6 +9,25 @@ export const nameOf = (p) => p.slice(p.lastIndexOf("/") + 1);
 /** The folders above a path, from the top: `a/b/c` → `a`, `a/b`. */
 export const ancestors = (p) => { const out = []; for (let at = p.indexOf("/"); at > 0; at = p.indexOf("/", at + 1)) out.push(p.slice(0, at)); return out; };
 
+const normPath = (p) => p && p.length > 1 ? p.replace(/\/+$/, "") || "/" : p || "";
+const insidePath = (child, parent) => {
+  const c = normPath(child), p = normPath(parent);
+  return Boolean(c && p) && (c === p || c.startsWith(p === "/" ? "/" : `${p}/`));
+};
+
+/**
+ * The folder Files roots its tree at: keep a non-home `sp.folder` while the space's live terminal cwd stays inside it,
+ * else keep the previous non-home anchor (`prevRoot`) while live stays inside it (e.g. started in `~`, then `cd ~/repo/src`),
+ * else follow `live || sp.folder || ""`. Remote spaces never compare against local `homeDir`.
+ */
+export function filesRoot(sp, prevRoot, live, homeDir) {
+  const isLocalHome = (dir) => !sp?.machine && Boolean(dir && homeDir) && normPath(dir) === normPath(homeDir);
+  const folder = sp?.folder || "";
+  if (folder && !isLocalHome(folder) && (!live || insidePath(live, folder))) return folder;
+  if (prevRoot && !isLocalHome(prevRoot) && (!live || insidePath(live, prevRoot))) return prevRoot;
+  return live || folder || "";
+}
+
 // The same entries as paths from the space's folder ($2 is the folder's, "" or "src/"), a folder's with a slash, put to Git.
 export const IGNORED = 'for p in "$1"/* "$1"/.[!.]* "$1"/..?*; do [ -e "$p" ] || [ -L "$p" ] || continue; n=${p##*/}; [ "$n" = .git ] && continue; if [ -d "$p" ]; then printf "%s%s/\\0" "$2" "$n"; else printf "%s%s\\0" "$2" "$n"; fi; done | git check-ignore --stdin -z; :';
 // Before reading a file on another machine: its size, and NULs in its first 8 KB. readTextFile there turns a binary into

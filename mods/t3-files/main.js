@@ -2,11 +2,11 @@
 // One copy serves every space, here or on another machine, each one's state kept by its id.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from "gpui-base";
-import { checking, spaces, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
+import { checking, spaces, panes, home, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
 import * as fs from "fs/promises";
 import { Buffer } from "buffer";
-import { panelState, surfacesFor, closeSurface, openFile, navigateFolder } from "./panel.js";
-import { terminalFor } from "./terminal-context.js";
+import { panelState, surfacesFor, closeSurface, openFile, navigateFolder, resetFilesTabs } from "./panel.js";
+import { terminalFor, spaceFolder } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
 import { withNav, treeHead, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
 import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
@@ -19,7 +19,7 @@ import { opener, popupOpen, hang } from "./trigger.js";
 import { tip, hoverKept, glow } from "./tip.js";
 import { MENU_ROW } from "./menu-row.js";
 import { LIST, join, parseListing } from "./file-listing.js";
-import { IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, parentOf, nameOf, ancestors, parseIgnored, markIgnored, folderEntries, terms, narrows,
+import { IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, parentOf, nameOf, ancestors, filesRoot, parseIgnored, markIgnored, folderEntries, terms, narrows,
   filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket } from "./model.js";
 import { alpha } from "./color.js";
 
@@ -56,15 +56,17 @@ const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads
 
 const zoom = () => Number(settings()?.zoom) || 1;
 
-function blank(sp) {
-  return { id: sp.id, root: sp.folder, on: sp.machine ?? null, git: undefined, entries: new Map(), expanded: new Set(), ignored: new Set(),
+const rootOkay = (s, sp) => (sp.machine ?? null) === (s.on ?? null) && filesRoot(sp, s.root, spaceFolder(sp, panes()), home()) === s.root;
+
+function blank(sp, root = sp.folder) {
+  return { id: sp.id, root, on: sp.machine ?? null, git: undefined, entries: new Map(), expanded: new Set(), ignored: new Set(),
     version: 0, file: null, folder: null, trail: null, view: null, previews: new Map(), selected: null, focus: null, query: "", found: null, paths: null, loading: new Set(), errors: new Map() };
 }
 
 export default class Files extends View {
   init(_props, cx) {
     // A copy opened as one of its menus is only that (menus.js).
-    if (props()?.files) return initMenu(this, cx);
+    if (props()?.files) return initMenu(this, cx, rootOkay);
     this.states = new Map();
     this.treeHandle = cx.focus_handle();
     this.navHandle = cx.focus_handle();
@@ -97,7 +99,7 @@ export default class Files extends View {
     // is a breadcrumb menu's file (menus.js): the person's own pick, so the tree takes the keyboard.
     cx.spawn(async (cx) => {
       for (;;) {
-        const c = await nextCommand(), st = this.current(), at = c.indexOf(":"), [what, arg] = [c.slice(0, at), c.slice(at + 1)];
+        const c = await nextCommand(), at = c.indexOf(":"), [what, arg] = [c.slice(0, at), c.slice(at + 1)];
         // The terminal's pane-close keys only dismiss menus while Files has the keyboard.
         if (c === "close" || c === "close:menu") {
           if (!closeMenus() && c === "close") closeSurface();
@@ -105,10 +107,12 @@ export default class Files extends View {
           continue;
         }
         if (c === "focus") { enter(this, cx, "t3-files-refresh"); this.search.focus(); }
-        if (!st || at < 0) continue;
+        if (at < 0 || (what !== "open" && what !== "pick" && what !== "search")) continue;
+        const st = this.sync(cx) ?? this.current();
+        if (!st) continue;
         if (what === "open") this.pick(st, arg, cx);
         else if (what === "pick") this.pick(st, arg, cx, true);
-        else if (what === "search") { this.search.set_value(arg); this.find(st, arg, cx); }
+        else { this.search.set_value(arg); this.find(st, arg, cx); }
       }
     });
   }
@@ -126,16 +130,51 @@ export default class Files extends View {
     return sp ? this.states.get(sp.id) : null;
   }
 
-  // A space's state, made the first time and made again when its folder moves; the latest one last. The FULL last keep all
+  // A space's state, made the first time and made again when its root moves; the latest one last. The FULL last keep all
   // they read; older ones only how they were being read, and read again when back.
-  stateFor(sp) {
+  stateFor(sp, ps = panes(), cx = null, drawing = false) {
     let st = this.states.get(sp.id);
-    if (!st || st.root !== sp.folder || st.on !== (sp.machine ?? null)) { if (st) this.drop(st); st = blank(sp); }
+    const on = sp.machine ?? null, nextRoot = filesRoot(sp, st?.root ?? null, spaceFolder(sp, ps), home());
+    const moved = Boolean(st && (st.root !== nextRoot || st.on !== on));
+    if (!st || moved) {
+      if (st) this.drop(st);
+      st = blank(sp, nextRoot);
+      if (moved) this.resetSpace(sp, st, cx, drawing);
+    }
     else if ([...this.states.keys()].at(-1) === sp.id) return st;
     this.states.delete(sp.id);
     this.states.set(sp.id, st);
     for (const old of [...this.states.values()].slice(0, -FULL)) this.states.set(old.id, this.slim(old));
     return st;
+  }
+
+  // Root moved for `sp`: clear tree scroll/reveal state, drop stale file/folder tabs, close menus and clear search.
+  // When called during render(), defer host writes (setShared, InputState.set_value) to the next tick and suppress stale tabs on this frame.
+  resetSpace(sp, st, cx, drawing) {
+    const treeId = `t3-files-tree-${sp.id}`;
+    delete this.treeReveal[treeId];
+    if (this.scrollTop && treeId in this.scrollTop) {
+      const next = { ...this.scrollTop };
+      delete next[treeId];
+      this.scrollTop = next;
+    }
+    const finish = () => {
+      st.flushReset = null;
+      resetFilesTabs(sp.id);
+      closeMenus();
+      if (spaces().some(s => s.active && s.id === sp.id) && this.search.value() !== st.query) this.search.set_value(st.query);
+    };
+    if (drawing && cx) {
+      st.flushReset = finish;
+      cx.timer.after(0, (cx) => {
+        if (this.states.get(sp.id) !== st || !st.flushReset) return;
+        st.flushReset();
+        cx.notify();
+      });
+    } else {
+      finish();
+      if (!drawing && cx) cx.notify();
+    }
   }
 
   // What `st` read let go, for whatever still holds it too (a read under way): its editor, image and lists.
@@ -148,13 +187,13 @@ export default class Files extends View {
   // A space let go of, keeping its file, open folders and search's words.
   slim(st) {
     this.drop(st);
-    return Object.assign(blank({ id: st.id, folder: st.root, machine: st.on }), { file: st.file, folder: st.folder, trail: st.trail, fileBorn: st.fileBorn, seen: st.seen, expanded: new Set(st.expanded), selected: st.selected, focus: st.focus, query: st.query });
+    return Object.assign(blank({ id: st.id, folder: st.root, machine: st.on }, st.root), { file: st.file, folder: st.folder, trail: st.trail, fileBorn: st.fileBorn, seen: st.seen, expanded: new Set(st.expanded), selected: st.selected, focus: st.focus, query: st.query });
   }
 
   // It works only while it shows (works): the page in the open panel, for the active space. Shown, it reads at once; hidden,
   // answers still under way are dropped and nothing more is asked. A closed space's state goes.
-  sync(cx, focus = false, all = spaces()) {
-    if (checking()) return;
+  sync(cx, focus = false, all = spaces(), ps = null, drawing = false) {
+    if (checking()) return null;
     // The layout read once (panelState), not again for each space kept.
     const sp = all.find((s) => s.active), panel = panelState();
     for (const [id, st] of this.states) {
@@ -163,8 +202,10 @@ export default class Files extends View {
       for (const [path, kept] of st.previews) if (!tabs.some(t => t.path === path && t.born === kept.born)) { this.releasePreview(kept.view); st.previews.delete(path); if (st.view === kept.view) st.view = null; }
       if (st.file && !tabs.some(t => t.path === st.file && t.born === st.fileBorn)) { st.file = null; st.view = null; }
     }
-    const st = sp && panel.open && panel.page === "files" ? this.stateFor(sp) : null;
-    const tab = st && (panel.tabs.find(t => t.id === panel.active) ?? null), key = tabKey(tab);
+    const st = sp && panel.open && panel.page === "files" ? this.stateFor(sp, ps ?? panes(), cx, drawing) : null;
+    if (st?.flushReset && !drawing) st.flushReset();
+    const cur = st ? surfacesFor(sp.id, panel.pages) : null;
+    const tab = st && !st.flushReset ? (cur.tabs.find(t => t.id === cur.active) ?? null) : null, key = tabKey(tab);
     const file = tab?.folder ? null : tab?.path ?? null, folder = tab?.folder ? tab.path ?? "" : null;
     if (st && (st.seen !== key || st.file !== file || st.folder !== folder)) {
       // Bind the tab, its cached preview and tree selection before drawing. Only the work that needs the host waits.
@@ -202,6 +243,7 @@ export default class Files extends View {
       }
       this.recheck(awake, cx, true);
     }
+    return st;
   }
 
   sleep() {
@@ -374,6 +416,7 @@ export default class Files extends View {
   }
 
   open(st, rel, cx) {
+    st.flushReset?.();
     openFile(rel);
     // Opened here: what the panel shows now is this, not a pick to answer.
     const tab = activeTab(st.id);
@@ -588,6 +631,7 @@ export default class Files extends View {
 
   // A breadcrumb: the person's own move, so the tree takes the keyboard once it's there.
   navigate(st, path, cx) {
+    st.flushReset?.();
     if (path && path === st.trail && path !== st.folder) { this.pick(st, path, cx, true); return; }
     navigateFolder(path, st.trail ?? st.file ?? path, Boolean(st.file));
     this.sync(cx, true);
@@ -633,8 +677,8 @@ export default class Files extends View {
     if (props()?.files) return menuView(this);
     const t = theme(), all = spaces(), sp = all.find((s) => s.active);
     if (!sp) return div().id("t3-files").size_full();
-    this.sync(cx, false, all);
-    const st = this.stateFor(sp);
+    const ps = panes();
+    const st = this.sync(cx, false, all, ps, true) ?? this.stateFor(sp, ps, cx, true);
     // Lines changed: the editor made again, just after this draw, as an editor can't be made in one.
     const v = st.view;
     if (v?.code && v.wrap !== wrapLines()) cx.timer.after(0, (cx) => {
@@ -699,7 +743,7 @@ export default class Files extends View {
     const kept = (key, el) => available ? stop(this, t, key, el, 8) : el;
     return split(t, { id: "t3-files-open-group", mainId: id, moreId, chevron: `${MOD}/icons/chevron-down.svg`, size: "xs", surface: "chrome", hot, on: popupOpen(this, moreId, MENU_CLOSED), disabled: !available, label: `Open in ${target}`, moreLabel: "Choose application" },
       main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 14)).on_hover(hover(id))
-        .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target); })))),
+        .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target, rootOkay); })))),
       more => kept(moreId, more.on_hover(hover(moreId)).when(available, opener(this, { id: moreId, closed: MENU_CLOSED, onOpen: (b, cx) => {
         openMenu("open-in", { height: openInHeight(names), ...hang(b, MENU_W) }, { source: this.source(st), targets: names }, !b);
         cx.spawn(async cx => { this.targets = await installedTargets(); cx.notify(); });

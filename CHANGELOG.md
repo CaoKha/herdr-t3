@@ -7,6 +7,8 @@ English · [中文](CHANGELOG.zh-CN.md)
 - Splitting a named tab across two or more top-level agents no longer drops the tab name to the program name for agents without a session name or a telling terminal title, such as an unnamed Pi. Agents with their own telling titles still show those titles, and Pi with a session name still shows its session. Sub-agents still never inherit a tab name, and agents started from a plain shell count as top-level.
 - In an agent's right-click menu, **Rename** (or **Rename tab** when another top-level agent shares the tab) stays available for top-level agents not named by Pi's session, including non-Pi agents running in a shell that has a leftover `pi.session` label, and stays hidden for sub-agents even in their own tab.
 - Right-click an idle agent that has finished a turn (or open its menu from the breadcrumb title) with Inbox selected to **Mark unread**. It puts the agent back to Done in place without switching routes (showing its unread dot on the Inbox card, pane header and space menu, as well as Agents and tabs in Lists), brings a settled or snoozed agent back to Active, and works with the sidebar hidden.
+- Files follows a space's live working folder when the space started in your local home folder or moved outside its saved folder, while staying anchored to the project root as terminals enter subfolders or switch tabs. When the root changes, Files clears old file and folder tabs (keeping Review and falling back to generic Files), resets search and closes stale menus.
+- Review opened outside a repository now loads automatically once the tab's terminal moves into a Git repository, instead of staying on "Not a git repository".
 
 ## 2026-11-20
 
