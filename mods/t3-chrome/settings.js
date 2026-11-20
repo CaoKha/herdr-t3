@@ -2,16 +2,24 @@
 // its sizes, type and theme colors as they are there, not T3's, so it reads as Herdr's. What it holds is t3.settings (docs/adr/0009).
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex, Select, Popup } from "gpui-base";
-import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFile, exec } from "herdr";
+import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFile, exec, layout } from "herdr";
 import { SETTINGS, t3Settings } from "./layout-settings.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { menuKeys, openLit } from "./list.js";
 import { menuRow } from "./menu-row.js";
+import { sidebarParts } from "./sidebar.js";
 
-const SECTIONS = [{ id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" }];
+const SECTIONS = [
+  { id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" },
+  { id: "sidebar", title: "Sidebar", icon: "mods/t3-chrome/icons/panel-left.svg" },
+];
+// A row's value is t3.settings' `key`, unless it has `get` and `set`: what the sidebar shows is the layout's own stack, which
+// ⌘⇧L (t3-tabs.sidebar) switches too, so it's read from there each time and never copied into t3.settings.
 const ROWS = [
-  { key: "afterAway", title: "After putting away", about: "Settling, snoozing or dragging away the agent in view.", options: () => [["home", "Home"], ["next", "Next card"]] },
-  { key: "homeMod", title: "Home shows", about: "A terminal, or a mod that offers itself with \"home\": true in its mod.json.", options: (view) => view.homeMods },
+  { section: "home", key: "afterAway", title: "After putting away", about: "Settling, snoozing or dragging away the agent in view.", options: () => [["home", "Home"], ["next", "Next card"]] },
+  { section: "home", key: "homeMod", title: "Home shows", about: "A terminal, or a mod that offers itself with \"home\": true in its mod.json.", options: (view) => view.homeMods },
+  { section: "sidebar", key: "sidebarShows", title: "Sidebar shows", about: "The Inbox, or the Spaces and Agents lists. ⌘⇧L switches it too.", options: () => [["inbox", "Inbox"], ["lists", "Lists"]],
+    get: () => sidebarParts(layout()).stack?.active ?? "lists", set: (child) => run("layout.select", { stack: "sidebar-lists", child }) },
 ];
 // Home as a shell, not a mod (homeMod null): an agent started there turns that space into an ordinary one (t3-tabs/navigation.js).
 const TERMINAL = [null, "Terminal"];
@@ -21,6 +29,7 @@ export function initSettings(view, cx) {
   view.keys.focus();
   stopsInit(view, cx, "modal");
   view.homeMods = [];
+  view.section = SECTIONS[0].id;
   // The row whose menu is open, and each row's handles: its button's, and its menu's while open.
   view.picking = null;
   view.pickAt = -1;
@@ -56,14 +65,17 @@ export function settingsView(view) {
   // The layout's menu, as the agents list's sort menu, on the kit's Select as the Snooze unit's: hung 4px under the button, as
   // wide; nothing lit until a key or the pointer gets there; ↑/↓, Home, End, typeahead, Enter or Space, Esc; the one in use ticked.
   const menu = (r) => {
-    const options = r.options(view), id = `st-${r.key}`, label = options.find(([v]) => v === now[r.key])?.[1] ?? now[r.key];
+    const value = r.get ? r.get() : now[r.key];
+    const options = r.options(view), id = `st-${r.key}`, label = options.find(([v]) => v === value)?.[1] ?? value;
     const { focus, keys } = view.pick[r.key], open = view.picking === r.key;
     // Opened by keys (Enter or Space on the button: no press), its first row lit; by the pointer, none (list.js openLit).
     const show = (on, keys = false) => { view.picking = on ? r.key : null; view.pickAt = openLit(on && keys); };
-    const choose = (value) => {
+    const choose = (picked) => {
       show(false);
       focus.focus();
-      if (value !== now[r.key]) pick(r.key, value);
+      if (picked === value) return;
+      if (r.set) r.set(picked);
+      else pick(r.key, picked);
     };
     const trigger = stop(view, t, id, h_flex().id(id).w_full().h(32).px(11).gap(8).rounded(8).border_1().border_color(t.border).bg(t.raised).items_center().cursor_pointer()
       .hover((s) => s.bg(t.hover)).on_hover((on) => { view.overPick = on ? r.key : null; })
@@ -83,18 +95,26 @@ export function settingsView(view) {
       .on_mouse_down_out((_e, cx) => { if (view.overPick !== r.key) { show(false); cx.notify(); } })
       // Its Esc here, before the dialog's own, which would close it.
       .on_key_down(menuKeys(view, options.map(([, l]) => l), (at) => choose(options[at][0]), { at: "pickAt", close: () => { show(false); focus.focus(); } }))
-      .children(options.map(([value, name], i) => menuRow(view, t, `${id}-${value ?? "terminal"}`, { at: [view, "pickAt", i], label: name,
-        trail: value === now[r.key] ? svg("mods/t3-chrome/icons/check.svg").size(14).flex_none().text_color(t.foreground) : null, pick: (cx) => { choose(value); cx.notify(); } })
-        .role("list_box_option").aria_selected(value === now[r.key])));
+      .children(options.map(([v, name], i) => menuRow(view, t, `${id}-${v ?? "terminal"}`, { at: [view, "pickAt", i], label: name,
+        trail: v === value ? svg("mods/t3-chrome/icons/check.svg").size(14).flex_none().text_color(t.foreground) : null, pick: (cx) => { choose(v); cx.notify(); } })
+        .role("list_box_option").aria_selected(v === value)));
     return Select.new(id).w(220).flex_none().accessibility_label(r.title).open(open).track_focus(focus).content_focus_handle(keys)
       .on_open_change((on, cx) => { show(on); cx.notify(); })
       .child(Popup.new(`${id}-popup`, trigger).w_full().when(open, (el) => el.content(list)));
   };
   const nav = v_flex().flex_none().w(190).h_full().p(10).gap(2).border_r(1).border_color(t.border)
     .child(div().px(10).pt(6).pb(12).text_size(16).font_semibold().text_color(t.foreground).child("Herdr T3"))
-    .children(SECTIONS.map((s) => h_flex().id(`st-s-${s.id}`).gap(10).px(10).py(7).items_center().rounded(7).bg(t.raised)
-      .child(svg(s.icon).size(15).text_color(t.accent))
-      .child(div().flex_1().text_size(13.5).text_color(t.foreground).child(s.title))));
+    // Herdr's nav: the section shown on the raised fill, its icon in the accent; another muted, lit hovered. A click shows it.
+    .children(SECTIONS.map((s) => {
+      const on = view.section === s.id, id = `st-s-${s.id}`;
+      return stop(view, t, id, h_flex().id(id).gap(10).px(10).py(7).items_center().rounded(7).cursor_pointer()
+        .when(on, (el) => el.bg(t.raised)).when(!on, (el) => el.hover((st) => st.bg(t.hover)))
+        .role("tab").aria_selected(on).accessibility_label(s.title)
+        .on_click((_e, cx) => { view.section = s.id; view.picking = null; cx.notify(); })
+        .child(svg(s.icon).size(15).text_color(on ? t.accent : t.muted))
+        .child(div().flex_1().text_size(13.5).text_color(on ? t.foreground : t.muted).child(s.title)), 7);
+    }));
+  const section = SECTIONS.find((s) => s.id === view.section) ?? SECTIONS[0];
   return focusRoot(view, h_flex().id("settings").track_focus(view.keys).w_full().h(620).min_h(0).items_start()
     .on_key_down((e, cx) => {
       if (e.key !== "escape") return;
@@ -103,6 +123,6 @@ export function settingsView(view) {
     })
     .child(nav)
     .child(div().flex_1().min_w(0).h_full().px(28).py(22)
-      .child(div().pt(6).pb(8).text_size(12).font_semibold().text_color(t.dim).child("HOME"))
-      .children(ROWS.map(row))));
+      .child(div().pt(6).pb(8).text_size(12).font_semibold().text_color(t.dim).child(section.title.toUpperCase()))
+      .children(ROWS.filter((r) => r.section === section.id).map(row))));
 }

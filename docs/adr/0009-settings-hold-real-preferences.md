@@ -15,3 +15,4 @@
 - 设置每次现读（`shared/layout-settings.js` 带默认值），没有缓存，也没有迁移。
 - 外观照搬 Herdr 自带的 Settings，而不是 T3：它和 Herdr 的设置并列，看起来应该是同一类东西。
 - 以后新增选项先对照本条；只有一个分区时也保留左侧导航，加分区不用改结构。
+- Sidebar 页的 Sidebar shows（Inbox／Lists，2026-11-19 从品牌栏按钮挪来）不算新偏好，也不进 `t3.settings`：它直接读、选布局自己的 `sidebar-lists` stack，和 `cmd-shift-l` 是同一个状态，设置页只是它的又一个入口。

@@ -167,7 +167,7 @@ Putting away the viewed agent (Settle, Snooze, drag, sweep) goes Home by default
 
 Home is one local hidden space shared across projects and machines, created on demand, found only by its remembered id or the exact name `Home\u200b`, and left out of every list. It holds one mod (`t3-home` by default) or a shell; if that shell starts an agent, the space becomes an ordinary one in place and the next Home is fresh.
 
-Layout Settings (footer sliders or `cmd-shift-,`) has exactly two preferences:
+Layout Settings (footer sliders or `cmd-shift-,`) has two pages. Home has exactly two stored preferences; Sidebar has Sidebar shows, Inbox or Lists, which reads and switches the layout's own sidebar stack as `cmd-shift-l` does and stores nothing:
 
 | Preference | Choices and effect |
 | --- | --- |

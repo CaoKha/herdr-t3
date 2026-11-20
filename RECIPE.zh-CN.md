@@ -167,7 +167,7 @@ Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设
 
 Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只靠记住的 id 或确切名字 `Home\u200b` 认领，所有列表都不显示它。里面是一个 mod（默认 `t3-home`）或 shell；这个 shell 起了 agent，就原地变成普通 space，下次 Home 重新创建。
 
-布局设置（底栏 sliders 或 `cmd-shift-,`）恰好两项：
+布局设置（底栏 sliders 或 `cmd-shift-,`）分两页。Home 页恰好两项存下来的偏好；Sidebar 页只有 Sidebar shows（Inbox 或 Lists），和 `cmd-shift-l` 一样读取并切换布局自己的侧栏栈，不另存：
 
 | 偏好 | 选择与作用 |
 | --- | --- |
