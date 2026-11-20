@@ -80,7 +80,7 @@ async function check(checking) {
     vm.runInContext("watchReview({}, cx)", bar);
   }
   // Every fake here settles by promise alone, so one macrotask turn lets the started chains drain.
-  await new Promise(r => setTimeout(r, 10));
+  await new Promise(r => setImmediate(r));
   if (checking) assert.deepEqual(effects, [], "checking must not execute commands or write files");
   else {
     assert.ok(effects.some(([kind, cmd, args]) => kind === "exec" && cmd === "rm" && args.includes("/app/cache/t3-files")));

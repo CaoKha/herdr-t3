@@ -7,7 +7,7 @@ const fs = require("node:fs/promises");
 const { existsSync } = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { runtime, find, texts } = require("./harness.cjs");
+const { runtime, find, texts, idle } = require("./harness.cjs");
 
 const MOD = "asciicn-wallpaper", KEY = `${MOD}.scene`, PLACEMENTS = `${MOD}.placements`;
 // A photo: its left half black, its right half white.
@@ -29,8 +29,8 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
       return { pixels: PHOTO, plan: m["ascii-art.js"].imagePlan(W, H) };
     } }) };
     const base = path.join(root, "home");
-    const r = await runtime(base, { stubs: source });
-    const { cx, state, hooks, look, settle, dir, app } = r;
+    const r = await runtime(base, { stubs: source, clock: true });
+    const { cx, state, hooks, look, settle, advance, dir, app } = r;
     const { toSlider } = r.modules["framing.js"];
     Object.assign(look.colours, { ansi0: "#000001", ansi15: "#fffffe", ansi7: "#c0c0c1", ansi8: "#808081" });
     const h = await r.home();
@@ -187,7 +187,6 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
 
     // Choosing reads the picture; the card shows only its name until it's drawn, its footer already in place. A wait under
     // 150 ms shows nothing; past that, progress, kept on screen at least 300 ms.
-    const sleep = (ms) => new Promise(go => setTimeout(go, ms));
     let release;
     hold = new Promise(go => { release = go; });
     const choosing = h.command(sent.slice(MOD.length + 1), cx);
@@ -200,7 +199,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.equal(find(card, "wallpaper-progress"), undefined, "nothing says it is waiting before 150 ms");
     assert.ok(find(card, "wallpaper-apply") && !find(card, "wallpaper-apply").handlers.on_click, "Apply stands where it will be, not yet pressable");
     assert.equal(card.items.at(-1).key, "wallpaper-card-footer", "the footer ends the card");
-    await sleep(200);
+    advance(200);
     card = at("wallpaper-card");
     assert.ok(find(card, "wallpaper-progress"), "a longer wait shows progress");
     assert.ok(texts(card).some(s => /Reading/.test(s)), "and says it is reading");
@@ -209,7 +208,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     let d = h.draft;
     assert.equal(d.phase, "ready");
     assert.ok(find(at("wallpaper-card"), "wallpaper-progress"), "progress that showed doesn't vanish at once");
-    await sleep(350);
+    advance(350);
     card = at("wallpaper-card");
     assert.equal(find(card, "wallpaper-progress"), undefined, "it goes once it has shown long enough");
     assert.equal(card.props.bottom, 12);
@@ -238,14 +237,14 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     const drawing2 = h.setStyle("blocks", cx);
     assert.equal(at("wallpaper-picture").props.path, shownBefore, "the last mode stays up");
     assert.doesNotMatch(texts(at("wallpaper-card-status")).join(""), /Drawing/, "nothing says so before 150 ms");
-    await sleep(200);
+    advance(200);
     assert.equal(at("wallpaper-picture").props.path, shownBefore, "still up while drawing");
     assert.match(texts(at("wallpaper-card-status")).join(""), /Drawing Blocks/);
     assert.ok(find(at("wallpaper-styles"), "wallpaper-style-spinner"), "the mode being drawn spins");
     release();
     await drawing2;
     hooks.beforeWrite = (file) => { io++; writes.push(file); };
-    await sleep(350);
+    advance(350);
     await shown();
     assert.notEqual(at("wallpaper-picture").props.path, shownBefore, "then the new mode replaces it");
     assert.doesNotMatch(texts(at("wallpaper-card-status")).join(""), /Drawing/);
@@ -570,11 +569,12 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
     assert.equal(state[KEY], "file:Coast 3", "a retry takes the next free name");
 
     // Cancelling while progress shows takes it away with the card.
+    await shown();
     hold = new Promise(go => { release = go; });
     const slow = h.startPreview("/photos/Slow.png", "Slow", cx);
     await settle(() => reads.at(-1) === "/photos/Slow.png");
     tree();
-    await sleep(200);
+    advance(200);
     assert.ok(find(at("wallpaper-card"), "wallpaper-progress"));
     await h.cancelPreview(cx);
     assert.equal(at("wallpaper-card"), undefined);
@@ -679,8 +679,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} vs $
   } finally {
     clearTimeout(watchdog);
     await fs.chmod(root, 0o700).catch(() => null);
-    // A picture a last render asked for may still be landing.
-    await new Promise(go => setTimeout(go, 300));
+    await idle();
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5 });
   }
 })().catch(e => { console.error(e); process.exitCode = 1; });

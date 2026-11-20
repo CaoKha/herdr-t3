@@ -20,6 +20,10 @@ function link(context, file, source) {
   vm.runInContext(`__m[${JSON.stringify(file)}] = (() => {\n${body}\nreturn { ${exported.map(([k, n]) => `${k}: ${n}`).join(", ")} };\n})();`, context, { filename: file });
 }
 
+// Tasks a timer started (a picture a render asked for), until they end: `idle()` awaits them all.
+const later = new Set();
+const idle = async () => { while (later.size) await Promise.allSettled([...later]); };
+
 const MODULES = ["ascii-art.js", "scenes.js", "library.js", "source.js", "framing.js", "tip.js", "focus.js", "color.js", "button.js", "list.js", "menu-row.js", "trigger.js", "store.js", "main.js"];
 
 // A render tree: what a test can find by id, read the geometry of and press.
@@ -46,7 +50,7 @@ const texts = (n) => typeof n === "string" ? [n] : !n || typeof n !== "object" ?
  * the file dialog returns, and `watchFolder(dir)`, the folder watch behind a live Home. `runs`: the commands run().
  * `view.props`: what props() returns. `stubs` replace modules.
  */
-async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
+async function runtime(base, { stubs = {}, platform = "macos", clock = false } = {}) {
   const app = path.join(base, "app 'quoted"), dir = path.join(app, "asciicn-wallpaper");
   await fs.mkdir(path.join(app, "mods/asciicn-wallpaper"), { recursive: true });
   await fs.symlink(path.join(__dirname, "scenes"), path.join(app, "mods/asciicn-wallpaper/scenes")).catch((e) => { if (e.code !== "EEXIST") throw e; });
@@ -103,6 +107,10 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   };
   const context = vm.createContext(env);
   context.__m = {};
+  // `clock`: the mod's Date.now stands still, moved on only by `advance(ms)`.
+  let now = Date.now();
+  if (clock) vm.runInContext("Date", context).now = () => now;
+  const advance = (ms) => { now += ms; };
   // Keyboard stops and tooltips have their own checks in shared/.
   stubs = { "focus.js": () => ({ stop: (_v, _t, _id, el) => el, focusRoot: (_v, el) => el, stopsInit: v => { v.fs = {}; }, stopsEnd() {}, enter() {},
     pressed: v => { v.pressAt = Date.now(); }, justClosed: () => false }),
@@ -114,7 +122,10 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   }
   const Mod = context.__m["main.js"].default;
   let focused = null;
-  const cx = { notify() {}, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => setImmediate(() => fn(cx)),
+  const cx = { notify() {}, stop_propagation() {}, spawn: fn => fn(cx), timer: { after: (_ms, fn) => {
+    const end = new Promise(go => setImmediate(() => go(fn(cx)))).then(() => {}, () => {});
+    later.add(end); end.then(() => later.delete(end));
+  },
     every: (_ms, fn) => { const t = { fn, cancel() { every.splice(every.indexOf(t) >>> 0, 1); } }; every.push(t); return t; } },
     focus_handle: () => { const h = { focus: () => { focused = h; }, is_focused: () => focused === h }; return h; } };
   // A sized Home. Most checks drive scans directly; a live Home starts its own background tasks.
@@ -133,7 +144,7 @@ async function runtime(base, { stubs = {}, platform = "macos" } = {}) {
   };
   // `ticks()`: each repeating timer (cx.timer.every) fires once.
   const ticks = () => { for (const t of [...every]) t.fn(cx); };
-  return { app, dir, state, messages, overlays, runs, hooks, view, look, win, world, ticks, cx, home, settle, modules: context.__m };
+  return { app, dir, state, messages, overlays, runs, hooks, view, look, win, world, ticks, cx, home, settle, advance, modules: context.__m };
 }
 
-module.exports = { runtime, find, texts };
+module.exports = { runtime, find, texts, idle };
