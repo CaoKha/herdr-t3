@@ -5,8 +5,12 @@ Herdr App 的一套布局，让人同时开着很多 agent，只看需要他的�
 ## 来自 Herdr
 
 **Space**：
-一个项目的工作区，在某一台机器上，里面有若干标签。
-_Avoid_: project、workspace
+在某一台机器上打开的一个 Project，里面有若干标签。
+_Avoid_: workspace、工作区；不要把 Space 叫成 project
+
+**Project**（T3 Code 的概念）：
+某一台机器上的一个文件夹记录。Space 关掉后它还在，New 能在原机器、原文件夹上重开它。
+_Avoid_: 书签、bookmark
 
 **Agent**：
 向 Herdr 报告状态（working、blocked、done、idle）的终端程序。
@@ -34,7 +38,7 @@ _Avoid_: host、server
 _Avoid_: Focus（旧名）、通知
 
 **Lists**：
-按项目组织的侧栏，由 Spaces 和 Agents 两个列表组成。
+按 Space 组织的侧栏，由 Spaces 和 Agents 两个列表组成。
 _Avoid_: 列表模式
 
 **卡片**：
@@ -70,7 +74,7 @@ _Avoid_: 稍后提醒、mute
 ## 位置和入口
 
 **Home**：
-收起当前查看的 agent 后的落脚点，一个不属于任何项目的隐形 space，里面只放一样东西（一个 mod 或一个 shell），不放 agent。
+收起当前查看的 agent 后的落脚点，一个不属于任何 Project 的隐形 space，里面只放一样东西（一个 mod 或一个 shell），不放 agent。
 _Avoid_: dashboard、首页
 
 **Settings**（布局设置）：

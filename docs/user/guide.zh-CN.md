@@ -6,7 +6,7 @@
 
 ## 功能
 
-- **两种侧栏**：侧栏顶栏按钮切换 Inbox（注意力）和 Lists（项目），`cmd-]`／`cmd-[` 都可逐个走。Settle、Snooze 藏 agent 属于 Inbox，Lists 关闭后回之前的标签。
+- **两种侧栏**：`cmd-shift-l` 切换 Inbox（注意力）和 Lists（space），`cmd-]`／`cmd-[` 都可逐个走。Settle、Snooze 藏 agent 属于 Inbox，Lists 关闭后回之前的标签。
   - Spaces：只在不寻常时显示仓库、分支和领先/落后；worktree 折叠在所属仓库下，checkout 开没开都一样；机器多于一台时按机器分组，`ctrl-1…9` 和切换下一个 space 的键按看到的顺序走。
   - Agents：按 space 或按优先级分组，可置顶，子 agent 缩进在父级下。
   - Inbox：T3 式 Settle。需要你的 agent 以卡片留在上方，等你处理的排最前。结束的 agent 可以收进 **Settled**，有新工作时自动回来。工作中的 agent 折叠进 Working。Snooze 把不需要你的 agent 藏到你选的时间。要结束已 Settle 的 agent 进程，用 **Clean up**。
@@ -26,10 +26,10 @@
   - 键盘操作：用 `cmd-shift-b`（或在按钮上按 Enter）打开时，第一个控件带焦点环。↑／↓ 在行间移动，←／→ 在一行的两半间移动，Enter 按下；这样打开的菜单首行点亮，关掉后键盘回到它的箭头。Escape 关闭详情，回到终端。
   - 卡片右键可显示或隐藏这几项，或 Reset；全部隐藏时用 Choose what to show 找回。
   - 打开面板会收起详情；面板放大时，快捷键先恢复终端。Home 没有 Actions。
-- **其他机器**：机器多于一台时 Spaces 按机器分组，来自其他机器的 Inbox 卡片带服务器标记，标记不单独弹提示。Lists 的 Agents 行只在悬停详情里显示机器名；Inbox 卡片的悬停详情也能查看机器名。在 Herdr 的 Settings 里添加机器；重建过的机器会提供 Connect，New space 会先问建在哪台机器上。
+- **其他机器**：机器多于一台时 Spaces 按机器分组，来自其他机器的 Inbox 卡片带远程机器标记，标记不单独弹提示。Lists 的 Agents 行只在悬停详情里显示机器名；Inbox 卡片的悬停详情也能查看机器名。在 Herdr 的 Settings 里添加机器；重建过的机器会提供 Connect，New space 会先问建在哪台机器上。
 - 机器名旁的警告表示断开后 agent 会停止，即使现在仍已连接。点警告查看 Herdr 的说明和 Copy 按钮，再自行到那台机器上执行建议的命令。此报告需要远程 herdr-core 0.1.21 或更新版本；旧 core 没有该字段时不显示警告。
 - **程序图标**：Inbox、Agents、标签、窗格标题、Go to 和子 agent 菜单直接使用 Herdr 官方素材，保留原有留白和配色，图标槽按各组件的尺寸绘制。
-- **项目图标**：space 显示其仓库的 favicon（在它所在的机器上查找），没有时显示 T3 配色的首字母图标。
+- **Space 标记**：space 显示其仓库的 favicon（在它所在的机器上查找），没有时显示 T3 配色的首字母图标。
 - **右键菜单**：代表 agent、space、仓库、机器、标签或窗格的东西，右键都打开它的菜单，在哪里右键都是同一份。agent 的（Inbox 卡片、Agents 行、标签栏里的名字）：Pin、Settle、Snooze 或 Wake（只在 Inbox 下有；鼠标停在 Snooze 上，时间选项在菜单旁边展开，同 T3 的子菜单）、标签里只有它时的 Rename、Copy address、Send back 回父级、Close。space 的（Spaces 或 Agents 里的行、标签栏、Inbox 的筛选）：New tab、Rename、Copy path、New worktree 和 Open worktree、Remove worktree、Close。Spaces 里仓库那一行暗行：Open、Copy path。机器标题：New space here、Connect。标签的：New tab、Rename、Close。窗格的（终端、窗格标题栏）：Split、Zoom、Copy address、Send right-clicks to pane、Close pane。当下做不了的不列出来。
 - **关闭前确认**：标签或窗格的 ×、标签上的中键、`cmd-w`、`cmd-shift-w` 和右键菜单的 Close 在有程序运行时先询问，没有程序运行时直接关闭。开框后标签里增加了终端，或关闭标签会连带关闭整个 space 时，会再次询问。
 - **space 面板**：窗口最右面板按 space 归属，跨终端标签；每 space 记标签列表、当前项、开关和放大，宽度全窗口共用。初次打开为空，Open a surface 提供 Files F 和装了扩展才有的 Review R，+ 同样提供。Review 读标签工作处的仓库：最后活动终端所在文件夹，没有时用 space 文件夹，所以 space 文件夹不是仓库时，也能评审你 `cd` 进去的仓库；在其他机器上或不在仓库里时置灰并说明原因。+ Files 添加或选中整宽树的通用标签；文件原位替换通用标签，已有标签就选中它，其他文件追加。文件标签共用一棵树，选标签清空搜索并定位文件；Review 唯一。顶栏依次是标签、紧跟末标签的 +、放大／恢复和面板开关，平台按钮只在窗口最右；标签左侧图标在悬停或键盘聚焦时换成 ×。标签放不下时用滚轮横滚，‹ › 并排出现在标签后，哪边到头哪边置灰，当前标签自动滚入。同名文件照 T3 看起来一样；名字被截断时悬停显示全名。右上角的详情、Lists 的 + 和面板开关是一组，右缘对齐窗格头最右的控件；面板头的首个标签和末个按钮，与下面 Files 或 Review 的头部同边。隐藏（`cmd-alt-b`）保留标签并退出放大。×、中键或在 Files／Review 里按 `cmd-w` 关闭当前标签，不关背后的终端；选右邻、无则左邻，最后一个关闭收起，重开为空。标签菜单：Copy path、Close、Close others、Close to the right、Close all。在 Files／Review 里按 `cmd-t` 在 + 下打开菜单，F／R 添加，方向键和 Enter 可用；终端里的 `cmd-t` 仍是新标签。切换保留 Review 的范围／组／文件／位置，关闭再添加从默认开始。每 space 只保留最近显示三个文件的预览／Editor／阅读位置，更早的回顶重读；每类 surface 完整数据只留最近三个 space。隐藏停止刷新、回来补读，不留递归 watcher（Files 本机通常 5s、远程 10s，Review 15s）。
@@ -42,7 +42,7 @@
 
 点击卡片打开 agent。点卡片上的图钉可取消置顶，Undo 可恢复它的位置。悬停分支旁的工作树图标可查看 checkout 目录名和分支名。
 
-从 Home 回到项目或在项目间跳转时，目标终端直接出现在该 space 的工作区域。如果上次离开时开着 Files，它会和终端一起出现。切到已缓存的文件标签时，面包屑和预览一起恢复。
+从 Home 回到 space 或在 space 间跳转时，目标终端直接出现在该 space 的工作区域。如果上次离开时开着 Files，它会和终端一起出现。切到已缓存的文件标签时，面包屑和预览一起恢复。
 
 菜单打开后，即使列表顺序变化，点击或按 Enter 仍作用于你选中的命令和对象。对象已离开时需重新选择，关闭再打开同一路径的文件标签也一样。独立 Inbox 的 Settle 快捷键以按下时持有焦点的 agent 为准。
 
@@ -123,9 +123,9 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 - 其他机器上的 space，面板里的 Review 置灰，你自己加的 Review 栏也不显示。
 - 其他机器上的 Files：可见时文本变化通常在 10 秒内显示，大仓库适当放慢；图片重新点选时重读，超过 512 KB 的图片不预览。
 - Files 只预览 1 MB 以内的文本，只给常见语言着色（JavaScript 和 TypeScript、JSON、YAML、Rust、Go、Python、shell、CSS、C 和 C++、Java、Kotlin、Ruby、PHP、SQL、Lua、GraphQL、Makefile）；TOML、HTML、Swift 等显示为纯文本。agent 改写你正看着的超过 16 KB 的文件、或你对它切换 Wrap 后，它先显示片刻纯文本，内容约 10 秒不再变化（Wrap 是 0.3 秒）后再着色；其间你滚动过，就保持纯文本，直到再次打开。超过 256 KB 的不自动着色，按代码上方的 **Highlight anyway** 才着色，着色时窗口会停顿片刻。
-- Files 保留宿主原生只读 Editor。其 gutter 底色与高度暂不能匹配 T3；保留文字选择，本次未验证真实 Herdr 鼠标拖选。
+- Files 用 Herdr 原生的只读编辑器显示代码，所以行号栏的底色和高度没法照 T3。文字仍可选中。
 - 长行自动换行（Files 和 Review 的默认）时在面板边缘断行，Review 里必要时会从单词中间断开，但不会拆开带重音的字母或连成一个的 emoji。
 - Files 只按路径搜索，不搜内容，也不含 Git 忽略的文件；不在 Git 里时最多搜 20 万个文件。
 - 这次启动 Herdr 后 Inbox 还没显示过时，侧栏隐藏期间它不更新卡片顺序，`cmd-]` 和 `cmd-[` 可能按旧顺序走。`cmd-shift-s` 照常能 Settle。
 
-终端路径点击首版未完成：宿主没有终端链接／点击回调。真实中／右键、拖动和键盘焦点路由仍需真机回放。
+点击终端里的路径不会打开它：Herdr 不把终端里的点击告诉布局。

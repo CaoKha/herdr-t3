@@ -1,6 +1,6 @@
 # Space 面板由可关闭的标签组成
 
-取代 [0011](0011-one-space-panel.md) 的固定 Files／Review 两页；修订 [0015](0015-panel-pages-stay-independent.md) 的阅读状态生命周期。目录面包屑由 [0018](0018-files-follow-t3-surfaces.md) 修订为同 T3：从文件旁打开目录标签。详情 popup 原在本篇，已拆到 [0019](0019-details-popup.md)。
+取代 [0011](0011-one-space-panel.md) 的固定 Files／Review 两页；修订 [0015](0015-panel-pages-stay-independent.md) 的阅读状态生命周期。目录面包屑由 [0018](0018-files-follow-t3-surfaces.md) 修订为同 T3：从文件旁打开目录标签。详情 popup 见 [0019](0019-details-popup.md)。
 
 按 T3 Code `09a54f01` 的 surface 交互，每个 space 保存标签列表、活动标签、开关和放大状态；宽度仍是整个窗口一份。
 

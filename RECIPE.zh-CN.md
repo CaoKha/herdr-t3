@@ -34,7 +34,7 @@ Herdr App 的一个安静、近似 T3 Code 的窗口，在 agent 越开越多时
 
 初始选中 Inbox。顶行是可在侧栏内显示紧凑结果列表的 Search 输入框，然后是 Filter by space、New space、New tab。筛选列出 All spaces，以及应用筛选前有 Inbox 条目或已被选中的非 Home space。下面 Pinned、Active 卡片在上；Working、Snoozed、Settled 是贴底的折叠收纳区，带数量，空间不够时并入卡片的滚动。折叠的收纳区仍露出当前查看的行。Settled 收纳已收起的 agent，用 Show more 分页。标题行只显示名称、数量和折叠箭头。
 
-卡片三行齐全时高 78：space 与状态或时间（Working 加时长、Needs you、Done，否则经过多久），agent 标题，可选的分支行，行末是程序图标和远程机器标记。正在看、需要人、done 的标题是 medium `foreground`，其余 `muted`；工作中卡片平时 70%，悬停或正在看时恢复。Settled、Snoozed 是 36px 窄行，悬停把时间换成 Un-settle 或 Wake；Snoozed 带 `accent` 闹钟，Woke 是 `blocked` 文字。悬停卡片或 Agents 行会在右侧出现详情卡。规格：[inbox](docs/internals/specs/inbox.md)。
+卡片三行齐全时高 78：space 与状态或时间（Working 加时长、Needs you、Done，否则经过多久），agent 标题，可选的分支行，行末是程序图标和远程机器标记。正在看、需要人、done 的标题是 medium `foreground`，其余 `muted`；工作中卡片平时 70%，悬停或正在看时恢复。Settled、Snoozed 是 36px 窄行，悬停把时间换成 Un-settle 或 Wake；Snoozed 带 `accent` 闹钟，`Woke` 是 `blocked` 文字。悬停卡片或 Agents 行会在右侧出现详情卡。规格：[inbox](docs/internals/specs/inbox.md)。
 
 ### Lists
 
@@ -48,7 +48,7 @@ Agents 是 36px 行：程序图标、状态持续时间（`<1m`、`5m`、`3h`、
 
 Lists 下标签栏显示当前 space 全部标签：高 24、圆角 6、字号 12，当前为 `foreground` 7%（悬停 4%）；每个标签有图标、名字和末尾状态槽；悬停时 `×` 盖住图标，状态槽不变（与面板头标签共用一种标签）；中键与 `×` 一样关闭。放不下先收窄，再滚动。
 
-Inbox 下左边是面包屑：space／父级／当前查看的 agent（14px medium），就是侧栏点亮的那个 agent。右边是收紧的工具标签，不显示状态：被 zoom 藏住的 pane、当前 agent 家族的其他标签、不含 agent 的标签。焦点移到程序上时，面包屑保留该 agent 并变暗，点它回去。
+Inbox 下左边是面包屑：space／父级／当前查看的 agent（14px medium），就是侧栏点亮的那个 agent。右边是收紧的工具标签，不显示状态：被 zoom 藏住的 pane、当前查看的 agent 家族的其他标签、不含 agent 的标签。焦点移到程序上时，面包屑保留该 agent 并变暗，点它回去。
 
 Herdr 原生 zoom 中的标签变为虚线分段组，每 pane 一段。标签后是一组间隔 4 的 28px 按钮：Lists 的新终端 `+`、Details（`square-menu`）、面板关时角上的 `panel-right`；Windows 和 Linux 的窗口按钮间隔 8 跟在最后。面板打开时，面板和窗口按钮移到面板头；开关在屏幕上的位置不变，开关面板的那一帧里 Details 已在最终位置。规格：[tab-bar](docs/internals/specs/tab-bar.md)。
 
@@ -68,7 +68,7 @@ Herdr 原生 zoom 中的标签变为虚线分段组，每 pane 一段。标签�
 
 可把文件或文件夹行拖进终端粘贴路径，不按 Enter；引号、本机文件复制到远程终端、不支持的投递由 Herdr 处理。普通点击与 Insert 菜单项保留。
 
-Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件后左边是内容，右边可调宽的列里是树。文件头有面包屑（`›` 打开一个目录菜单，照 T3 原地换目录，顶上是 Back）、Open in 分体按钮和 Preview/Code、Wrap、Tree 开关，图标 14px，同 T3 文件工具栏。Open in 照 T3 头部的分体按钮：高 24，图标和箭头外面一圈 `input` 描边，中间一根全高分隔线，静止时没有底，悬停时只有指针下那一半变底；Actions 在栏上的 `▶ | ⌄` 是同一个控件（`shared/button.js` 的 `split()` `xs`），详情里的分体行仍无边框，同 T3 面板。内容区是主题的 `background`，文件头和树所在的列是面板的 `chrome`，交界处一根淡线，同 T3 代码区和文件树。树没有折叠箭头：目录图标开合两态，文件用 Pierre 图标、颜色取主题，忽略项变暗。搜索过滤同一棵树。内容是 Markdown 预览、原生只读 `Editor` 或图片。Herdr 在界面线程上给代码着色，每 KB 约 1.5ms，新建的编辑器又从顶部开始，所以 256KB 以内的文件打开时直接着色；超过 16KB 时，显示中被改写的文本先以纯文本换上，内容保持 10s 不变后再着色，切换 Wrap 后 300ms 再着色，纯文本期间滚动过就不再自动着色，直到再次打开；超过 256KB 不自动着色，代码上方一条琥珀色提示带 **Highlight anyway**。规格：[files](docs/internals/specs/files.md)。
+Files 只读显示 space 在其机器上的文件夹：整宽树；打开文件后左边是内容，右边可调宽的列里是树。文件头有面包屑（`›` 打开一个目录菜单，照 T3 原地换目录，顶上是 Back）、Open in 分体按钮和 Preview/Code、Wrap、Tree 开关，图标 14px，同 T3 文件工具栏。Open in 照 T3 头部的分体按钮：高 24，图标和箭头外面一圈 `input` 描边，中间一根全高分隔线，静止时没有底，悬停时只有指针下那一半变底；Actions 在栏上的 `▶ | ⌄` 是同一个控件（`shared/button.js` 的 `split()` `xs`），详情里的分体行仍无边框，同 T3 面板。内容区是主题的 `background`，文件头和树所在的列是面板的 `chrome`，交界处一根淡线，同 T3 代码区和文件树。树没有折叠箭头：目录图标开合两态，文件用 Pierre 图标、颜色取主题，忽略项变暗。搜索过滤同一棵树。内容是 Markdown 预览、原生只读 `Editor` 或图片。Herdr 在界面线程上给代码着色，新建的编辑器又从顶部开始，所以文件打开时直接着色；较大的文件在显示中被改写时先以纯文本换上，内容稳定后再着色，纯文本期间滚动过就不再自动着色；超过大小上限不自动着色，代码上方一条琥珀色提示带 **Highlight anyway**。规格：[files](docs/internals/specs/files.md)。
 
 ### 可选 Review
 
@@ -84,11 +84,11 @@ Home 的默认页面：正中 Next agent、Go to、New tab 三个带键帽的按
 
 ### 名字与状态标记
 
-卡片、Agents 行、标签、标题统一命名：Pi 在跑先用 `pi.session`；再用人为命名的标签，但只给顶层 agent，且不能与另一个顶层 agent 共用此标签；然后是有意义的终端标题，只去掉该程序自己的装饰（Pi `π - … - <目录>`，OpenCode `OC | `）；最后程序名。拒绝纯路径／user@host／程序／目录标题，以及不再跑 agent 时残留的 agent 装饰标题。子 agent 不继承标签名。未命名标签按里面的 agent，否则按聚焦 pane 命名。
+卡片、Agents 行、标签、标题统一命名：Pi 在跑先用 `pi.session`；再用人为命名的标签，但只给顶层 agent，且不能与另一个顶层 agent 共用此标签；然后是有意义的终端标题，只去掉该程序自己的装饰（Pi `π - … - <目录>`，OpenCode `OC | `）；最后程序名。拒绝纯路径／`user@host`／程序／目录标题，以及不再跑 agent 时残留的 agent 装饰标题。子 agent 不继承标签名。未命名标签按里面的 agent，否则按聚焦 pane 命名。
 
 父级汇总活着的后代：任一 blocked/error 优先；然后自己的未读 done；再是自己或后代 working；否则自己的状态。子 agent 自身行把 error 写成 Failed（同一个 `!`、`ansi1` 色）。会报告状态或程序标成 agent 的活终端才算 agent；命令 shell 不算，但经过 shell 启动的 agent 算。Working 用自带转圈、`working` 色；blocked 是 15% `blocked` 底的圆角 `!`；done 是 6px `done` 点（Inbox 写绿色 `Done`）；idle 在 Agents 里是环，其他地方不画。
 
-Space 标记用项目 favicon，没有则取名字首字母，颜色按名字哈希取 T3 色板。
+Space 标记用 Project 的 favicon，没有则取名字首字母，颜色按名字哈希取 T3 色板。
 
 ### Inbox 与 Lists 的边界
 
@@ -99,7 +99,7 @@ Space 标记用项目 favicon，没有则取名字首字母，颜色按名字哈
 | Settle／Snooze 控件 | 满足条件时提供 | 不提供；Settle 键无作用 |
 | Snooze 中的 working | 藏进 Snoozed、不计 working 数 | 原有行和顺序继续转圈 |
 | Settled／snoozed 未读 done | 隐去 | 隐去 |
-| 关闭当前 agent 整标签／最后 pane | Home | space 上一次看的标签 |
+| 关闭当前查看的 agent 整标签／最后 pane | Home | space 上一次看的标签 |
 | agent 导航 | 画出的行；折叠收纳区只算当前行 | 全部分组，包括折叠的 |
 | space 筛选 | 从别处带进被隐藏 agent 时可放宽 | 保持不动 |
 | 标签栏 | agent 面包屑＋家族／工具，工具无状态 | 全部标签和状态 |
@@ -110,7 +110,7 @@ Snooze 子树任一处失败、或查看时开始新轮，两个模式都结束 
 
 Active 先 blocked，其余按何时回到人手上；各收纳区按时间排。查看不改变顺序；点击 `agent.focus`，不自动 zoom 分屏。
 
-Settle 始终手动：悬停已结束的卡片（置顶的也可）按 `✓ Settle`，或对当前 agent 按 `cmd-shift-s`。它去掉 pin、写终端标签、移入 Settled；有新工作自动回来。Un-settle、对它再按 Settle 键或把它拖出来，都会把它放回 Active 顶部。
+Settle 始终手动：悬停已结束的卡片（置顶的也可）按 `✓ Settle`，或对当前查看的 agent 按 `cmd-shift-s`。它去掉 pin、写终端标签、移入 Settled；有新工作自动回来。Un-settle、对它再按 Settle 键或把它拖出来，都会把它放回 Active 顶部。
 
 Pin 是一份与 Agents 共用的手排顺序；pin 会结束 Snooze。Settle、Snooze、Unpin 在底栏显示 `Settled, ⇧⌘Z to undo` 之类提示 5s（没绑键时只写 `Undo`）；Undo 恢复位置、标签和 pin。`cmd-z` 留给终端；Undo 的键是 `cmd-shift-z`。
 
@@ -130,7 +130,7 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 单击标签选中，双击改名，右键打开菜单，拖动排序（Inbox 只能拖不含 agent 的标签）。点击 Inbox 面包屑的 space 打开菜单（宽 `280`，顶置 New tab 后最多滚动 10 行），列出 New tab（`t3-tabs.new`）以及当前 space 下的全部 agent（含嵌套子 agent）与非 agent 终端窗格；右键行项打开对应的 agent 或窗格菜单，悬停行上的 `×` 或高亮后按 `ctrl-d` 经常规确认关闭该窗格。从标签条进入不含 agent 的标签时，面包屑保留该 space 最后看的 agent 并变暗；从 space 菜单点 New tab 或按 `cmd-t` 之后，面包屑只有 space，直到再看某个 agent。
 
-上／下 agent 按所选模式的行走，不循环；上／下标签在显示的标签间循环。关闭当前 agent 整标签或最后 pane，Inbox 回 Home，Lists 回该 space 最近看的标签；后台关闭不跳。布局发起的每次关闭都先问 `hc get`：只剩自己的 shell 时立即关，否则询问 `Close terminal "<名字>"?`（`This stops the running process and clears its history.`）。
+上／下 agent 按所选模式的行走，不循环；上／下标签在显示的标签间循环。关闭当前查看的 agent 整标签或最后 pane，Inbox 回 Home，Lists 回该 space 最近看的标签；后台关闭不跳。布局发起的每次关闭都先问 `hc get`：只剩自己的 shell 时立即关，否则询问 `Close terminal "<名字>"?`（`This stops the running process and clears its history.`）。
 
 关闭确认覆盖提示中的终端和对 space 的影响。如果确认前范围扩大，就重新询问。
 
@@ -155,7 +155,7 @@ pane mod 只有通过 `shared("<mod>.program") = { icon, tint, name, inbox: true
 
 ### Go to、New、Clean up 与 Actions
 
-Go to（`cmd-p`）列出所有 pane，最近的在前，打开时选中之前的 pane，所以 `cmd-p`、Enter 来回切换；Enter 跨 space 聚焦，`ctrl-d` 走安全关闭。New 先列出已打开的 space，当前项排最前，再列出 `t3.projects` 记住但尚未打开的项目。常驻的 `t3-tabs` 记录项目。New 按机器和目录这一对值判断项目是否已打开。选已打开的 space 在其当前位置新建标签，选书签则用 `space.new` 在原机器和目录重新打开，并保留显式命名。平台修饰键加 `1…9` 选择对应行。底栏可新建 space，多机器时先问哪台。见 [New](docs/internals/specs/dialogs.md#new) 和 [storage](docs/internals/storage.md)。
+Go to（`cmd-p`）列出所有 pane，最近的在前，打开时选中之前的 pane，所以 `cmd-p`、Enter 来回切换；Enter 跨 space 聚焦，`ctrl-d` 走安全关闭。New 先列出已打开的 space，当前项排最前，再列出 `t3.projects` 记住但尚未打开的 Project。常驻的 `t3-tabs` 记录 Project。New 按机器和目录这一对值判断 Project 是否已打开。选已打开的 space 在其当前位置新建标签，选 Project 则用 `space.new` 在原机器和目录重新打开，并保留显式命名。平台修饰键加 `1…9` 选择对应行。底栏可新建 space，多机器时先问哪台。见 [New](docs/internals/specs/dialogs.md#new) 和 [storage](docs/internals/storage.md)。
 
 **Clean up**（`t3-tabs.cleanup`）不离开 Inbox，打开一个对话框，它本身就是确认框。当前标签之外已由 core 确认为 Settled 的 agent 和停在提示符的非 agent shell 折成一块，写明数量和随之关闭的 space，展开按 space 列名字；**Close** 一起关掉，逐个复查，清空的 space 随之关闭。被落下的程序，也就是所在 space 已没有在工作的 agent、且不是你正在的 space 里仍在运行的非 agent 终端，各是一张卡片，写明 space、机器和前台进程：点卡片跳过去，点 `Stop` 或高亮后按 `ctrl-d` 当场停掉；用文字而不用 `×`，因为它不再询问。还有 agent 在工作的 space 里的程序算在用，不列出。数量和随之关闭的 space 随仍在的终端实时更新。底部说明跳过了什么：当前标签，以及你正在的 space 里的程序。两样都没有时弹出提示。见 [Clean up](docs/internals/specs/dialogs.md#clean-up) 和[清理命令](docs/internals/specs/tab-bar.md#t3-tabs-commands)。
 
@@ -163,9 +163,9 @@ Actions 全局一份。`▶` 重跑上次的动作，菜单运行另一个并设
 
 ### Home 与设置
 
-收起当前 agent（Settle、Snooze、拖动、划选）默认回 Home，下一步交给人决定；布局设置可改为走到下一张卡片。关闭当前 agent 的整个标签仍回 Home。`cmd-shift-h` 或品牌栏的标记去 Home。
+收起当前查看的 agent（Settle、Snooze、拖动、划选）默认回 Home，下一步交给人决定；布局设置可改为走到下一张卡片。关闭当前查看的 agent 的整个标签仍回 Home。`cmd-shift-h` 或品牌栏的标记去 Home。
 
-Home 是按需创建、本机一个隐形 space，跨项目和机器共用，只靠记住的 id 或确切名字 `Home\u200b` 认领，所有列表都不显示它。里面是一个 mod（默认 `t3-home`）或 shell；这个 shell 起了 agent，就原地变成普通 space，下次 Home 重新创建。
+Home 是按需创建、本机一个隐形 space，不属于任何 Project，各机器共用，只靠记住的 id 或确切名字 `Home\u200b` 认领，所有列表都不显示它。里面是一个 mod（默认 `t3-home`）或 shell；这个 shell 起了 agent，就原地变成普通 space，下次 Home 重新创建。
 
 布局设置（底栏 sliders 或 `cmd-shift-,`）分两页。Home 页恰好两项存下来的偏好；Sidebar 页只有 Sidebar shows（Inbox 或 Lists），和 `cmd-shift-l` 一样读取并切换布局自己的侧栏栈，不另存：
 
@@ -286,7 +286,7 @@ mod 用 `spaces/panes/agents/terminals/focused/layout/settings/window/keys`、`r
 3. Inbox：Settle、Un-settle、Undo、新工作、两种模式的 pin、拖动、划选和取消都符合前述行为。Settled 标题行只显示名称、数量和折叠箭头。Filter by space 跳过只有 shell 且无 Inbox 条目的 space，已选中的 space 在最后一个 Inbox 条目消失后仍留在筛选里。收起后的去处遵循偏好；后台动作不跳；Lists 的 Settle 键无作用；侧栏隐藏时顺序、不循环和 5s Undo 照旧。
 4. Snooze working 和置顶的 agent、权限询问、失败或查看时的新轮（Inbox 未启动时也一样）、前后台到期：Needs you、`Woke` 和 pin 都符合规则；Custom 输入无效时保持打开；取消不改任何东西。
 5. 面包屑的 current、held、away、fresh 状态，子 agent 和 zoom 与点亮的卡片、焦点一致。关闭前后台标签、最后 pane 和分屏 pane 按描述落点，保留未读邻居，停止程序前先问；弹层上的关闭键不关下面的标签。
-6. 在 Home 的 shell 里起 agent，留下带该 agent 的普通 space，下次 Home 干净，项目编号稳定。Go to 优先显示上一个窗格和名字命中的结果，显示远程信息，支持键盘且终端保有 Tab 键。在 New 选已打开的 space，在其当前位置新建标签。关闭项目的最后一个终端，在已打开的 space 下方找到它，并在原机器和目录重新打开。打开后只在已打开的 space 里出现一次。worktree 折叠保持分组和编号。
+6. 在 Home 的 shell 里起 agent，留下带该 agent 的普通 space，下次 Home 干净，space 编号稳定。Go to 优先显示上一个窗格和名字命中的结果，显示远程信息，支持键盘且终端保有 Tab 键。在 New 选已打开的 space，在其当前位置新建标签。关闭 space 的最后一个终端，在已打开的 space 下方找到它的 Project，并在原机器和目录重新打开。打开后只在已打开的 space 里出现一次。worktree 折叠保持分组和编号。
 7. Actions 增、改、删，在各位置和目录运行：必填项、确认、上次选择、shell 保留。
 8. space 面板与 Files：每条打开、替换、去重、关闭、批量、隐藏、放大和驱逐规则；本机与远程；菜单与剪贴板；禁用、缺失、长名和大量文件；面板与终端快捷键。详情：Actions 空与满、locked 机器行、选择与执行、键盘走查、分层 Escape、来源失效、冷暖打开耗时。
 9. Review 范围、base、远程、commit、组、已看、`j`/`k`、Analyze、Unicode、二进制、空与失败：树和 diff 同序，不误分析，换行安全，吸顶头不透明，勾选框 alpha 正确。

@@ -13,11 +13,11 @@ The Home space and its default content (`t3-home`): geometry, identity and edge 
 
 ## Identity
 
-- One local hidden space, shared across projects and machines, created on demand.
+- One local hidden space, in no Project, shared across spaces and machines, created on demand.
 - Claimed only by its remembered id (`t3-tabs.home`), or by the strict local explicit name `Home\u200b`; never by plain `Home` or by its contents.
 - When waiting for a newly created Home, use the same local explicit-name check. A remote namesake can appear first without being claimed.
 - With another space showing, create Home and add its configured mod without changing focus. Leave the previous space visible until the mod pane exists, then set Home's frame and panel state before selecting the mod tab. Close the starter tab only if both tabs still belong to the local Home. For Terminal, select the starter tab itself.
-- If a different project is showing when Home is ready, leave that project selected and finish preparing Home in the background.
+- If a different space is showing when Home is ready, leave that space selected and finish preparing Home in the background.
 - When no space is showing, Herdr shows the first space even with `focus: false`. Its starter terminal can appear until the mod tab is ready; `space.new` cannot take a mod.
 - Hidden from Spaces, New, the Inbox filter, Go to and space navigation.
 - Holds one selected mod (`t3-home` by default) or, for Terminal, a shell in the home folder.

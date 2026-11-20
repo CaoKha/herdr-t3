@@ -2,7 +2,7 @@
 
 布局有了自己的设置页（`t3-tabs.settings` 打开，`t3-chrome` 绘制）。设置页只收这样的选项：两种做法各自对一类人更省注意力，没有一个对所有人都更好。为保留旧行为、外观微调或一次性的口味，不加设置。这条和 [0008](0008-change-behaviour-without-toggles.md) 不冲突：0008 管行为变更，不留开关保旧行为；本条管本来就因人而异的偏好。
 
-收进来的两项：收起当前 agent 后回 Home 还是跳到下一张卡片（按需挑下一步的人要 Home，连续清队列的人要下一张）；Home 放什么：默认页、终端，或自荐的 mod（默认页只放三个按钮，有人把 Home 当常驻 shell，有人想要自己的看板）。终端里起了 agent，那个 space 就不再是 Home，所以选终端不会让 Home 被占住（见 [0005](0005-home-is-a-hidden-space.md)）。
+收进来的两项：收起当前查看的 agent 后回 Home 还是跳到下一张卡片（按需挑下一步的人要 Home，连续清队列的人要下一张）；Home 放什么：默认页、终端，或自荐的 mod（默认页只放三个按钮，有人把 Home 当常驻 shell，有人想要自己的看板）。终端里起了 agent，那个 space 就不再是 Home，所以选终端不会让 Home 被占住（见 [0005](0005-home-is-a-hidden-space.md)）。
 
 ## Considered Options
 
@@ -15,4 +15,4 @@
 - 设置每次现读（`shared/layout-settings.js` 带默认值），没有缓存，也没有迁移。
 - 外观照搬 Herdr 自带的 Settings，而不是 T3：它和 Herdr 的设置并列，看起来应该是同一类东西。
 - 以后新增选项先对照本条；只有一个分区时也保留左侧导航，加分区不用改结构。
-- Sidebar 页的 Sidebar shows（Inbox／Lists，2026-11-19 从品牌栏按钮挪来）不算新偏好，也不进 `t3.settings`：它直接读、选布局自己的 `sidebar-lists` stack，和 `cmd-shift-l` 是同一个状态，设置页只是它的又一个入口。
+- Sidebar 页的 Sidebar shows（Inbox／Lists）不算新偏好，也不进 `t3.settings`：它直接读、选布局自己的 `sidebar-lists` stack，和 `cmd-shift-l` 是同一个状态，设置页只是它的又一个入口。

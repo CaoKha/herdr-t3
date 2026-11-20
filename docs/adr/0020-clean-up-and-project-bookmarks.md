@@ -5,7 +5,7 @@ Herdr 的 space 靠活窗格维持存在，而每个终端都是真实进程。I
 我们把回收做成一个不离开 Inbox 的动作，并让项目不再靠活终端保活：
 
 - **项目书签（`t3.projects`）**：`t3-tabs` 自动记录打开过的非 Home 项目 `(machine, folder, name, named?)`（最近在前，上限 50）。`New`（`t3-new-menu`）在当前存活 space 之后顺序列出尚未打开的书签，选中即调 `space.new` 原地唤醒，不显示进程状态或关闭控件。关掉整个 space 不再有损失，也就不再需要盘点哪些项目还活着。
-- **Clean up（`t3-tabs.cleanup`）**：快捷键与侧栏底栏的垃圾桶图标打开它的对话框，对话框就是确认框，不先打开任何列表。闲置的终端（当前标签之外、core 已确认 `settled` 的顶层 agent，以及 `atPrompt` 的非 agent shell）折成一块，只说有几个、哪些 space 随之关闭，展开才按 space 列名字；主按钮一键关掉，确认时逐个复查，整标签都属待关集合时经 `tab.close`（`confirmed: true`）关闭，空掉的 space 随之关闭。被落下的程序（Left behind）各是一张卡片，写明所在 space 和前台进程：点卡片跳过去，卡片上的 `Stop`（或 `ctrl-d`）当场停掉，不再二次确认（2026-11-19 用户决定）；用文字而不用 `×`，因为布局别处的 `×` 在有程序运行时会先询问，同一个图标不该有两种后果。数量和随之关闭的 space 按仍在的终端实时计算，底部说明写明跳过的两种范围：当前标签，以及当前 space 里的程序。名字统一为 Clean up：它回收的东西不能恢复，所以不叫回收站或 Trash，垃圾桶只是图标。被落下指它仍在运行，但所在 space 已没有在工作的 agent（没有未 Settle 的顶层 agent，Snooze 中的算在工作），且不是你正在的 space。两样都没有时只弹提示。被忘掉的程序就是在这里被发现并处理的。
+- **Clean up（`t3-tabs.cleanup`）**：快捷键与侧栏底栏的垃圾桶图标打开它的对话框，对话框就是确认框，不先打开任何列表。闲置的终端（当前标签之外、core 已确认 `settled` 的顶层 agent，以及 `atPrompt` 的非 agent shell）折成一块，只说有几个、哪些 space 随之关闭，展开才按 space 列名字；主按钮一键关掉，确认时逐个复查，整标签都属待关集合时经 `tab.close`（`confirmed: true`）关闭，空掉的 space 随之关闭。被落下的程序（Left behind）各是一张卡片，写明所在 space 和前台进程：点卡片跳过去，卡片上的 `Stop`（或 `ctrl-d`）当场停掉，不再二次确认；用文字而不用 `×`，因为布局别处的 `×` 在有程序运行时会先询问，同一个图标不该有两种后果。数量和随之关闭的 space 按仍在的终端实时计算，底部说明写明跳过的两种范围：当前标签，以及当前 space 里的程序。名字统一为 Clean up：它回收的东西不能恢复，所以不叫回收站或 Trash，垃圾桶只是图标。被落下指它仍在运行，但所在 space 已没有在工作的 agent（没有未 Settle 的顶层 agent，Snooze 中的算在工作），且不是你正在的 space。两样都没有时只弹提示。被忘掉的程序就是在这里被发现并处理的。
 - **找终端**：交给 Go to（它本就搜 space 名，输入项目名即列出该项目的窗格）和面包屑的 space 菜单。
 - **Inbox 与 Filter**：从 `Settled` 头部移除 `Clear`；`Filter by space` 仅列出当前在 Inbox 有条目或仍在 `scope` 中的 space。
 

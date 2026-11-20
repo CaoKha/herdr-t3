@@ -21,8 +21,8 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (
 
 ### New
 
-- Live spaces first (current first, machines kept together), followed by remembered dormant projects (`t3.projects`) whose `(machine, folder)` is not already open; the second line is the folder, with server or machine for remote spaces. Dormant projects on a remote machine that isn't ready stay dimmed (`0.64`) and cannot be picked.
-- Choosing a live space opens a new tab at its current place (`newTab`); choosing a dormant project runs `space.new` with its `folder`, `machine` and explicit `name` when `named`. No process status or close controls appear here ([ADR 0020](../../adr/0020-clean-up-and-project-bookmarks.md)).
+- Live spaces first (current first, machines kept together), followed by remembered Projects (`t3.projects`) whose `(machine, folder)` is not already open; the second line is the folder, with the machine for remote ones. Projects on a remote machine that isn't ready stay dimmed (`0.64`) and cannot be picked.
+- Choosing a live space opens a new tab at its current place (`newTab`); choosing a Project runs `space.new` with its `folder`, `machine` and explicit `name` when `named`. No process status or close controls appear here ([ADR 0020](../../adr/0020-clean-up-and-project-bookmarks.md)).
 - Platform `1…9` pick numbered rows, labelled `⌘1` on macOS and `Super+1` elsewhere.
 - New space in the footer and the Inbox and Spaces headers make the same choice: create immediately with only this computer, otherwise ask which machine. Candidates are this computer, the reported machines, and machines that still have a space. The active space's machine comes first; remote machines that aren't ready (including those no longer reported) are listed but cannot be picked.
 - The footer opens the Machines step in place, with `← Spaces` to go back; a sidebar header opens at that step. Pressing the same header button closes its step; pressing the other switches steps. `cmd-n` creates on the active space's machine directly; New space shows that shortcut only when it creates directly. A sidebar installed without the New menu uses Herdr's native New space command.
@@ -42,7 +42,7 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (
 
 ## Actions
 
-- Global, not per project. The primary is the last run, else the first. `▶` repeats it; choosing from the menu runs and makes it primary; a row's gear edits; Add action creates. The menu is one, from the bar's `⌄` or Details' row, as T3's `ProjectScriptsControl`: no rule over Add action, a row's gear only while the row is lit or the gear has the keyboard.
+- Global, not per Project. The primary is the last run, else the first. `▶` repeats it; choosing from the menu runs and makes it primary; a row's gear edits; Add action creates. The menu is one, from the bar's `⌄` or Details' row, as T3's `ProjectScriptsControl`: no rule over Add action, a row's gear only while the row is lit or the gear has the keyboard.
 - The standalone bar menu is 220 wide, aligned 1px past the chevron's right edge and 5px below its bounds; 28px rows with 36px for padding and Add action, capped at 420px. With no press bounds it uses the host's placement. The demo passes explicit window-pixel chevron bounds to `t3-actions.bar-menu:<bounds>`; it opens that same standalone popup, not a child of Details or a click on the default layout's Details button.
 - Editor fields: required non-blank Name and Command; optional Folder, icon and place (Tab / Split right / Split down). Save is disabled until valid; Delete asks.
 - Each run opens a new named tab or split: `terminal.open { argv: ["sh", "-c", command], name, place, folder? }`; the shell stays after the command exits.

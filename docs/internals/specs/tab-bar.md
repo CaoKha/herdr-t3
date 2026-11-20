@@ -43,9 +43,9 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 ## Hidden sidebar
 
 - The row starts at `toggleLeft` (`shared/sidebar.js`), the brand bar's own inset, so the sidebar toggle stays on the same screen points shown or hidden ([sidebar](sidebar.md#brand-bar)). Outside macOS's window buttons that is 8.
-- Then the toggle, `Show sidebar`: a 28 ghost `sm` icon button, nothing else. It says nothing of the agents (no counts or marks, 2026-11-19 user decision): their state is the sidebar's, and Herdr's own notice says when one needs the person. It carries 4 on its right, so what follows is a group's 8 away (t3-tokens P3).
-- That 8 is the brand bar's from the same toggle to Herdr's tile ([sidebar](sidebar.md#brand-bar), `BRAND_GAP`): in Inbox, hiding the sidebar puts the breadcrumb's 14px space mark where the 16px tile was, left edges together (2026-11-20 user decision: the sidebar has one gap between icons).
-- Nothing else before the tabs or the breadcrumb: no brand, as T3's collapsed sidebar leaves only its trigger (2026-11-20 user decision; Home is `cmd-shift-h`, the palette, or the brand bar once shown), at Home or away, in Inbox or Lists: no Inbox cards, no blocked agents (2026-11-20 user decision, [ADR 0010](../../adr/0010-inbox-tab-bar-follows-the-agent.md)). `check-hidden-row.cjs` holds it.
+- Then the toggle, `Show sidebar`: a 28 ghost `sm` icon button, nothing else. It says nothing of the agents (no counts or marks): their state is the sidebar's, and Herdr's own notice says when one needs the person. It carries 4 on its right, so what follows is a group's 8 away (t3-tokens P3).
+- That 8 is the brand bar's from the same toggle to Herdr's tile ([sidebar](sidebar.md#brand-bar), `BRAND_GAP`): in Inbox, hiding the sidebar puts the breadcrumb's 14px space mark where the 16px tile was, left edges together: the sidebar has one gap between icons.
+- Nothing else before the tabs or the breadcrumb: no brand, as T3's collapsed sidebar leaves only its trigger (Home is `cmd-shift-h`, or the brand bar once shown), at Home or away, in Inbox or Lists: no Inbox cards, no blocked agents ([ADR 0010](../../adr/0010-inbox-tab-bar-follows-the-agent.md)). `check-hidden-row.cjs` holds it.
 
 ## Home row
 
@@ -56,7 +56,7 @@ The bar and the Inbox share one rule (`navigation.js` `inViewAgent`), recomputed
 
 ## Tab tooltips
 
-- Only a clipped name gets a label: `tip.js`'s tooltip, below the tab, with the whole name (t3-tokens P5). Whole names get none, and the state isn't said, as `×` no longer covers the mark. Any press on the tab hides it; it stays down while a drag is held.
+- Only a clipped name gets a label: `tip.js`'s tooltip, below the tab, with the whole name (t3-tokens P5). Whole names get none, and the state isn't said: `×` leaves the mark in view. Any press on the tab hides it; it stays down while a drag is held.
 - The close button's tooltip, `Close tab`, waits 500ms; only the active tab's shows the key.
 
 ## Zoom group
@@ -87,7 +87,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 - Agent next/previous (`cmd-]` / `cmd-[`) walks the selected mode's rows without wrapping, including mod cards, not pane-less sub-agents. From Home, next takes the first row and previous the last.
 - Tab next/previous wraps through the displayed tabs; `cmd-1…9` numbering follows them too.
 - The floating keys block can advance navigation with no strip present. The strip and the tab-number / tab-cycle commands advance from the current Herdr observation before using the same tab order, regardless of which block drew first. Repeating an unchanged observation does not repeat a zoom, end a Snooze twice, or record a temporary close neighbour as a visit.
-- Space keys follow sidebar order, folded worktrees included, skipping Home and synthetic checkout rows; project numbers stay stable.
+- Space keys follow sidebar order, folded worktrees included, skipping Home and synthetic checkout rows; space numbers stay stable.
 - When the layout knows the destination, prepare its work frame before selecting it (`fitRow`):
 
   | Where | `work-view` | `work-main` | `tabs-row` |
@@ -112,7 +112,8 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 - Every layout ×, a tab's middle-click, close key, context-menu Close and Go to's `ctrl-d` asks `hc get <terminal> --json` first. Only the terminal's own shell: close at once. A running program, or no answer: ask.
 - `Close terminal "<name>"?` with `This stops the running process and clears its history.` Several programs: a plural title and a list of names. A tab's lone pane uses the tab's name.
 - A tab close covers the terminal identities in that tab and whether closing it also closes its space. Check that scope when accepting the answer and again after any wait to land elsewhere. A new terminal or a newly last tab needs a fresh answer, with the space consequence shown if it applies. The same or smaller scope can close on the existing answer.
-- Enter confirms, Esc cancels. The space's last pane uses Herdr's own Close space. Direct `tab.close` / `pane.close`, palette included, stay native.
+- Enter confirms, Esc cancels. The space's last pane uses Herdr's own Close space. Direct `tab.close` / `pane.close`, palette included, stay native: the palette lists only Herdr's commands, so it can't reach the layout's close.
+- Unlike T3, which asks before closing any terminal (`confirmTerminalClose`) and has a setting to stop asking, a bare shell closes at once and there is no setting: asking about a shell is noise, and turning the question off for running programs isn't a preference worth a switch ([ADR 0009](../../adr/0009-settings-hold-real-preferences.md)).
 
 ## t3-tabs commands
 
@@ -122,4 +123,4 @@ The floating `tabs-keys` copy handles these even with the sidebar hidden or the 
 - `t3-tabs.close-tab:<id>`, `t3-tabs.close-pane:<id>`, `t3-tabs.cleanup-now:<serial>`
 - `t3-tabs.pin:<address>`, `unpin:<address>`, `settle:<address>`, `wake:<address>`, `snooze:<address>:<wake-ms>`. Settle and Wake of a background agent don't go Home; the viewed agent leaves as with the key.
 - `t3-tabs.space:<n>`, `space-next`, `space-prev`, `tab:<n>`, `tab-next`, `tab-prev`
-- `t3-tabs` (`keys` block) also records live non-Home spaces into `t3.projects` ([storage](../storage.md)) outside `checking()`, and owns `Clean up` ([dialogs](dialogs.md#clean-up): it opens its dialog with the idle terminals by space and a card for each program left behind (a non-agent terminal still running in a space where no agent is at work and that you're not in) with its foreground process, or a toast when there's neither; `stop-pane:<pane>` stops a card's program without asking and `go-pane:<pane>` goes to it; confirming rechecks `stillSettled` and `atPrompt` before closing tabs with `confirmed: true` or individual panes).
+- `t3-tabs` (`keys` block) also records live non-Home spaces into `t3.projects` ([storage](../storage.md)) outside `checking()`, and owns Clean up with its `stop-pane:<pane>` and `go-pane:<pane>` ([dialogs](dialogs.md#clean-up)).

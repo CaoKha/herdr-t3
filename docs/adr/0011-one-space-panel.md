@@ -6,7 +6,7 @@
 
 面板沿用 Herdr 自带布局的结构和 id：`panel` 列里一个 `panel-body` stack，用 `layout.select`、`layout.show`、`layout.hide` 切换。顶上 40px 的面板头由 `t3-chrome` 画，列出 stack 里实际有的页。Review 是 extra，安装时把自己的块加进 `panel-body`；没装就只有 Files。
 
-面板里内容在左、导航在右：导航贴窗口外沿、内容贴标签区，和左侧栏对称。Files 是右边文件树、左边文件内容；Review 的组侧栏和文件栏也移到 diff 右边，和 pulls.review 网页版方向相反。
+面板里内容在左、导航在右：导航贴窗口外沿、内容贴标签区，和左侧栏对称。Files 是右边文件树、左边文件内容；Review 的组侧栏和文件列表也移到 diff 右边，和 pulls.review 网页版方向相反。
 
 Inbox 的卡片只代表一个 agent 或一个窗格。Review 不再是窗格，也就没有卡片；它的状态（AI 分析中、分析好了还没看）显示在标签栏的 Review 栏和面板头的 Review 页签上。
 
