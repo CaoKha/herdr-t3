@@ -42,6 +42,8 @@ export default class WorkspaceChrome extends View {
     this.surfaceWidths = {}; this.surfaceStrip = {};
     // The brand's name width, unzoomed, written by brand() (brand.js) once drawn.
     this.brandNameW = 0;
+    // The footer Undo notice's available width and measured text widths (unzoomed logical px).
+    this.noticeW = null; this.noticeSummaryW = {}; this.noticeUndoW = {};
     if (props()?.view === "settings") return initSettings(this, cx);
     stopsInit(this, cx);
     if (props()?.part?.startsWith("surface-")) {
@@ -124,19 +126,42 @@ export default class WorkspaceChrome extends View {
       // T3's undo notice (t3-inbox.notice), in this row's free space so it covers nothing; Undo is inert while it fades. One older than
       // its 5s plus the fade is left from before a restart.
       const undo = shared(KEY.notice), undoLive = Boolean(undo?.live && Date.now() - undo.at < 5000);
-      const undoButton = undo && h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
+      const noticeActive = Boolean(undo && Date.now() - undo.at < 6000);
+      const summary = noticeActive ? `${undo.action}${undo.count === 1 ? "" : ` ${undo.count}`},` : "";
+      const undoText = noticeActive ? undoLabel("t3-tabs.undo") : "";
+      const noteW = (key, sub) => (size, cx) => {
+        const w = size.width / zoomOf();
+        if (sub === undefined) {
+          if (this[key] === w) return;
+          this[key] = w;
+        } else {
+          const map = (this[key] ??= {});
+          if (map[sub] === w) return;
+          map[sub] = w;
+        }
+        cx.notify();
+      };
+      const summaryW = this.noticeSummaryW?.[summary], undoW = this.noticeUndoW?.[undoText];
+      const showSummary = !(this.noticeW != null && summaryW > 0 && undoW > 0 && summaryW + 4 + undoW > this.noticeW + 0.5);
+      const undoButton = noticeActive && h_flex().id("undo-notice-undo").flex_none().h(24).items_center().whitespace_nowrap().font_medium().text_color(t.foreground)
+        .on_size_change(noteW("noticeUndoW", undoText))
         .when(undoLive, (el) => el.hover((s) => s.underline()).on_hover(glow(this, "undo-notice-undo")).role("button")
           .accessibility_label(`Undo: ${undo.action} ${undo.count} agent${undo.count === 1 ? "" : "s"}`)
           .on_click(() => run("t3-tabs.undo")))
-        .child(undoLabel("t3-tabs.undo"))
+        .child(undoText)
         .when(undoLive, (el) => stop(this, t, "undo-notice-undo", el, 4));
-      // Short of room the summary is cut, never Undo: GPUI's flex can't do T3's two wraps.
-      const notice = undo && Date.now() - undo.at < 6000 && h_flex().id(`undo-notice-${undo.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
+      // Match T3's SidebarThreadUndoNotice: the summary fits whole beside Undo or is omitted, never truncated to "…".
+      const notice = noticeActive && h_flex().id(`undo-notice-${undo.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
         .text_size(11).text_color(t.dim).opacity(undo.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
-        .child(div().min_w(0).truncate().child(`${undo.action}${undo.count === 1 ? "" : ` ${undo.count}`},`))
+        .when(showSummary, (el) => el.child(div().id("undo-notice-summary").flex_none().whitespace_nowrap().child(summary)))
         // As T3's InlineButton: medium, foreground, underlined on hover.
         // T3's names its key in the button (threadUndoLabel), so it has no tooltip.
         .child(undoButton);
+      const measureSummary = noticeActive && div().id(`undo-summary-measure-${summary}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap()
+        .text_size(11).font_normal().child(summary).on_size_change(noteW("noticeSummaryW", summary));
+      const noticeSlot = h_flex().id("footer-notice-slot").relative().flex_1().min_w(0).h(24).items_center()
+        .on_size_change(noteW("noticeW"))
+        .when(Boolean(notice), (el) => el.child(notice).child(measureSummary));
       const button = (id, icon, label, action, key) => tip(this, t, id, label, stop(this, t, id, drawButton(t, id, { size: "default", icon, label, hot: this.hot === id })
         .on_hover(glow(this, id))
         // Each opens over its button, before the pointer can report leaving it.
@@ -148,7 +173,7 @@ export default class WorkspaceChrome extends View {
           .child(button("t3-settings", "mods/t3-chrome/icons/sliders-horizontal.svg", "Herdr T3 settings", () => run("t3-tabs.settings"), "t3-tabs.settings"))
           // Clean up: what closes and what still runs, in the dialog t3-tabs opens (ADR 0020).
           .child(button("clean-up", "mods/t3-chrome/icons/trash-2.svg", "Clean up", () => run("t3-tabs.cleanup"), "t3-tabs.cleanup")))
-        .child(notice || div().flex_1())
+        .child(noticeSlot)
         .when(Boolean(ready), el => el.child(tip(this, t, "app-update", `Update ${ready} downloaded. Click to restart`, stop(this, t, "app-update", div().id("app-update").h(32).px(12).flex_none().flex().items_center()
           .rounded_full().bg(alpha(t.accent, "26")).text_size(12).text_color(t.accent).hover(s => s.bg(alpha(t.accent, "40"))).on_hover(glow(this, "app-update"))
           .role("button").accessibility_label(`Restart into Herdr ${ready}`)

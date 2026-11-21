@@ -68,7 +68,7 @@ Geometry, constants and edge rules of the Inbox sidebar (`t3-inbox`) and its Sno
 ## Undo notice
 
 - `Settled, ⇧⌘Z to undo`, `Snoozed, …`, `Unpinned, …`, with a count for a batch, in the footer's free space for 5s, fading over 200ms. With the sidebar hidden it shows in the tab bar.
-- When short of room, the summary truncates before Undo does. Repeats of the same action combine into one notice.
+- When short of room, the summary is hidden whole and Undo stays (never truncated to `…`). Repeats of the same action combine into one notice.
 - Undo restores state; it doesn't count as new work. While still on the Home that action reached, Undo also returns to an agent that was in view when it was put away; one put away in the background stays where it is, and after going elsewhere Undo doesn't navigate.
 - Undo's key is `cmd-shift-z` (`t3-tabs.undo`), written in the button as T3's `threadUndoLabel` does (`undoLabel` in `shared/tip.js`, read from the bindings; plain `Undo` with none bound, as standalone Inbox), and the button has no tooltip; `cmd-z` belongs to terminals. At Home the Settle key does nothing: Undo has only its own key, as T3's.
 

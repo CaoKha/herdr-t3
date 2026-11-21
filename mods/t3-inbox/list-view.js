@@ -128,17 +128,38 @@ export function inboxList(view, t, model, drag, draw, cx) {
   // from shared(KEY.notice). Docked alone, with no footer, it goes over the first shelf's header.
   const n = view.notice;
   const footer = (x) => !x?.hidden && ((x?.content?.mod === "t3-chrome" && Boolean(x.content.props?.footer)) || (x?.children ?? []).some(footer));
-  const notice = n && !footer(layout()) && h_flex().id(`undo-notice-${n.gen}`).absolute().left(0).right(0).top(-24).h(24).px(10).gap(4).items_center()
+  const standaloneNotice = Boolean(n && !footer(layout()));
+  const noticeSummary = standaloneNotice ? `${n.action} ${n.count} agent${n.count === 1 ? "" : "s"},` : "";
+  const noticeUndo = standaloneNotice ? undoLabel("t3-tabs.undo", "t3-inbox.undo") : "";
+  const noteW = (key, sub, pad = 0) => (size, cx) => {
+    const w = Math.max(0, size.width / (Number(settings()?.zoom) || 1) - pad);
+    if (sub === undefined) {
+      if (view[key] === w) return;
+      view[key] = w;
+    } else {
+      const map = (view[key] ??= {});
+      if (map[sub] === w) return;
+      map[sub] = w;
+    }
+    cx.notify();
+  };
+  const summaryW = view.noticeSummaryW?.[noticeSummary], undoW = view.noticeUndoW?.[noticeUndo];
+  const showSummary = !(view.noticeW != null && summaryW > 0 && undoW > 0 && summaryW + 4 + undoW > view.noticeW + 0.5);
+  const notice = standaloneNotice && h_flex().id(`undo-notice-${n.gen}`).absolute().left(0).right(0).top(-24).h(24).px(10).gap(4).items_center()
     .bg(t.chrome).text_size(11).text_color(t.dim).opacity(n.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
-    .child(div().min_w(0).truncate().child(`${n.action} ${n.count} agent${n.count === 1 ? "" : "s"},`))
+    .on_size_change(noteW("noticeW", undefined, 20))
+    .when(showSummary, (el) => el.child(div().id("undo-notice-summary").flex_none().whitespace_nowrap().child(noticeSummary)))
     // As T3's InlineButton: medium, foreground, underlined on hover.
-    .when(n.live, (el) => el.child(div().id("undo-notice-undo").flex_none().font_medium().text_color(t.foreground).hover((s) => s.underline())
+    .when(n.live, (el) => el.child(div().id("undo-notice-undo").flex_none().whitespace_nowrap().font_medium().text_color(t.foreground).hover((s) => s.underline())
       .role("button").accessibility_label(`Undo: ${n.action} ${n.count} agent${n.count === 1 ? "" : "s"}`)
+      .on_size_change(noteW("noticeUndoW", noticeUndo))
       .on_click((_e, cx) => {
         cx.stop_propagation();
         view.undo(cx);
       })
-      .child(undoLabel("t3-tabs.undo", "t3-inbox.undo"))));
+      .child(noticeUndo)));
+  const measureSummary = standaloneNotice && div().id(`undo-summary-measure-${noticeSummary}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap()
+    .text_size(11).font_normal().child(noticeSummary).on_size_change(noteW("noticeSummaryW", noticeSummary));
   const top = inboxTop(view, t, model);
   // Vertical padding lives in child spacers: pt/pb on an overflow_y_scroll container with a flex_1 filler adds pt+pb of spurious scroll in GPUI.
   const body = v_flex().id("inbox-list").relative().flex_1().min_h(0).px(8).overflow_y_scroll()
@@ -182,7 +203,9 @@ export function inboxList(view, t, model, drag, draw, cx) {
   }
   // One native viewport: free space pushes the shelves down, but each shelf row is a direct scroll target.
   add(div().id("active-rest").min_h(0).flex_1().on_mouse_move((_e, cx) => aim({ section: "active" }, cx)));
-  add(div().id("inbox-shelf-start").relative().flex_none().h(0).when(Boolean(notice), (el) => el.child(notice)));
+  add(div().id("inbox-shelf-start").relative().flex_none().h(0)
+    .on_size_change(noteW("noticeW", undefined, 20))
+    .when(Boolean(notice), (el) => el.child(notice).child(measureSummary)));
   let firstShelf = true;
   const addShelf = (el, address = null, before = STACK, after = 0) => {
     add(v_flex().flex_none().mt(firstShelf ? 0 : before).mb(after).child(el), address);

@@ -1,18 +1,28 @@
-import { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window } from "herdr";
-import { namer, programOf } from "./name.js";
+import { checking, exec, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window } from "herdr";
+import { namer, programOf, isSubAgent } from "./name.js";
 import { descendants, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { sidebarParts } from "./sidebar.js";
 import { agentStep } from "./agent-step.js";
-import { newTab } from "./project.js";
+import { newTab, placeOf } from "./project.js";
 import { rememberProjects } from "./projects.js";
 import { t3Settings } from "./layout-settings.js";
 import { KEY } from "./store.js";
 import { writeLabel } from "./labels.js";
 
+// Checks a local directory via `sh` (`fs/promises` is sandboxed to manifest read roots and has no stat); fails open on shell errors.
+async function folderExists(folder) {
+  try {
+    const r = await exec("sh", ["-c", '[ -d "$1" ]', "sh", folder]);
+    return r.code !== 1;
+  } catch {
+    return true;
+  }
+}
+
 // One instance per Tabs view; the Herdr operations also admit the check's fake core.
-export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => checking(), spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel }) {
-  const { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel } = core;
+export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => checking(), spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel, folderExists }) {
+  const { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel, folderExists: checkFolder = folderExists } = core;
   // lastIn: each tab's agent last in view, which the Inbox's bar holds while a program there has the focus.
   // fresh: spaces where the person started something new (a New tab, New's pick, cmd-t) since last looking at an agent there.
   const trail = {}, lastIn = {}, fresh = new Set(), owed = new Map(), waking = new Map();
@@ -20,7 +30,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
   // Spaces that were Home until an agent started there: their rename may not have shown yet.
   const released = new Set();
   let renaming = false, going, inView, wasHome, unread, focusWas, zoomOff, asking, settingsOpen;
-  let tabAnswer, tabAskSerial = 0, cleanupAnswer, cleanupSerial = 0;
+  let tabAnswer, tabAskSerial = 0, cleanupAnswer, cleanupSerial = 0, cleanupScanSerial = 0;
   const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
   // The Inbox's ways with attention hold unless Lists is the mode (docs/adr/0002).
   const listsShown = () => sidebarParts(layout()).stack?.active === "lists";
@@ -173,7 +183,9 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       const terminal = p.terminal;
       if (!terminal || p.tab === tabNow || !tabs.has(p.tab)) continue;
       const a = byAgent.get(terminal), k = byAddr.get(terminal), under = kids(terminal);
-      if (a ? k && !k.parent && stillSettled(k, ownStatus(a.status, terminal, all), under) : !programOf(p)?.agent && !under.length) {
+      if (a
+        ? k && !isSubAgent(terminal, byAddr) && stillSettled(k, ownStatus(a.status, terminal, all), under)
+        : !programOf(p)?.agent && k?.status == null && !under.length) {
         candidates.set(p.pane, { terminal, agent: Boolean(a) });
       }
     }
@@ -183,8 +195,16 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     const spaceOfTab = new Map(openSpaces.flatMap(s => s.tabs.map(c => [c.id, s.id])));
     for (const a of ags) {
       const k = byAddr.get(a.address), space = spaceOfTab.get(a.tab);
-      if (!space || k?.parent) continue;
+      if (!space || isSubAgent(a.address, byAddr)) continue;
       if (!(k && stillSettled(k, ownStatus(a.status, a.address, all), kids(a.address)))) working.add(space);
+    }
+    for (const p of ps) {
+      const terminal = p.terminal;
+      if (!terminal || byAgent.has(terminal)) continue;
+      const space = spaceOfTab.get(p.tab), k = byAddr.get(terminal);
+      if (!space || working.has(space) || isSubAgent(terminal, byAddr)) continue;
+      if (!programOf(p)?.agent && k?.status == null) continue;
+      if (!(k && stillSettled(k, ownStatus(k.status, terminal, all), kids(terminal)))) working.add(space);
     }
     return { openSpaces, ps, candidates, working };
   }
@@ -192,10 +212,11 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
   // `kept`: the non-agent terminals in scope still running a program (pane → its process); cleanup keeps those left behind.
   async function scanCleanup(targets) {
     const { candidates } = cleanupScope();
-    const eligible = new Map(), busy = new Map();
+    const eligible = new Map(), busy = new Map(), procs = new Map();
     await Promise.all([...candidates].map(async ([pane, { terminal, agent }]) => {
       if (targets && targets.get(pane) !== terminal) return;
       const fg = agent ? null : await foreground(terminal);
+      if (fg?.process) procs.set(pane, fg.process);
       if (agent || fg.prompt) eligible.set(pane, { terminal, agent });
       else busy.set(pane, fg.process);
     }));
@@ -204,15 +225,20 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     const confirmed = new Map();
     for (const [pane, { terminal, agent }] of eligible) {
       const p = current.candidates.get(pane);
-      if (p?.terminal === terminal && p.agent === agent) confirmed.set(pane, terminal);
+      if (p?.terminal === terminal && p.agent === agent) confirmed.set(pane, { terminal, agent });
     }
-    const kept = new Map([...busy].filter(([pane]) => current.candidates.has(pane)));
-    return { openSpaces: current.openSpaces, ps: current.ps, confirmed, kept, working: current.working };
+    const kept = new Map([...busy].filter(([pane]) => {
+      const p = current.candidates.get(pane);
+      return p && !p.agent && p.terminal === candidates.get(pane).terminal;
+    }));
+    return { openSpaces: current.openSpaces, ps: current.ps, confirmed, kept, working: current.working, procs };
   }
 
   // Clean up (t3-actions draws it): what closes, by space, and a card for each program left behind. Nothing in it, a toast.
   async function cleanup(cx) {
-    const { openSpaces, ps, confirmed, kept: running, working } = await scanCleanup(null);
+    const scan = ++cleanupScanSerial;
+    const { openSpaces, ps, confirmed, kept: running, working, procs } = await scanCleanup(null);
+    if (scan !== cleanupScanSerial) return;
     const n = confirmed.size;
     // Left behind: a program running where no agent is at work any more. Elsewhere it's in use, and not Clean up's.
     const tabSpace = new Map(openSpaces.flatMap(s => s.tabs.map(c => [c.id, s.id])));
@@ -222,15 +248,29 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       return;
     }
     const name = namer(), mine = s => { const tabs = new Set(s.tabs.map(c => c.id)); return ps.filter(p => tabs.has(p.tab)); };
+    const tabOf = new Map(openSpaces.flatMap(s => s.tabs.map(c => [c.id, c])));
+    const inTab = new Map();
+    for (const p of ps) inTab.set(p.tab, (inTab.get(p.tab) ?? 0) + 1);
+    const rowName = (p) => {
+      const tab = tabOf.get(p.tab);
+      if (tab?.named && tab.name && inTab.get(p.tab) === 1) return tab.name;
+      const label = name(p);
+      const proc = procs.get(p.pane);
+      return label === p.terminal && proc ? proc : label;
+    };
     // Each row as Clean up draws it: the pane's own name and program, under its space's mark.
     const rows = (has) => openSpaces.flatMap(s => mine(s).filter(p => has(p.pane)).map(p => ({
-      pane: p.pane, name: name(p), space: s.name, spaceId: s.id, machine: s.machine ?? null, program: programOf(p) ?? null,
+      pane: p.pane, name: rowName(p), space: s.name, spaceId: s.id, machine: s.machine ?? null, program: programOf(p) ?? null,
     })));
-    const idle = rows(pane => confirmed.has(pane));
+    const settledMap = new Map(), shellsMap = new Map();
+    for (const [pane, { terminal, agent }] of confirmed) (agent ? settledMap : shellsMap).set(pane, terminal);
+    const settled = rows(pane => settledMap.has(pane)).map(r => ({ ...r, terminal: settledMap.get(r.pane) }));
+    const shells = rows(pane => shellsMap.has(pane)).map(r => ({ ...r, terminal: shellsMap.get(r.pane) }));
     const cards = rows(pane => kept.has(pane)).map(c => ({ ...c, process: kept.get(c.pane) }));
-    const command = n ? `cleanup-now:${++cleanupSerial}` : null;
-    openCleanUp({ actions: "clean-up", idle, cards, command: command && { name: `t3-tabs.${command}` } }, cx);
-    cleanupAnswer = command && { command, targets: confirmed };
+    const serial = n ? ++cleanupSerial : null;
+    const command = serial ? `cleanup-now:${serial}` : null;
+    openCleanUp({ actions: "clean-up", settled, shells, cards, command: command && { name: `t3-tabs.${command}` } }, cx);
+    cleanupAnswer = serial ? { serial, settled: settledMap, shells: shellsMap } : null;
   }
 
   // A card's ×: Clean up already asked, so the program stops now; alone in its tab, the tab goes too, as cleanup closes.
@@ -618,9 +658,31 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       else if (command.startsWith("go-pane:")) focusPane(command.slice("go-pane:".length));
       else if (command.startsWith("cleanup-now:")) {
         const answer = cleanupAnswer;
-        if (answer?.command === command) {
-          cleanupAnswer = null;
-          await cleanupNow(answer.targets);
+        const rest = command.slice("cleanup-now:".length), colon = rest.indexOf(":");
+        const serial = colon < 0 ? rest : rest.slice(0, colon), scope = colon < 0 ? "all" : rest.slice(colon + 1);
+        if (answer && String(answer.serial) === serial) {
+          let targets = null;
+          if (scope === "all") {
+            targets = new Map([...answer.settled, ...answer.shells]);
+            cleanupAnswer = null;
+          } else if (scope === "settled") {
+            targets = new Map(answer.settled);
+            answer.settled.clear();
+            if (!answer.shells.size) cleanupAnswer = null;
+          } else if (scope === "shells") {
+            targets = new Map(answer.shells);
+            answer.shells.clear();
+            if (!answer.settled.size) cleanupAnswer = null;
+          } else if (scope.startsWith("pane:")) {
+            const pane = scope.slice("pane:".length), term = answer.settled.get(pane) ?? answer.shells.get(pane);
+            if (term !== undefined) {
+              targets = new Map([[pane, term]]);
+              answer.settled.delete(pane);
+              answer.shells.delete(pane);
+              if (!answer.settled.size && !answer.shells.size) cleanupAnswer = null;
+            }
+          }
+          if (targets?.size) await cleanupNow(targets);
         }
       }
       else if (command === "home") await goHome(cx);
@@ -636,7 +698,19 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       else if (command === "new" || command.startsWith("new:")) {
         const all = spaces(), id = command.slice("new:".length), space = all.find(s => id ? s.id === id : s.active);
         if (!space || space.id === knownHome(all)?.id) run("mod.open", { name: "t3-new-menu" });
-        else { fresh.add(space.id); newTab(space); }
+        else {
+          const folder = !space.machine && !checking() ? placeOf(space, panes()) : null;
+          if (folder && !(await checkFolder(folder))) {
+            const h = home();
+            const shown = h && (folder === h || folder.startsWith(`${h}/`) || folder.startsWith(`${h}\\`)) ? "~" + folder.slice(h.length) : folder;
+            notify({ title: "Folder not found", body: `${shown} no longer exists on this computer.`, level: "warning" });
+            return;
+          }
+          const live = spaces().find(s => s.id === space.id);
+          if (!live) return;
+          fresh.add(live.id);
+          newTab(live);
+        }
       }
       else if (command.startsWith("space:")) selectSpace(Number(command.slice("space:".length)));
       else if (command === "space-next") walkSpaces(1);

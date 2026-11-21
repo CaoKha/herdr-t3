@@ -86,7 +86,7 @@ _Avoid_: preferences、config、T3 settings
 _Avoid_: picker（mod 名）；Search 是 Inbox 的行内搜索
 
 **Clean up**：
-侧栏底栏垃圾桶图标和 `cmd-shift-r` 打开的回收对话框：注意力之外闲置的终端（已 Settle 的 agent、停在提示符的 shell）折成一块，一键关掉；所在 space 已没有在工作的 agent、却还在运行的程序（Left behind）各是一张卡片，可以跳过去或单独停掉；还有 agent 在工作的 space 里的程序算在用，不放进来。
+侧栏底栏垃圾桶图标和 `cmd-shift-r` 打开的回收对话框：当前标签之外已 Settle 的顶层 agent（**Settled**）和停在提示符的空 shell（**Idle shells**）分为两块独立折叠，可分组、逐行或一键关掉；所在 space 已没有在工作的 agent、却还在运行的程序（Left behind）各是一张卡片，可以跳过去或单独停掉；还有 agent 在工作的 space 里的程序算在用，不放进来。
 _Avoid_: Close idle、Clear、Running、Background（旧名）；回收站、Trash（关掉的终端不能恢复）
 
 **Action**：

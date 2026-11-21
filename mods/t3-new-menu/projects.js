@@ -8,10 +8,10 @@ const projectKey = (machine, folder) => `${machine ?? ""}\0${folder}`;
 
 function projectEntry(s, ps, localHome) {
   const machine = s.machine ?? null;
-  const place = placeOf(s, ps);
-  const folder = s.folder && (machine !== null || s.named || s.folder !== localHome) ? s.folder : place;
-  if (!folder || (machine === null && !s.named && folder === localHome)) return null;
-  const name = s.name || folder.split(/[\\/]/).filter(Boolean).pop() || folder;
+  if (machine === null && !s.named && (!s.folder || s.folder === localHome)) return null;
+  const folder = s.folder || placeOf(s, ps);
+  if (!folder) return null;
+  const name = (s.named || folder === s.folder ? s.name : "") || folder.split(/[\\/]/).filter(Boolean).pop() || folder;
   return s.named ? { machine, folder, name, named: true } : { machine, folder, name };
 }
 
@@ -69,4 +69,15 @@ export function dormantProjects(sp, ps, homeId, saved = [], reportedMachines = [
       ...(p.named ? { named: true } : {}),
       off: Boolean(p.machine && !ready.has(p.machine)),
     }));
+}
+
+/**
+ * Removes the remembered Project matching `(machine, folder)`. Returns `null` when nothing matched so callers don't rewrite shared state.
+ * @param {any[] | null | undefined} saved @param {string | null | undefined} machine @param {string} folder
+ */
+export function forgetProject(saved, machine, folder) {
+  if (!Array.isArray(saved) || !folder) return null;
+  const drop = projectKey(machine ?? null, folder);
+  const next = saved.filter((p) => !p || typeof p.folder !== "string" || projectKey(p.machine ?? null, p.folder) !== drop);
+  return next.length === saved.length ? null : next;
 }

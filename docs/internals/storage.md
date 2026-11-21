@@ -76,7 +76,7 @@ Review 的树菜单也是本 mod 的原生 popup，复用 `shared/menus.js`：�
 - 几个 mod 都要读写的数据，经 `shared/` 里的一个模块读写，默认值也写在那里：置顶经 `shared/pins.js`（`pinList`、`pin`、`unpin`、`putBack`），布局设置经 `shared/layout-settings.js`。所以 Pin 不管从哪里点，都会结束 Snooze；Undo 不管从哪里点，都会把置顶放回原位。
 - 只有一个 mod 读写的键，在那个 mod 里写 `shared(KEY.x) ?? 默认值`。
 
-`t3.settings` 默认 `{ afterAway: "home", homeMod: "t3-home" }`，Terminal 存为 `homeMod: null`。`t3.projects` 存打开过的非 Home Space 的 Project 记录 `[{ machine, folder, name, named? }]`（不含未命名的本机 `~` 目录，当前活动的排最前，最多 50 条），由常驻的 `t3-tabs` 写入（内容未变不写）、`t3-new-menu` 只读。`t3-actions.actions` 是 `{ list: [{ id, name, command, icon, place, cwd? }], last }`，全局一份。`t3-inbox.rows`、`t3-agents.rows` 发布各自画出的 `{ order, view }`，供上／下 agent 键走同一顺序。重启保留 pins、settings、projects、每 space 面板、Home id、最近 pane（`t3-tabs.recent`，至多 30 个）和终端标签；最后看的 agent 和关闭历史只在内存里。
+`t3.settings` 默认 `{ afterAway: "home", homeMod: "t3-home" }`，Terminal 存为 `homeMod: null`。`t3.projects` 存打开过的非 Home Space 的 Project 记录 `[{ machine, folder, name, named? }]`（不含未命名的本机 `~` 空间，即使其终端 `cd` 到其他目录也不记；当前活动的排最前，最多 50 条），由常驻的 `t3-tabs` 写入（内容未变不写）、`t3-new-menu` 只读。`t3-actions.actions` 是 `{ list: [{ id, name, command, icon, place, cwd? }], last }`，全局一份。`t3-inbox.rows`、`t3-agents.rows` 发布各自画出的 `{ order, view }`，供上／下 agent 键走同一顺序。重启保留 pins、settings、projects、每 space 面板、Home id、最近 pane（`t3-tabs.recent`，至多 30 个）和终端标签；最后看的 agent 和关闭历史只在内存里。
 
 `t3.homeShown` 是 Home 此刻显示的壁纸图 `{ path, w, h, right, top, opacity, home }`（Home 的逻辑像素，`right`、`top` 从 Home 的右上角量，`home` 是写入时的 Home id），只由 `asciicn-wallpaper` 写、`t3-tabs` 的 Home 行读，用来画同一张图在这一行的部分（[ADR 0021](../adr/0021-home-is-one-surface.md)）。壁纸每次渲染时写真正画出的那一层（还在加载的不写），只有某个字段变了才写。整台机器只有一份，pane mod 又不知道自己是哪个 pane，所以只有顶行读的那一个实例写：Home 正在显示，并且 Home 那个 tab 只放这一个壁纸 pane。拆开的 Home 里的两个壁纸、别的 tab 里的壁纸都不写；否则两个实例各写各的构图，每次写都让对方重绘，永远停不下来。旧值的防护在读的一方：只有 Home 那个 tab 只放一个 `asciicn-wallpaper` pane、并且 `home` 等于当前 Home id 时才画；重启后壁纸第一次渲染前读到的旧值，路径还在就是同一张图，不在就什么都不画。
 
@@ -90,7 +90,7 @@ Files 的树按 space 共用，文件阅读位置按标签实例只记本次运�
 
 详情记的各 space 仓库根（`review-details.js` 的 `roots`）只留本次运行，供新菜单确认仓库前显示。详情与独立 Review 栏的来源只随任务和 popup props 传递，不持久化；本机机器名在详情弹层启动时读取。
 
-`globalThis.t3Titlebar` 只记本次运行测到的面板宽度（t3-chrome 的面板头），供键盘打开详情时锚定到同一入口；面板关着时详情的位置由 `panel.js` `windowEndPx` 和布局的 `tabs-end-inset` 算出，不靠测量。读写都经 `shared/titlebar.js`（`notePanelWidth`、`detailsAnchor`）；不写共享状态或磁盘。Files 的 Insert 借剪贴板粘贴路径，进行中只记本次运行的 `globalThis.t3PastePending`，防止连按把剪贴板换成半截；约 150ms 后放回原剪贴板并清掉。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
+`globalThis.t3Titlebar` 只记本次运行测到的面板宽度（t3-chrome 的面板头），供键盘打开详情时锚定到同一入口；面板关着时详情的位置由 `panel.js` `windowEndPx` 和布局的 `tabs-end-inset` 算出，不靠测量。读写都经 `shared/titlebar.js`（`notePanelWidth`、`detailsAnchor`）；不写共享状态或磁盘。`globalThis.t3PanelPx` 只记本次运行放大面板前的 `panel` 逻辑像素宽（`shared/panel.js` `setWide`），放大时切 `weight: 1` 铺满工作区、还原时按此宽度切回固定宽。Files 的 Insert 借剪贴板粘贴路径，进行中只记本次运行的 `globalThis.t3PastePending`，防止连按把剪贴板换成半截；约 150ms 后放回原剪贴板并清掉。Insert 拒绝带控制字符的路径，防止粘贴成为终端控制输入；Copy path 仍可用。
 
 详情只记本次运行的 `globalThis.t3Details.id`（打开着的详情 popup）。t3-menu、Files 和详情的菜单谁挂在谁下面，只记在本次运行的 `globalThis.t3Popups`（`shared/popup-menu.js`：overlay id → `{ mod, parent, kind, back? }`），用于行和split的开启态、关闭时连带关掉下级菜单，以及子菜单自己关闭时把键盘交回上级（`back`）；关闭即删。Commits 子菜单打开时从本次运行的 `globalThis.t3DetailsRange`（打开着的范围菜单）取已读到的提交，不另读 Git。都不写共享偏好。Open in菜单选择只更新全局目标名，真正执行只在主按钮点击发生。
 

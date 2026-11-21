@@ -470,7 +470,7 @@ for (const width of [208, 256]) {
   f.slots["sidebar-lists"] = { id: "sidebar-lists", active: "inbox" };
   const note = find(footer.render(cx), "undo-notice-3");
   assert.deepEqual([strings(note), "flex_1" in note.style, note.style.text_size], [["Settled 2,", "⇧⌘Z to undo"], true, 11]);
-  assert.ok("flex_none" in find(note, "undo-notice-undo").style && "truncate" in note.items[0].style, "short of room the summary is cut, never Undo");
+  assert.ok("flex_none" in find(note, "undo-notice-undo").style && !("truncate" in note.items[0].style), "short of room the summary hides whole, never truncated to an ellipsis");
   fire(find(note, "undo-notice-undo"), "on_click", {}, cx);
   assert.deepEqual(f.calls.pop(), ["t3-tabs.undo", {}]);
   f.state["t3.notice"].count = 1;

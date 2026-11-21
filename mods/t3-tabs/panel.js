@@ -125,10 +125,25 @@ export function closeSurface(id = panelState().active, mode = "one") {
   hidePanel();
 }
 
+// Default px width when restoring a widened panel whose pre-wide width wasn't recorded in this run.
+const PANEL_PX = 540;
+function setWide(wide) {
+  const panel = layoutNode(layout(), "panel");
+  if (wide) {
+    const px = panel?.size?.px;
+    if (Number.isFinite(px) && px > 0) globalThis.t3PanelPx = px;
+    run("layout.resize", { id: "panel", weight: 1 });
+    run("layout.hide", { id: "work" });
+  } else {
+    if (panel && !panel.size?.px) run("layout.resize", { id: "panel", px: globalThis.t3PanelPx ?? PANEL_PX });
+    run("layout.show", { id: "work" });
+  }
+}
+
 // Put away: the work column back if the panel had taken its place; the tabs stay.
 export function hidePanel() {
   const s = panelState();
-  if (s.wide) run("layout.show", { id: "work" });
+  if (s.wide) setWide(false);
   showPanel(false);
   if (s.owns) save({ open: false, wide: false });
 }
@@ -152,7 +167,7 @@ export function togglePanel(page) {
 export function toggleWide() {
   const s = panelState();
   if (!s.open) return;
-  run(s.wide ? "layout.show" : "layout.hide", { id: "work" });
+  setWide(!s.wide);
   save({ wide: !s.wide });
 }
 
@@ -210,7 +225,7 @@ function keptFor(space) {
 }
 function lay(want, space) {
   run("layout.select", { stack: "panel-body", child: want.page });
-  run(want.wide ? "layout.hide" : "layout.show", { id: "work" });
+  setWide(want.wide);
   showPanel(want.open, space);
 }
 

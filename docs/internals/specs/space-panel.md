@@ -6,7 +6,7 @@ Sources: T3 `09a54f01` `RightPanelTabs.tsx`, `ui/panel-tab-close-button.tsx`, `R
 
 ## Column
 
-The rightmost full-height column: initially hidden, initially equal in weight to the work column, at least 480px, its outside divider draggable. No card: the 40px head and `panel-body` below it are one `chrome` surface from the top to the window's bottom, set apart from the work column by the root's 1px divider. The head's layout padding (12 each side) and the pages' own rows put content 12 in from the column's edges, so the head's panel-right stands where the tab bar's does with the panel closed (12 from the window edge, same 40px row). The width is one for the whole window.
+The rightmost full-height column: initially hidden, 540px wide by default, at least 360px, its outside divider draggable. No card: the 40px head and `panel-body` below it are one `chrome` surface from the top to the window's bottom, set apart from the work column by the root's 1px divider. The head's layout padding (12 each side) and the pages' own rows put content 12 in from the column's edges, so the head's panel-right stands where the tab bar's does with the panel closed (12 from the window edge, same 40px row). The width is one for the whole window.
 
 On a layout jump to a known space, restore the destination's panel slot, visibility and maximize state with its selection, not after its first frame. Until the selection comes back, an observation of the source is not a panel change to save. If a third space is observed instead, restore that space immediately; a more recent layout jump supersedes an earlier preparation.
 

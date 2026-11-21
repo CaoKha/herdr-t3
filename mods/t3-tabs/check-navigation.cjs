@@ -30,6 +30,8 @@ function fixture() {
     focused: () => shown, shared: key => state[key], setShared: (key, value) => { state[key] = value; },
     layout: () => ({ children: Object.values(slots) }), home: () => "/home/test", window: () => ({ active: true }),
     run: (name, args) => calls.push([name, plain(args ?? {})]),
+    exec: async () => ({ code: 0, stdout: "", stderr: "" }),
+    folderExists: async () => true,
     hc: args => { labelled.push([...args]); return Promise.resolve(hcAnswer(args)); },
     notify: n => notifications.push(n),
     openOverlay: spec => { events.push("open"); overlays.push(spec); return overlays.length; },
@@ -144,14 +146,16 @@ async function checkCleanup() {
     const dialog = f.overlays[0];
     assert.equal(dialog.mod, "t3-actions");
     assert.equal(dialog.kind, "dialog");
-    // Clean up: what closes, by space, folded into one count; each program still running, a card with its process.
+    // Clean up: settled top-level agents and idle shells in their own shelves; each program still running, a card with its process.
     assert.deepEqual(plain(dialog.props), {
       actions: "clean-up",
-      idle: [
-        { pane: "settled", name: "Pi", space: "project 1", spaceId: "s1", machine: null, program: f.agents()[0].program },
-        { pane: "drained-shell", name: "drained-shell-term", space: "project 1", spaceId: "s1", machine: null, program: null },
-        { pane: "split-shell", name: "split-shell-term", space: "project 2", spaceId: "s2", machine: "vps", program: null },
-        { pane: "quiet", name: "quiet-term", space: "project 2", spaceId: "s2", machine: "vps", program: null },
+      settled: [
+        { pane: "settled", terminal: "settled-term", name: "second task", space: "project 1", spaceId: "s1", machine: null, program: f.agents()[0].program },
+      ],
+      shells: [
+        { pane: "drained-shell", terminal: "drained-shell-term", name: "zsh", space: "project 1", spaceId: "s1", machine: null, program: null },
+        { pane: "split-shell", terminal: "split-shell-term", name: "zsh", space: "project 2", spaceId: "s2", machine: "vps", program: null },
+        { pane: "quiet", terminal: "quiet-term", name: "zsh", space: "project 2", spaceId: "s2", machine: "vps", program: null },
       ],
       // project 2 still has agents at work: its programs are in use, not left behind.
       cards: [],
@@ -238,7 +242,7 @@ async function checkCleanup() {
     f.agents().splice(0, 1);
     await view.handle("cleanup", f.cx);
     assert.deepEqual(plain(f.overlays[0].props).cards,
-      [{ pane: "leftover", name: "leftover-term", space: "project 3", spaceId: "s3", machine: null, program: null, process: "vite" }]);
+      [{ pane: "leftover", name: "vite", space: "project 3", spaceId: "s3", machine: null, program: null, process: "vite" }]);
   }
   {
     // A card's × stops its program at once: Clean up already asked. Alone in its tab, the tab goes with it.
@@ -251,6 +255,185 @@ async function checkCleanup() {
     f.calls.length = 0;
     await view.handle("go-pane:vite", f.cx);
     assert.deepEqual(f.calls, [["pane.focus", { pane: "vite" }]], "a card goes to its pane");
+  }
+  {
+    // Orphaned/recovered top-level agents whose parent exited act as top-level: cleanable when settled, working when not.
+    const f = fixture(), view = f.navigation();
+    const program = f.agents()[0].program;
+    const busy = { code: 0, stdout: JSON.stringify({ pid: 1, foreground: { pid: 2, name: "vite" } }) };
+    f.answerHc(() => busy);
+    f.spaces()[0].tabs[0].active = true;
+    f.spaces().push(
+      { id: "s-orphan-settled", name: "orphan settled", machine: null, folder: "/work/os", tabs: [{ id: "os-agent" }, { id: "os-prog" }] },
+      { id: "s-orphan-active", name: "orphan active", machine: null, folder: "/work/oa", tabs: [{ id: "oa-agent" }, { id: "oa-prog" }] },
+    );
+    f.terminals().push({ address: "dead-parent", state: "exited", status: "idle", program });
+    // Settled orphan whose parent exited: cleanable, and its space's running program is Left behind.
+    f.panes().push({ pane: "p-os", tab: "os-agent", terminal: "t-os", program }, { pane: "p-os-vite", tab: "os-prog", terminal: "t-os-vite" });
+    f.agents().push({ pane: "p-os", tab: "os-agent", address: "t-os", status: "idle", program });
+    f.terminals().push({ address: "t-os", parent: "dead-parent", state: "live", status: "idle", turn: 2, labels: { settled: "1:2" }, program });
+    // Active orphan whose parent is missing: not cleanable, and marks its space working so its program is not Left behind.
+    f.panes().push({ pane: "p-oa", tab: "oa-agent", terminal: "t-oa", program }, { pane: "p-oa-vite", tab: "oa-prog", terminal: "t-oa-vite" });
+    f.agents().push({ pane: "p-oa", tab: "oa-agent", address: "t-oa", status: "working", program });
+    f.terminals().push({ address: "t-oa", parent: "gone-parent", state: "live", status: "working", turn: 1, labels: {}, program });
+
+    await view.handle("cleanup", f.cx);
+    assert.equal(f.overlays.length, 1);
+    assert.deepEqual(plain(f.overlays[0].props).settled.map(r => r.pane), ["p-os"], "settled orphaned agent is cleanable");
+    assert.deepEqual(plain(f.overlays[0].props).shells, [], "no idle shells");
+    assert.deepEqual(plain(f.overlays[0].props).cards.map(c => c.pane), ["p-os-vite"], "unsettled orphaned agent protects its space's running program");
+  }
+  {
+    // A starting non-sub-agent (not yet in agents()) protects its space from Left behind and is never probed as a shell.
+    const f = fixture(), view = f.navigation();
+    const program = f.agents()[0].program;
+    const busy = { code: 0, stdout: JSON.stringify({ pid: 1, foreground: { pid: 2, name: "vite" } }) };
+    f.answerHc(() => busy);
+    f.spaces()[0].tabs[0].active = true;
+    f.spaces().push(
+      { id: "s-start-prog", name: "starting program", machine: null, folder: "/work/sp", tabs: [{ id: "sp-ag" }, { id: "sp-vite" }] },
+      { id: "s-start-status", name: "starting status", machine: null, folder: "/work/ss", tabs: [{ id: "ss-ag" }, { id: "ss-vite" }] },
+      { id: "s-unlisted-settled", name: "unlisted settled", machine: null, folder: "/work/us", tabs: [{ id: "us-ag" }, { id: "us-vite" }] },
+    );
+    // Starting agent identified by program.agent (no terminal status yet).
+    f.panes().push({ pane: "p-sp-ag", tab: "sp-ag", terminal: "t-sp-ag", program }, { pane: "p-sp-vite", tab: "sp-vite", terminal: "t-sp-vite" });
+    f.terminals().push({ address: "t-sp-ag", state: "live", program });
+    // Starting agent identified by k.status != null (no program.agent yet).
+    f.panes().push({ pane: "p-ss-ag", tab: "ss-ag", terminal: "t-ss-ag" }, { pane: "p-ss-vite", tab: "ss-vite", terminal: "t-ss-vite" });
+    f.terminals().push({ address: "t-ss-ag", state: "live", status: "working", turn: 1, labels: {} });
+    // Agent terminal not in agents() that is already stillSettled does not block Left behind, and is not probed as a shell.
+    f.panes().push({ pane: "p-us-ag", tab: "us-ag", terminal: "t-us-ag" }, { pane: "p-us-vite", tab: "us-vite", terminal: "t-us-vite" });
+    f.terminals().push({ address: "t-us-ag", state: "live", status: "idle", turn: 2, labels: { settled: "1:2" } });
+
+    await view.handle("cleanup", f.cx);
+    assert.deepEqual(plain(f.overlays[0].props).cards.map(c => c.pane), ["p-us-vite"], "starting agents protect their spaces; already-settled unlisted agent does not");
+    assert.ok(!f.labelled.some(args => ["t-sp-ag", "t-ss-ag", "t-us-ag"].includes(args[1])), "agent terminals are not probed as shells");
+  }
+  {
+    // Row naming: lone pane in a named tab keeps tab.name; unnamed non-agent falls back to fg.process over raw terminal address,
+    // while preserving real titles and program names.
+    const f = fixture(), view = f.navigation();
+    const prompt = { code: 0, stdout: JSON.stringify({ pid: 1, foreground: { pid: 1, name: "zsh" } }) };
+    const node = { code: 0, stdout: JSON.stringify({ pid: 1, foreground: { pid: 2, name: "node" } }) };
+    const lazygitProg = { key: "lazygit", name: "lazygit", agent: false };
+    const answers = new Map([
+      ["t-dev", node], ["t-split-a", node], ["t-split-b", prompt], ["t-titled", node],
+      ["t-prog", node], ["t-unresp", { code: 1, stdout: "" }],
+    ]);
+    f.answerHc(([_cmd, addr]) => answers.get(addr) ?? prompt);
+    f.spaces()[0].tabs[0].active = true;
+    f.spaces().push({
+      id: "s-names", name: "names", machine: null, folder: "/work/n", tabs: [
+        { id: "tab-dev", name: "Dev server", named: true },
+        { id: "tab-scratch", name: "Scratch", named: true },
+        { id: "tab-split", name: "Split tab", named: true },
+        { id: "tab-titled" },
+        { id: "tab-prog" },
+        { id: "tab-unresp" },
+      ],
+    });
+    f.panes().push(
+      { pane: "p-dev", tab: "tab-dev", terminal: "t-dev" },
+      { pane: "p-scratch", tab: "tab-scratch", terminal: "t-scratch" },
+      { pane: "p-split-a", tab: "tab-split", terminal: "t-split-a" },
+      { pane: "p-split-b", tab: "tab-split", terminal: "t-split-b" },
+      { pane: "p-titled", tab: "tab-titled", terminal: "t-titled", title: "Build watcher" },
+      { pane: "p-prog", tab: "tab-prog", terminal: "t-prog", program: lazygitProg },
+      { pane: "p-unresp", tab: "tab-unresp", terminal: "t-unresp" },
+    );
+    await view.handle("cleanup", f.cx);
+    const props = plain(f.overlays[0].props);
+    assert.deepEqual(props.settled, []);
+    assert.deepEqual(Object.fromEntries(props.shells.map(r => [r.pane, r.name])), {
+      "p-scratch": "Scratch",
+      "p-split-b": "zsh",
+    }, "lone named shell tab keeps tab.name; split falls back to fg.process");
+    assert.deepEqual(Object.fromEntries(props.cards.map(c => [c.pane, c.name])), {
+      "p-dev": "Dev server",
+      "p-split-a": "node",
+      "p-titled": "Build watcher",
+      "p-prog": "lazygit",
+      "p-unresp": "t-unresp",
+    }, "lone named Action tab keeps tab.name; unnamed preserves title/program, falls back to fg.process, else terminal address");
+  }
+  {
+    // Concurrent cleanup triggers: latest-wins serial guard drops stale slow scans so they don't open or overwrite dialogs.
+    const { f, idle, response } = cleanupFixture();
+    const gates = [];
+    const view = f.navigation(undefined, {
+      hc: args => args[1] === idle.terminal
+        ? new Promise(resolve => gates.push(() => resolve(response(args))))
+        : Promise.resolve(response(args)),
+    });
+    const first = view.handle("cleanup", f.cx);
+    await flush();
+    const second = view.handle("cleanup", f.cx);
+    await flush();
+    assert.equal(gates.length, 2, "two scans in flight");
+    // Second finishes first, then stale first finishes after: only the second opens a dialog.
+    gates[1]();
+    await second;
+    assert.equal(f.overlays.length, 1, "latest scan opens its dialog");
+    gates[0]();
+    await first;
+    assert.equal(f.overlays.length, 1, "stale scan finishing later does not open a second dialog");
+    assert.equal(f.notifications.length, 0);
+  }
+  {
+    // Scoped cleanup: :settled, :shells, :pane:<pane> and :all share one serial, recheck targets, keep remaining targets alive,
+    // and only close a tab when every pane in it is in the confirmed subset.
+    const { f } = cleanupFixture(), view = f.navigation();
+    // Put an idle shell alongside the settled agent in tab b1 to verify subset closes use pane.close, not tab.close.
+    f.panes().push({ pane: "b1-shell", tab: "b1", terminal: "b1-shell-term" });
+    await view.handle("cleanup", f.cx);
+    const cmd = closeAnswer(f.overlays[0]);
+    // Close settled only: b1 still has b1-shell, so settled closes via pane.close; shells remain in cleanupAnswer.
+    await view.handle(`${cmd}:settled`, f.cx);
+    assert.deepEqual(f.calls.splice(0), [["pane.close", { pane: "settled" }]], ":settled closes only settled panes");
+    await view.handle(`${cmd}:settled`, f.cx);
+    assert.deepEqual(f.calls, [], ":settled cannot run twice");
+    // Remove settled pane from live state as host would.
+    f.panes().splice(f.panes().findIndex(p => p.pane === "settled"), 1);
+    // Close a single shell pane alone in its tab -> tab.close; and one in a split tab -> pane.close.
+    await view.handle(`${cmd}:pane:quiet`, f.cx);
+    assert.deepEqual(f.calls.splice(0), [["tab.close", { id: "quiet-shell-tab", confirmed: true }]], ":pane closes a lone pane's tab");
+    await view.handle(`${cmd}:pane:quiet`, f.cx);
+    assert.deepEqual(f.calls, [], "same pane cannot close twice");
+    await view.handle(`${cmd}:pane:split-shell`, f.cx);
+    assert.deepEqual(f.calls.splice(0), [["pane.close", { pane: "split-shell" }]], ":pane closes a split pane alone");
+    // Remaining shells (drained-shell, b1-shell) close via :shells; b1 is now wholly in the confirmed subset so it closes via tab.close.
+    await view.handle(`${cmd}:shells`, f.cx);
+    assert.deepEqual(f.calls.splice(0), [
+      ["tab.close", { id: "b1", confirmed: true }],
+      ["tab.close", { id: "drained-shell-tab", confirmed: true }],
+    ], ":shells closes remaining shells and clears cleanupAnswer");
+    // Now both groups are exhausted; :all or bare serial does nothing.
+    await view.handle(cmd, f.cx);
+    await view.handle(`${cmd}:all`, f.cx);
+    assert.deepEqual(f.calls, [], "exhausted cleanupAnswer does nothing");
+  }
+  {
+    // :all closes both groups at once; :pane rechecks through scanCleanup (spares newly busy/unsettled/focused panes),
+    // and stale serials or replaced dialogs reject all scoped commands.
+    const { f, settled, split, quiet, answers, busy } = cleanupFixture(), view = f.navigation();
+    await view.handle("cleanup", f.cx);
+    const stale = closeAnswer(f.overlays[0]);
+    await view.handle("cleanup", f.cx);
+    const current = closeAnswer(f.overlays[1]);
+    for (const suffix of ["", ":all", ":settled", ":shells", ":pane:quiet"]) await view.handle(`${stale}${suffix}`, f.cx);
+    assert.deepEqual(f.calls, [], "stale serial rejects every scoped cleanup command");
+    // Make split busy and settled unsettled before :pane and :all.
+    answers.set(split.terminal, busy);
+    settled.k.turn++;
+    await view.handle(`${current}:pane:split-shell`, f.cx);
+    await view.handle(`${current}:pane:settled`, f.cx);
+    assert.deepEqual(f.calls, [], ":pane rechecks through scanCleanup and spares busy/unsettled panes");
+    await view.handle(`${current}:all`, f.cx);
+    assert.deepEqual(f.calls.splice(0), [
+      ["tab.close", { id: "drained-shell-tab", confirmed: true }],
+      ["tab.close", { id: "quiet-shell-tab", confirmed: true }],
+    ], ":all closes remaining confirmed targets across both groups");
+    assert.ok(quiet, "fixture quiet used");
   }
 }
 
@@ -1375,8 +1558,119 @@ async function check() {
   }
 }
 
+// Opening a new tab in a local space checks its current folder first; missing folders warn instead of failing cryptically,
+// while remote spaces and checking() never probe local disk.
+async function checkNewTabMissingFolder() {
+  {
+    // Local active space (`new`) whose live cwd under home() no longer exists: warn with ~, no tab.new, and don't mark space fresh.
+    const f = fixture(), probed = [];
+    const tabs = f.spaces()[0].tabs;
+    tabs.splice(0, Infinity, { id: "mine", name: "mine", named: true, active: true }, { id: "prog", name: "prog", named: true, active: false });
+    f.agents()[0].tab = "mine";
+    f.panes()[0].tab = "mine";
+    f.panes()[0].cwd = "/home/test/vanished";
+    f.panes().push({ pane: "p-prog", tab: "prog", terminal: "t-prog" });
+    f.slots.lists = { id: "sidebar-lists", active: "inbox" };
+    const view = f.navigation(undefined, { folderExists: async (p) => { probed.push(p); return false; } });
+    const show = (id, agent) => {
+      tabs.forEach(c => { c.active = c.id === id; });
+      f.agents()[0].focused = Boolean(agent);
+      Object.assign(f.shown, { tab: id, agent: agent ?? null });
+      return view.frame().context;
+    };
+    show("mine", "t0");
+    assert.equal(show("prog").head, "t0");
+    await view.handle("new", f.cx);
+    assert.deepEqual(probed, ["/home/test/vanished"]);
+    assert.deepEqual(f.calls, [], "missing local folder does not run tab.new");
+    assert.deepEqual(plain(f.notifications), [{
+      title: "Folder not found",
+      body: "~/vanished no longer exists on this computer.",
+      level: "warning",
+    }]);
+    assert.equal(show("prog").head, "t0", "failed new tab does not mark space as fresh");
+  }
+  {
+    // Local named space (`new:s1`) whose creation folder outside home() is missing, plus home boundary check (`/home/test-other`).
+    const f = fixture(), probed = [];
+    const view = f.navigation(undefined, { folderExists: async (p) => { probed.push(p); return false; } });
+    await view.handle("new:s1", f.cx);
+    assert.deepEqual(probed, ["/work/p1"]);
+    assert.deepEqual(f.calls, []);
+    assert.deepEqual(plain(f.notifications.splice(0)), [{
+      title: "Folder not found",
+      body: "/work/p1 no longer exists on this computer.",
+      level: "warning",
+    }]);
+    f.spaces()[1].folder = "/home/test-other/proj";
+    await view.handle("new:s1", f.cx);
+    assert.deepEqual(plain(f.notifications.splice(0)), [{
+      title: "Folder not found",
+      body: "/home/test-other/proj no longer exists on this computer.",
+      level: "warning",
+    }], "home prefix shortening requires a path separator boundary");
+    f.spaces()[1].folder = "/home/test";
+    await view.handle("new:s1", f.cx);
+    assert.deepEqual(plain(f.notifications.splice(0)), [{
+      title: "Folder not found",
+      body: "~ no longer exists on this computer.",
+      level: "warning",
+    }], "exact home folder shortens to ~");
+  }
+  {
+    // Remote spaces (`new` and `new:s2`) never probe local disk and always open the tab.
+    const f = fixture(), probed = [];
+    f.spaces()[0].active = false;
+    f.spaces()[2].active = true;
+    const view = f.navigation(undefined, { folderExists: async (p) => { probed.push(p); return false; } });
+    await view.handle("new", f.cx);
+    await view.handle("new:s2", f.cx);
+    assert.deepEqual(probed, [], "remote spaces are never probed locally");
+    assert.deepEqual(plain(f.calls), [
+      ["tab.new", { space: "s2", folder: "/work/s2" }],
+      ["tab.new", { space: "s2", folder: "/work/s2" }],
+    ]);
+    assert.deepEqual(f.notifications, []);
+  }
+  {
+    // checking() skips folder probing.
+    const f = fixture(), probed = [];
+    const view = f.navigation(undefined, { checking: () => true, folderExists: async (p) => { probed.push(p); return false; } });
+    await view.handle("new", f.cx);
+    assert.deepEqual(probed, []);
+    assert.deepEqual(plain(f.calls), [["tab.new", { space: "s0", folder: "/work/s0" }]]);
+  }
+  {
+    // Real folderExists via keysBlock + exec: code 1 warns, code 0 opens, thrown exec fails open.
+    const f = fixture();
+    let mode = "missing";
+    const send = keysBlock(f, {
+      exec: async (cmd, args) => {
+        assert.equal(cmd, "sh");
+        assert.equal(args[3], "/work/s0");
+        if (mode === "throw") throw new Error("sh unavailable");
+        return { code: mode === "missing" ? 1 : 0, stdout: "", stderr: "" };
+      },
+    });
+    await send("new");
+    assert.deepEqual(f.calls, [], "exec exit 1 blocks tab.new");
+    assert.deepEqual(plain(f.notifications.splice(0)), [{
+      title: "Folder not found",
+      body: "/work/s0 no longer exists on this computer.",
+      level: "warning",
+    }]);
+    mode = "ok";
+    await send("new");
+    assert.deepEqual(plain(f.calls.splice(0)), [["tab.new", { space: "s0", folder: "/work/s0" }]]);
+    mode = "throw";
+    await send("new");
+    assert.deepEqual(plain(f.calls.splice(0)), [["tab.new", { space: "s0", folder: "/work/s0" }]], "exec error fails open");
+    assert.deepEqual(f.notifications, []);
+  }
+}
+
 (async () => {
-  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch, menu: checkMenuAtHome, unread: checkUnread, details: checkDetailsKey };
+  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch, menu: checkMenuAtHome, unread: checkUnread, details: checkDetailsKey, missingFolder: checkNewTabMissingFolder };
   if (process.argv[2]) { await additions[process.argv[2]](); return; }
   for (const verify of Object.values(additions)) await verify();
   await check();

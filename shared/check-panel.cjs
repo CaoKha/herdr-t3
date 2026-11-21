@@ -1,16 +1,16 @@
 // panel.js on a fake layout: what each space's panel shows as its tabs come and go, and which repository Review reads.
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
-const saved = {}, ui = { open: false, page: 'panel-empty', wide: false, space: 'a', slots: ['files', 'review', 'panel-empty'], end: 28, buttons: false };
+const saved = {}, ui = { open: false, page: 'panel-empty', wide: false, space: 'a', slots: ['files', 'review', 'panel-empty'], end: 28, buttons: false, panelSize: { px: 540 } };
 const machines = { a: null, b: null, home: null, far: 'devbox' };
 let cwd = {}, repos = {}, spaceReads = 0;
-const layout = () => ({ id: 'root', children: [{ id: 'work', hidden: ui.wide, children: [{ id: 'window-end', size: { px: ui.end } }] }, { id: 'panel', hidden: !ui.open, children: [{ id: 'panel-body', active: ui.page, children: ui.slots.map(id => ({ id })) }] }] });
+const layout = () => ({ id: 'root', children: [{ id: 'work', hidden: ui.wide, children: [{ id: 'window-end', size: { px: ui.end } }] }, { id: 'panel', hidden: !ui.open, size: { ...ui.panelSize }, children: [{ id: 'panel-body', active: ui.page, children: ui.slots.map(id => ({ id })) }] }] });
 const context = vm.createContext({ KEY: { panels: 't3.panels' }, GROUP_GAP: 4, layout, Map, Date, Math, window: () => ({ buttons: ui.buttons }),
   spaces: () => (spaceReads++, Object.keys(machines)).map(id => ({ id, active: id === ui.space, folder: '/space', machine: machines[id], tabs: [{ id: `${id}-tab`, active: true }] })),
   focused: () => cwd[ui.space] ? { space: ui.space, tab: `${ui.space}-tab`, terminal: `${ui.space}-t` } : null,
   panes: () => Object.entries(cwd).map(([s, dir]) => ({ tab: `${s}-tab`, terminal: `${s}-t`, cwd: dir })),
   exec: async (_cmd, args, { cwd: dir }) => { const root = Object.keys(repos).find(r => dir === r || dir.startsWith(r + '/')); return root ? { code: 0, stdout: root + '\n' } : { code: 128, stdout: '' }; },
   shared: k => saved[k], setShared: (k, v) => { saved[k] = v; },
-  run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (cmd === 'layout.resize' && a.id === 'window-end') ui.end = a.px; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
+  run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (cmd === 'layout.resize' && a.id === 'window-end') ui.end = a.px; else if (cmd === 'layout.resize' && a.id === 'panel') ui.panelSize = a.weight != null ? { weight: a.weight } : { px: a.px }; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
 });
 // Each step that shows or hides the panel sizes the tab bar's window part for that state in the same go (t3-tabs draws the
 // closed panel's toggle after Details (P3), then the window's buttons; nothing while the panel is open): the frame that
@@ -30,16 +30,19 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   // Its tab picked again: shown, and revealed again.
   p.activateSurface('file:b.js'); p.activateSurface('file:b.js');
   assert.equal(p.panelState().tabs[1].reveal, 2);
-  // Hidden: the tabs stay, wide goes. Closing the last tab puts the panel away; opened again it's empty.
-  p.toggleWide(); p.togglePanel(); assert.deepEqual([ui.open, ui.wide], [false, false]);
+  // Hidden: the tabs stay, wide goes. Widening switches the px panel to weight: 1 so it fills the work area, and restoring puts back its dragged px width.
+  ui.panelSize = { px: 620 };
+  p.toggleWide(); assert.deepEqual([ui.wide, ui.panelSize], [true, { weight: 1 }], 'widening fills the work area');
+  p.toggleWide(); assert.deepEqual([ui.wide, ui.panelSize], [false, { px: 620 }], 'restoring keeps the dragged px width');
+  p.toggleWide(); p.togglePanel(); assert.deepEqual([ui.open, ui.wide, ui.panelSize], [false, false, { px: 620 }]);
   p.togglePanel(); assert.deepEqual([ui.open, ui.wide, ui.page, tabs()], [true, false, 'files', 'file:a.js *file:b.js review']);
   p.closeSurface('file:a.js', 'all'); assert.deepEqual([ui.open, tabs()], [false, '']);
   p.togglePanel(); assert.deepEqual([ui.open, ui.page], [true, 'panel-empty']);
   // Each space keeps its own, wide too; a new one starts closed and empty.
   p.showPage('files'); p.openFile('a.js'); p.toggleWide();
   const view = {}; p.syncPanel(view);
-  ui.space = 'b'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, ui.wide, tabs()], [false, false, '']);
-  ui.space = 'a'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, ui.wide, ui.page, tabs()], [true, true, 'files', '*file:a.js']);
+  ui.space = 'b'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, ui.wide, ui.panelSize, tabs()], [false, false, { px: 620 }, '']);
+  ui.space = 'a'; p.syncPanel(view); p.syncPanel(view); assert.deepEqual([ui.open, ui.wide, ui.panelSize, ui.page, tabs()], [true, true, { weight: 1 }, 'files', '*file:a.js']);
   // Settled on a space, the keys copy's draw reads spaces() once: it draws on every change, and each read copies every space.
   spaceReads = 0; p.syncPanel(view);
   assert.equal(spaceReads, 1, `${spaceReads} reads of spaces() for a draw that changes nothing`);

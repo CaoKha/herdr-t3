@@ -22,8 +22,8 @@
 - **Home**：收起正在看的 agent 后，回到一个安静的页面，不会自动跳到下一张卡片。下一步看什么由你决定。也可以在设置（`cmd-shift-,`）里改成跳到下一张卡片，或者把 Home 换成终端或你自己的 mod。
 - **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名、标状态。
 - **跳转**（`cmd-p`）：按名字跳到任何窗格，agent 和普通程序都行。最近访问顺序变化时，Enter 仍跳到你选中的窗格。
-- **Clean up**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的垃圾桶图标）不离开 Inbox 回收用完的终端：已 Settle 的 agent 和空闲 shell 折成一块，点 **Close** 一起关掉；所在 space 已没有在工作的 agent、却还在运行的程序各是一张卡片，可以跳过去或点 **Stop** 停掉。
-- **New** 先列出打开的 space，再列出记住的项目。项目的最后一个终端关闭后仍可选中，在原来的机器和目录重新打开。
+- **Clean up**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的垃圾桶图标）不离开 Inbox 回收用完的终端：**Settled**（已 Settle 的 agent）和 **Idle shells**（空闲 shell）各自独立折叠，可分组、逐行或一键关掉；所在 space 已没有在工作的 agent、却还在运行的程序各是一张卡片，可以跳过去或点 **Stop** 停掉。
+- **New** 先列出打开的 space，再列出记住的项目。项目的最后一个终端关闭后仍可选中，在原来的机器和目录重新打开；不再需要的记住项目可点 `×` 或按 `ctrl-d` 移除。
 - **详情**（`cmd-shift-b`）：locked 电脑／目录、Open in、全局 Actions，下面的 Review 行一点就显示 Review，箭头选范围。已装T3编辑器（含VSCodium／JetBrains）与Files共用偏好，菜单只选择，主按钮才打开；右键卡片可选择显示哪些项。
 - **窄标签、带框窗格**，照 T3 Code 的外观。在 Inbox 下，点标签栏面包屑里的 space 名打开菜单，可新建标签页或直接切到当前 space 下的其他 agent、子 agent 和终端程序。
 - **子 agent 菜单**：数量入口只打开原顺序的树；点行或方向键加 Enter 来 peek，右键打开侧栏同一份 agent 菜单，含 Send back、Copy address。每行用 Agents 行同样的标记：空闲显示闲了多久，Failed 是红色，完成圆点看过就消失。

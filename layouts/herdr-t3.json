@@ -196,8 +196,8 @@
       "type": "column",
       "resizable": false,
       "hidden": true,
-      "size": { "weight": 1 },
-      "min": 480,
+      "size": { "px": 540 },
+      "min": 360,
       "children": [
         { "id": "panel-head", "type": "block", "size": { "px": 40 }, "padding": [0, 12], "window_drag": true, "content": { "mod": "t3-chrome", "props": { "part": "panel" } } },
         {

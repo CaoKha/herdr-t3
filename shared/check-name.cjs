@@ -125,7 +125,7 @@ assert.equal(named(), "Pi", "Pi's unnamed title is only its folder, which the sp
 pane.title = "⠋ project";
 assert.equal(named(), "Pi", "nor Codex's: its spinner and project");
 pane.title = "OC | Review PR";
-assert.equal(named(), "OC | Review PR", "an agent's marks come off only its own titles");
+assert.equal(named(), "Pi", "another agent's mark left behind in the same terminal is ignored");
 pane.program = { name: "OpenCode", key: "opencode", agent: true };
 assert.equal(named(), "Review PR");
 pane.program = program;
@@ -136,6 +136,22 @@ assert.equal(named(), "Pi");
 terms[0].labels["pi.session"] = "Fix login"; pane.title = "π - Fix login - project";
 pane.program = { name: "Git Changes", key: "lazygit", agent: false };
 assert.equal(named(), "Git Changes", "lazygit after Pi in the same shell: Pi's session and title are left behind");
+pane.title = "OC | old";
+assert.equal(named(), "Git Changes", "lazygit after OpenCode in the same shell: OpenCode's title is left behind");
+pane.program = null;
+assert.equal(named(), "t2", "null program after OpenCode ignores leftover mark");
+pane.title = "π - jinjiebewater";
+assert.equal(named(), "t2", "null program after Pi ignores leftover mark");
+for (const other of [
+  { name: "Antigravity", key: "antigravity", agent: true },
+  { name: "Claude Code", key: "claude", agent: true },
+]) {
+  pane.program = other;
+  pane.title = "π - jinjiebewater";
+  assert.equal(named(), other.name, `${other.name} after Pi in the same terminal ignores leftover Pi mark`);
+  pane.title = "OC | old";
+  assert.equal(named(), other.name, `${other.name} after OpenCode in the same terminal ignores leftover OpenCode mark`);
+}
 pane.program = program; delete terms[0].labels["pi.session"];
 
 // A shell: its prompt's title and its own address tell nothing.

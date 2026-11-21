@@ -4,6 +4,12 @@
 
 ## 2026-11-21
 
+- **New**（`t3-new-menu`）现用独立的 `Projects` 分组标题区分已打开的 **Spaces** 与记住的 **Projects**，并将 `⌘1…9` 快捷键竖向对齐；记住的项目行（含离线远程机记录）带右端固定 `×` 按钮，也支持高亮后按 `ctrl-d` 移除记录、弹窗保持打开（不动已打开的 space 或磁盘文件）；本机目录已删除的 Space 或记住项目会变暗并标注 `· Folder not found`，点选或通过 `cmd-t`／`+`／菜单新建标签时弹 **Folder not found** 警告（弹窗保持打开便于清理）；点选离线远程机的记住项目会弹 **Machine unavailable** 提示；未命名的本机 `~` 临时 space `cd` 到其他目录时不再写入记住项目列表。
+- 侧栏底栏（及独立版 Inbox）空间不足时，Undo 提示的前置摘要（如 `Settled,`）不再截成省略号，改为整段隐藏，只完整保留 `⇧⌘Z to undo`（或 `Undo`）。
+- **Clean up** 现将已 Settle 的顶层 agent（**Settled**）与停在提示符的空 shell（**Idle shells**）拆成两个独立折叠分组，所有分组头、展开行和 **Left behind** 卡片右端统一常驻 54px 固定宽 **Close**／**Stop** 按钮（悬停不再抽动，一步执行、关闭前复查），展开行显示程序或终端图标，底部提供 **Close all**／**Close**；同时修复父终端已退出的顶层 agent 与启动中 agent 的归类、单窗格命名标签与 shell 进程名显示、弹窗打开期间实时剔除变更条目、过长 `closes …` 截断、远程机器名显示、清空自动关闭、仅 Done 时按 Enter 关闭及并发扫描防重入。
+- 在跑过 Pi 或 OpenCode 的终端里改跑其他 agent（如 Antigravity、Claude）时，不再沿用残留的 `π - ` 或 `OC | ` 标题标记，改为正常显示当前 agent 名称。
+- space 面板默认宽度改为 540px、最小 360px，不再与工作区按等权重平分且最小 480px。
+- Files 现与 Review 一致：面板宽度不足 640px 时，在树里选文件会临时折起文件树，窄屏下切换树开关或点 Locate 仅作用于本次，不覆盖宽屏偏好。
 - 已命名的标签分屏运行多个顶层 agent 时，没有会话名也没有有效终端标题的 agent（例如未命名会话的 Pi）不再退回程序名，改为继续显示自定义标签名；自带有效终端标题的 agent 仍各自显示自己的标题，带会话名的 Pi 仍优先显示会话名。子 agent 仍不继承标签名，由普通 shell 启动的 agent 按顶层处理。
 - agent 右键菜单里，未由 Pi 会话名命名的顶层 agent 始终提供 **Rename**（与另一顶层 agent 共用标签时显示 **Rename tab**），包括在残留 `pi.session` 的终端里运行的非 Pi agent；子 agent 即使在独立标签里也不显示重命名项。
 - 选中 Inbox 时，右键已结束过一轮的空闲 agent（或从面包屑标题打开它的菜单）新增 **Mark unread**：原地把该 agent 重新标回 Done、不切换路由（Inbox 卡片、窗格头、space 切换菜单以及 Lists 下的 Agents 和标签栏都会重新显示未读圆点），已 Settle 或 Snooze 的 agent 会随之回到 Active，侧栏隐藏时也可用。

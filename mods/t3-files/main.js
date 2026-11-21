@@ -8,7 +8,7 @@ import { Buffer } from "buffer";
 import { panelState, surfacesFor, closeSurface, openFile, navigateFolder, resetFilesTabs } from "./panel.js";
 import { terminalFor, spaceFolder } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
-import { withNav, treeHead, navOpen, setNavOpen, holdWidth } from "./nav-column.js";
+import { withNav, treeHead, navOpen, setNavOpen, holdWidth, NAV_NARROW, navShown } from "./nav-column.js";
 import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
 import { KEY, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
@@ -85,6 +85,8 @@ export default class Files extends View {
     this.targets = ["Finder"];
     if (window()?.platform === "macos") cx.spawn(async cx => { this.targets = await installedTargets(); cx.notify(); });
     this.navOpen = navOpen();
+    /** @type {boolean | undefined} */
+    this.narrowNav = undefined;
     // The width the code is laid out at, behind its room while that moves (codeView, nav-column.js holdWidth).
     /** @type {{ at?: number, want?: number, run?: number }} */
     this.codeHold = {};
@@ -669,7 +671,11 @@ export default class Files extends View {
   // A row clicked or picked by the keys: lit, a file opened, a folder opened or closed.
   chooseRow(st, row, cx) {
     this.select(st, row.path); st.focus = row.path;
-    if (row.dir) this.toggle(st, row.path, cx); else this.open(st, row.path, cx);
+    if (row.dir) this.toggle(st, row.path, cx);
+    else {
+      if ((this.size?.width ?? 800) < NAV_NARROW) this.narrowNav = false;
+      this.open(st, row.path, cx);
+    }
     cx.notify();
   }
 
@@ -689,18 +695,19 @@ export default class Files extends View {
     // Plain code shown: colored once left alone. Behind, not asked: a refresh draws it again once it's in front.
     else if (!v?.waiting && this.wantsColor(v) && this.shown()) this.colorLater(st, v, IDLE, cx);
     this.syncSearch(st, cx);
-    const width = this.size?.width ?? 800;
+    const width = this.size?.width ?? 800, nav = navShown(width, this.navOpen, this.narrowNav);
     return focusRoot(this, v_flex().id("t3-files").relative().size_full().min_h(0).text_color(t.foreground).text_size(13)
       .track_focus(this.handle).on_mouse_down("left", () => this.handle.focus())
       .on_size_change((size, cx) => { this.size = { width: size.width / zoom(), height: size.height / zoom() }; cx.notify(); })
       .when(Boolean(st.file) || st.folder !== null, el => el.child(this.toolbar(st, t)))
-      .child(div().flex_1().min_h(0).child(st.file ? withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: this.tree(st, t), open: this.navOpen, handle: this.navHandle })
+      .child(div().flex_1().min_h(0).child(st.file ? withNav(t, "t3-files", width, { content: this.content(st, t), head: this.searchHead(st, t), list: this.tree(st, t), open: nav, handle: this.navHandle })
         : v_flex().size_full().min_h(0).child(treeHead("t3-files-head", this.searchHead(st, t))).child(div().flex_1().min_h(0).child(this.tree(st, t))))));
   }
 
   // 32 high, not T3's 40, so its centre is the work column's pane header's (specs/files.md); its controls centred, as Review's bar,
   // so Tree stays put between the pages.
   toolbar(st, t) {
+    const width = this.size?.width ?? 800, nav = navShown(width, this.navOpen, this.narrowNav);
     const md = kindOf(st.file ?? "") === "markdown", code = shared(KEY.markdown) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
     const crumb = (label, path, last) => {
@@ -729,7 +736,11 @@ export default class Files extends View {
           }, { on: md && !code, disabled: !md, size: "sm", iconSize: 14 }))
           // Wrap or scroll long lines, this page's own choice.
           .child(this.control(t, "t3-files-wrap", "text-wrap", st.view?.code && (!md || code) ? wrapLines() ? "Disable word wrap" : "Enable word wrap" : "Word wrap is only available in code", (cx) => { setWrapLines(!wrapLines()); cx.notify(); }, { on: wrapLines(), disabled: !st.view?.code || md && !code, size: "sm", iconSize: 14 }))
-          .child(this.control(t, "t3-files-nav-toggle", "folder-tree", !st.file ? "The file tree is always visible for folders" : this.navOpen ? "Hide the file tree" : "Show the file tree", cx => { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); cx.notify(); }, { on: !st.file || this.navOpen, disabled: !st.file, size: "sm", iconSize: 14 })));
+          .child(this.control(t, "t3-files-nav-toggle", "folder-tree", !st.file ? "The file tree is always visible for folders" : nav ? "Hide the file tree" : "Show the file tree", cx => {
+            if (width < NAV_NARROW) this.narrowNav = !nav;
+            else { this.navOpen = !this.navOpen; setNavOpen(this.navOpen); }
+            cx.notify();
+          }, { on: !st.file || nav, disabled: !st.file, size: "sm", iconSize: 14 })));
   }
 
   // T3's OpenInPicker in its header, outlined: the app's icon opens the file or folder there; ⌄ picks the app (menus.js,
@@ -763,7 +774,11 @@ export default class Files extends View {
             .child(div().max_w_full().whitespace_normal().child(st.file)).child(div().max_w_full().whitespace_normal().text_color(t.dim).child(st.root))
             .child(h_flex().gap(4)
               .child(this.control(t, "t3-files-retry-file", "refresh-cw", "Try reading the file again", cx => { st.view = { loading: true }; cx.notify(); this.loadPreview(st, st.file, cx, true); }))
-              .child(this.control(t, "t3-files-locate", "folder-tree", "Locate the file in Files", cx => { this.navOpen = true; this.reveal(st, st.file, cx, true); })))
+              .child(this.control(t, "t3-files-locate", "folder-tree", "Locate the file in Files", cx => {
+                if ((this.size?.width ?? 800) < NAV_NARROW) this.narrowNav = true;
+                else this.navOpen = true;
+                this.reveal(st, st.file, cx, true);
+              })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
           // The page's edge (t3-tokens「规则」R1), not T3's px-6.
           : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))

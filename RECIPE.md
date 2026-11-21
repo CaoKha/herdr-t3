@@ -21,7 +21,7 @@ Built with Herdr's layout JSON and mod API, in T3 Code's proportions. The person
 | Work area | `chrome`, including the gaps behind panes; 8px horizontal inset, 8px pane gaps and bottom inset |
 | Pane | `background`, radius 8, 2px border also in `background`; framed even alone |
 | Pane header | Always present outside Home, 28px, inside the pane |
-| Space panel | Rightmost full-height column; initially hidden, initially equal weight to work, min 480px; draggable outside divider; no card: head and pages one `chrome` surface from the top to the window's bottom, set apart from work by the divider; their content 12 in from the column's edges |
+| Space panel | Rightmost full-height column; initially hidden, 540 logical px by default, min 360px; draggable outside divider; no card: head and pages one `chrome` surface from the top to the window's bottom, set apart from work by the divider; their content 12 in from the column's edges |
 | Dividers | 1px `border` |
 
 There is no title bar; terminal opacity is 0 and terminal padding `[8, 0]`. A pane's 2px focus border defaults to `background`, invisible without changing the terminal's size; setting the layout's `focus.color` to `accent` shows it. In a split, unfocused headers fade to 50% until hovered. The shipped `workspace-status` bar exists but is hidden.

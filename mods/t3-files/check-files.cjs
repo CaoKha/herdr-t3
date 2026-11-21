@@ -1190,6 +1190,94 @@ async function liveRootFollowing() {
   }
 }
 
+async function narrowNavCollapse() {
+  const listing = new Map([["/r", "d\0src\0f\0a.js\0f\0b.js\0f\0bad.js\0"], ["/r/src", "f\0c.js\0"]]);
+  const { view, cx, w, settle, store } = makePage({ listing });
+  w.texts = { "/r/bad.js": new Error("stream did not contain valid UTF-8") };
+  const resize = (width) => find(view.render(cx), "t3-files").handlers.on_size_change({ width, height: 600 }, cx);
+  view.render(cx); await settle();
+
+  // Narrow (< 640): picking a file in the tree collapses the nav column without modifying stored nav.open.
+  resize(540);
+  let root = view.render(cx);
+  find(root, "row-a.js").handlers.on_click({}, cx); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "t3-files-nav"), null, "picking a file when narrow collapses the nav column");
+  assert.ok(find(root, "t3-files-solo"), "content takes full panel width when narrow nav collapses");
+  assert.equal(store.get("nav.open"), undefined, "narrow file pick does not modify stored nav.open");
+  assert.equal(find(root, "t3-files-nav-toggle").style.accessibility_label?.[0], "Show the file tree");
+
+  // Narrow: clicking the nav toggle toggles narrowNav without modifying stored nav.open.
+  find(root, "t3-files-nav-toggle").handlers.on_click({}, cx);
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"), "clicking nav toggle when narrow re-opens the tree");
+  assert.equal(store.get("nav.open"), undefined, "narrow nav toggle does not modify stored nav.open");
+  assert.equal(find(root, "t3-files-nav-toggle").style.accessibility_label?.[0], "Hide the file tree");
+
+  // Clicking a folder while narrow keeps the tree open.
+  find(root, "row-src").handlers.on_click({}, cx); await settle();
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"), "expanding a folder when narrow keeps the nav column open");
+
+  // Picking a file by keyboard while narrow also collapses the nav column without modifying stored nav.open.
+  view.current().focus = "b.js";
+  find(root, "t3-files-tree").handlers.on_key_down({ key: "enter", keystroke: "enter" }, cx); await settle();
+  root = view.render(cx);
+  assert.equal(view.current().file, "b.js");
+  assert.equal(find(root, "t3-files-nav"), null, "keyboard file pick when narrow collapses the nav column");
+  assert.equal(store.get("nav.open"), undefined, "keyboard file pick when narrow does not modify stored nav.open");
+
+  // Narrow toggle can both show and hide without modifying stored nav.open.
+  find(root, "t3-files-nav-toggle").handlers.on_click({}, cx);
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"));
+  find(root, "t3-files-nav-toggle").handlers.on_click({}, cx);
+  root = view.render(cx);
+  assert.equal(find(root, "t3-files-nav"), null);
+  assert.equal(store.get("nav.open"), undefined);
+
+  // Widening back to >= 640 restores the stored nav.open state (both open and closed preferences).
+  resize(640);
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"), "widening to >= 640 restores stored open preference");
+  find(root, "t3-files-nav-toggle").handlers.on_click({}, cx);
+  assert.equal(store.get("nav.open"), "false", "toggling when wide persists nav.open");
+  assert.equal(find(view.render(cx), "t3-files-nav"), null);
+  resize(540);
+  find(view.render(cx), "t3-files-nav-toggle").handlers.on_click({}, cx);
+  assert.ok(find(view.render(cx), "t3-files-nav"), "narrow toggle peeks even when wide preference is closed");
+  assert.equal(store.get("nav.open"), "false", "narrow peek does not overwrite stored closed preference");
+  resize(700);
+  assert.equal(find(view.render(cx), "t3-files-nav"), null, "widening back restores stored closed preference");
+  find(view.render(cx), "t3-files-nav-toggle").handlers.on_click({}, cx);
+  assert.equal(store.get("nav.open"), "true");
+
+  // Picking a file when width >= 640 keeps the nav column open.
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"));
+  find(root, "row-a.js").handlers.on_click({}, cx); await settle();
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"), "picking a file when width >= 640 keeps the nav column open");
+  view.current().focus = "b.js";
+  find(root, "t3-files-tree").handlers.on_key_down({ key: "enter", keystroke: "enter" }, cx); await settle();
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"), "keyboard file pick when width >= 640 keeps the nav column open");
+
+  // Clicking Locate when narrow re-opens the tree so the file can be seen, without touching stored nav.open.
+  resize(540);
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"));
+  find(root, "row-bad.js").handlers.on_click({}, cx); await settle();
+  root = view.render(cx);
+  assert.equal(find(root, "t3-files-nav"), null, "picking unreadable file when narrow folds the tree");
+  const locate = find(root, "t3-files-locate");
+  assert.ok(locate, "problem view renders Locate button");
+  locate.handlers.on_click({}, cx); await settle();
+  root = view.render(cx);
+  assert.ok(find(root, "t3-files-nav"), "clicking Locate when narrow re-opens the tree");
+  assert.equal(store.get("nav.open"), "true");
+}
+
 (async () => {
   assert.deepEqual(plain(m.ancestors("a/b/c.js")), ["a", "a/b"]);
 
@@ -1311,5 +1399,6 @@ async function liveRootFollowing() {
   await idleTick();
   await menus();
   await liveRootFollowing();
+  await narrowNavCollapse();
   console.log("t3-files checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });
