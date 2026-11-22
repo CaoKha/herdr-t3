@@ -1,14 +1,14 @@
 // A pane's header, for layouts that frame their panes (`"pane": { "header": { "content": { "mod": "t3-pane" } } }`): the program's icon,
-// the agent's name or the terminal's title, its folder and status, and split, zoom and close; with props { kids: terminal }, its sub-agents' list.
+// the agent's name or the terminal's title, its folder, sub-agents button, and split, zoom and close; with props { kids: terminal }, its sub-agents' list.
 
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { panes, terminals, agents, spaces, props, run, theme, home, openOverlay, closeOverlay, settings, shared, setShared, layout } from "herdr";
-import { modStatus, namer, programOf } from "./name.js";
-import { kidStatus, kidTree, notNews, ownStatus, subAgents } from "./tree.js";
+import { namer, programOf } from "./name.js";
+import { kidStatus, kidTree, subAgents } from "./tree.js";
 import { statusMark, STATUS_WORD, took } from "./status-mark.js";
 import { programIcon } from "./program.js";
-import { tip, tipMark, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
+import { tip, glow, POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { menuJump, scrollList, litProp, propsLit } from "./list.js";
@@ -22,12 +22,6 @@ import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
 const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = closedKey("t3-pane", "kids");
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const kidName = (k) => k.name || k.template || k.program?.name || k.address;
-
-// Time left on a snooze, as the Inbox's row says it: 10m, 3h, 2d.
-function left(ms, now) {
-  const m = Math.max(1, Math.ceil((ms - now) / 60000));
-  return m < 60 ? `${m}m` : m < 1440 ? `${Math.ceil(m / 60)}h` : `${Math.ceil(m / 1440)}d`;
-}
 
 function folder(cwd) {
   if (!cwd) return "";
@@ -54,22 +48,12 @@ export default class Pane extends View {
     stopsInit(this, cx);
   }
 
-  // One redraw at `at`, when a snooze's time left or its end changes what's drawn with nothing else changing; 0: none, as
-  // every pane has a header. A one-shot the draw re-arms: a draw arranges work only through cx.timer.after.
-  napClock(at, cx) {
-    if (at === this.napAt) return;
-    this.napWatch?.cancel();
-    this.napAt = at;
-    // A day at most, as the Inbox's wake timer: a longer wait is armed again then.
-    this.napWatch = at ? cx.timer.after(Math.min(at - Date.now(), 86400000), (cx) => { this.napAt = null; cx.notify(); }) : null;
-  }
-
   async close() {
     if (props()?.kids) {
       this.clock?.cancel();
       setShared(KIDS_CLOSED, Date.now());
     }
-    else { stopsEnd(this); this.napWatch?.cancel(); }
+    else stopsEnd(this);
   }
 
   // Everything the agent started, a step in for each level, as the agents list nests them, each with its own status:
@@ -133,15 +117,14 @@ export default class Pane extends View {
   }
 
   // How many sub-agents, all the way down, as T3's details meta button, in the colour of needing the person if one does;
-  // a click opens their list under it. `kids`: their words (subAgents); `busyOwn`: its own agent is at work.
-  kidsButton(t, pane, terminal, kids, busyOwn) {
+  // a click opens their list under it. `kids`: their words (subAgents).
+  kidsButton(t, pane, terminal, kids) {
     const stuck = kids.filter((s) => s === "blocked").length, busy = kids.filter((s) => s === "working").length;
     const label = [plural(kids.length, "sub-agent", "sub-agents"), stuck && `${stuck} need${stuck === 1 ? "s" : ""} you`, busy && `${busy} working`].filter(Boolean).join(", ");
     // Hung from the button, right edges together, as the agents list's sort menu; no press (the keyboard), the app's default.
-    // One at work puts the working mark before the count, inside the button, unless the agent has it in the slot after it: one a header.
     return trigger(this, t, `ph-kids-${pane}`, { wide: true, label, size: "xs", surface: "card", color: stuck ? t.blocked : undefined, closed: KIDS_CLOSED,
       onOpen: (b) => { openOverlay({ mod: "t3-pane", kind: "popup", width: KIDS_WIDTH, ...hang(b, KIDS_WIDTH), props: { kids: terminal, ...litProp(!b) } }); } },
-    (el) => el.when(busy > 0 && !busyOwn, (b) => b.child(statusMark("mods/t3-pane", t, "working"))).child(String(kids.length))
+    (el) => el.when(busy > 0, (b) => b.child(statusMark("mods/t3-pane", t, "working"))).child(String(kids.length))
       .child(svg("mods/t3-pane/icons/chevron-down.svg").size(14).flex_none()));
   }
 
@@ -173,7 +156,7 @@ export default class Pane extends View {
       }), radiusOf("xs")), { action: key });
   }
 
-  render(cx) {
+  render() {
     const t = theme();
     if (props()?.kids) return this.kidsMenu(t);
     const ps = panes(), p = ps.find((q) => q.pane === props()?.pane), sp = p && spaces();
@@ -189,21 +172,11 @@ export default class Pane extends View {
     const crumbed = alone && inbox && every.some((a) => a.address === p.terminal);
     const name = crumbed || (!p.mod && pic && named === p.program?.name) ? "" : named;
     // Split, the panes beside the focused one recede, as T3's split terminals do, with no ring: their icon, name and folder a
-    // step down, back up while hovered. Its status mark (what needs the person) and its buttons stay as they are.
+    // step down, back up while hovered. Its buttons stay as they are.
     const quiet = !alone && !p.focused && !this.hovered;
-    // Its agent's own status; what it started speaks through the sub-agent button (tree.js).
+    // What this agent started speaks through the sub-agent button (tree.js).
     const kids = subAgents(every, all)(p.terminal);
-    const st = p.mod ? modStatus(p) : ownStatus(p.status, p.terminal, all);
-    // Put away, it's no news (no done dot, in either mode). With the Inbox chosen the header says so, as its Inbox row does
-    // (docs/adr/0002): a snooze with its clock and time left, else Settle's check. At work or needing the person, that shows first.
-    const k = p.terminal && all.find((x) => x.address === p.terminal);
-    const away = !p.mod && st !== "working" && st !== "blocked" && notNews(k, p.status, kids);
-    const now = Date.now(), nap = away && Number(k.labels?.snoozed) > now ? Number(k.labels.snoozed) : 0;
-    // With the Inbox the time left shows, a minute at a time; in Lists only the wake shows, the done coming back.
-    this.napClock(nap && inbox ? nap - (Math.ceil((nap - now) / 60000) - 1) * 60000 : nap, cx);
     const pane = p.pane;
-    // A mark takes the last button's 24px, so it, the × and the tab bar's + share one column: pr(2), the frame's 2 and the block's 8 are the bar's 12.
-    const slot = (mark) => div().min_w(24).flex_none().flex().items_center().justify_center().child(mark);
     // The buttons show with the keyboard on the header or one of them, as they do hovered: the header's the stop that gets there.
     const head = `pane-head-${pane}`, tools = ["r", "d", "z", "x"].map((k) => `ph-${k}-${pane}`);
     // The rounded frame paints the background; rectangular child fills would cover its corners.
@@ -231,13 +204,6 @@ export default class Pane extends View {
           .child(this.button(t, `ph-d-${pane}`, "mods/t3-pane/icons/square-split-vertical.svg", "Split down", () => run("pane.split", { direction: "down", pane }), "pane.split:down"))
           .child(this.button(t, `ph-z-${pane}`, `mods/t3-pane/icons/${p.zoomed ? "minimize-2" : "maximize-2"}.svg`, p.zoomed ? "Unzoom pane" : "Zoom pane", () => run("pane.zoom", { pane }), "pane.zoom"))
           .child(this.button(t, `ph-x-${pane}`, "mods/t3-pane/icons/x.svg", "Close pane", () => { this.hot = null; run(`t3-tabs.close-pane:${pane}`); }, "t3-tabs.close-pane")))))
-      .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal, kids, st === "working")))
-      // The same marks as the agents list and tabs.
-      .when(st === "working" || st === "blocked", el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, STATUS_WORD[st], statusMark("mods/t3-pane", t, st, 14)))))
-      .when(inbox && away, el => el.child(slot(nap
-        ? tipMark(this, t, `ph-mark-${pane}`, "Snoozed", h_flex().gap(4).items_center().text_size(12).text_color(t.accent)
-          .child(svg("mods/t3-pane/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(nap, now)))
-        : tipMark(this, t, `ph-mark-${pane}`, "Settled", svg("mods/t3-pane/icons/check.svg").size(14).flex_none().text_color(t.dim)))))
-      .when(st === "done" && !away, el => el.child(slot(tipMark(this, t, `ph-mark-${pane}`, "Done", statusMark("mods/t3-pane", t, "done").mx(3))))), 8));
+      .when(Boolean(p.terminal && kids.length), (el) => el.child(this.kidsButton(t, pane, p.terminal, kids))), 8));
   }
 }

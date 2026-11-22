@@ -1526,7 +1526,7 @@ async function checkInbox() {
     const all = () => [tabs.render(cx), f.load("t3-agents").render(cx), f.load("t3-spaces").render(cx), f.load("t3-chrome").render(cx), f.load("t3-pane", { pane: "p0" }).render(cx)].flatMap(walk);
     const look = n => { const { accessibility_label, ...s } = n.style; return JSON.stringify([s, strings(n)]); };
     const marks = all().filter(n => strings(n).join("") === "!" && n.style.size === 14);
-    assert.ok(marks.length >= 2, "tabs and the pane header show needs-you (the agents list's is 12, as T3's one-line row)");
+    assert.equal(marks.length, 1, "tabs show the 14px needs-you mark (pane headers show none; the agents list's is 12, as T3's one-line row)");
     assert.equal(new Set(marks.map(look)).size, 1, "needs-you is drawn the same everywhere");
     assert.ok(!all().some(n => Object.keys(n.style).some(k => k.includes("scrollbar"))), "lists scroll without a painted bar");
     assert.ok(!all().some(n => /\p{Script=Han}/u.test(strings(n).join("") + (n.style.accessibility_label ?? ""))), "UI text and labels are English");
@@ -1606,7 +1606,7 @@ async function checkInbox() {
   const working = tree => walk(tree).find(n => n.source?.endsWith("/icons/circle-dashed.svg"));
   const open = f.load("t3-agents");
   for (const tree of [tabs.render(cx), open.render(cx)]) assert.equal(working(tree).style.text_color, f.theme().working);
-  assert.equal(working(head).style.text_color, f.theme().working, "a header with sub-agents still shows its own agent at work");
+  assert.equal(working(head), undefined, "pane headers show no own working mark");
   for (const id of ["ph-r-p0", "ph-d-p0", "ph-z-p0", "ph-x-p0"]) assert.deepEqual([find(head, id).style.h, find(head, id).style.w], [24, 24]);
   const actions = walk(head).find(n => n.items.some(child => child?.key === "tip-ph-r-p0"));
   assert.equal(actions.style.gap, 4);

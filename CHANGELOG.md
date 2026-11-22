@@ -4,6 +4,8 @@ English · [中文](CHANGELOG.zh-CN.md)
 
 ## 2026-11-23
 
+- Removed the right-end status mark (`working`, `blocked`, `done`, and Inbox `Settled` / `Snoozed` marks plus their snooze countdown timer) from pane headers (`t3-pane`); status stays in the sidebar and tabs. The sub-agent button remains and shows the working mark whenever any descendant is working.
+
 - Unified Undo notices across Inbox and the tab bar (`shared/notice.js`): consecutive Settle/Snooze/Unpin actions across card buttons, menus and shortcuts now batch into one Undo notice, `cmd-shift-z` responds immediately even when the sidebar is hidden or in Lists, failed Undo writes restore the notice for retry, and ephemeral undo callbacks are no longer persisted into `t3.notice`.
 - Running a `Tab` Action from Details now closes Details cleanly instead of triggering a false "Open Details again" warning toast; split Actions still keep Details open.
 - Files now rebuilds open code previews when the theme or `font_family` changes, and clicking **Locate** in wide mode persists the opened file tree preference.

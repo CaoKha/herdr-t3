@@ -58,7 +58,7 @@ Details (`cmd-shift-b`) is a native popup under its button, 280 wide, up to 420 
 
 ### Panes and sub-agents
 
-A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, the state, then split, zoom and close controls that appear on hover or keyboard focus. Inbox headers mark a settled agent with a `dim` check and a snoozed one with an alarm clock and time left. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working mark before the count while one is at work and the agent itself isn't (a header has one working mark at most); it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
+A pane header shows the program icon, a meaningful name (left out when it is just the program's name, or when the Inbox breadcrumb already says it), the folder, the sub-agent button, and split, zoom and close controls that appear on hover or keyboard focus. Pane headers show no right-end status mark of their own. The sub-agent button reads `3 ⌄` for live descendants, tinted `blocked` when one needs you, with the working mark before the count while any descendant is at work; it opens a 280px list of descendants in tree order with their status marks. Spec: [pane](docs/internals/specs/pane.md).
 
 ### Space panel
 

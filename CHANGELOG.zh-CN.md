@@ -4,6 +4,8 @@
 
 ## 2026-11-23
 
+- 移除窗格标题栏（`t3-pane`）右端的状态标记（`working`／`blocked`／`done` 以及 Inbox 下的 `Settled` 勾、`Snoozed` 闹钟与倒计时定时器），不再与侧栏和标签栏重复显示状态。子 agent 按钮保留，并在任意后代工作中时直接显示工作标记。
+
 - 统一 Inbox 与标签栏的 Undo 提示和撤销队列（`shared/notice.js`）：通过卡片按钮、菜单和快捷键连续执行 Settle／Snooze／Unpin 现可合并为同一条 Undo 提示，侧栏隐藏或切到 Lists 时按 `cmd-shift-z` 立即撤销不再有 1 秒延迟，撤销写入失败会保留提示以供重试，且临时撤销快照不再写入持久化的 `t3.notice`。
 - 在详情（Details）里运行默认打开新标签的 Action 会先干净收起详情，不再误弹「Open Details again」警告；分屏运行的 Action 仍保持详情打开。
 - Files 在切换主题或更改字体后自动重建代码编辑器配色；宽屏下点击错误页 **Locate** 打开文件树时同步保存偏好。

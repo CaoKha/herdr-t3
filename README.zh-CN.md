@@ -20,7 +20,7 @@
 - **Inbox 和 Lists**：用 `cmd-shift-l` 或在布局设置里切换。Inbox 按注意力排列 agent，支持 Settle、Snooze 和 Mark unread（从右键菜单把已读空闲 agent 标回 Done）。**Settled** 收纳已收起的 agent，**Filter by space** 只列出有 Inbox 条目或已在筛选中选中的 space。Lists 列出 space 和其中的 agent。
 - **切换 space** 或从 Home 返回 space 时，目标标签栏、终端和上次打开的右侧面板一起出现。
 - **Home**：收起正在看的 agent 后，回到一个安静的页面，不会自动跳到下一张卡片。下一步看什么由你决定。也可以在设置（`cmd-shift-,`）里改成跳到下一张卡片，或者把 Home 换成终端或你自己的 mod。
-- **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名、标状态。
+- **同一个名字，同一套标记**：卡片、列表、标签和窗格标题用同样的方式给终端取名，卡片、列表和标签共用同一套状态标记。
 - **跳转**（`cmd-p`）：按名字跳到任何窗格，agent 和普通程序都行。最近访问顺序变化时，Enter 仍跳到你选中的窗格。
 - **Clean up**（`cmd-shift-r`／`ctrl-alt-r`，或侧栏底栏的垃圾桶图标）不离开 Inbox 回收用完的终端：**Settled**（已 Settle 的 agent）和 **Idle shells**（空闲 shell）各自独立折叠，可分组、逐行或一键关掉；所在 space 已没有在工作的 agent、却还在运行的程序各是一张卡片，可以跳过去或点 **Stop** 停掉。
 - **New** 先列出打开的 space，再列出记住的项目。项目的最后一个终端关闭后仍可选中，在原来的机器和目录重新打开；不再需要的记住项目可点 `×` 或按 `ctrl-d` 移除。
