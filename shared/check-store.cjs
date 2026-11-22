@@ -6,13 +6,13 @@ const vm = require("node:vm");
 
 const state = {}, local = new Map();
 const src = fs.readFileSync(path.join(__dirname, "store.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
-  + "\nglobalThis.store = { KEY, closedKey, wrapLines, setWrapLines };";
+  + "\nglobalThis.store = { KEY, closedKey, wrapLines, setWrapLines, readLocal };";
 const context = vm.createContext({
   shared: (k) => state[k] ?? null, setShared: (k, v) => { state[k] = v; },
   localStorage: { getItem: (k) => local.get(k) ?? null, setItem: (k, v) => local.set(k, v), removeItem: (k) => local.delete(k) },
 });
 vm.runInContext(src, context);
-const { KEY, closedKey, wrapLines, setWrapLines } = context.store;
+const { KEY, closedKey, wrapLines, setWrapLines, readLocal } = context.store;
 
 // Each page (its own copy, its own localStorage) wraps until set to Scroll, and one page's choice cannot change the other.
 assert.equal(wrapLines(), true);
@@ -32,5 +32,26 @@ for (const dir of ["shared", "mods", "extras/mods"]) for (const f of fs.readdirS
   if (!f.endsWith(".js") || path.basename(f) === "store.js") continue;
   const hit = fs.readFileSync(path.join(root, dir, f), "utf8").match(/["'`][^"'`\s]*\.([a-z]+C|c)losed["'`]/);
   assert.equal(hit, null, `${dir}/${f}: ${hit?.[0]} — name a popup's close stamp with closedKey`);
+}
+// readLocal safely parses JSON from localStorage and returns fallback on missing, "null", or corrupted JSON.
+{
+  const fallback = { ok: true };
+  assert.equal(readLocal("missing.key", fallback), fallback);
+  local.set("null.key", "null");
+  assert.equal(readLocal("null.key", fallback), fallback);
+  local.set("bad.key", "{not json");
+  assert.equal(readLocal("bad.key", fallback), fallback);
+  local.set("empty.key", "");
+  assert.equal(readLocal("empty.key", fallback), fallback);
+  local.set("obj.key", '{"a":1}');
+  assert.deepEqual({ ...readLocal("obj.key", fallback) }, { a: 1 });
+  local.set("false.key", "false");
+  assert.equal(readLocal("false.key", true), false);
+  local.set("zero.key", "0");
+  assert.equal(readLocal("zero.key", 42), 0);
+  local.set("wrong.arr", '{"a":1}');
+  assert.deepEqual(readLocal("wrong.arr", []), []);
+  local.set("wrong.obj", '["a"]');
+  assert.deepEqual(readLocal("wrong.obj", {}), {});
 }
 console.log("ok: store names every key by the rule, and each page keeps its own line mode.");

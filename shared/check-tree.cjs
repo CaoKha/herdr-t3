@@ -4,7 +4,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "tree.js"), "utf8").replace(/^export /gm, "");
-const { agentKids, descendants, kidStatus, kidTree, subAgents, ownStatus } = vm.runInThisContext("(() => {" + source + "\nreturn { agentKids, descendants, kidStatus, kidTree, subAgents, ownStatus }; })()");
+const { agentKids, descendants, kidStatus, kidTree, subAgents, ownStatus, terminalByAddress } = vm.runInThisContext("(() => {" + source + "\nreturn { agentKids, descendants, kidStatus, kidTree, subAgents, ownStatus, terminalByAddress }; })()");
 
 // A sub-agent's done is a dot only until it's read, as a top-level agent's (GLOSSARY: unread done).
 assert.equal(kidStatus({ address: "reply", status: "done" }, new Map([["reply", "done"]])), "done", "unread, as agents() says");
@@ -27,6 +27,10 @@ const names = (ks) => ks.map((k) => k.address);
 assert.deepEqual(names(agentKids(all, "top")), ["a", "b", "new"], "a shell isn't one; what it started stands where it would have");
 assert.deepEqual(names(agentKids(all, "a")), [], "nor is a shell with nothing under it");
 assert.deepEqual(names(descendants(all, "top")), ["a", "b", "new"], "all the way down");
+const byAt = terminalByAddress(all);
+assert.equal(byAt.get("top")?.address, "top");
+assert.equal(byAt.get("gone")?.state, "exited", "index includes non-live terminals");
+assert.equal(byAt.get("missing"), undefined);
 const deep = [agent("top", null), agent("a", "top"), agent("a1", "a"), agent("b", "top")];
 assert.deepEqual(kidTree(deep, "top").map((r) => [r.k.address, r.depth, r.lines.join("")]), [["a", 0, "├"], ["a1", 1, "│└"], ["b", 0, "└"]],
   "tree order, each a level in from its parent");
@@ -49,9 +53,10 @@ assert.deepEqual(names(descendants(ring, "top")), ["child", "grandchild"], "a li
   const words = big.slice(0, 200).map((a) => under(a.address));
   assert.equal(words.flat().length, 1800 - 360, "every agent under one, shells left out");
   assert.ok(reads <= 3 * big.length, `${reads} reads of ${big.length} terminals for 200 agents`);
-  // A sub-agent's own lookup (ownStatus) and the tree for the menu read the same index.
+  // A sub-agent's own lookup (ownStatus), terminalByAddress and the tree for the menu read the same index.
   reads = 0;
-  for (const a of big.slice(0, 200)) ownStatus(a.status, a.address, counted);
+  const byAddr = terminalByAddress(counted);
+  for (const a of big.slice(0, 200)) { ownStatus(a.status, a.address, counted); assert.equal(byAddr.get(a.address)?.address, a.address); }
   kidTree(counted, "top0");
   assert.ok(reads <= 3 * big.length, `${reads} reads for 200 lookups and a tree`);
 }

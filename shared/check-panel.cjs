@@ -111,5 +111,43 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   p.togglePanel('review'); assert.equal(ui.open, false);
   p.showPage('review'); p.closeSurface(); assert.equal(ui.open, false);
   assert.equal(JSON.stringify(saved['t3.panels'].b), before);
+  // newBorn shares globalThis.t3LastBorn across mod copies, stays strictly > Date.now(), previous t3LastBorn, and existing tab borns.
+  {
+    const sharedSaved = {}, frozenNow = 10000;
+    const sharedUi = { open: false, page: 'panel-empty', wide: false, space: 'a', slots: ['files', 'review', 'panel-empty'], end: 28, buttons: false, panelSize: { px: 540 } };
+    const sharedLayout = () => ({ id: 'root', children: [{ id: 'work', hidden: sharedUi.wide, children: [{ id: 'window-end', size: { px: sharedUi.end } }] }, { id: 'panel', hidden: !sharedUi.open, size: { ...sharedUi.panelSize }, children: [{ id: 'panel-body', active: sharedUi.page, children: sharedUi.slots.map(id => ({ id })) }] }] });
+    const sharedCtx = vm.createContext({
+      KEY: { panels: 't3.panels' }, GROUP_GAP: 4, layout: sharedLayout, Map, Math, Date: { now: () => frozenNow },
+      window: () => ({ buttons: sharedUi.buttons }),
+      spaces: () => ['a', 'b'].map(id => ({ id, active: id === sharedUi.space, folder: '/space', machine: null, tabs: [{ id: `${id}-tab`, active: true }] })),
+      focused: () => null, panes: () => [], exec: async () => ({ code: 128, stdout: '' }),
+      shared: k => sharedSaved[k], setShared: (k, v) => { sharedSaved[k] = v; }, run: () => {},
+    });
+    const modCode = ['terminal-context.js', 'surfaces.js', 'panel.js']
+      .map(f => fs.readFileSync(`${__dirname}/${f}`, 'utf8').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, ''))
+      .join('\n');
+    vm.runInContext(`(() => {\n${modCode}\nglobalThis.c1 = { showPage, closeSurface, openFile, resetFilesTabs };\n})();`, sharedCtx);
+    vm.runInContext(`(() => {\n${modCode}\nglobalThis.c2 = { showPage, closeSurface, openFile, resetFilesTabs };\n})();`, sharedCtx);
+    assert.equal(sharedCtx.t3LastBorn, 0);
+    sharedCtx.c1.showPage('review');
+    const born1 = sharedSaved['t3.panels'].a.tabs.find(t => t.id === 'review').born;
+    assert.ok(born1 > frozenNow, `born1 (${born1}) must be strictly > Date.now() (${frozenNow})`);
+    sharedCtx.c2.closeSurface('review');
+    sharedCtx.c2.showPage('review');
+    const born2 = sharedSaved['t3.panels'].a.tabs.find(t => t.id === 'review').born;
+    assert.ok(born2 > born1, `second copy at same ms (${born2}) must be > first copy (${born1})`);
+    assert.equal(sharedCtx.t3LastBorn, born2);
+    // Strictly greater than any existing tab's born in that space even if t3LastBorn is lower.
+    sharedCtx.t3LastBorn = 0;
+    sharedSaved['t3.panels'].a = { open: true, wide: false, active: 'files', tabs: [{ id: 'files', born: 50000 }] };
+    sharedCtx.c1.openFile('x.js');
+    const born3 = sharedSaved['t3.panels'].a.tabs.find(t => t.id === 'file:x.js').born;
+    assert.equal(born3, 50001);
+    // Also respects existing tab born in an explicit non-active space passed to resetFilesTabs(space).
+    sharedCtx.t3LastBorn = 0;
+    sharedSaved['t3.panels'].b = { open: true, wide: false, active: 'file:y.js', tabs: [{ id: 'file:y.js', path: 'y.js', born: 60000 }] };
+    assert.equal(sharedCtx.c1.resetFilesTabs('b'), true);
+    assert.equal(sharedSaved['t3.panels'].b.tabs.find(t => t.id === 'files').born, 60001);
+  }
   console.log('ok: each space keeps its panel and tabs, hides, widens and restores; Review reads the tab\'s repository; Herdr\'s own stack');
 })().catch(e => { console.error(e); process.exit(1); });

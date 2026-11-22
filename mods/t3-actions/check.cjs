@@ -1011,5 +1011,103 @@ delete state["t3-tabs.compact"];
   assert.deepEqual(plain(labels()), ["Open in Finder", "Open in Zed"], "the open menu lists it too");
   Object.assign(env, was); jobs.length = 0;
 }
+{
+  // Tab-action from Details closes the popup chain before terminal.open (no false source warning); split-action stays open;
+  // and the 100ms source watcher cancels itself once !sourceOkay(source) fires so it can never notify twice.
+  const was = { spaces: env.spaces, panes: env.panes, focused: env.focused };
+  let tab = "b";
+  env.spaces = () => [{ id: "s", active: true, machine: null, folder: "/space", tabs: [{ id: "b", active: tab === "b" }, { id: "new-tab", active: tab === "new-tab" }] }];
+  env.panes = () => [{ pane: "p", terminal: "t9", tab: "b", cwd: "/captured" }];
+  env.focused = () => ({ space: "s", tab, terminal: tab === "b" ? "t9" : "t10", cwd: "/captured" });
+
+  // 1) Directly on Details card: tab action (explicit place: "tab" and default omitted place) dismisses Details before terminal.open.
+  for (const place of ["tab", undefined]) {
+    tab = "b";
+    state["t3-actions.actions"] = { list: [{ id: "a", name: "Tab act", command: "ls", ...(place ? { place } : {}) }] };
+    const entry = load({ details: true }), events = [], watches = [];
+    const entryClose = (id) => { events.push(["close", id]); const reg = entry.testScope.t3Details; if (reg?.id === id) reg.id = null; };
+    entry.testScope.closeOverlay = entryClose;
+    fire(find(entry.render(), "details-toggle"), "on_click", {}, cx);
+    const detSpec = overlays.at(-1), detId = overlays.length;
+    assert.equal(vm.runInContext("openedDetails()", entry.testScope), detId);
+    entry.testScope.props = () => ({ ...detSpec.props, overlay: detId });
+    const det = new entry.testScope.Mod();
+    const detCx = { ...cx, timer: { ...cx.timer, every: (ms, f) => { const h = { ms, f, cancelled: 0, cancel() { this.cancelled++; } }; watches.push(h); return h; } } };
+    det.init(entry.testScope.props(), detCx);
+    entry.testScope.run = (name, args) => {
+      events.push(["run", name, plain(args)]);
+      if (name === "terminal.open" && args.place === "tab") tab = "new-tab";
+    };
+    notices.length = 0;
+    fire(find(det.render(), "action-run"), "on_click");
+    const closeAt = events.findIndex(([kind, arg]) => kind === "close" && arg === detId);
+    const openAt = events.findIndex(([kind, arg]) => kind === "run" && arg === "terminal.open");
+    assert.ok(closeAt >= 0 && openAt > closeAt, `place=${place}: Details closes before terminal.open`);
+    assert.equal(vm.runInContext("openedDetails()", entry.testScope), null, `place=${place}: openedDetails cleared`);
+    assert.equal(notices.length, 0, `place=${place}: no false warning`);
+  }
+
+  // 2) From Details' Actions menu: tab action closes menu + Details before terminal.open; split action closes menu only.
+  {
+    tab = "b";
+    state["t3-actions.actions"] = { list: [
+      { id: "a-tab", name: "Tab menu act", command: "ls" },
+      { id: "a-split", name: "Split menu act", command: "pwd", place: "right" },
+    ] };
+    const source = { space: "s", tab: "b", terminal: "t9", folder: "/captured", machine: null };
+    const events = [];
+    const menuView = load({ actions: "menu", source, details: "det-1", parents: ["det-1"], overlay: "menu-1" });
+    menuView.testScope.closeOverlay = (id) => events.push(["close", id]);
+    menuView.testScope.run = (name, args) => events.push(["run", name, plain(args)]);
+    fire(find(menuView.render(), "action-a-tab"), "on_click");
+    const detCloseAt = events.findIndex(([kind, arg]) => kind === "close" && arg === "det-1");
+    const openAt = events.findIndex(([kind, arg]) => kind === "run" && arg === "terminal.open");
+    assert.ok(detCloseAt >= 0 && openAt > detCloseAt, "menu tab action closes Details before terminal.open");
+
+    events.length = 0;
+    fire(find(menuView.render(), "action-a-split"), "on_click");
+    assert.ok(!events.some(([kind, arg]) => kind === "close" && arg === "det-1"), "menu split action keeps Details open");
+    assert.ok(events.some(([kind, arg]) => kind === "run" && arg === "terminal.open"), "menu split action runs terminal.open");
+  }
+
+  // 3) Directly on Details card: split action (place: "right" / "down") keeps Details open.
+  for (const place of ["right", "down"]) {
+    tab = "b";
+    state["t3-actions.actions"] = { list: [{ id: "a", name: "Split", command: "pwd", place }] };
+    const entry = load({ details: true }), closed = [];
+    entry.testScope.closeOverlay = (id) => closed.push(id);
+    fire(find(entry.render(), "details-toggle"), "on_click", {}, cx);
+    const detSpec = overlays.at(-1), detId = overlays.length;
+    entry.testScope.props = () => ({ ...detSpec.props, overlay: detId });
+    const det = new entry.testScope.Mod(); det.init(entry.testScope.props(), cx);
+    fire(find(det.render(), "action-run"), "on_click");
+    assert.equal(closed.length, 0, `place=${place}: Details stays open`);
+    assert.equal(vm.runInContext("openedDetails()", entry.testScope), detId, `place=${place}: openedDetails stays set`);
+    vm.runInContext("dismissDetails()", entry.testScope);
+  }
+
+  // 4) External source change cancels the 100ms watch immediately so it never notifies twice.
+  {
+    tab = "b";
+    const source = { space: "s", tab: "b", terminal: "t9", folder: "/captured", machine: null };
+    const watches = [], closed = [];
+    const det = load({ actions: "details", source, overlay: "det-watch" });
+    det.testScope.closeOverlay = (id) => closed.push(id);
+    const detCx = { ...cx, timer: { ...cx.timer, every: (ms, f) => { const h = { ms, f, cancelled: 0, cancel() { this.cancelled++; } }; watches.push(h); return h; } } };
+    det.init({ actions: "details", source, overlay: "det-watch" }, detCx);
+    const watch = watches.find(w => w.ms === 100);
+    assert.ok(watch, "100ms source watch registered");
+    tab = "new-tab";
+    notices.length = 0;
+    watch.f();
+    if (!watch.cancelled) watch.f();
+    assert.equal(watch.cancelled, 1, "watch cancels itself immediately when source changes");
+    assert.deepEqual(closed, ["det-watch"], "closes Details once");
+    assert.equal(notices.length, 1, "warns once and never notifies twice");
+    assert.equal(notices[0].title, "Open Details again");
+  }
+
+  Object.assign(env, was);
+}
 console.log("ok: Actions controls/editor; Details opens on its source, its menus under their rows and gone with it, walked by keys; its Review row shows Review and picks its range");
 })().catch((e) => { console.error(e); process.exit(1); });

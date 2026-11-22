@@ -145,4 +145,32 @@ terms[0].labels.snoozed = String(Date.now() - 1); assert.ok(done());
 }
 // Tab reaches the footer's New tab in…, as every control in a popup.
 assert.equal(find(open().render(), "picker-new").style.tab_index, 0);
+
+// Drawing rows indexes terminals once by address instead of scanning terminals() for every row.
+{
+  const count = 200;
+  let addressReads = 0;
+  const savedPanes = panes.splice(0);
+  const savedTabs = spaces[1].tabs.splice(0);
+  spaces[1].tabs.push({ id: "c-many", name: "Many", named: true, active: true });
+  for (let i = 0; i < count; i++) {
+    panes.push({ pane: `pm-${i}`, tab: "c-many", terminal: `tm-${i}`, program: pi, status: "done", focused: i === 0 });
+  }
+  terms = Array.from({ length: count }, (_, i) => ({
+    get address() { addressReads++; return `tm-${i}`; },
+    turn: 1,
+    labels: i === count - 1 ? { settled: "1:1" } : {},
+  }));
+  shared["t3-tabs.recent"] = ["pm-0", ...Array.from({ length: 10 }, (_, i) => `pm-${count - 1 - i}`)];
+  const m = open();
+  addressReads = 0;
+  const tree = m.render();
+  assert.ok(addressReads <= 3 * count, `row() must use a byAddress map instead of O(panes * terminals) scan: ${addressReads} reads for ${count} terminals`);
+  assert.equal(hasDone(find(tree, `pane:pm-${count - 1}`)), false, "settled label still hides done via byAddress map");
+  assert.equal(hasDone(find(tree, `pane:pm-${count - 2}`)), true);
+  delete shared["t3-tabs.recent"];
+  terms = [];
+  panes.splice(0, panes.length, ...savedPanes);
+  spaces[1].tabs.splice(0, spaces[1].tabs.length, ...savedTabs);
+}
 console.log("ok picker");

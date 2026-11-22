@@ -11,8 +11,8 @@ import { menuKeys, litOnHover, litProp, propsLit } from "./list.js";
 import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
 import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY, closedKey } from "./store.js";
-import { pinList, setPinned } from "./pins.js";
+import { KEY, closedKey, readLocal } from "./store.js";
+import { prunePins, setPinned } from "./pins.js";
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
@@ -51,9 +51,9 @@ export default class Agents extends View {
     cx.spawn(async (cx) => {
       for (;;) if (await nextCommand() === "focus") enter(this, cx, "ag-sort");
     });
-    this.folded = JSON.parse(localStorage.getItem("folded") ?? "{}");
+    this.folded = readLocal("folded", {});
     // Each agent's last state and when it changed (ms), kept across restarts.
-    this.changed = JSON.parse(localStorage.getItem("changes") ?? "{}");
+    this.changed = readLocal("changes", {});
     // Behind the Inbox nothing is drawn or published, so nothing is sorted or grouped: only what outlives the tick is kept.
     cx.timer.every(1000, () => {
       const parts = sidebarParts(layout());
@@ -61,9 +61,12 @@ export default class Agents extends View {
       this.observe();
       this.agentOrder = null;
     });
-    cx.timer.every(30000, (cx) => cx.notify()); // The rows' times move with nothing else changing.
+    cx.timer.every(30000, (cx) => { if (revealVisible()) cx.notify(); }); // The rows' times move with nothing else changing.
     // Older installs kept pins in this list's storage; move them over once, before the inbox writes any.
-    if (shared(KEY.pins) == null && localStorage.getItem("pins")) setPinned(JSON.parse(localStorage.getItem("pins")));
+    if (shared(KEY.pins) == null && localStorage.getItem("pins")) {
+      const legacy = readLocal("pins", null);
+      if (Array.isArray(legacy)) setPinned(legacy);
+    }
   }
 
   cancelReveal() {
@@ -116,12 +119,11 @@ export default class Agents extends View {
 
   // Drops pins and fold choices of agents that ended. Only for machines the list has heard from:
   // right after a start, or while a machine connects, its agents aren't listed yet.
-  prune(all, pins) {
+  prune(all) {
+    const kept = prunePins(all);
     const machine = (addr) => (addr.includes("/") ? addr.split("/")[0] : "");
     const heard = new Set(all.map((k) => machine(k.address)));
     const live = new Set(all.filter((k) => k.state === "live").map((k) => k.address));
-    const kept = pins.filter((p) => !heard.has(machine(p)) || live.has(p));
-    if (kept.length !== pins.length) setPinned(kept);
     // Group headers (sp-…, sec-…, pinned) fold under the same store; only agents' entries end.
     const ended = Object.keys(this.folded).filter((k) => !/^(sp-|sec-|pinned$)/.test(k) && heard.has(machine(k)) && !live.has(k));
     for (const k of ended) delete this.folded[k];
@@ -182,7 +184,7 @@ export default class Agents extends View {
   // What every look owes, drawn or not: each agent's history, the done being read, and ended agents' pins and folds dropped.
   observe() {
     const every = agents(), all = terminals(), sp = spaces(), now = Date.now();
-    const pins = this.prune(all, pinList());
+    const pins = this.prune(all);
     this.track(every, sp, now);
     this.hold(every);
     return { every, all, sp, now, pins };

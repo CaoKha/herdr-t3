@@ -22,22 +22,26 @@ const exec = async (_cmd, args, opts) => {
 };
 const input = () => ({text:'',value(){return this.text;},set_value(v){this.text=v;},focus(){}});
 const picked = [];
+let liveSpaces = [{ id: 's' }];
 let api;
 const view = () => ({root:'/repo',space:'s',page:'/branch/fix',width:736,height:500,popup:'scope',handle:{focus(){}},scopeSearch:input(),refSearch:input(),
   closePopup(){this.popup=null; api.releaseScope(this);},
   pick(page,opts){picked.push({page,...opts});},
   openCommits(){}});
 const element = kit.elements();
-api = load({exec,shared:k=>state.get(k),setShared:(k,v)=>state.set(k,v),settings:()=>({zoom:1}),
+api = load({exec,shared:k=>state.get(k),setShared:(k,v)=>state.set(k,v),spaces:()=>liveSpaces,settings:()=>({zoom:1}),
   div:element,h_flex:element,v_flex:element,svg:element,Input:{new:element},drawButton:element,ghostButton:element,DISABLED:0.64});
 const flush = async () => { for(let i=0;i<50;i++) await Promise.resolve(); };
 
 (async () => {
-  // A base picked: the space keeps it, Changes against it; the switch's pick stays open.
+  // A base picked: the space keeps it, Changes against it; the switch's pick stays open; dead spaces are pruned.
   const v = view(); api.openScope(v,cx); await flush();
+  state.set('review.bases', { s: 'main', live: 'develop', dead: 'stale-branch' });
+  liveSpaces = [{ id: 's' }, { id: 'live' }];
   api.pickBase(v, 'origin/dev', cx, true);
-  assert.equal(state.get('review.bases').s, 'origin/dev');
+  assert.deepEqual(JSON.parse(JSON.stringify(state.get('review.bases'))), { s: 'origin/dev', live: 'develop' });
   assert.deepEqual(JSON.parse(JSON.stringify(picked.pop())), {page:'/compare/origin/dev...fix',stays:true});
+  liveSpaces = [{ id: 's' }];
   state.delete('review.bases');
 
   // Keys: ↓ from nothing lights the first row; → on Commits opens it in the page; Escape goes back, Commits lit.

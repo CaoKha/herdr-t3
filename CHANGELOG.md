@@ -2,6 +2,14 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-23
+
+- Unified Undo notices across Inbox and the tab bar (`shared/notice.js`): consecutive Settle/Snooze/Unpin actions across card buttons, menus and shortcuts now batch into one Undo notice, `cmd-shift-z` responds immediately even when the sidebar is hidden or in Lists, failed Undo writes restore the notice for retry, and ephemeral undo callbacks are no longer persisted into `t3.notice`.
+- Running a `Tab` Action from Details now closes Details cleanly instead of triggering a false "Open Details again" warning toast; split Actions still keep Details open.
+- Files now rebuilds open code previews when the theme or `font_family` changes, and clicking **Locate** in wide mode persists the opened file tree preference.
+- Fixed non-modal keyboard focus handling (`shared/focus.js`) so externally owned handles (such as wallpaper framing controls) are never recycled into the shared handle pool.
+- Hardened shared data and background polling: `t3.pins` now prunes ended agents in default Inbox mode (and standalone Inbox); `t3-spaces`, `t3-inbox` and `t3-agents` pause unnecessary hidden-mode timers and guard `localStorage` JSON reads; `t3-spaces` and `t3-menu` merge repository root probing into a single read-only `git rev-parse` with failure checks; project favicon lookup deduplicates across mods and ignores invalid/fragment icon links; `t3-tabs` and `t3-picker` use O(1) terminal maps and prune closed entries; `bar-measure` only updates `t3-tabs.compact` when the flag changes; `review.bases` prunes closed spaces on write.
+
 ## 2026-11-21
 
 - **New** (`t3-new-menu`) now separates live **Spaces** and remembered **Projects** under a `Projects` heading with aligned `⌘1…9` shortcuts, lets you remove remembered Projects (including entries on offline remote machines) with the fixed right-end `×` button or `ctrl-d` while keeping New open, warns **Folder not found** (inline `· Folder not found` on dimmed local rows and a warning toast in both New and `t3-tabs.new` / `cmd-t` / `+` / menus) when a local folder has been deleted on disk, warns **Machine unavailable** when picking an offline remote Project, and no longer records transient `cd` folders from unnamed local `~` scratch spaces into remembered Projects.

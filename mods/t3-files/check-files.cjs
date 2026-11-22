@@ -25,7 +25,8 @@ const space = (id, folder, active = false, machine = null) => ({ id, folder, mac
 // b.js. Each folder is in Git but `/n…`. `w` is the world: what ran, what's watched, the editors made, reads held back.
 function makePage({ page = "files", spaces = [space("s1", "/r", true)], panes = [], home = "/Users/test", listing = null, appDir = null, clock = Date } = {}) {
   const w = { spaces, panes, home, paneReads: 0, windowActive: true, ran: [], read: [], watchers: [], made: [], hold: null, held: [], stall: null, stalled: [], files: ["a.js", "b.js"], notified: 0,
-    props: null, overlays: [], closed: [], commands: [], focusCalls: 0, hostReads: 0 };
+    props: null, overlays: [], closed: [], commands: [], focusCalls: 0, hostReads: 0,
+    theme: { foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }, fontFamily: "mono" };
   const shared = {}, wrote = [], store = new Map([["lines.wrap", "false"], ["nav.width", "300"]]), timers = [], everies = [], failed = [];
   const commands = [];
   let wake = null, running = null;
@@ -71,9 +72,9 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], panes = 
     Input: { new: element }, Editor: { new: (state) => element("editor", state) }, TextView: { markdown: element }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
     InputState: { new: () => { let v = ""; const events = w.inputEvents = {}; return { on(name, f) { events[name] = f; }, value: () => v,
       set_value(x) { assert.ok(!w.drawing, "InputState.set_value must run outside the draw"); v = x; }, focus() { events.focus?.({}, cx); } }; } },
-    EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
+    EditorState: { new: (o) => { const e = { wrap: o.soft_wrap, text: o.value, language: o.language, font_family: o.font_family, syntax: o.syntax, released: false, release() { this.released = true; return true; } }; w.made.push(e); return e; } },
     spaces: () => { w.hostReads++; return w.spaces; }, agents: () => [], focused: () => null, panes: () => { w.paneReads++; return w.panes; }, home: () => w.home, layout: () => { w.hostReads++; return layout; },
-    theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" }), settings: () => ({ zoom: 1, font_family: "mono" }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => appDir ?? "/tmp/none",
+    theme: () => w.theme, settings: () => ({ zoom: 1, font_family: w.fontFamily }), window: () => ({ active: w.windowActive, platform: "macos" }), appHome: () => appDir ?? "/tmp/none",
     shared: (k) => shared[k], setShared: (k, v) => { assert.ok(!w.drawing, "setShared must run outside the draw"); wrote.push(k); shared[k] = v; },
     run(c) { w.commands.push(c); }, notify() {}, exec, keys: () => [],
     props: () => w.props, openOverlay: (o) => { w.overlays.push(o); return `o${w.overlays.length}`; }, closeOverlay: (id) => { w.closed.push(id); },
@@ -1276,6 +1277,73 @@ async function narrowNavCollapse() {
   root = view.render(cx);
   assert.ok(find(root, "t3-files-nav"), "clicking Locate when narrow re-opens the tree");
   assert.equal(store.get("nav.open"), "true");
+
+  // Clicking Locate when wide (>= 640) also persists nav.open = true in localStorage.
+  resize(700);
+  find(view.render(cx), "t3-files-nav-toggle").handlers.on_click({}, cx);
+  assert.equal(store.get("nav.open"), "false");
+  assert.equal(find(view.render(cx), "t3-files-nav"), null);
+  const wideLocate = find(view.render(cx), "t3-files-locate");
+  assert.ok(wideLocate);
+  wideLocate.handlers.on_click({}, cx); await settle();
+  assert.ok(find(view.render(cx), "t3-files-nav"), "clicking Locate when wide opens the tree");
+  assert.equal(store.get("nav.open"), "true", "clicking Locate when wide persists nav.open = true");
+}
+
+async function editorStyleRefresh() {
+  const big = "let x = 1;\n".repeat(20000);
+  const { view, cx, w, settle, fire } = makePage();
+  w.theme = { foreground: "#ffffff", dim: "#888888", ansi1: "#aa1111", ansi2: "#22aa22", ansi3: "#aaaa33", ansi4: "#4444aa", ansi5: "#aa55aa", ansi6: "#66aaaa", accent: "#0000ff", border: "#444444", input: "#555555", background: "#111111" };
+  w.texts = { "/r/a.js": "const a = 1;\n", "/r/big.js": big, "/r/big2.js": big };
+  view.render(cx); await settle();
+  const open = async (file) => { view.open(view.current(), file, cx); await settle(); view.render(cx); };
+
+  // 1) Theme syntax color change rebuilds EditorState after render with updated syntax palette.
+  await open("a.js");
+  const first = view.current().view.code;
+  assert.equal(first.syntax.keyword, "#aa55aa");
+  assert.equal(first.font_family, "mono");
+  w.theme = { ...w.theme, ansi5: "#ff00ff" };
+  view.render(cx); await fire(0);
+  const afterTheme = view.current().view.code;
+  assert.notEqual(afterTheme, first, "theme change rebuilds editor");
+  assert.equal(first.released, true, "old editor released on theme change");
+  assert.equal(afterTheme.syntax.keyword, "#ff00ff");
+  assert.equal(afterTheme.language, "js");
+  const madeAfterTheme = w.made.length;
+  view.render(cx); await fire(0);
+  assert.equal(w.made.length, madeAfterTheme, "steady style does not rebuild again");
+
+  // 2) font_family change rebuilds EditorState after render with new font_family.
+  w.fontFamily = "JetBrains Mono";
+  view.render(cx); await fire(0);
+  const afterFont = view.current().view.code;
+  assert.notEqual(afterFont, afterTheme, "font_family change rebuilds editor");
+  assert.equal(afterTheme.released, true, "old editor released on font change");
+  assert.equal(afterFont.font_family, "JetBrains Mono");
+  assert.equal(afterFont.language, "js");
+
+  // 3) Scrolled-while-plain large file preserves scrolled/plain rules across font/theme changes.
+  await open("big.js");
+  w.texts["/r/big.js"] = big + "// 1\n";
+  view.recheck(view.current(), cx); await settle(); view.render(cx);
+  assert.equal(view.current().view.code.language, undefined, "rewritten large file starts plain");
+  find(view.render(cx), "t3-files-code").handlers.on_scroll_wheel({}, cx);
+  assert.equal(view.current().view.scrolled, true);
+  w.fontFamily = "Fira Code";
+  view.render(cx); await fire(0); await fire(10000);
+  assert.equal(view.current().view.code.font_family, "Fira Code", "rebuilt with new font_family");
+  assert.equal(view.current().view.code.language, undefined, "scrolled plain large file stays plain");
+
+  // 4) Unscrolled large colored file refreshes on theme change and re-colors after idle.
+  await open("big2.js");
+  assert.equal(view.current().view.code.language, "js");
+  w.theme = { ...w.theme, ansi2: "#00ff00" };
+  view.render(cx); await fire(0);
+  assert.equal(view.current().view.code.language, undefined, "large file rebuilds plain immediately on style change");
+  view.render(cx); await fire(300);
+  assert.equal(view.current().view.code.language, "js", "re-colors after idle");
+  assert.equal(view.current().view.code.syntax.string, "#00ff00", "re-colored with new syntax color");
 }
 
 (async () => {
@@ -1400,5 +1468,6 @@ async function narrowNavCollapse() {
   await menus();
   await liveRootFollowing();
   await narrowNavCollapse();
+  await editorStyleRefresh();
   console.log("t3-files checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

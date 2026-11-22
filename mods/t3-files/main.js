@@ -55,6 +55,8 @@ let lastImage = 0; // The host caches decoded images by path, even after the cop
 const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads from updating the index or filesystem-monitor state
 
 const zoom = () => Number(settings()?.zoom) || 1;
+const editorStyle = (t = theme(), font = settings().font_family) =>
+  JSON.stringify([t.ansi5, t.ansi2, t.dim, t.ansi4, t.ansi3, t.ansi1, t.ansi6, font]);
 
 const rootOkay = (s, sp) => (sp.machine ?? null) === (s.on ?? null) && filesRoot(sp, s.root, spaceFolder(sp, panes()), home()) === s.root;
 
@@ -523,10 +525,11 @@ export default class Files extends View {
   // The view's code, wrapped as this page's Wrap choice says (store.js), which it notes: the editor takes it only when made.
   // Colored if `color` and it has a language; else plain, for colorLater. Its old editor goes.
   editor(view, rel, color) {
-    const t = theme(), old = view.code;
+    const t = theme(), old = view.code, font = /** @type {string} */ (settings().font_family);
     view.wrap = wrapLines(); view.lang = languageOf(nameOf(rel));
     view.colored = Boolean(view.lang) && color;
-    view.code = EditorState.new({ language: view.colored ? view.lang : undefined, value: view.text, readonly: true, soft_wrap: view.wrap, font_family: /** @type {string} */ (settings().font_family), font_size: 12,
+    view.style = editorStyle(t, font);
+    view.code = EditorState.new({ language: view.colored ? view.lang : undefined, value: view.text, readonly: true, soft_wrap: view.wrap, font_family: font, font_size: 12,
       syntax: { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi1, constant: t.ansi6 } });
     old?.release();
   }
@@ -685,10 +688,10 @@ export default class Files extends View {
     if (!sp) return div().id("t3-files").size_full();
     const ps = panes();
     const st = this.sync(cx, false, all, ps, true) ?? this.stateFor(sp, ps, cx, true);
-    // Lines changed: the editor made again, just after this draw, as an editor can't be made in one.
-    const v = st.view;
-    if (v?.code && v.wrap !== wrapLines()) cx.timer.after(0, (cx) => {
-      if (st.view !== v || !v.code || v.wrap === wrapLines()) return;
+    // Lines or style changed: the editor made again, just after this draw, as an editor can't be made in one.
+    const v = st.view, style = editorStyle(t);
+    if (v?.code && (v.wrap !== wrapLines() || v.style !== style)) cx.timer.after(0, (cx) => {
+      if (st.view !== v || !v.code || (v.wrap === wrapLines() && v.style === editorStyle())) return;
       this.editor(v, st.file, this.small(v) && this.fits(v));
       cx.notify();
     });
@@ -776,7 +779,7 @@ export default class Files extends View {
               .child(this.control(t, "t3-files-retry-file", "refresh-cw", "Try reading the file again", cx => { st.view = { loading: true }; cx.notify(); this.loadPreview(st, st.file, cx, true); }))
               .child(this.control(t, "t3-files-locate", "folder-tree", "Locate the file in Files", cx => {
                 if ((this.size?.width ?? 800) < NAV_NARROW) this.narrowNav = true;
-                else this.navOpen = true;
+                else { this.navOpen = true; setNavOpen(true); }
                 this.reveal(st, st.file, cx, true);
               })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())

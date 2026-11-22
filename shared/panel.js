@@ -11,9 +11,12 @@ import { surfaceActivate, surfaceAdd, surfaceOpenFile, surfaceNavigate, surfaceC
 export const layoutNode = (node, id) => node?.id === id ? node : (node?.children ?? []).reduce((hit, c) => hit ?? layoutNode(c, id), null);
 const activeSpaceId = () => spaces().find(p => p.active)?.id;
 const panelSlots = () => (layoutNode(layout(), "panel-body")?.children ?? []).map(c => c.id);
-// A tab's instance name: later than any this copy gave, so a tab closed and added again in one moment is still another.
-let lastBorn = 0;
-const newBorn = () => (lastBorn = Math.max(Date.now(), lastBorn + 1));
+// A tab's instance name: later than now, any copy's last born, and any tab already kept for this space, so a tab closed and added again in one moment is still another.
+globalThis.t3LastBorn ??= 0;
+function newBorn(space = activeSpaceId()) {
+  const maxTab = (shared(KEY.panels)?.[space]?.tabs ?? []).reduce((m, t) => Math.max(m, Number(t.born) || 0), 0);
+  return (globalThis.t3LastBorn = Math.max(Date.now(), globalThis.t3LastBorn, maxTab) + 1);
+}
 
 /** `space`'s tabs and the active one; Review's only where the extra is installed. */
 export function surfacesFor(space = activeSpaceId(), slots = panelSlots()) {
@@ -106,7 +109,7 @@ export function resetFilesTabs(space = activeSpaceId()) {
   if (!slots.includes("panel-empty")) return false;
   const all = shared(KEY.panels) ?? {}, was = all[space];
   if (!was?.tabs?.length) return false;
-  const current = surfacesFor(space, slots), next = surfaceResetFiles(current, newBorn());
+  const current = surfacesFor(space, slots), next = surfaceResetFiles(current, newBorn(space));
   if (next === current) return false;
   setShared(KEY.panels, { ...all, [space]: { tabs: next.tabs, active: next.active, open: Boolean(was.open), wide: Boolean(was.wide) } });
   return true;

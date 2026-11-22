@@ -75,8 +75,9 @@ export function initDetails(view, cx) {
     cx.notify();
   });
   // The one watch on the source: Details goes, and its menus with it (layerClosed).
-  cx.timer.every(100, () => {
+  const watch = cx.timer.every(100, () => {
     if (sourceOkay(source)) return;
+    watch.cancel();
     closeOverlay(props().overlay);
     notify({ title: "Open Details again", body: "The space, tab or terminal it was opened on changed.", level: "warning" });
   });

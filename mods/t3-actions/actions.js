@@ -12,7 +12,7 @@ import { KEY } from "./store.js";
 import { button, radiusOf, split, cardRow, tint } from "./button.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { closeChain, hasOpen } from "./popup-menu.js";
-import { sourceOkay, openLayer, rowMenu, focusSource, splitHot, CHEVRON, MENU_CLOSED } from "./details-popup.js";
+import { sourceOkay, openLayer, rowMenu, focusSource, splitHot, dismissDetails, openedDetails, CHEVRON, MENU_CLOSED } from "./details-popup.js";
 
 export const MOD = "t3-actions";
 export const ICONS = ["play", "test", "lint", "configure", "build", "debug"];
@@ -37,7 +37,7 @@ export function openBarMenu(b) {
 }
 
 function runAction(a) {
-  const source = props()?.source;
+  const p = props(), source = p?.source;
   if (!sourceOkay(source)) { closeChain(); return; }
   focusSource(source);
   setShared(KEY.actions, { ...state(), last: a.id });
@@ -45,6 +45,11 @@ function runAction(a) {
   const f = focused();
   const folder = a.cwd?.startsWith("~") ? home() + a.cwd.slice(1)
     : a.cwd || source?.folder || f?.cwd || panes().find(p => p.tab === f?.tab && p.cwd)?.cwd || spaces().find(s => s.active)?.folder;
+  // A tab action switches the active tab, so close Details beforehand to avoid its source watch firing a false warning.
+  if (source && (a.place ?? "tab") === "tab") {
+    if (p?.actions === "details" && (!p.overlay || openedDetails() === p.overlay)) dismissDetails();
+    else closeChain();
+  }
   // shortcut: sh -c skips your shell's aliases and functions and needs sh (not plain Windows); `zsh -ic` in the command gets them.
   run("terminal.open", { argv: ["sh", "-c", a.command], name: a.name, place: a.place ?? "tab", ...(folder ? { folder } : {}) });
 }

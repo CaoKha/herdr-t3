@@ -26,7 +26,7 @@ function fixture() {
   const cx = { notify() {}, timer: { after(ms, fn) { const t = { ms, fn }; timers.push(t); return t; } } };
   const core = {
     checking: () => false,
-    spaces: () => spaces, agents: () => agents, terminals: () => terminals, panes: () => panes, machines: () => machines,
+    spaces: () => spaces, agents: () => agents, terminals: () => [...terminals], panes: () => [...panes], machines: () => machines,
     focused: () => shown, shared: key => state[key], setShared: (key, value) => { state[key] = value; },
     layout: () => ({ children: Object.values(slots) }), home: () => "/home/test", window: () => ({ active: true }),
     run: (name, args) => calls.push([name, plain(args ?? {})]),
@@ -40,7 +40,7 @@ function fixture() {
   const scope = vm.createContext({ ...core, Date: { now: () => now } });
   vm.runInContext(source, scope, { filename: "navigation.js" });
   Object.assign(core, vm.runInContext("({ namer, programOf, focusAgent, focusPane, writeLabel })", scope));
-  return { ...core, cx, slots, state, shown, calls, labelled, overlays, closed, notifications, timers, events,
+  return { ...core, terminals: () => terminals, panes: () => panes, cx, slots, state, shown, calls, labelled, overlays, closed, notifications, timers, events,
     navigation: (beforeAsk, over = {}) => {
       const view = scope.navigation(beforeAsk, { ...core, ...over }), frame = view.frame;
       if (twice) view.frame = () => { view.advance(); const model = frame(); view.advance(); return model; };
@@ -444,7 +444,7 @@ function keysBlock(f, over = {}) {
     ...f, View: class {}, props: () => ({ part: "keys" }), layoutNode: () => null, restorePanel() {},
     nextCommand: () => new Promise(resolve => pending.push(resolve)), ...over,
   });
-  vm.runInContext([source, kit.strip(read("pins.js")), kit.strip(read("main.js")).replace("export default class", "globalThis.Mod = class")].join("\n"), scope);
+  vm.runInContext([source, kit.strip(read("pins.js")), kit.strip(read("notice.js")), kit.strip(read("main.js")).replace("export default class", "globalThis.Mod = class")].join("\n"), scope);
   const mod = new scope.Mod();
   mod.init({}, { ...f.cx, focus_handle() {}, spawn: fn => fn(f.cx) });
   const send = async name => { pending.shift()(name); await flush(); };
@@ -1669,8 +1669,123 @@ async function checkNewTabMissingFolder() {
   }
 }
 
+async function checkPruningAndLinearScans() {
+  // 1. Prune dead space/terminal entries (trail, fresh, released, waking).
+  {
+    const f = fixture(), view = f.navigation();
+    const s1 = f.spaces()[1];
+    s1.tabs = [{ id: "b1", active: false }, { id: "b1_alt", active: true }];
+    f.spaces()[0].active = false;
+    s1.active = true;
+    view.advance(); // records b1_alt in trail.s1
+
+    // Remove s1 so trail.s1 is pruned, then re-add s1 with b1 active and b1_alt inactive.
+    s1.active = false;
+    f.spaces()[0].active = true;
+    const savedS1 = f.spaces().splice(1, 1)[0];
+    view.advance();
+    savedS1.tabs = [{ id: "b1", active: true }, { id: "b1_alt", active: false }];
+    f.spaces().splice(1, 0, savedS1);
+    view.advance();
+    f.calls.length = 0;
+    await view.handle("space:2", f.cx);
+    assert.deepEqual(f.calls, [["space.select", { id: "s1" }]], "pruned trail does not select stale tab after space closes and returns");
+  }
+
+  {
+    // fresh: closing a space prunes its fresh entry so returning with the same id can use trail again.
+    const f = fixture(), view = f.navigation();
+    f.slots.lists = { id: "sidebar-lists", active: "inbox" };
+    const s1 = f.spaces()[1];
+    s1.tabs = [{ id: "b1_agent", active: false }, { id: "b1_shell", active: true }];
+    f.agents().push({ address: "t1", pane: "p1", space: "s1", space_name: "project 1", tab: "b1_agent", title: "A1", program: f.agents()[0].program, focused: false, status: "idle" });
+    f.terminals().push({ address: "t1", pane: "p1", space: "s1", tab: "b1_agent", state: "live", status: "idle" });
+    f.panes().push({ pane: "p1", tab: "b1_agent", terminal: "t1" });
+    await view.handle("new:s1", f.cx); // marks s1 fresh
+    f.spaces().splice(1, 1);
+    view.advance(); // prunes s1 from fresh
+    f.spaces().splice(1, 0, { id: "s1", name: "project 1", active: true, folder: "/work/p1", machine: null, tabs: [{ id: "b1_agent", active: true }, { id: "b1_shell", active: false }] });
+    f.spaces()[0].active = false;
+    view.advance(); // records b1_agent in trail.s1 (while focused() is still elsewhere, so looked is null)
+    f.spaces()[1].tabs[0].active = false;
+    f.spaces()[1].tabs[1].active = true;
+    assert.equal(view.frame().context.tab, "b1_agent", "pruned fresh no longer blocks falling back to trail");
+  }
+
+  {
+    // released: closing a released Home space prunes its id so a re-created Home with the same id is recognized.
+    const f = fixture(), view = f.navigation();
+    const homeSpace = { id: "h", machine: null, named: true, name: "Home\u200b", active: false, tabs: [{ id: "ht", active: true }] };
+    f.state["t3-tabs.home"] = "h";
+    f.spaces().push(homeSpace);
+    f.agents().push({ address: "th", pane: "ph", space: "h", tab: "ht", status: "idle" });
+    view.advance(); // releases h
+    assert.equal(f.state["t3-tabs.home"], null);
+    f.agents().pop();
+    f.spaces().pop();
+    view.advance(); // prunes h from released
+    f.spaces().push({ id: "h", machine: null, named: true, name: "Home\u200b", active: false, tabs: [] });
+    view.advance();
+    assert.equal(f.state["t3-tabs.home"], "h", "pruned released id allows Home recognition again");
+  }
+
+  {
+    // waking: removing a terminal prunes its 10s waking cooldown so a new terminal with the same address wakes immediately.
+    const f = fixture(), view = f.navigation();
+    const t0 = f.terminals()[0];
+    t0.status = "error";
+    t0.labels = { snoozed: String(Date.now() + 60000) };
+    view.advance();
+    assert.equal(f.labelled.length, 1);
+    f.labelled.length = 0;
+    const removed = f.terminals().shift();
+    view.advance(); // prunes t0 from waking
+    f.advance(1000);
+    removed.labels = { snoozed: String(Date.now() + 60000) };
+    f.terminals().unshift(removed);
+    view.advance();
+    assert.equal(f.labelled.length, 1, "pruned waking entry does not suppress error wake within 10s");
+  }
+
+  // 2. No O(agents * terminals) or O(spaces * tabs) quadratic scans in advance().
+  {
+    const N = 120;
+    const baseSpaces = Array.from({ length: N }, (_, i) => ({
+      id: `s${i}`, name: `sp${i}`, active: i === 0, folder: `/work/${i}`, machine: null,
+      tabs: [{ id: `b${i}`, name: `t${i}`, named: true, active: true }],
+    }));
+    const baseAgents = Array.from({ length: N }, (_, i) => ({
+      address: `a${i}`, pane: `p${i}`, space: `s${i}`, tab: `b${i}`, status: "done", focused: i === 0,
+    }));
+    const baseTerms = Array.from({ length: N }, (_, i) => ({
+      address: `a${i}`, state: "live", status: "done", turn: 1, labels: {},
+    }));
+    const basePanes = Array.from({ length: N }, (_, i) => ({
+      pane: `p${i}`, tab: `b${i}`, terminal: `a${i}`, cwd: `/work/${i}`,
+    }));
+    let termReads = 0;
+    const countReads = (arr, onRead) => new Proxy(arr, {
+      get(target, prop, receiver) {
+        if (typeof prop === "string" && /^\d+$/.test(prop)) onRead();
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const f = fixture();
+    const view = f.navigation(undefined, {
+      spaces: () => baseSpaces,
+      agents: () => baseAgents,
+      terminals: () => countReads(baseTerms, () => { termReads++; }),
+      panes: () => basePanes,
+      focused: () => ({ space: "s0", tab: "b0", pane: "p0", terminal: "a0", agent: "a0" }),
+    });
+    view.advance();
+    // With O(N) Map indexing, termReads is O(N) (~1000-2000), far below O(N^2) (> 14400 * 2).
+    assert.ok(termReads < N * 20, `expected linear terminal reads for N=${N}, got ${termReads}`);
+  }
+}
+
 (async () => {
-  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch, menu: checkMenuAtHome, unread: checkUnread, details: checkDetailsKey, missingFolder: checkNewTabMissingFolder };
+  const additions = { bookmarks: checkBookmarks, cleanup: checkCleanup, dispatch: checkCleanupDispatch, menu: checkMenuAtHome, unread: checkUnread, details: checkDetailsKey, missingFolder: checkNewTabMissingFolder, pruningAndLinear: checkPruningAndLinearScans };
   if (process.argv[2]) { await additions[process.argv[2]](); return; }
   for (const verify of Object.values(additions)) await verify();
   await check();

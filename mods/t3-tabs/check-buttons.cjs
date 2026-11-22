@@ -25,6 +25,7 @@ const env = {
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {}, REVIEW_STATUS: "review.status",
   navigation: () => ({ get atHome() { reads.home++; return home; }, frame: () => ({ tabs: [tab], context: null }) }),
   subAgents: () => () => [], namer: () => p => p.title, programIcon: () => null,
+  terminalByAddress: all => new Map(all.map(k => [k.address, k])),
   POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
   openMenu: (_view, kind, target) => calls.push([kind, target]), openOverlay: value => calls.push(["overlay", value]),
 };
@@ -243,4 +244,31 @@ root = crumbs.crumb(t, crumbContext, crumbData);
 find(root, 'peer-agent').handlers.on_hover(true, timedCx); assert.equal(crumbs.details, null, 'whole titles show no repeated label');
 root = crumbs.crumb(t, crumbContext, { ...crumbData, narrow: true });
 find(root, 'crumb-parent').handlers.on_hover(true, timedCx); assert.equal(crumbs.details, 'crumb-parent', 'an ellipsis still shows the full parent name');
+
+// bar-measure only writes KEY.compact when the boolean value actually changes.
+{
+  const wasShared = env.shared, wasSetShared = env.setShared, wasSettings = env.settings, wasPart = part;
+  let compactValue = undefined, writes = 0, zoom = 1;
+  env.shared = (k) => k === "t3-tabs.compact" ? compactValue : null;
+  env.setShared = (k, v) => { if (k === "t3-tabs.compact") { compactValue = v; writes++; } };
+  env.settings = () => ({ zoom });
+  part = { part: "measure" };
+  const measure = load(__dirname);
+  const el = find(measure.render(), "bar-measure");
+  el.handlers.on_size_change({ width: 900 });
+  assert.deepEqual([compactValue, writes], [true, 1], "initial narrow width writes compact=true once");
+  el.handlers.on_size_change({ width: 800 });
+  assert.deepEqual([compactValue, writes], [true, 1], "still narrow: does not rewrite KEY.compact");
+  el.handlers.on_size_change({ width: 1200 });
+  assert.deepEqual([compactValue, writes], [false, 2], "crossing >= 1024 writes compact=false once");
+  el.handlers.on_size_change({ width: 1300 });
+  assert.deepEqual([compactValue, writes], [false, 2], "still wide: does not rewrite KEY.compact");
+  zoom = 2;
+  el.handlers.on_size_change({ width: 2048 });
+  assert.deepEqual([compactValue, writes], [false, 2], "zoomed 2048/2 = 1024 stays false without rewriting");
+  el.handlers.on_size_change({ width: 2046 });
+  assert.deepEqual([compactValue, writes], [true, 3], "zoomed 2046/2 = 1023 crosses to true");
+  env.shared = wasShared; env.setShared = wasSetShared; env.settings = wasSettings; part = wasPart;
+}
+
 console.log("ok: tab/window/sidebar and chrome buttons use the real helper and preserve their clicks, counts and platform glyphs.");

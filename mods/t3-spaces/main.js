@@ -14,7 +14,7 @@ import { openMenu } from "./menu.js";
 import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
 import { trigger } from "./trigger.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY, closedKey } from "./store.js";
+import { KEY, closedKey, readLocal } from "./store.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
 import { prepareSpace } from "./space-arrival.js";
@@ -51,15 +51,20 @@ export default class Spaces extends View {
     this.shown = new Set(spaces().map((s) => s.id));
     this.drag = null; // Pressed row, lifted once it moves 6px; edge names the gap actually drawn.
     this.machines = [];
-    this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
-    for (const state of Object.values(this.reconnecting)) state.busy = false;
-    this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
-    this.foldedRepos = new Set(JSON.parse(localStorage.getItem("repos.folded") ?? "[]"));
+    this.reconnecting = readLocal("machines.reconnecting", {});
+    for (const state of Object.values(this.reconnecting)) if (state && typeof state === "object") state.busy = false;
+    this.folded = new Set(readLocal("machines.folded", []));
+    this.foldedRepos = new Set(readLocal("repos.folded", []));
     this.order = spaceOrdering({ spaces, panes, machines, run, home: () => shared(KEY.home), facts: (w, ps) => this.repos.forSpace(w, ps),
       shown: this.shown, foldedRepos: this.foldedRepos, row: ROW, pitch: PITCH });
     this.machinesSeen = this.machinesNow();
-    this.refreshMachines(cx);
-    cx.timer.every(15000, cx => this.refreshMachines(cx));
+    this.machinesDirty = false;
+    this.machinesRefreshedAt = -Infinity;
+    this.wasInView = listInView();
+    if (this.wasInView) this.refreshMachines(cx);
+    cx.timer.every(15000, cx => {
+      if (listInView()) this.refreshMachines(cx);
+    });
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (repos.js).
     cx.timer.every(250, (cx) => this.checkNew(cx));
@@ -72,22 +77,35 @@ export default class Spaces extends View {
   checkNew(cx) {
     if (checking()) return;
     const now = Date.now();
-    const sp = spaces(), known = machines();
-    // A machine came or went: its heading needn't wait for the next poll.
+    const known = machines();
+    // A machine came or went: tracked while hidden, asked once back in view.
     const seen = this.machinesNow(known);
     if (seen !== this.machinesSeen) {
       this.machinesSeen = seen;
+      this.machinesDirty = true;
+    }
+    const sp = spaces(), active = window().active, draw = sp.some((s) => !this.shown.has(s.id)) || this.order.due(now);
+    // layout() copies the whole tree: skip when already in view and neither active nor drawing;
+    // once hidden, check every tick so returning to view wakes polling immediately.
+    const inView = !this.wasInView || active || draw ? listInView() : true;
+    if (!inView) {
+      this.wasInView = false;
+      return;
+    }
+    const returned = !this.wasInView;
+    this.wasInView = true;
+    if (this.machinesDirty || (returned && now - this.machinesRefreshedAt >= 15000)) {
       this.refreshMachines(cx);
     }
-    const active = window().active, draw = sp.some((s) => !this.shown.has(s.id)) || this.order.due(now);
-    // layout() copies the whole tree: where the list is matters only to the fallback and to a draw. Out of view nothing draws.
-    const visible = Boolean(active || draw) && listInView();
+    const visible = Boolean(active || draw);
     this.repos.update({ spaces: sp, panes: panes(), machines: known, active, visible, folded: this.folded }, now);
     if (draw && visible) cx.notify();
   }
 
   refreshMachines(cx) {
     if (checking()) return;
+    this.machinesDirty = false;
+    this.machinesRefreshedAt = Date.now();
     cx.spawn(async cx => {
       try {
         const r = await hc(["machine", "ls", "--json"]);

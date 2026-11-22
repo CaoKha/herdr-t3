@@ -2,6 +2,14 @@
 
 [English](CHANGELOG.md) · 中文
 
+## 2026-11-23
+
+- 统一 Inbox 与标签栏的 Undo 提示和撤销队列（`shared/notice.js`）：通过卡片按钮、菜单和快捷键连续执行 Settle／Snooze／Unpin 现可合并为同一条 Undo 提示，侧栏隐藏或切到 Lists 时按 `cmd-shift-z` 立即撤销不再有 1 秒延迟，撤销写入失败会保留提示以供重试，且临时撤销快照不再写入持久化的 `t3.notice`。
+- 在详情（Details）里运行默认打开新标签的 Action 会先干净收起详情，不再误弹「Open Details again」警告；分屏运行的 Action 仍保持详情打开。
+- Files 在切换主题或更改字体后自动重建代码编辑器配色；宽屏下点击错误页 **Locate** 打开文件树时同步保存偏好。
+- 修复非模态键盘焦点池（`shared/focus.js`）在退出键盘模式时把外部句柄（如壁纸取景控件）错误回收到公共池的问题。
+- 加固共享数据流与后台轮询：默认 Inbox 模式及独立版 Inbox 现同样清理已结束 agent 的 `t3.pins`；`t3-spaces`、`t3-inbox`、`t3-agents` 在隐藏或非当前模式下停掉多余轮询并对 `localStorage` JSON 读取加容错；`t3-spaces` 和 `t3-menu` 合并为单次只读 `git rev-parse` 并校验失败；项目图标探测跨 mod 去重并正确处理带 `#` 或无有效后缀的图标链接；`t3-tabs` 与 `t3-picker` 改用 O(1) 终端索引并清理已关闭记录；`bar-measure` 仅在紧凑态变化时写 `t3-tabs.compact`；`review.bases` 写入时清理已关闭 space。
+
 ## 2026-11-21
 
 - **New**（`t3-new-menu`）现用独立的 `Projects` 分组标题区分已打开的 **Spaces** 与记住的 **Projects**，并将 `⌘1…9` 快捷键竖向对齐；记住的项目行（含离线远程机记录）带右端固定 `×` 按钮，也支持高亮后按 `ctrl-d` 移除记录、弹窗保持打开（不动已打开的 space 或磁盘文件）；本机目录已删除的 Space 或记住项目会变暗并标注 `· Folder not found`，点选或通过 `cmd-t`／`+`／菜单新建标签时弹 **Folder not found** 警告（弹窗保持打开便于清理）；点选离线远程机的记住项目会弹 **Machine unavailable** 提示；未命名的本机 `~` 临时 space `cd` 到其他目录时不再写入记住项目列表。

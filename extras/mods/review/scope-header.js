@@ -3,7 +3,7 @@
 // not popups). What the menu reads, its rows and its picks are review-scope.js's, as Details shares them.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { shared, setShared } from "herdr";
+import { shared, setShared, spaces } from "herdr";
 import { scrollList, step } from "./list.js";
 import { hoverRow, subOpened, subLeft } from "./submenu.js";
 import { LU, COMPACT, MODEL_ROW, pickMark, searchField, popupClosed } from "./review-menu.js";
@@ -143,7 +143,10 @@ export function openBase(view, cx) {
 export function pickBase(view, value, cx, stays = false) {
   const head = scopeOf(view).head ?? repo(view)?.branch;
   releaseScope(view);
-  setShared(BASES, { ...shared(BASES), [view.space]: value });
+  const live = new Set(spaces().map(s => s.id));
+  live.add(view.space);
+  const kept = Object.fromEntries(Object.entries(shared(BASES) ?? {}).filter(([id]) => live.has(id)));
+  setShared(BASES, { ...kept, [view.space]: value });
   if (head) view.pick(changesPage(value, head), { stays }, cx);
   else if (!stays) view.closePopup(cx);
 }

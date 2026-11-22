@@ -31,6 +31,7 @@ const env = {
   navigation: () => ({ get atHome() { return atHome; }, frame: () => ({ tabs: atHome ? [] : [{ id: "c1", active: true, named: true, name: "Task" }], context: atHome || mode !== "inbox" ? null : ctx }) }),
   subAgents: () => () => [], namer: () => x => x.title, programIcon: () => null, programOf: x => x.program ?? null,
   ownStatus: s => s, treeStatus: s => s, notNews: () => false, stillSettled: () => false, modStatus: () => "done",
+  terminalByAddress: all => new Map(all.map(k => [k.address, k])),
   POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
   openMenu() {}, openOverlay() {},
 };

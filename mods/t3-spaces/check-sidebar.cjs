@@ -1748,7 +1748,7 @@ async function checkInbox() {
         if (cwd === "/away") throw new Error("machine is away");
         if (cwd === "/tmp") return { code: 128, stdout: "", stderr: "fatal: not a git repository" };
         const top = cwd.split("/").slice(0, 3).join("/");
-        return { code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head x\n" : args.includes("--show-toplevel") ? top : "/work/s0/.git" };
+        return { code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head x\n" : args.includes("--show-toplevel") && args.includes("--git-common-dir") ? `${top}\n/work/s0/.git\n` : args.includes("--show-toplevel") ? top : "/work/s0/.git" };
       } });
       const look = async () => {
         view.repos.update({ spaces: list, panes: o.panes(), machines: o.machines(), active: false, visible: true, folded: view.folded }, Date.now());
@@ -2774,7 +2774,7 @@ async function checkInbox() {
     const gone = hidden ? tabs.render(cx) : f.load("t3-chrome", { footer: true }).render(cx);
     assert.equal(find(gone, "undo-notice-undo").handlers.on_click, undefined, "Undo stops at five seconds");
     const labels = f.labelled.length; await tabs.undo(); assert.equal(f.labelled.length, labels, "expired Undo writes nothing");
-    cx.timers.filter(t => t.ms === 5250).at(-1).fn(cx);
+    cx.timers.filter(t => t.ms === 250 && !t.gone).at(-1).fn(cx);
     assert.equal(f.state["t3.notice"], null);
   }
 
@@ -2849,8 +2849,9 @@ async function checkInbox() {
     assert.equal(f.state["t3.notice"].count, 2, "successive unpins share one Undo notice");
     await tabs.undo();
     assert.deepEqual(plain(f.state["t3.pins"]), ["new", "head", "t0", "tail"]);
-    f.state["t3.notice"] = { owner: "tabs", action: "Settled", live: true, at: Date.now(), count: 1, undos: [{ address: "head", pins: [] }] };
-    tabs.unpin("t0", cx);
+    f.agents()[0].status = "idle"; k.labels = {};
+    await tabs.settle(cx, "t0");
+    tabs.unpin("tail", cx);
     assert.equal(f.state["t3.notice"].count, 1, "unpin does not merge a Settle undo into a pin-only action");
   }
 
@@ -2864,10 +2865,14 @@ async function checkInbox() {
     assert.deepEqual([f.calls, f.state["t3.pins"], f.state["t3.notice"]], [[], ["t0"], undefined]);
     assert.equal(f.notifications.at(-1).body, "offline");
     f.spaces()[0].active = false; f.spaces().push({ id: "h", name: "Home\u200b", named: true, active: true, machine: null, tabs: [] }); f.state["t3-tabs.home"] = "h";
-    f.state["t3.notice"] = { owner: "tabs", live: true, at: Date.now(), undos: [{ address: "t0", pins: [] }] };
-    await f.load("t3-tabs").undo();
+    const retry = f.load("t3-tabs");
+    f.answerHc(() => ({ code: 0 }));
+    await retry.settle(cx, "t0");
+    f.calls.length = 0;
+    f.answerHc(() => ({ code: 1, stderr: "offline" }));
+    await retry.undo();
     assert.deepEqual(f.calls, [], "failed Undo does not jump to an agent it could not restore");
-    assert.deepEqual(plain(f.state["t3.notice"].undos.map(u => u.address)), ["t0"], "and its notice stays, so Undo can be tried again");
+    assert.deepEqual([f.state["t3.notice"]?.live, f.state["t3.notice"]?.count], [true, 1], "and its notice stays, so Undo can be tried again");
   }
 
   {

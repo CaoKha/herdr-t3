@@ -213,4 +213,33 @@ const a = view(), b = view();
   holding = null;
 }
 
+// External handles in a non-modal view stay out of the pool when keyboard mode ends, and replacing a pooled handle returns it.
+{
+  const { v, cx } = view();
+  const ext1 = cx.focus_handle(), ext2 = cx.focus_handle();
+  enter(v, cx, "a");
+  stop(v, t, "a", element());
+  stop(v, t, "ext", element(), 6, { handle: ext1 });
+  const pooled = v.fs.handles.get("a");
+  assert.equal(stop(v, t, "a", element(), 6, { handle: ext2 }).style.track_focus, ext2);
+  assert.ok(v.fs.free.includes(pooled), "replaced pooled handle returns to free");
+  state["t3.focus"] = null;
+  focusRoot(v, element());
+  assert.equal(v.fs.handles.size, 0);
+  assert.ok(!v.fs.free.includes(ext1) && !v.fs.free.includes(ext2), "external handles never enter free");
+  assert.equal(v.fs.free.length, 64);
+  // Handles created when Tab tops up the pool are tracked as owned too, so leaving keyboard mode returns them.
+  enter(v, cx, "row-0");
+  for (let i = 0; i < 55; i++) stop(v, t, `row-${i}`, element());
+  const beforeTop = v.fs.free.length;
+  v.fs.handles.get("row-0").focus();
+  focusRoot(v, element()).handlers.on_key_up({ key: "tab" }, cx);
+  const poolAfterTop = v.fs.handles.size + v.fs.free.length;
+  assert.ok(v.fs.free.length > beforeTop, "Tab topped up free");
+  state["t3.focus"] = null;
+  focusRoot(v, element());
+  assert.equal(v.fs.free.length, poolAfterTop, "topped-up handles return to free");
+  holding = null;
+}
+
 console.log("ok: focus: stops only in keyboard mode, the ring, Tab across mods, the mode's end.");

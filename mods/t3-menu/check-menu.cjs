@@ -884,4 +884,34 @@ assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["spa
   assert.deepEqual(closed, ["empty-root", "empty-parent"], "once");
 }
 
-console.log("ok menu");
+// Space checkout detection runs one lock-free git rev-parse and rejects non-2-line or failing output.
+(async () => {
+  const checkout = vm.runInContext("checkout", context);
+  const was = context.exec;
+  const asked = [];
+  let reply = () => ({ code: 0, stdout: "" });
+  context.exec = async (cmd, args, opts) => { asked.push([cmd, args, opts]); return reply(cmd, args, opts); };
+  try {
+    reply = () => ({ code: 0, stdout: "/work/repo\n/work/repo/.git\n" });
+    assert.equal(await checkout("/work/repo", "vps"), "main");
+    assert.deepEqual(JSON.parse(JSON.stringify(asked.splice(0))), [
+      ["git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd: "/work/repo", on: "vps" }],
+    ]);
+    reply = () => ({ code: 0, stdout: "/work/wt\n/work/repo/.git\n" });
+    assert.equal(await checkout("/work/wt", null), "linked");
+    for (const bad of [
+      { code: 128, stdout: "/work/repo\n/work/repo/.git\n" },
+      { code: 0, stdout: "" },
+      { code: 0, stdout: "/work/repo\n" },
+      { code: 0, stdout: "\n/work/repo/.git\n" },
+      { code: 0, stdout: "/work/repo\n\n/work/repo/.git\n" },
+      { code: 0, stdout: "/work/repo\n/work/repo/.git\nextra\n" },
+    ]) {
+      reply = () => bad;
+      assert.equal(await checkout("/work/repo", null), null, `reject bad rev-parse output: ${JSON.stringify(bad)}`);
+    }
+  } finally {
+    context.exec = was;
+  }
+  console.log("ok menu");
+})().catch((e) => { console.error(e); process.exit(1); });

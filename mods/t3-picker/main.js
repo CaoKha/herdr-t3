@@ -5,7 +5,7 @@ import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { theme, spaces, panes, agents, terminals, focused, run, closeOverlay, props, window, shared, setShared } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { focusPane } from "./zoom.js";
-import { notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
+import { notNews, ownStatus, subAgents, terminalByAddress, treeStatus } from "./tree.js";
 import { statusMark } from "./status-mark.js";
 import { projectMark } from "./project.js";
 import { programIcon } from "./program.js";
@@ -72,9 +72,9 @@ export default class Picker extends View {
     else focusPane(pane);
   }
 
-  row(item, selection, ps, all) {
+  row(item, selection, ps, byAddress) {
     const pane = item.p.pane, t = theme(), on = selection.pane === pane, s = item.s, st = item.status;
-    const mark = st === "done" && notNews(all.find(k => k.address === item.p.terminal), item.p.status, item.under) ? null : statusMark("mods/t3-picker", t, st, 14);
+    const mark = st === "done" && notNews(byAddress.get(item.p.terminal), item.p.status, item.under) ? null : statusMark("mods/t3-picker", t, st, 14);
     return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(item.label)
       .when(on, (el) => el.bg(t.selected))
@@ -97,7 +97,7 @@ export default class Picker extends View {
   }
 
   render() {
-    const t = theme(), ps = panes(), all = terminals(), items = this.items(ps, all);
+    const t = theme(), ps = panes(), all = terminals(), items = this.items(ps, all), byAddress = terminalByAddress(all);
     // Opens on the first row: the pane you were in before, or another; never the one you're in, where Enter would go nowhere.
     // Editing the query replaces this token. A missing pane clears the highlight instead of choosing the new first row.
     const selection = this.selection ??= { pane: undefined };
@@ -122,7 +122,7 @@ export default class Picker extends View {
       // No heading: there is one kind of row, and the room goes to the list.
       .child(div().flex_none().mt(8).mb(8).px(8)
         .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ROW, at, height: Math.min(items.length * ROW, LIST_MAX),
-          draw: (i) => this.row(items[i], selection, ps, all), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
+          draw: (i) => this.row(items[i], selection, ps, byAddress), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
         .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
       // New work goes through New, which picks the space (and for a new space, the machine).
       .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"], ["Esc", "Close"]],

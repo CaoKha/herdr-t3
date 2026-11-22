@@ -15,7 +15,7 @@ function fixture(spaces = [space("s0", "/work/s0"), space("s1", "/work/p1"), spa
   const commands = [], watches = [], errors = [];
   let now = 1000000, answer = (_cmd, args, { cwd }) => {
     const top = cwd.split("/").slice(0, 3).join("/");
-    return { code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head x\n" : args.includes("--show-toplevel") ? `${top}\n` : `${top}/.git\n` };
+    return { code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head x\n" : `${top}\n${top}/.git\n` };
   };
   const cx = { notify() {}, spawn(fn) { fn(cx).catch(e => errors.push(e)); } };
   const adapter = {
@@ -76,7 +76,7 @@ async function check() {
     await f.flush();
     assert.equal(f.watches.length, 0, "a read for a closed repo cannot install a late watch");
     assert.equal(f.commands.length, 1, "a closed repo needs no further probes");
-    f.answer((_cmd, args) => ({ code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head main\n" : args.includes("--show-toplevel") ? "/work/main\n" : "/work/main/.git\n" }));
+    f.answer((_cmd, args) => ({ code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head main\n" : "/work/main\n/work/main/.git\n" }));
     f.snapshot.spaces = [space("s", "/work/main")]; f.update(); await f.flush();
     assert.equal(f.watches.length, 1, "reopening after an abandoned first read probes and watches again");
   }
@@ -91,7 +91,7 @@ async function check() {
       if (on) await away;
       if (args.includes("status")) await hold;
       const top = cwd.split("/").slice(0, 3).join("/");
-      return { code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head x\n" : args.includes("--show-toplevel") ? `${top}\n` : `${top}/.git\n` };
+      return { code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head x\n" : `${top}\n${top}/.git\n` };
     });
     for (let i = 0; i < 3; i++) { f.update(); await f.flush(); }
     assert.deepEqual(f.looks(), [["vps", "/work/s2"], [null, "/work/s0"]], "the next local place waits for its queue; polls cannot duplicate a read");
@@ -110,8 +110,7 @@ async function check() {
       const commands = f.commands.filter(([, , o]) => o.cwd === s.folder);
       assert.deepEqual(commands, [
         ["git", status, { cwd: s.folder, on: s.machine }],
-        ["git", ["rev-parse", "--show-toplevel"], { cwd: s.folder, on: s.machine }],
-        ["git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: s.folder, on: s.machine }],
+        ["git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd: s.folder, on: s.machine }],
       ], "all git arguments and the target machine survive extraction");
     }
     assert.deepEqual(f.watches.map(w => w.dir), ["/work/s0/.git", "/work/p1/.git"], "remote repos never enter the local watch");
@@ -252,7 +251,7 @@ async function check() {
     const main = space("main", "/work/main"), linked = space("linked", "/work/linked"), f = fixture([main, linked]);
     const pane = { pane: "p", terminal: "t", tab: "b-main", cwd: main.folder, status: "working", program: { agent: true } };
     f.snapshot.panes.push(pane);
-    f.answer((_cmd, args, { cwd }) => ({ code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head feature\n# branch.ab +2 -1\n" : args.includes("--show-toplevel") ? `${cwd}\n` : "/work/main/.git\n" }));
+    f.answer((_cmd, args, { cwd }) => ({ code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head feature\n# branch.ab +2 -1\n" : `${cwd}\n/work/main/.git\n` }));
     f.update();
     await f.flush();
     assert.deepEqual(f.fact(main).git, { name: "main", branch: "feature", ahead: 2, behind: 1, repo: '[null,"/work/main/.git"]', linked: false });
@@ -286,6 +285,35 @@ async function check() {
     assert.ok(asked <= 4 * list.length, `a look asks each pane's tab a few times, not once per space: ${asked} for ${list.length} panes`);
     await f.flush();
     assert.deepEqual(f.looks().at(-1), [null, "/work/s19/src"], "and still finds where each space is");
+  }
+  {
+    // A failed or malformed rev-parse never records an empty repo or starts a watch on "", and retries as unsure.
+    const s = space("s", "/work/s"), f = fixture([s]);
+    f.snapshot.active = true;
+    let at = 1000000;
+    for (const bad of [
+      { code: 128, stdout: "", stderr: "fatal: error" },
+      { code: 0, stdout: "", stderr: "" },
+      { code: 0, stdout: "/work/s\n", stderr: "" },
+      { code: 0, stdout: "\n/work/s/.git\n", stderr: "" },
+      { code: 0, stdout: "/work/s\n\n/work/s/.git\n", stderr: "" },
+      { code: 0, stdout: "/work/s\n/work/s/.git\nextra\n", stderr: "" },
+    ]) {
+      f.answer((_cmd, args) => args.includes("status") ? { code: 0, stderr: "", stdout: "# branch.head main\n" } : bad);
+      f.commands.splice(0);
+      f.update(at);
+      await f.flush();
+      assert.deepEqual(f.fact(s), { git: null, answered: true }, "malformed rev-parse stores no empty repo fact");
+      assert.deepEqual(f.watches, [], "malformed rev-parse never watches an empty path");
+      at += 61000;
+    }
+    f.answer((_cmd, args) => ({ code: 0, stderr: "", stdout: args.includes("status") ? "# branch.head main\n" : "/work/s\n/work/s/.git\n" }));
+    f.commands.splice(0);
+    f.update(at);
+    await f.flush();
+    assert.deepEqual(f.looks(), [[null, "/work/s"]], "marked unsure, it retries on fallback");
+    assert.equal(f.fact(s).git.repo, '[null,"/work/s/.git"]');
+    assert.deepEqual(f.watches.map(w => w.dir), ["/work/s/.git"]);
   }
   console.log("ok: repository facts, per-machine queues, trusted results, retries, local watches and fallback.");
 }

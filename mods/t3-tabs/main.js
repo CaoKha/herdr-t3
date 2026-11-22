@@ -2,7 +2,7 @@ import { View, div, image, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
-import { notNews, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
+import { notNews, ownStatus, stillSettled, subAgents, terminalByAddress, treeStatus } from "./tree.js";
 import { statusMark } from "./status-mark.js";
 import { tip, glow, undoLabel } from "./tip.js";
 import { detailsFor, detailsAt } from "./details.js";
@@ -16,6 +16,7 @@ import { sidebarParts, toggleLeft } from "./sidebar.js";
 import { navigation } from "./navigation.js";
 import { projectMark } from "./project.js";
 import { KEY, closedKey } from "./store.js";
+import { rememberNotice, undoNotice } from "./notice.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
@@ -145,7 +146,7 @@ export default class Tabs extends View {
         else if (command.startsWith("pin:")) pin(command.slice("pin:".length));
         else if (command.startsWith("snooze:")) await this.snooze(command.slice("snooze:".length), cx);
         else if (command.startsWith("unread:")) await this.unread(command.slice("unread:".length));
-        else if (command === "undo") await this.undo();
+        else if (command === "undo") await this.undo(cx);
         else await this.navigation.handle(command, cx);
       }
     });
@@ -183,7 +184,12 @@ export default class Tabs extends View {
     if (snoozed) await writeLabel(address, "snoozed", "");
     const pins = pinList();
     unpin([address]);
-    this.remember("Settled", { address, snoozed, pins, viewed: inView }, cx);
+    rememberNotice("Settled", 1, async () => {
+      if (!await writeLabel(address, "settled", "")) return false;
+      if (Number(snoozed) > Date.now()) await writeLabel(address, "snoozed", snoozed);
+      putBack(pins, [address]);
+      if (inView && this.navigation.atHome) focusAgent(address);
+    }, cx);
     const current = focused();
     if (inView && ["space", "tab", "pane", "terminal", "agent"].every(key => current?.[key] === f[key]) && !this.navigation.nextCard(address)) run("t3-tabs.home");
   }
@@ -200,7 +206,10 @@ export default class Tabs extends View {
     const f = { ...focused() }, was = k.labels?.snoozed ?? "";
     const inView = f.terminal === address || a.focused;
     if (!await writeLabel(address, "snoozed", String(at))) return;
-    this.remember("Snoozed", { address, snoozed: was, viewed: inView }, cx);
+    rememberNotice("Snoozed", 1, async () => {
+      if (!await writeLabel(address, "snoozed", was)) return false;
+      if (inView && this.navigation.atHome) focusAgent(address);
+    }, cx);
     const current = focused();
     if (inView && ["space", "tab", "pane", "terminal", "agent"].every(key => current?.[key] === f[key]) && !this.navigation.nextCard(address)) run("t3-tabs.home");
   }
@@ -229,52 +238,11 @@ export default class Tabs extends View {
     const pins = pinList();
     if (!pins.includes(address)) return;
     unpin([address]);
-    this.remember("Unpinned", { address, pins }, cx);
+    rememberNotice("Unpinned", 1, () => { putBack(pins, [address]); }, cx);
   }
 
-  remember(action, undo, cx) {
-    const old = shared(KEY.notice), now = Date.now();
-    const joined = old?.owner === "tabs" && old.action === action && old.live && now - old.at < 5000;
-    const n = { owner: "tabs", action, count: (joined ? old.count : 0) + 1, gen: (old?.gen ?? 0) + 1,
-      live: true, shown: joined, at: now, undos: [...(joined ? old.undos : []), undo] };
-    setShared(KEY.notice, n);
-    const update = (change) => {
-      const current = shared(KEY.notice);
-      if (current?.owner === "tabs" && current.gen === n.gen && current.at === n.at) setShared(KEY.notice, change && { ...current, ...change });
-    };
-    if (!joined) cx.timer.after(16, () => update({ shown: true }));
-    cx.timer.after(5000, () => update({ live: false, shown: false }));
-    cx.timer.after(5250, () => update(null));
-  }
-
-  async undo() {
-    const n = shared(KEY.notice);
-    if (!n?.live || Date.now() - n.at >= 5000) return;
-    if (n.owner !== "tabs") {
-      setShared(KEY.undo, { gen: n.gen, at: n.at, requestedAt: Date.now(), request: (shared(KEY.undo)?.request ?? 0) + 1 });
-      return;
-    }
-    // Gone while the writes run, so a second press can't repeat them; back with what failed, so it can be tried again.
-    setShared(KEY.notice, null);
-    // One put away from view is gone back to, while Home is still where that left the person; one never in view stays where it is.
-    let back;
-    const failed = [];
-    for (const u of [...n.undos].reverse()) {
-      // A snooze undone wakes it: the label back as it was.
-      if (n.action === "Snoozed") {
-        if (!await writeLabel(u.address, "snoozed", u.snoozed)) failed.unshift(u);
-        else if (u.viewed) back = u.address;
-        continue;
-      }
-      if (n.action !== "Unpinned") {
-        if (!await writeLabel(u.address, "settled", "")) { failed.unshift(u); continue; }
-        if (u.viewed) back = u.address;
-        if (Number(u.snoozed) > Date.now()) await writeLabel(u.address, "snoozed", u.snoozed);
-      }
-      putBack(u.pins, [u.address]);
-    }
-    if (failed.length) setShared(KEY.notice, { ...n, count: failed.length, undos: failed });
-    if (back && this.navigation.atHome) focusAgent(back);
+  async undo(cx) {
+    await undoNotice(cx);
   }
 
   // Each tab's width: its whole name while the room allows, else the longest names give way first.
@@ -393,7 +361,10 @@ export default class Tabs extends View {
     // The work column's width, in a strip the bar's controls can't change: measured in the bar, their collapsing would undo itself.
     // on_size_change reports zoomed pixels. Past T3's 768 for the same controls: here they share the row with the tabs.
     if (part === "measure") return div().id("bar-measure").size_full()
-      .on_size_change((size) => setShared(KEY.compact, size.width / (Number(settings()?.zoom) || 1) < 1024));
+      .on_size_change((size) => {
+        const next = size.width / (Number(settings()?.zoom) || 1) < 1024;
+        if (shared(KEY.compact) !== next) setShared(KEY.compact, next);
+      });
     const t = theme(), w = window();
     if (part === "keys") {
       this.navigation.advance();
@@ -442,13 +413,14 @@ export default class Tabs extends View {
     const strip = ctx ? [...ctx.kin, ...ctx.programs] : shown;
     // Each agent with its sub-agents (tree.js).
     const every = agents(), all = terminals(), under = subAgents(every, all);
+    const byAddress = terminalByAddress(all);
     const st = (a) => treeStatus(ownStatus(a.status, a.address, all), under(a.address));
     const ps = panes(), tabName = namer({ terminals: all, agents: every }), now = Date.now();
     // In Lists a snooze's end brings a done mark back (statusOf) with nothing else changing: the earliest one redraws the strip.
     this.redrawAt(inbox ? Infinity : all.reduce((at, k) => { const wake = Number(k.labels?.snoozed); return wake > now && wake < at ? wake : at; }, Infinity), cx);
     // The tab's most urgent agent, ranked as the app ranks tabs; a done one only while it's still news.
     const statusOf = (c) => {
-      const words = [...every.filter(a => a.tab === c.id).map(a => st(a) === "done" && notNews(all.find(k => k.address === a.address), a.status, under(a.address)) ? "idle" : st(a)), ...ps.filter(p => p.tab === c.id && p.mod).map(p => modStatus(p))];
+      const words = [...every.filter(a => a.tab === c.id).map(a => st(a) === "done" && notNews(byAddress.get(a.address), a.status, under(a.address)) ? "idle" : st(a)), ...ps.filter(p => p.tab === c.id && p.mod).map(p => modStatus(p))];
       return words.includes("blocked") ? "blocked"
         : words.includes("done") ? "done"
         : words.includes("working") ? "working" : null;

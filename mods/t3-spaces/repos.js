@@ -114,12 +114,17 @@ export function repoFacts({ exec, watchFolder, cx }) {
         return;
       }
       // The repo's own .git folder names it; a worktree's top differs from it.
-      const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on });
-      const common = await exec("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd, on });
+      const rev = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd, on });
       if (!wanted()) return;
-      const repo = common.stdout.trim();
+      const lines = (rev.stdout ?? "").trim().split(/\r?\n/).map((s) => s.trim());
+      if (rev.code !== 0 || lines.length !== 2 || !lines[0] || !lines[1]) {
+        git[key] ??= null;
+        unsure.add(key);
+        return;
+      }
+      const [top, repo] = lines;
       const name = repo.endsWith("/.git") ? base(repo.slice(0, -5)) : base(repo).replace(/\.git$/, "");
-      const info = { name, branch: null, ahead: 0, behind: 0, repo: JSON.stringify([on, repo]), linked: repo !== `${top.stdout.trim()}/.git` };
+      const info = { name, branch: null, ahead: 0, behind: 0, repo: JSON.stringify([on, repo]), linked: repo !== `${top}/.git` };
       for (const line of r.stdout.split("\n")) {
         if (line.startsWith("# branch.head ")) info.branch = line.slice(14);
         else if (line.startsWith("# branch.ab ")) {

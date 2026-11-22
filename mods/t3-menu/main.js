@@ -38,10 +38,11 @@ function place(s) {
 
 // A space's checkout: "main" (a repo's own), "linked" (a worktree), or null.
 async function checkout(folder, on) {
-  const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd: folder, on });
-  const common = await exec("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: folder, on });
-  if (top.code !== 0 || common.code !== 0) return null;
-  return common.stdout.trim() === `${top.stdout.trim()}/.git` ? "main" : "linked";
+  const rev = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd: folder, on });
+  const lines = (rev.stdout ?? "").trim().split(/\r?\n/).map((s) => s.trim());
+  if (rev.code !== 0 || lines.length !== 2 || !lines[0] || !lines[1]) return null;
+  const [top, common] = lines;
+  return common === `${top}/.git` ? "main" : "linked";
 }
 
 // The nearest live agent with a pane above an address. Reuse the answer for intermediate shells and pane-less agents.

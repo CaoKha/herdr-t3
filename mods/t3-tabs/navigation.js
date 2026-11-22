@@ -1,6 +1,6 @@
 import { checking, exec, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window } from "herdr";
 import { namer, programOf, isSubAgent } from "./name.js";
-import { descendants, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
+import { descendants, ownStatus, stillSettled, subAgents, terminalByAddress, treeStatus } from "./tree.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { sidebarParts } from "./sidebar.js";
 import { agentStep } from "./agent-step.js";
@@ -440,16 +440,29 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       wasHome = false;
     }
     const space = all.find(s => s.active), tab = space?.tabs.find(c => c.active), isHome = atHome(all);
-    const alive = (id) => all.some(s => s.tabs.some(c => c.id === id));
+    const liveSpaces = new Set(all.map(s => s.id)), liveTabs = new Set(all.flatMap(s => s.tabs.map(c => c.id)));
+    const alive = (id) => liveTabs.has(id);
+    for (const sid of Object.keys(trail)) {
+      if (!liveSpaces.has(sid)) delete trail[sid];
+      else {
+        const kept = trail[sid].filter(alive);
+        if (kept.length) trail[sid] = kept;
+        else delete trail[sid];
+      }
+    }
+    for (const sid of fresh) if (!liveSpaces.has(sid)) fresh.delete(sid);
+    for (const sid of released) if (!liveSpaces.has(sid)) released.delete(sid);
     const was = inView;
     // Herdr's pick shows until Home does, and that isn't somewhere the person went.
     const toHome = () => { going = { until: Date.now() + 500 }; run("t3-tabs.home"); };
     // Home's last program ended, past closePane: the space went with it.
-    if (wasHome && all.length && !all.some(s => s.id === homeId())) toHome();
+    if (wasHome && all.length && !liveSpaces.has(homeId())) toHome();
     wasHome = isHome;
     // For the closes this mod doesn't make, which leave() can't go ahead of: the tab's menu, the program ending. Herdr has
     // already picked the neighbour, and it may have been shown.
     const terms = terminals();
+    const byAddress = terminalByAddress(terms);
+    const byAgent = new Map(every.map(a => [a.address, a]));
     if (was && !alive(was.tab) && !isHome) {
       // With the Inbox, the agent in view lands on Home, as settling it does: what to look at next stays the person's to say.
       // In Lists, as any tab, unless no space is left to show.
@@ -462,20 +475,20 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
         if (before) owed.set(a.address, { ...before, until: Date.now() + 3000 });
       }
     }
-    const viewing = inViewAgent(terms, every, ps);
+    const viewing = inViewAgent(terms, every, ps, byAddress, byAgent);
     zoomFollows(every, ps);
-    payBack(tab, isHome, terms, every, ps);
-    endSnoozes(terms, every, viewing);
+    payBack(tab, isHome, terms, every, ps, byAddress, byAgent);
+    endSnoozes(terms, every, viewing, byAddress, byAgent);
     // What's unread now, for the next frame's close: its turn, and a snooze it woke from (seeing it clears that too).
     unread = new Map(every.filter(a => a.status === "done").map(a => {
-      const k = terms.find(k => k.address === a.address);
+      const k = byAddress.get(a.address);
       return [a.address, { turn: k?.turn ?? 0, snoozed: k?.labels?.snoozed }];
     }));
     if (going && (Date.now() > going.until || (going.tab ? tab?.id === going.tab : isHome))) going = null;
     // Until a close's target shows, what shows is Herdr's pick, not somewhere the person went.
     if (space && tab && !isHome && !going) trail[space.id] = [tab.id, ...(trail[space.id] ?? []).filter(id => id !== tab.id && alive(id))];
     inView = tab && !isHome && !going ? { tab: tab.id, space: space.id, agent: every.some(a => a.tab === tab.id) } : null;
-    const looked = !going && every.find(a => a.address === viewing);
+    const looked = !going && byAgent.get(viewing);
     if (looked && !isHome) { lastIn[looked.tab] = looked.address; fresh.delete(looked.space); }
     for (const id of Object.keys(lastIn)) if (!alive(id)) delete lastIn[id];
     return { spaces: all, panes: ps, space, every, all: terms, looked, home: isHome };
@@ -497,9 +510,9 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   // Once what Herdr's pick showed is out of view, and its seen has come back from the core (or the lower write could land first),
   // its turn is unread again. Still in view after a few seconds: the person stayed there, so it was seen after all.
-  function payBack(tab, home, terms, every, ps) {
+  function payBack(tab, home, terms, every, ps, byAddress = new Map(terms.map(k => [k.address, k])), byAgent = new Map(every.map(a => [a.address, a]))) {
     for (const [addr, o] of owed) {
-      const k = terms.find(k => k.address === addr), a = every.find(a => a.address === addr);
+      const k = byAddress.get(addr), a = byAgent.get(addr);
       if (!k || (k.turn ?? 0) !== o.turn || o.turn < 1) { owed.delete(addr); continue; }
       // Done already (the window wasn't active, so nothing was marked): only a cleared snooze may be owed.
       if (a?.status === "done") o.seen = true;
@@ -523,7 +536,8 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   // A snooze ends on a failure in its tree or a new turn given in view, as the Inbox ends it; here too, in either sidebar,
   // as the Inbox copy may not have started (docs/adr/0003). Seeing it once it has woken stays the Inbox's: Woke is its mark.
-  function endSnoozes(terms, every, viewing) {
+  function endSnoozes(terms, every, viewing, byAddress = new Map(terms.map(k => [k.address, k])), byAgent = new Map(every.map(a => [a.address, a]))) {
+    for (const addr of waking.keys()) if (!byAddress.has(addr)) waking.delete(addr);
     const was = states, active = window()?.active, now = Date.now();
     const under = subAgents(every, terms);
     const state = (a) => treeStatus(ownStatus(a.status, a.address, terms), under(a.address));
@@ -531,7 +545,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     const viewed = going ? null : viewing;
     for (const k of terms) {
       if (!k.labels?.snoozed || now - (waking.get(k.address) ?? -Infinity) < 10000) continue;
-      const a = every.find(a => a.address === k.address);
+      const a = byAgent.get(k.address);
       if (!a) continue;
       const failed = k.status === "error" || descendants(terms, a.address).some(d => d.status === "error");
       const turned = active && a.address === viewed && states.get(a.address) === "working" && ["idle", "done"].includes(was.get(a.address));
@@ -544,10 +558,10 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   // The agent in view, as the Inbox's row in view (t3-inbox/row-model.js inboxInView): the focused one; else a sub-agent with
   // no row of its own (a block, a peek) stands for its nearest agent; a mod pane for the agent beside it, unless it has a card.
-  function inViewAgent(terms, every, ps) {
+  function inViewAgent(terms, every, ps, byAddress = new Map(terms.map(k => [k.address, k])), byAgent = new Map(every.map(a => [a.address, a]))) {
     const own = every.find(a => a.focused);
     if (own) return own.address;
-    const f = focused(), byAddress = new Map(terms.map(k => [k.address, k])), listed = (k) => every.some(a => a.address === k.address);
+    const f = focused();
     if (f?.pane && !f.terminal) {
       const p = ps.find(p => p.pane === f.pane);
       if (p?.mod && programOf(p)?.inbox) return null;
@@ -556,8 +570,8 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     }
     const seen = new Set();
     let k = byAddress.get(f?.pane ? f.terminal : f?.agent ?? f?.terminal);
-    while (k && !listed(k) && !seen.has(k.address)) { seen.add(k.address); k = byAddress.get(k.parent); }
-    return k && listed(k) ? k.address : null;
+    while (k && !byAgent.has(k.address) && !seen.has(k.address)) { seen.add(k.address); k = byAddress.get(k.parent); }
+    return k && byAgent.has(k.address) ? k.address : null;
   }
 
   // Who the Inbox's bar is about: the agent in view, the card the Inbox lights. With none (a program has the focus), the one last

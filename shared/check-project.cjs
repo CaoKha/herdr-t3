@@ -15,7 +15,7 @@ function load(host = {}) {
     Buffer, createHash: require("node:crypto").createHash, Date, ...host,
   });
   const src = ["store.js", "color.js", "space-arrival.js", "project.js"].map((f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"))).join("\n");
-  vm.runInContext(src + "\nglobalThis.project = { projectMark, placeOf, monogramColor, monogram };", context);
+  vm.runInContext(src + "\nglobalThis.project = { projectMark, placeOf, monogramColor, monogram, linkedIcon, lookUp };", context);
   return { ...context.project, state, reads, context };
 }
 const t = { background: "#000000", dim: "DIM" };
@@ -71,18 +71,18 @@ const t = { background: "#000000", dim: "DIM" };
 // A space's own icon, found as T3 finds it, replaces its monogram.
 (async () => {
   const runs = [], written = [];
-  let asked = 0, published;
+  let asked = 0, published, gitArgs;
   const found = new Promise((done) => { published = done; });
   const ps = () => [{ pane: "A", tab: "b1", cwd: "/w/one/src" }];
   // Its terminal is down in the repo: the icon is the repo's, as T3's is its project root's.
   const space = { id: "s1", name: "One", folder: "", machine: "vps", tabs: [{ id: "b1" }] };
-  const { projectMark, state, context } = load({
+  const { projectMark, linkedIcon, lookUp, state, context } = load({
     appHome: () => "/app", spaces: () => [space], panes: ps,
     fs: { exists: async () => false, mkdir: async () => {}, writeFile: async (p, b) => written.push([p, Buffer.from(b).toString()]) },
     readTextFile: async (p) => p === "/w/one/index.html" ? `<link href="/brand/logo.svg" rel="icon">` : null,
     exec: async (cmd, args, opts) => {
       asked++;
-      if (cmd === "git") return opts.cwd === "/w/one/src" ? { code: 0, stdout: "/w/one\n" } : { code: 128, stdout: "" };
+      if (cmd === "git") { gitArgs = args; return opts.cwd === "/w/one/src" ? { code: 0, stdout: "/w/one\n" } : { code: 128, stdout: "" }; }
       runs.push([args.slice(3), opts]);
       if (args[1].startsWith("base64")) return { code: 0, stdout: Buffer.from("<svg/>").toString("base64").replace(/(.{4})/g, "$1\n") };
       return { code: 0, stdout: args.includes("brand/logo.svg") ? "brand/logo.svg" : "" };
@@ -93,6 +93,7 @@ const t = { background: "#000000", dim: "DIM" };
   context.setShared = (k, v) => { set(k, v); if (k === "t3.spaceIcons") published(); };
   assert.deepEqual(projectMark("mods/t3-x", space, 16, t, ps()).items, ["O"], "its letter until the look answers");
   await found;
+  assert.deepEqual([...gitArgs], ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"]);
   assert.equal(runs[0][0][0], "favicon.svg", "the well-known places first, in T3's order");
   assert.deepEqual([...runs[1][0]], ["public/brand/logo.svg", "brand/logo.svg"], "then the page's link, public/ first");
   assert.deepEqual({ ...runs[1][1] }, { cwd: "/w/one", on: "vps" }, "looked for on the space's own machine");
@@ -105,5 +106,70 @@ const t = { background: "#000000", dim: "DIM" };
   const before = asked;
   projectMark("mods/t3-x", space, 16, t, ps());
   assert.equal(asked, before, "found, it isn't looked for again within ten minutes");
+
+  // linkedIcon strips '#' fragments as well as '?' query strings.
+  assert.equal(linkedIcon(`<link rel="icon" href="/brand/logo.svg#icon">`), "/brand/logo.svg");
+  assert.equal(linkedIcon(`<link rel="shortcut icon" href="/brand/logo.png?v=1#top">`), "/brand/logo.png");
+  assert.equal(linkedIcon(`head: () => ({ links: [{ rel: "icon", href: "/app.ico#hash" }] })`), "/app.ico");
+
+  // lookUp rejects files without a known image extension (including dots only in parent directories).
+  for (const badHit of ["dir.v1/favicon", "favicon", "favicon.html", "favicon.icns"]) {
+    let wrote = 0;
+    const { lookUp: lookBad } = load({
+      appHome: () => "/app",
+      fs: { exists: async () => false, mkdir: async () => {}, writeFile: async () => { wrote++; } },
+      readTextFile: async (p) => p === "/proj/index.html" ? `<link rel="icon" href="/${badHit}">` : null,
+      exec: async (cmd, args) => {
+        if (cmd === "git") return { code: 128, stdout: "" };
+        if (args[1].startsWith("base64")) return { code: 0, stdout: Buffer.from("x").toString("base64") };
+        return { code: 0, stdout: args.includes(badHit) ? badHit : "" };
+      },
+    });
+    assert.equal(await lookBad(null, "/proj"), null, `rejects ${badHit}`);
+    assert.equal(wrote, 0, `writes nothing for ${badHit}`);
+  }
+  {
+    const wrote = [];
+    const { lookUp: lookGood } = load({
+      appHome: () => "/app",
+      fs: { exists: async () => false, mkdir: async () => {}, writeFile: async (p, b) => wrote.push(p) },
+      readTextFile: async (p) => p === "/proj/index.html" ? `<link rel="icon" href="/logo.WEBP#frag">` : null,
+      exec: async (cmd, args) => {
+        if (cmd === "git") return { code: 128, stdout: "" };
+        if (args[1].startsWith("base64")) return { code: 0, stdout: Buffer.from("img").toString("base64") };
+        return { code: 0, stdout: args.includes("logo.WEBP") ? "logo.WEBP" : "" };
+      },
+    });
+    const res = await lookGood(null, "/proj");
+    assert.match(res, /^cache\/t3-icons\/[0-9a-f]{16}\.webp$/);
+    assert.equal(wrote.length, 1);
+  }
+
+  // Multiple mod copies share globalThis.t3ProjectLooked, and checks can reset it.
+  {
+    const sharedState = {};
+    let lookCalls = 0, now = 1000;
+    const modSrc = ["store.js", "color.js", "space-arrival.js", "project.js"].map((f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"))).join("\n");
+    const sp = { id: "s1", name: "One", folder: "/proj", machine: null, tabs: [] };
+    const ctx = vm.createContext({
+      image: (src) => element("image", src), svg: (src) => element("svg", src), h_flex: () => element(),
+      checking: () => false, settings: () => ({}), run() {}, spaces: () => [sp], panes: () => [],
+      shared: (k) => sharedState[k], setShared: (k, v) => { sharedState[k] = v; },
+      readTextFile: async () => null, appHome: () => "/app",
+      fs: { exists: async () => false, mkdir: async () => {}, writeFile: async () => {} },
+      exec: async (cmd) => { if (cmd === "git") lookCalls++; return { code: 1, stdout: "" }; },
+      Buffer, createHash: require("node:crypto").createHash, Date: { now: () => now },
+    });
+    vm.runInContext(`${modSrc}\nglobalThis.copy1 = { projectMark };`, ctx);
+    vm.runInContext(`(() => {\n${modSrc}\nglobalThis.copy2 = { projectMark };\n})();`, ctx);
+    ctx.copy1.projectMark("mods/t3-a", sp, 16, t, []);
+    assert.equal(lookCalls, 1);
+    ctx.copy2.projectMark("mods/t3-b", sp, 16, t, []);
+    assert.equal(lookCalls, 1, "second copy reuses shared t3ProjectLooked");
+    ctx.t3ProjectLooked.clear();
+    ctx.copy2.projectMark("mods/t3-b", sp, 16, t, []);
+    assert.equal(lookCalls, 2, "clearing t3ProjectLooked triggers a fresh lookup");
+  }
+
   console.log("ok: a space's monogram, icon and place, read once for a draw's list of panes.");
 })().catch((e) => { console.error(e); process.exitCode = 1; });
