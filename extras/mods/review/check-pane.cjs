@@ -13,7 +13,7 @@ const paneHeadCentre = kit.paneHeadCentre(fs.readFileSync(fs.existsSync(layoutIn
 const source = (file) => kit.bundle((f) => fs.readFileSync(path.join(__dirname, f), "utf8"), file, (f, src, needs) =>
   f === "button.js" ? "const { drawButton, ghostButton, tint, GROUP_GAP } = (() => {\n" + kit.strip(src) + "\nreturn { drawButton: button, ghostButton, tint, GROUP_GAP };\n})();"
   : f === "trigger.js" ? needs() + "\nconst { trigger, opener, popupOpen } = (() => { const button = drawButton;\n" + kit.strip(src) + "\nreturn { trigger, opener, popupOpen };\n})();"
-  : f === "menus.js" ? needs() + "\nconst { initMenu, closeMenu, menuView, closeMenus, openMenu, rowItems } = (() => { const window = appWindow;\n" + kit.strip(src) + "\nreturn { initMenu, closeMenu, menuView, closeMenus, openMenu, rowItems };\n})();"
+  : f === "menus.js" ? needs() + "\nconst { initMenu, closeMenu, menuView, closeMenus, openMenu, rowItems, paste } = (() => { const window = appWindow;\n" + kit.strip(src) + "\nreturn { initMenu, closeMenu, menuView, closeMenus, openMenu, rowItems, paste };\n})();"
   : f === "popup-menu.js" ? needs() + "\nconst { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed } = (() => {\n" + kit.strip(src) + "\nreturn { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed };\n})();"
   : null, new Set(file === "main.js" ? ["rows.js", "daemon.js", "tip.js"] : []));
 
@@ -243,12 +243,21 @@ assert.equal(pageLabel("/compare/origin/main...other", review), "other vs origin
 // main.js: every state's render and every item kind, without a window.
 // Elements record their ids and handlers (`id.on_name`), so a test can press one and see what the next render draws.
 // They keep their words and styles too.
+// A press's listener is kept under its button too (`id.on_mouse_down:right`).
 const lists = [], drawn = new Set(), handlers = new Map(), texts = new Map(), styles = {};
+// While a virtual list's item renderer runs, a listener throws, as Herdr's: the rows are rebuilt every frame.
+let listing = 0, scrolled = 0;
+const listItems = (render, range) => { listing++; try { return render(range); } finally { listing--; } };
 const element = (named = null) => {
   let id = named;
   const el = new Proxy(function () {}, { get: (_t, key) => key === "when" ? function (c, f) { if (c) f(this); return this; }
     : key === "id" ? (v) => { id = v; drawn.add(v); return el; }
-    : typeof key === "string" && key.startsWith("on_") ? (...args) => { handlers.set(`${id}.${key}`, args.at(-1)); return el; }
+    : typeof key === "string" && key.startsWith("on_") ? (...args) => {
+      if (listing) throw new Error(`${key} registered from a virtual list's item renderer (${id})`);
+      handlers.set(`${id}.${key}`, args.at(-1));
+      if (args.length > 1 && typeof args[0] === "string") handlers.set(`${id}.${key}:${args[0]}`, args.at(-1));
+      return el;
+    }
     : key === "child" ? function (v) { if (typeof v === "string" && id) texts.set(id, v); return this; }
     : function (...args) { if (id) (styles[id] ??= {})[key] = args[0] ?? true; return this; } });
   return el;
@@ -272,6 +281,7 @@ let keyboard = null;
 const field = { text: "", events: {}, value() { return this.text; }, set_value(v) { this.text = v; }, on(event, h) { this.events[event] = h; return true; }, focus() { keyboard = "field"; } };
 const scopeField = { ...field, events: {}, focus() { keyboard = "scope"; } };
 const refField = { ...field, events: {}, focus() { keyboard = "refs"; } };
+const noteField = { ...field, events: {}, focus() { keyboard = "note"; } };
 // The page's own localStorage: whether its file tree's column is open.
 const local = new Map();
 const env = {
@@ -289,9 +299,9 @@ const env = {
   PathBuilder: (() => { const chain = new Proxy({}, { get: () => () => chain }); return { stroke: () => chain, fill: () => chain }; })(),
   window: { paint_path: () => element() }, appWindow: () => ({ platform: "macos", active: windowActive }),
   // LaunchServices probes are not link navigation; shared/check-open-in.cjs checks those separately.
-  exec: (...args) => { if (!(args[0] === "open" && args[1][0] === "-Ra")) browsed.push(args); return Promise.resolve({ code: 0 }); }, Input: { new: () => element() }, InputState: { new: (options) => options.placeholder === "Search" ? scopeField : options.placeholder === "Search refs" ? refField : field },
-  v_virtual_list: (_id, count, sizes, _key, render) => { assert.equal(sizes.length, count); lists.push(() => render({ start: 0, end: count }).forEach(Boolean)); return element(); },
-  VirtualListScrollHandle: { new: () => ({ scroll_to_item: (i) => calls.push(["scroll", i]) }) },
+  exec: (...args) => { if (!(args[0] === "open" && args[1][0] === "-Ra")) browsed.push(args); return Promise.resolve({ code: 0 }); }, Input: { new: () => element() }, InputState: { new: (options) => options.placeholder === "Search" ? scopeField : options.placeholder === "Search refs" ? refField : options.placeholder === "Add a note" ? noteField : field },
+  v_virtual_list: (_id, count, sizes, _key, render) => { assert.equal(sizes.length, count); lists.push(() => listItems(render, { start: 0, end: count }).forEach(Boolean)); return element(); },
+  VirtualListScrollHandle: { new: () => ({ scroll_to_item: (i) => calls.push(["scroll", i]), offset: () => ({ x: 0, y: scrolled }) }) },
   TextView: { markdown: element },
   spaces: () => [["s1", "/repo"], ["s2", "/other"], ["r1", "/srv", "kvm"]].map(([id, folder, machine = null]) => ({ id, folder, machine, active: id === activeSpace, tabs: [] })),
   // Herdr T3's layout: the panel open, on the page shown.
@@ -698,6 +708,62 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
   const wheel = (x, dx) => handlers.get("review-diff-area.on_scroll_wheel")({ delta: { x: dx, y: 0 }, local_position: { x, y: 0 } }, cx);
   wheel(700, -50);
   assert.deepEqual(plain(pane.shift), [0, 50, 0]);
+  {
+    // Lines picked by their numbers go to the tab's agent as a paste, never with Enter (lines.js holds the text).
+    const sideWas = pane.sideWidth, shiftWas = [...pane.shift];
+    const rowsOf = (p) => pane.review.files.find(f => f.path === p).hunks.flatMap(h => h.rows);
+    const picked = (p, i) => pane.linePick?.path === p && pane.linePick.keys.has(vm.runInContext("lineKey", mainScope)(rowsOf(p)[i]));
+    // Where a row is drawn, on its numbers or its code: its run's place in the list, less the scroll, then its line's; split, its side.
+    const spot = (p, i, numbers = true) => {
+      const row = rowsOf(p)[i], items = pane.itemList, sizes = pane.listSizes();
+      const at = items.findIndex(item => item.path === p && item.lines?.some(l => l === row || l.left === row || l.right === row));
+      const k = items[at].lines.findIndex(l => l === row || l.left === row || l.right === row), line = items[at].lines[k];
+      const right = items[at].kind === "pair" && line.left !== row;
+      return { x: (right ? pane.view / 2 + 1 : 0) + (numbers ? 10 : 100), y: sizes.slice(0, at).reduce((a, b) => a + b, 0) + k * 20 + 10 - scrolled };
+    };
+    // Every press goes to the diff's own handlers: a virtual list's rows hold none.
+    const area = (x = 10, y = 0, button = "left", shift = false) => handlers.get(`review-diff-area.on_mouse_down:${button}`)({ local_position: { x, y }, modifiers: { shift } }, cx);
+    const gutter = (p, i, shift = false) => { const { x, y } = spot(p, i); area(x, y, "left", shift); };
+    const redraw = () => { handlers.delete("review-lines-send.on_click"); drawn.clear(); pane.render(cx); };
+    scrolled = 15;
+    gutter("a.ts", 0);
+    assert.ok(picked("a.ts", 0) && !picked("a.ts", 1), "a number's press picks its line, and keeps it");
+    gutter("a.ts", 2); gutter("a.ts", 0, true);
+    assert.ok(picked("a.ts", 0) && picked("a.ts", 1) && picked("a.ts", 2), "shift extends upwards, the right side's line to the left's");
+    gutter("a.ts", 0); gutter("a.ts", 2, true); gutter("c.ts", 0, true);
+    assert.ok(pane.linePick.path === "a.ts" && pane.linePick.keys.size === 3, "shift extends downwards, in the file, not across files");
+    area(pane.view - 8);
+    assert.ok(pane.linePick, "the scrollbar's strip keeps it");
+    area();
+    assert.equal(pane.linePick, null, "a press elsewhere lets go");
+    gutter("a.ts", 1); area(spot("a.ts", 1, false).x, spot("a.ts", 1, false).y);
+    assert.equal(pane.linePick, null, "a press on a line's code lets go");
+    gutter("a.ts", 1); pane.key({ keystroke: "escape" }, cx);
+    assert.equal(pane.linePick, null, "Escape lets go");
+    // No agent in the tab: the bar says so and Send is off.
+    gutter("a.ts", 1); redraw();
+    assert.ok(drawn.has("review-lines-bar"), [...drawn].filter(d => d.startsWith("review")).join());
+    assert.ok(styles["review-lines-send"].opacity < 1 && !handlers.has("review-lines-send.on_click"));
+    gutter("a.ts", 2, true); area(spot("a.ts", 1, false).x, spot("a.ts", 1, false).y, "right");
+    assert.ok(overlays.at(-1).props.files === "lines" && overlays.at(-1).props.agent === null && pane.linePick.keys.size === 2, "a right-press in the pick offers it");
+    area(spot("a.ts", 0, false).x, spot("a.ts", 0, false).y, "right");
+    assert.ok(picked("a.ts", 0) && pane.linePick.keys.size === 1, "a right-press outside the pick picks its line");
+    // An agent (this fake's spaces have no tabs): Send pastes and nothing else; the clipboard comes back after.
+    const panesWere = mainScope.panes, jobs = [];
+    mainScope.panes = () => [{ tab: undefined, terminal: "cc", program: { agent: true } }];
+    let clipboard = "mine";
+    const pasteCx = { ...cx, read_from_clipboard: () => clipboard, write_to_clipboard: (v) => { clipboard = v; }, sleep: async () => {}, spawn: (f) => jobs.push(f) };
+    gutter("a.ts", 1); gutter("a.ts", 2, true); noteField.text = "why"; redraw();
+    const from = calls.length;
+    handlers.get("review-lines-send.on_click")({}, pasteCx);
+    assert.deepEqual(calls.slice(from).map(c => c[0]), ["pane.focus", "terminal.paste"], "a paste, no send or Enter");
+    assert.equal(calls[from][1].terminal, "cc");
+    assert.equal(clipboard, " a.ts:2 (old)\n```ts\n-2:\n```\na.ts:2 (new)\n```ts\n+:2\n```\nwhy");
+    assert.ok(pane.linePick === null && noteField.text === "", "sent: the pick and the note go");
+    await jobs.shift()(pasteCx);
+    assert.equal(clipboard, "mine");
+    mainScope.panes = panesWere; pane.sideWidth = sideWas; pane.shift = shiftWas; scrolled = 0;
+  }
   wheel(700, -5000); wheel(100, -50);
   assert.deepEqual(plain(pane.shift), [0, 1500 - pane.view / 2, 0]);
   wheel(700, 5000);
@@ -1369,7 +1435,7 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
   // One press on a file's header acts at once, by where it lands: the reviewed box at its start, the whole file and the
   // fold at its end, a fold anywhere else; and the file becomes the current one.
   pane.view = 1000; pane.render(cx);
-  const header = (x) => { handlers.get("review-diff-area.on_mouse_down")({ local_position: { x, y: 0 } }, cx); handlers.get("null.on_item_click")("f:c.ts", cx); };
+  const header = (x) => { handlers.get("review-diff-area.on_mouse_down:left")({ local_position: { x, y: 0 } }, cx); handlers.get("null.on_item_click")("f:c.ts", cx); };
   const c = () => pane.review.files.find(f => f.path === "c.ts");
   const reviewed = c().reviewed;
   header(20);
@@ -1392,7 +1458,7 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
   assert.ok(drawn.has("sticky-file"));
   assert.equal(styles["sticky-file"].bg, env.theme().background, "the stuck header covers code in the diff's own colour (nav-column.js puts it on background), even when the theme's selection is translucent");
   pane.current = null; calls.length = 0;
-  handlers.get("review-diff-area.on_mouse_down")({ local_position: { x: 300, y: 10 } }, cx);
+  handlers.get("review-diff-area.on_mouse_down:left")({ local_position: { x: 300, y: 10 } }, cx);
   handlers.get("null.on_item_click")(pane.itemList[rowAt].key, cx);
   assert.equal(pane.current, null);
   handlers.get("sticky-file.on_click")({}, cx);
@@ -1792,7 +1858,7 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
     for (const path of ["a.ts", "c.ts"]) p.collapsed.add(path);
     p.version++; p.render(cx);
     for (const path of ["a.ts", "c.ts"]) {
-      handlers.get("review-diff-area.on_mouse_down")({ local_position: { x: p.view - 50, y: 0 } }, cx);
+      handlers.get("review-diff-area.on_mouse_down:left")({ local_position: { x: p.view - 50, y: 0 } }, cx);
       handlers.get("null.on_item_click")(`f:${path}`, cx);
     }
     await wait();
@@ -2109,7 +2175,7 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
   }
   // The list draws only a window of its items, from `top`, as a scrolled v_virtual_list does.
   let top = 0;
-  const windowed = { v_virtual_list: (_id, count, _sizes, _key, render) => { render({ start: top, end: Math.min(count, top + 40) }).forEach(Boolean); return element(); } };
+  const windowed = { v_virtual_list: (_id, count, _sizes, _key, render) => { listItems(render, { start: top, end: Math.min(count, top + 40) }).forEach(Boolean); return element(); } };
   {
     // Scrolling a big group, a batch's rows come on their own, not inside the page's every file and group again: each is
     // weighed against the same rows inside the whole page.

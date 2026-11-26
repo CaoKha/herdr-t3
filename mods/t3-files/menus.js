@@ -1,5 +1,5 @@
-// Files and Review's menus (docs/adr/0018), native popups of their own mod: a tree row's, a breadcrumb's folder and Open in's
-// apps. A breadcrumb's folder menu, as T3's FileBreadcrumbs, moves through folders in place, Back on top. Each acts only while
+// Files and Review's menus (docs/adr/0018), native popups of their own mod: a tree row's, a breadcrumb's folder, Open in's
+// apps and Review's picked lines'. A breadcrumb's folder menu, as T3's FileBreadcrumbs, moves through folders in place, Back on top. Each acts only while
 // the space and tab it was opened on still show (`source`).
 import { svg } from "gpui-kit";
 import { v_flex } from "gpui-base";
@@ -22,7 +22,7 @@ export const MENU_W = 220, folderHeight = () => 8 + 12 * ui(MENU_ROW);
 // Stamped as a top menu closes, for the control that opened it (trigger.js); a submenu's, for the menu it hangs off.
 export const MENU_CLOSED = closedKey("t3-files", "menu");
 
-/** Opens a top menu: `kind` (row, editors, folder, open-in), openOverlay's `place` ({ at?, height }), `extra` its props;
+/** Opens a top menu: `kind` (row, editors, folder, open-in, lines), openOverlay's `place` ({ at?, height }), `extra` its props;
  *  `keys`: opened by keys, its first row lit. */
 export const openMenu = (kind, place, extra, keys = false) => openPopup({ mod: extra.menuMod ?? "t3-files", width: MENU_W, ...place, props: { ...extra, files: kind } }, null, null, keys);
 
@@ -45,28 +45,32 @@ export function rowItems({ remote = false, platform, agent = null, editors = [],
   ].filter(it => it && (!deleted || it.id === "copy-path"));
 }
 
-// Into the agent's input as a paste, never sent: the clipboard carries it and gets its text back once the paste has read it.
-// A clipboard holding no text (an image) isn't touched.
 export function mention(path, address, cx) {
   if (/[\x00-\x1f\x7f]/.test(path)) {
     notify({ title: "Couldn't insert this path", body: "It contains control characters. Use Copy path instead.", level: "warning" });
     return;
   }
+  // shortcut: the host cannot read an input line, so always supply a separating space; refine when it exposes input text.
+  paste(` ${path}`, address, cx, "Insert would replace it. Copy path, then paste it yourself.");
+}
+
+// Into the agent's input as a paste, never sent: the clipboard carries it and gets its text back once the paste has read it.
+// A clipboard holding no text (an image) isn't touched: `refusal` says what to do instead. Whether it pasted.
+export function paste(text, address, cx, refusal) {
   const previous = cx.read_from_clipboard();
   if (previous === undefined) {
-    notify({ title: "The clipboard holds something that isn't text", body: "Insert would replace it. Copy path, then paste it yourself.", level: "warning" });
-    return;
+    notify({ title: "The clipboard holds something that isn't text", body: refusal, level: "warning" });
+    return false;
   }
-  if (/** @type {any} */ (globalThis).t3PastePending) return;
+  if (/** @type {any} */ (globalThis).t3PastePending) return false;
   /** @type {any} */ (globalThis).t3PastePending = true;
-  // shortcut: the host cannot read an input line, so always supply a separating space; refine when it exposes input text.
-  const text = ` ${path}`;
   try { cx.write_to_clipboard(text); run("pane.focus", { terminal: address }); run("terminal.paste"); }
   catch (e) { cx.write_to_clipboard(previous); /** @type {any} */ (globalThis).t3PastePending = false; throw e; }
   cx.spawn(async (cx) => {
     try { await cx.sleep(150); }
     finally { if (cx.read_from_clipboard() === text) cx.write_to_clipboard(previous); /** @type {any} */ (globalThis).t3PastePending = false; }
   });
+  return true;
 }
 
 /** Opens `rel` in app `name`, here only, once more checking the menu's space still shows; the app that opened is the next default. */
@@ -139,6 +143,8 @@ function items(view) {
     else if (it.id === "copy-path") cx.write_to_clipboard(p.path);
     else if (it.id === "mention" && p.agent) mention(p.path, p.agent.terminal, cx);
   } }));
+  // Review's picked diff lines: the page sends them itself, with its note.
+  if (p.files === "lines") return [{ id: "send", label: "Send to agent", icon: "terminal", disabled: !p.agent, hint: p.agent ? "" : p.reason, run: () => run("review.send") }];
   // A breadcrumb's folder, as T3's: Back to the folder above, then its entries; a folder shows in this menu, a file opens in Files.
   const up = backDir(view), name = (dir) => dir.slice(dir.lastIndexOf("/") + 1) || s.root.replace(/\/$/, "").split("/").pop() || s.root;
   const back = up === null ? [] : [{ id: "..", label: `Back to ${name(up)}`, icon: "arrow-left", into: up }];

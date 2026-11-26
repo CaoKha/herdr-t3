@@ -51,7 +51,16 @@ The optional Review page (`extras/mods/review`, for the pulls.review fork): tool
 - Settings' Lines: Wrap/Scroll is this page's own, independent of Files.
 - A binary file shows only its `binary` header and requests no rows.
 - The diff and the group summary over it are on `background`, as T3's diff on `--code-background` (nav-column.js puts the content there); the toolbar, group tabs and the navigation column stay on the panel's `chrome`. As Pierre's diff, nothing in it is ruled or outlined: file headers sit on the diff's ground, the stuck one too (the file in front isn't lit; the tree says which), hunk rows on `foreground` 5% (Pierre's separator), a line's note card on 4% with radius 8 (a critical one on `blocked` 10%), and split's sides are 1px apart on the panel's `chrome`.
+- Added and removed lines are washed in `ansi2` / `ansi1` at 5.5% (`0e`); picked lines in `accent` at 15% (`26`) in place of it, their numbers in `foreground`.
 - Sticky file headers stay opaque over scrolling code. Translucent theme checkbox colours keep their own alpha when scaled.
+
+## Send to agent
+
+- A press on a line's number (either column, unified or split) picks it; shift-press moves the far end within the same file, a shift-press in another file does nothing. A left press elsewhere in the diff, except the right 16 (the scrollbar's strip), or Escape lets go; so do changing the range and the review going. No keyboard extension: the diff has no focused line. The list's rows hold no handlers (Herdr refuses one registered in a virtual list's item renderer): the diff's own left and right presses find the line from the list's scroll offset and its items' heights, and its numbers by their column.
+- While lines are picked, a bar is pinned 12 above the diff's foot, 12 in from each side, 40 high, popover style (radius 8, `popover`, `border`, shadow): count and file name, a one-line note, then `xs` primary **Send to agent**. Without an agent it shows why and the button is off. `cmd-enter`, Enter in the note, and the `lines` menu row (right-press on a line; outside the pick it picks that line first) send too; the menu runs `review.send`.
+- Target: the tab's last active terminal when its program is an agent, else the tab's first agent terminal. A plain program is refused, not just a missing terminal: `terminal.paste` is unbracketed when the program hasn't asked for bracketed paste, and every newline would run.
+- Text (`lines.js`): per side a `path:start-end (old|new)` line (one line: `path:n`) over a fence named by the extension (`Makefile` → `makefile`, none → bare), at least one backtick longer than any run in the code; no `+`/`-`; a trailing CR dropped; a number gap starts another block. Added and context are the new file's; removed and context the old file's (a rename's old path). A pick with both is two blocks, old then new, each a contiguous run of its file, rather than one `diff` block whose numbers would fit neither file. Then the note. A leading space, no trailing newline, as Insert. Other control characters refuse the send.
+- Delivery is `menus.js` `paste`, Insert's: clipboard, `pane.focus`, `terminal.paste`, the old clipboard back after 150 ms, one paste at a time, a non-text clipboard left alone. Once pasted, the pick and note clear. A pick whose ends a refresh removed says so and clears.
 
 ## Refresh and memory
 

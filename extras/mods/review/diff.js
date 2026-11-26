@@ -1,15 +1,19 @@
 import { div, svg } from "gpui-kit";
-import { v_flex, h_flex, Scrollbar, v_virtual_list, TextView } from "gpui-base";
-import { notify } from "herdr";
+import { v_flex, h_flex, Scrollbar, v_virtual_list, TextView, Input } from "gpui-base";
+import { notify, spaces } from "herdr";
 import { review } from "./daemon.js";
 import { codeInset, FILE, noteWidth, NUMBER_W, ROW, wrapRow } from "./rows.js";
 import { canFull } from "./review-load.js";
-import { LU, mono, zoom, isLight, checkMark, diffStats, popover } from "./controls.js";
+import { PANE, LU, mono, zoom, isLight, checkMark, diffStats, popover } from "./controls.js";
+import { button as drawButton } from "./button.js";
 import { fileStatus } from "./files.js";
 import { emptyState } from "./panel-states.js";
 import { holdWidth } from "./nav-column.js";
 import { alpha } from "./color.js";
 import { ui } from "./layout-settings.js";
+import { openMenu } from "./menus.js";
+import { MENU_ROW } from "./menu-row.js";
+import { agentFor, fileRows, lineKey, pickLine, sendLines } from "./lines.js";
 
 // The runs measured for a character's width, and a wide one's: long enough that rounding the whole to a pixel doesn't matter.
 const MEASURED = "0".repeat(100), MEASURED_WIDE = "中".repeat(100);
@@ -130,8 +134,19 @@ export function diffView(view, t) {
         }
         if (moved) cx.notify();
       })
-      // A row reports only its key: where the press landed says which part of a file's header it was for.
-      .on_mouse_down("left", (event) => { view.pressX = (event.local_position?.x ?? 0) / zoom(); view.pressY = (event.local_position?.y ?? 0) / zoom(); })
+      // A row reports only its key: where the press landed says which part of a file's header it was for, and which line's
+      // numbers (lineAt). A press anywhere else in the diff lets go of the picked lines; one on the scrollbar's strip (the
+      // right 16) keeps them.
+      .on_mouse_down("left", (event, cx) => {
+        view.pressX = (event.local_position?.x ?? 0) / zoom(); view.pressY = (event.local_position?.y ?? 0) / zoom();
+        const hit = lineAt(view, view.pressX, view.pressY);
+        if (hit?.numbers) pickAt(view, hit, Boolean(event.modifiers?.shift), cx);
+        else if (view.linePick && view.pressX < view.view - 16) { view.linePick = null; cx.notify(); }
+      })
+      .on_mouse_down("right", (event, cx) => {
+        const hit = lineAt(view, (event.local_position?.x ?? 0) / zoom(), (event.local_position?.y ?? 0) / zoom());
+        if (hit) lineMenu(view, hit, cx);
+      })
       // A wide character's own: a code font seldom has CJK, and the one drawn in its place makes it about 1em, not 2 columns.
       .when(!view.charWidth || view.charFont !== mono() || view.charSize !== ui(12), el => el.child(measureRun("review-char", MEASURED, (w) => { view.panel.charWidth = w; view.panel.charFont = mono(); view.panel.charSize = ui(12); })))
       .when(!view.wideWidth || view.wideFont !== mono() || view.wideSize !== ui(12), el => el.child(measureRun("review-wide", MEASURED_WIDE, (w) => { view.panel.wideWidth = w; view.panel.wideFont = mono(); view.panel.wideSize = ui(12); })))
@@ -164,6 +179,7 @@ export function diffView(view, t) {
         .child(diffItem(view, t, { key: `f:${sticky.path}`, kind: "file", file: sticky, size: ui(FILE) }))))
       .child(Scrollbar.vertical("review-diff").absolute().inset_0())
       .children(view.hbars(t))
+      .when(Boolean(view.linePick), el => el.child(linesBar(view, t)))
       // As T3's DiffPanel with nothing to show: a diff with no files has no group either.
       .when(!items.length, el => el.child(div().absolute().inset_0().child(view.review?.files.length
         ? emptyState(t, "review-empty", `${LU}/file-diff.svg`, "No files in this group", null)
@@ -187,14 +203,15 @@ export function hbars(view, t) {
 
 // One side of a line: its line numbers (one in split, old and new in unified), its sign and its code, slid left by `shift`.
 // `wrapped`: the row's lines as rows.js's wrapRow cut them, each ROW tall, the numbers and sign beside the first.
-function drawCode(t, row, numbers, shift = 0, wrapped = null) {
+// `picked`: the row is in the lines picked. A press on it is placed by the diff's own handlers (lineAt).
+function drawCode(t, row, numbers, shift = 0, wrapped = null, picked = false) {
   if (!row) return div().flex_1().min_w(0).h_full().bg(t.canvas);
-  const tint = row.kind === "+" ? alpha(t.ansi2, "1c") : row.kind === "-" ? alpha(t.ansi1, "1c") : null;
+  const tint = picked ? alpha(t.accent, "26") : row.kind === "+" ? alpha(t.ansi2, "0e") : row.kind === "-" ? alpha(t.ansi1, "0e") : null;
   const code = (tokens) => spans(tokens).map(([text, color]) => div().flex_none().text_color(color ?? t.foreground).child(text));
   // Herdr ships JetBrains Mono; Geist Mono, a common terminal font here, draws `=>` over the space before it.
   return h_flex().flex_1().min_w(0).h_full().overflow_hidden().font_family(mono()).when(Boolean(tint), el => el.bg(tint))
     .when(!wrapped, el => el.items_center()).when(Boolean(wrapped), el => el.items_start())
-    .children(numbers.map(number => div().w(ui(NUMBER_W)).flex_none().pr(6).text_right().text_color(t.dim)
+    .children(numbers.map(number => div().w(ui(NUMBER_W)).flex_none().pr(6).text_right().text_color(picked ? t.foreground : t.dim).cursor_pointer()
       .when(Boolean(wrapped), el => el.h(ui(ROW)).flex().items_center().justify_end()).child(number === undefined ? "" : String(number))))
     .child(div().w(12).flex_none().text_color(row.kind === "+" ? t.ansi2 : row.kind === "-" ? t.ansi1 : t.dim)
       .when(Boolean(wrapped), el => el.h(ui(ROW)).flex().items_center()).child(row.kind === " " ? "" : row.kind))
@@ -255,21 +272,77 @@ function diffItem(view, t, item) {
       return div().w_full().h(item.size).pl(codeInset(view.splitShown())).pr(12).gap(8).flex().items_center().text_color(t.dim)
         .when(Boolean(item.loading), el => el.child(svg("mods/review/icons/loader-circle.svg").size(14).flex_none().text_color(t.working))).child(item.text);
     default:
-      return v_flex().w_full().h(item.size).children(item.lines.map(line => diffLine(view, t, item.kind, line)));
+      return v_flex().w_full().h(item.size).children(item.lines.map(line => diffLine(view, t, item.kind, line, item.path)));
   }
 }
 
-// One code line of a run, ROW tall; wrapped, as many ROWs as its lines (a pair, its longer side's), as buildItems counts them.
-function diffLine(view, t, kind, line) {
-  const cols = view.wrapCols?.[kind], cut = (row) => cols && row ? wrapRow(row, cols, view.wrapCols.wide) : null;
+// A row of a line as rows.js's wrapRow cuts it for `kind`'s width; null unwrapped.
+const cutRow = (view, kind, row) => { const cols = view.wrapCols?.[kind]; return cols && row ? wrapRow(row, cols, view.wrapCols.wide) : null; };
+// How many ROWs a line takes: wrapped, as many as its lines (a pair, its longer side's), as buildItems counts them.
+const lineRows = (view, kind, line) => kind === "pair"
+  ? Math.max(cutRow(view, kind, line.left)?.length ?? 1, cutRow(view, kind, line.right)?.length ?? 1) : cutRow(view, kind, line)?.length ?? 1;
+const isPicked = (view, path, row) => Boolean(row && view.linePick?.keys.has(lineKey(row))) && view.linePick.path === path;
+
+// One code line of a run, lineRows ROWs tall.
+function diffLine(view, t, kind, line, path) {
+  const height = lineRows(view, kind, line) * ui(ROW);
   if (kind === "pair") {
-    const left = cut(line.left), right = cut(line.right);
-    return h_flex().w_full().h(cols ? Math.max(left?.length ?? 1, right?.length ?? 1) * ui(ROW) : ui(ROW))
-      .child(drawCode(t, line.left, [line.left?.old], Math.min(view.shift[0], view.sideMax(0)), left))
+    return h_flex().w_full().h(height)
+      .child(drawCode(t, line.left, [line.left?.old], Math.min(view.shift[0], view.sideMax(0)), cutRow(view, kind, line.left), isPicked(view, path, line.left)))
       // A 1px gap of the panel's chrome between the halves on background, as Pierre's sides, no rule.
       .child(div().w(1).h_full().flex_none().bg(t.chrome))
-      .child(drawCode(t, line.right, [line.right?.new], Math.min(view.shift[1], view.sideMax(1)), right));
+      .child(drawCode(t, line.right, [line.right?.new], Math.min(view.shift[1], view.sideMax(1)), cutRow(view, kind, line.right), isPicked(view, path, line.right)));
   }
-  const numbers = kind === "solo" ? [line.kind === "-" ? line.old : line.new] : [line.old, line.new], lines = cut(line);
-  return h_flex().w_full().h(lines ? lines.length * ui(ROW) : ui(ROW)).child(drawCode(t, line, numbers, Math.min(view.shift[2], view.sideMax(2)), lines));
+  const numbers = kind === "solo" ? [line.kind === "-" ? line.old : line.new] : [line.old, line.new];
+  return h_flex().w_full().h(height).child(drawCode(t, line, numbers, Math.min(view.shift[2], view.sideMax(2)), cutRow(view, kind, line), isPicked(view, path, line)));
+}
+
+// The code line under a press at (x, y) in the diff, placed by the list's scroll offset and its items' sizes as diffLine
+// lays them out: its file, its row and whether the press was on its numbers; null off a line or under the stuck header.
+function lineAt(view, x, y) {
+  if (view.stuck && y < ui(FILE)) return null;
+  const items = view.itemList ?? [], sizes = view.listSizes();
+  let i = 0, top = y + (view.scroll?.offset().y ?? 0);
+  while (i < items.length && top >= sizes[i]) top -= sizes[i++];
+  const item = items[i];
+  if (!item?.lines) return null;
+  let line = null;
+  for (const each of item.lines) {
+    const height = lineRows(view, item.kind, each) * ui(ROW);
+    if (top < height) { line = each; break; }
+    top -= height;
+  }
+  if (!line) return null;
+  if (item.kind !== "pair") return { path: item.path, row: line, numbers: x < (item.kind === "solo" ? 1 : 2) * ui(NUMBER_W) };
+  // Split: two halves with a 1px gap between.
+  const half = (view.view - 1) / 2, row = x < half ? line.left : x >= half + 1 ? line.right : null;
+  return row ? { path: item.path, row, numbers: (x < half ? x : x - half - 1) < ui(NUMBER_W) } : null;
+}
+
+// A press on a line's number picks it, shift-press extends the pick in its file.
+function pickAt(view, { path, row }, shift, cx) {
+  const file = view.review?.files.find(f => f.path === path);
+  view.linePick = pickLine(view.linePick, path, fileRows(file, view.full.get(path)), row, shift);
+  cx.notify();
+}
+
+// A right-press on a line offers Send to agent: on the pick when the line is in it, else on the line alone.
+function lineMenu(view, hit, cx) {
+  cx.stop_propagation();
+  if (!isPicked(view, hit.path, hit.row)) pickAt(view, hit, false, cx);
+  const space = spaces().find(s => s.id === view.space), target = agentFor(view.space);
+  openMenu("lines", { height: 8 + ui(MENU_ROW) }, { menuMod: PANE, source: { space: view.space, tab: space?.tabs.find(tab => tab.active)?.id },
+    agent: target.terminal ? { terminal: target.terminal } : null, reason: target.reason });
+}
+
+// The picked lines' bar, pinned over the diff's foot: what they are, a note, and Send to agent (cmd-enter, or Enter in the note).
+function linesBar(view, t) {
+  const target = agentFor(view.space), { path } = view.linePick, n = view.linePick.keys.size;
+  return h_flex().id("review-lines-bar").absolute().bottom(12).left(12).right(12).h(40).px(8).gap(8).items_center()
+    .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg()
+    .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_mouse_down("right", (_e, cx) => cx.stop_propagation())
+    .child(div().flex_none().max_w(240).truncate().text_color(t.dim).child(`${n} ${n === 1 ? "line" : "lines"} · ${path.slice(path.lastIndexOf("/") + 1)}`))
+    .child(Input.new(view.lineNote).flex_1().min_w(0).h(24).text_size(ui(12)).text_color(t.foreground))
+    .when(!target.terminal, el => el.child(div().flex_none().text_color(t.dim).child(target.reason)))
+    .child(drawButton(t, "review-lines-send", { variant: "primary", size: "xs", text: "Send to agent", disabled: !target.terminal, act: (cx) => sendLines(view, cx) }));
 }

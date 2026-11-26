@@ -2,6 +2,7 @@
 
 ## 2026-11-26
 
+- Review can send diff lines to the tab's agent: click a line's number, shift-click another in the same file, add a note if you like and press **Send to agent** (also `cmd-enter`, or a line's right-click menu). The agent's input gets the file and line numbers over a fenced copy of the code and your note, pasted, never sent. Lines added and removed in Review's diff are tinted half as strongly as before.
 - A Markdown table of screenshots in Pull requests and Issues shows as a table: its columns side by side with thin lines between them, the header in bold, each picture shrunk to its cell (click one to open it). It used to break apart into stray `|` text with the pictures stacked between. A table without pictures shows as before.
 - **Text size** in the layout's settings (new **Text** section): the panels, lists, menus, tabs and code views draw their text at the size you pick (12 to 18 px), and their rows grow with it, while the terminals keep their own font size. **Default** follows Herdr's interface size (13). The window's bars keep their height.
 - Code blocks in Pull requests and Issues take the mouse wheel while they can still scroll, so the page scrolls only once a block reaches its end, and a `diff` or `patch` block's text can be selected and copied. A diff block keeps its green and red washes behind the changed lines; its text is no longer coloured.

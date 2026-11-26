@@ -5,6 +5,7 @@ import { scopeKey } from "./scope-header.js";
 import { treeKey, revealRow } from "./file-tree.js";
 import { TREE, toggleDir, pickGroup } from "./files.js";
 import { NAV_NARROW } from "./nav-column.js";
+import { sendLines } from "./lines.js";
 
 export function reviewKey(view, e, cx) {
   // Typing a model name isn't a shortcut; Escape closes the panel. An open submenu has the keyboard.
@@ -53,7 +54,8 @@ export function reviewKey(view, e, cx) {
     return;
   }
   const actions = {
-    escape: () => view.closePopup(cx),
+    escape: () => { if (!view.popup && view.linePick) { view.linePick = null; cx.notify(); } else view.closePopup(cx); },
+    "cmd-enter": () => { if (view.linePick) sendLines(view, cx); },
     j: () => view.step(1, cx), k: () => view.step(-1, cx),
     r: () => { const f = view.currentFile(); if (f) view.setReviewed(f, !f.reviewed, cx); },
     f: () => { const f = view.currentFile(); if (f) view.toggleFull(f, cx); },

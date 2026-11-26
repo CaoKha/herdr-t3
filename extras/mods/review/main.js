@@ -27,6 +27,7 @@ import { reviewKey } from "./keys.js";
 import { wrapLines } from "./store.js";
 import { initMenu, closeMenu, menuView, closeMenus } from "./menus.js";
 import { installedTargets } from "./open-in.js";
+import { sendLines } from "./lines.js";
 import { textSize, ui } from "./layout-settings.js";
 
 // A request this young when its space's review starts is the click that opened the panel; an older one was already shown.
@@ -65,6 +66,9 @@ export default class ReviewPanel extends View {
     this.refSearch = InputState.new({ placeholder: "Search refs" });
     this.refSearch.on("change", (_e, cx) => { const s = this.shown(); if (!s) return; s.baseAt = 0; s.scrollTop = { ...s.scrollTop, "base-list": 0 }; cx.notify(); });
     this.refSearch.on("submit", (_e, cx) => { const s = this.shown(), item = s && baseList(s)[s.baseAt]; if (item) pickBase(s, item.value, cx); });
+    // The picked lines' note; Enter in it sends them.
+    this.lineNote = InputState.new({ placeholder: "Add a note" });
+    this.lineNote.on("submit", (_e, cx) => { const s = this.shown(); if (s?.linePick) sendLines(s, cx); });
     // The colors the rows on screen are in.
     this.colorsKey = JSON.stringify(colors(theme()));
     this.handle = cx.focus_handle();
@@ -79,6 +83,7 @@ export default class ReviewPanel extends View {
     cx.spawn(async (cx) => {
       for (;;) {
         const [name, page] = (await nextCommand()).split(":"), s = this.shown();
+        if (name === "send" && s?.linePick) sendLines(s, cx);
         if (name === "close" && !closeMenus(PANE)) {
           if (s?.popup) s.closePopup(cx);
           else if (page !== "menu") closeSurface();
@@ -178,6 +183,8 @@ export default class ReviewPanel extends View {
     this.review = null; this.error = null; this.version = 0; this.sideWidth = [0, 0, 0]; this.shift = [0, 0, 0];
     this.startingUntil = 0; this.loading = null; this.loadId = 0; this.hiddenId = 0; this.marks = 0; this.marking = 0;
     this.flipped = new Set(); this.focusPath = null; this.pickedAt = 0;
+    // The diff lines picked to send to the agent (lines.js).
+    this.linePick = null;
     this.collapsed = new Set(); this.full = new Map(); this.fullReads = new Map(); this.parts = new Map(); this.seen = new Set();
     this.scroll = null; this.barsOn = false; this.barsRun = 0;
   }
@@ -209,14 +216,14 @@ export default class ReviewPanel extends View {
     releaseScope(this);
     // The old page stays on screen, dimmed and inert, until the new one's read replaces it: apply() then resets what belonged to it.
     this.fullReads.clear();
-    this.page = page; this.switching = Boolean(this.review); this.error = null; this.analyzeError = null; this.startingUntil = 0; this.awayAnalysis = null;
+    this.page = page; this.linePick = null; this.switching = Boolean(this.review); this.error = null; this.analyzeError = null; this.startingUntil = 0; this.awayAnalysis = null;
     this.wasRunning = false; this.news = null;
     this.version++;
     this.load(cx);
   }
 
   // No review shown, or none yet: what belonged to the last one goes with it.
-  forget() { this.restoreTo = null; this.review = null; this.switching = false; this.groupKey = null; this.current = null; this.full.clear(); this.fullReads.clear(); this.parts.clear(); this.shift = [0, 0, 0]; }
+  forget() { this.restoreTo = null; this.review = null; this.linePick = null; this.switching = false; this.groupKey = null; this.current = null; this.full.clear(); this.fullReads.clear(); this.parts.clear(); this.shift = [0, 0, 0]; }
 
   surfaceAlive() {
     return !panelState().owns || surfaceBorn("review", this.space) === this.surfaceBorn;
