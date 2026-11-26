@@ -1,0 +1,4 @@
+The icons in icons/ are from Lucide (https://lucide.dev), ISC License, Copyright (c) Lucide Contributors, except
+icons/pulls-review.svg, pulls.review's mark.
+model.js's stackOf and gh.js's way of reading GitHub through gh are adapted from Branch PR in munza/herdr-mods
+(https://github.com/munza/herdr-mods), Apache-2.0, Copyright 2026 Tawsif Aqib.

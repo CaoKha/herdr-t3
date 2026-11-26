@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md) · 中文
 
+## 2026-11-26
+
+- space 面板新增 **Pull requests** 页（`t3-pulls`，`cmd-shift-u`，或 + → Pull requests）：**Branch** 列出标签所在分支的 pull request（open、closed 或 merged；fork 里同名分支的不算），只有一个时直接打开详情；**Repo** 列出仓库最近更新的 100 个 open pull request，可按标题、编号或分支搜索。每行显示状态、标题、编号、`head → base`、checks 标记和最近更新时间。详情先给出作者和分支，再用一行给出 Checks、Reviews 和合并状态，然后是 Stack（有堆叠时）、Checks（点击打开该项）、Reviewers 和 Description。**Review** 把 pull request 的 head 和 base fetch 进标签所在的仓库，在 Review 里打开 GitHub 所显示的改动（需 Review 扩展，仅本机 space）；旁边是 **Open in pulls.review** 和 **Open on GitHub**。只在这一页显示时经你的 `gh` 登录读取：显示时立即读，之后每分钟一次；`gh` 未安装或未登录时说明要运行什么。只读。它取代 Branch PR 扩展，`extras/` 里已移除。
+
 ## 2026-11-23
 
 - 移除窗格标题栏（`t3-pane`）右端的状态标记（`working`／`blocked`／`done` 以及 Inbox 下的 `Settled` 勾、`Snoozed` 闹钟与倒计时定时器），不再与侧栏和标签栏重复显示状态。子 agent 按钮保留，并在任意后代工作中时直接显示工作标记。

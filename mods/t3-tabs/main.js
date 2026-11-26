@@ -121,6 +121,8 @@ export default class Tabs extends View {
         else if (command === "settle") await this.settle(cx);
         // The space panel (docs/adr/0017), keyed as VS Code's: a surface opens on it, or puts away the panel showing it; `panel` keeps it as it was.
         else if (command === "files") togglePanel("files");
+        else if (command === "pulls") togglePanel("pulls");
+        else if (command === "issues") togglePanel("issues");
         else if (command === "review") {
           const p = panelState(), sp = spaces().find(s => s.active);
           if (!p.pages.includes("review")) continue;

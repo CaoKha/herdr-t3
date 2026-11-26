@@ -5,6 +5,8 @@
     "cmd-shift-b": "t3-tabs.details",
     "cmd-shift-e": "t3-tabs.files",
     "cmd-shift-g": "t3-tabs.review",
+    "cmd-shift-u": "t3-tabs.pulls",
+    "cmd-shift-i": "t3-tabs.issues",
     "cmd-alt-b": "t3-tabs.panel",
     "cmd-shift-s": "t3-tabs.settle",
     "cmd-shift-z": "t3-tabs.undo",
@@ -165,6 +167,13 @@
     "ctrl-alt-shift-x": "review.close",
     "cmd-shift-w": "review.close:menu",
     "ctrl-alt-x": "review.close:menu"
+  },
+  "mod:t3-pulls": {
+    "cmd-t": "t3-chrome.surface-menu",
+    "cmd-w": "t3-pulls.close",
+    "ctrl-alt-shift-x": "t3-pulls.close",
+    "cmd-shift-w": "t3-pulls.close:menu",
+    "ctrl-alt-x": "t3-pulls.close:menu"
   },
   "mod:asciicn-wallpaper": {
     "cmd-w": "overlay.close",

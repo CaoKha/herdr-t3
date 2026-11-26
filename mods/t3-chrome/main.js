@@ -23,7 +23,7 @@ import { alpha } from "./color.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file: their names and icons. Review wears pulls.review's own mark,
 // as the Review bar does: a review, not a git command. In its colors, so an image.
-const PAGES = { files: ["Files", "folder-tree"], review: ["Review", "pulls-review", true] };
+const PAGES = { files: ["Files", "folder-tree"], review: ["Review", "pulls-review", true], pulls: ["Pull requests", "git-pull-request"], issues: ["Issues", "circle-dot"] };
 // The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md「菜单行」).
 const MENU_W = 220, menuHeight = (rows) => rows * MENU_ROW + 8;
 const zoomOf = () => Number(settings()?.zoom) || 1;
@@ -217,7 +217,7 @@ export default class WorkspaceChrome extends View {
   // + 's menu: under its press, else (the panel's cmd-t) under where + stands: the head's mod ends its padding in from the
   // window's right, + after the tabs as the strip has them scrolled. A popup's `at` is in zoomed px.
   openSurfaceMenu(press) {
-    const z = zoomOf(), rows = panelState().pages.includes("review") ? 2 : 1;
+    const pages = panelState().pages, z = zoomOf(), rows = 1 + ["review", "pulls", "issues"].filter(page => pages.includes(page)).length;
     let at = hang(press, 0, { align: "start", gap: 6 }).at;
     if (!at && this.headW) {
       const root = layout(), high = layoutNode(root, "panel-head")?.size?.px ?? 40;
@@ -295,6 +295,8 @@ export default class WorkspaceChrome extends View {
     ] : [
       { label: "Files", key: "f", icon: "mods/t3-chrome/icons/folder-tree.svg", act: () => showPage("files") },
       ...(s.pages.includes("review") ? [{ label: "Review", key: "r", icon: image("mods/t3-chrome/icons/pulls-review.svg").size(16), disabled: Boolean(this.reviewReason), reason: this.reviewReason, act: () => showPage("review") }] : []),
+      ...(s.pages.includes("pulls") ? [{ label: "Pull requests", key: "p", icon: "mods/t3-chrome/icons/git-pull-request.svg", act: () => showPage("pulls") }] : []),
+      ...(s.pages.includes("issues") ? [{ label: "Issues", key: "i", icon: "mods/t3-chrome/icons/circle-dot.svg", act: () => showPage("issues") }] : []),
     ];
     const choose = (i, cx) => {
       // The popup's tab can disappear or be reopened before a repaint; its path isn't its instance.

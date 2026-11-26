@@ -116,12 +116,15 @@ prepare_replacement() {
 
 # Keep the theme, valid stack selections, focus ring color and blocks for installed extras.
 # The Review bar keeps its props and goes right before tabs-end. Its companion page goes in panel-body.
+# Branch Issue (extras/branch-issue), installed on its own, gets the Issues page in panel-body.
 review_extra=false
 theme_export=false
+branch_issue=false
 if [ -d "$app/mods/pulls-review" ]; then review_extra=true; fi
 if [ -d "$app/mods/t3-theme-export" ]; then theme_export=true; fi
+if [ -d "$app/mods/branch-issue" ]; then branch_issue=true; fi
 require_object "$src/layouts/herdr-t3.json" "$src/layouts/herdr-t3.json"
-jq -e --slurpfile old "$layout_input" --argjson review_extra "$review_extra" --argjson theme_export "$theme_export" '
+jq -e --slurpfile old "$layout_input" --argjson review_extra "$review_extra" --argjson theme_export "$theme_export" --argjson branch_issue "$branch_issue" '
     $old[0] as $old
   | [$old | .. | objects | .focus? | objects | .color][0] as $c
   | ([$old | .. | objects | select((.id | strings) and .active) | {(.id): .active}] | add // {}) as $active
@@ -132,6 +135,7 @@ jq -e --slurpfile old "$layout_input" --argjson review_extra "$review_extra" --a
   | (if $review_extra and $review then (.. | objects | select(.id? == "tabs-row") | .children) |= ((map(.id) | index("tabs-end")) as $i | .[0:$i] + [$review] + .[$i:]) else . end)
   | (if $theme_export and $export then (.. | objects | select(.id? == "work") | .children) |= (. + [$export]) else . end)
   | (if $review_extra then (.. | objects | select(.id? == "panel-body") | .children) |= (. + [{ id: "review", type: "block", content: { mod: "review" } }]) else . end)
+  | (if $branch_issue then (.. | objects | select(.id? == "panel-body") | .children) |= (. + [{ id: "issues", type: "block", content: { mod: "branch-issue" } }]) else . end)
   | (.. | objects | select((.id | strings) and .type == "stack")) |= (
       $active[.id] as $choice | if $choice and any(.children[]?; .id == $choice) then .active = $choice else . end
     )' "$src/layouts/herdr-t3.json" > "$staging/layout.new"

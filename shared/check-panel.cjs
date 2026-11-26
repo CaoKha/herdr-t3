@@ -111,6 +111,22 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   p.togglePanel('review'); assert.equal(ui.open, false);
   p.showPage('review'); p.closeSurface(); assert.equal(ui.open, false);
   assert.equal(JSON.stringify(saved['t3.panels'].b), before);
+  // Pull requests (t3-pulls) is a page of its own slot, as Review: its tab counts only where the layout has the slot.
+  ui.space = 'home'; ui.open = false; ui.slots = ['files', 'panel-empty'];
+  saved['t3.panels'].home = { open: false, wide: false, active: 'pulls', tabs: [{ id: 'files', born: 1 }, { id: 'pulls', born: 2 }] };
+  assert.equal(tabs(), '*files');
+  assert.equal(p.showPage('pulls'), false);
+  ui.slots.push('pulls');
+  assert.equal(tabs(), 'files *pulls');
+  p.togglePanel(); assert.deepEqual([ui.open, ui.page], [true, 'pulls']);
+  p.closeSurface('pulls'); assert.deepEqual([ui.page, tabs()], ['files', '*files']);
+  p.showPage('pulls'); assert.deepEqual([ui.page, tabs()], ['pulls', 'files *pulls']);
+  p.togglePanel('pulls'); assert.equal(ui.open, false);
+  // Issues (Branch Issue) likewise.
+  assert.equal(p.showPage('issues'), false);
+  ui.slots.push('issues');
+  p.showPage('issues'); assert.deepEqual([ui.open, ui.page, tabs()], [true, 'issues', 'files pulls *issues']);
+  p.togglePanel('issues'); assert.equal(ui.open, false);
   // newBorn shares globalThis.t3LastBorn across mod copies, stays strictly > Date.now(), previous t3LastBorn, and existing tab borns.
   {
     const sharedSaved = {}, frozenNow = 10000;

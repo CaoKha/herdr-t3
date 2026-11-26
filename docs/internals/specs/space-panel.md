@@ -1,6 +1,6 @@
 # Space panel
 
-The right-hand space panel's head (`t3-chrome` `part:"panel"`), its surface tabs, empty page and tab lifecycle. Files and Review pages have their own specs, [files](files.md) and [review](review.md). Decisions: [ADR 0017](../../adr/0017-space-panel-surfaces.md); stored state: [storage](../storage.md) (`t3.panels`). Shared sizes are in [t3-tokens](../t3-tokens.md).
+The right-hand space panel's head (`t3-chrome` `part:"panel"`), its surface tabs, empty page and tab lifecycle. Files, Review and Pull requests pages have their own specs, [files](files.md), [review](review.md) and [pulls](pulls.md). Decisions: [ADR 0017](../../adr/0017-space-panel-surfaces.md); stored state: [storage](../storage.md) (`t3.panels`). Shared sizes are in [t3-tokens](../t3-tokens.md).
 
 Sources: T3 `09a54f01` `RightPanelTabs.tsx`, `ui/panel-tab-close-button.tsx`, `RightPanelEmptyState`.
 
@@ -23,8 +23,8 @@ On a layout jump to a known space, restore the destination's panel slot, visibil
 ## Surface menu
 
 - `+`'s menu: left-aligned, 6 below; opened by keyboard, it computes the same position from the head's width and scroll. 220 wide, rows × 28 + 8 high; rows from t3-tokens「菜单行」.
-- Rows: Files (F), Review (R) when installed. Letters pick, arrows skip greyed rows, Enter runs; letters with modifiers, or with an input focused, pass through. Review greyed with its reason when unavailable; no "checking" flash.
-- In Files or Review, `cmd-t` opens this menu under `+` and `cmd-w` closes the active tab, never the terminal: both through `keys.json`'s `mod:t3-files` / `mod:review` contexts (`t3-chrome.surface-menu`, `t3-files.close`, `review.close`), not `on_key_down`.
+- Rows: Files (F), Review (R) when installed, Pull requests (P), Issues (I) when Branch Issue is installed. Letters pick, arrows skip greyed rows, Enter runs; letters with modifiers, or with an input focused, pass through. Review greyed with its reason when unavailable; no "checking" flash.
+- In Files, Review or Pull requests, `cmd-t` opens this menu under `+` and `cmd-w` closes the active tab, never the terminal: both through `keys.json`'s `mod:t3-files` / `mod:review` / `mod:t3-pulls` contexts (`t3-chrome.surface-menu`, `t3-files.close`, `review.close`, `t3-pulls.close`), not `on_key_down`.
 
 ## Empty page
 
@@ -34,7 +34,7 @@ On a layout jump to a known space, restore the destination's panel slot, visibil
 
 ## Tabs and their lifecycle
 
-- No fixed pages: one tab per file, at most one generic Files and one Review.
+- No fixed pages: one tab per file, at most one generic Files, one Review and one Pull requests.
 - `+` Files adds or selects the full-width tree. Opening a file replaces generic Files, or selects the file's existing tab.
 - All file tabs share one tree. Selecting a tab bumps its `reveal`: Files clears the search and reveals the file. Opening a file from the tree or search results isn't a selection and keeps the search.
 - Close with `×` or a middle click. Closing the active tab picks the right neighbour, else the left; closing another keeps the active one. Closing the last hides the panel; reopening shows the empty page.

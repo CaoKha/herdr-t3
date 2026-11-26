@@ -1,5 +1,5 @@
 // A space panel's surfaces (docs/adr/0017, 0018), as T3 Code's rightPanelStore keeps them; pure, panel.js stores the result.
-// A tab's `id` is "files" (the generic Files), "review" or `file:<path>` (with `folder`, a folder's tree from there).
+// A tab's `id` is "files" (the generic Files), "review", "pulls" (Pull requests), "issues" or `file:<path>` (with `folder`, a folder's tree from there).
 // `born` names one instance, so a mod tells a re-added tab from the one it read for; `reveal` counts picks, as T3's revealRequestId.
 
 const surfaceFile = (path, born, extra = {}) => ({ id: `file:${path}`, path, born, reveal: 0, ...extra });
@@ -10,7 +10,7 @@ export function surfaceActivate(s, id) {
   return { tabs: s.tabs.map(t => t.id === id ? { ...t, reveal: (t.reveal ?? 0) + 1 } : t), active: id };
 }
 
-/** `+` or a surface's key: "files" or "review", picked if it's there, else added at the end. */
+/** `+` or a surface's key: "files", "review", "pulls" or "issues", picked if it's there, else added at the end. */
 export function surfaceAdd(s, id, born) {
   return s.tabs.some(t => t.id === id) ? surfaceActivate(s, id) : { tabs: [...s.tabs, { id, born, reveal: 0 }], active: id };
 }

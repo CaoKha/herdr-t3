@@ -18,9 +18,13 @@ function newBorn(space = activeSpaceId()) {
   return (globalThis.t3LastBorn = Math.max(Date.now(), globalThis.t3LastBorn, maxTab) + 1);
 }
 
-/** `space`'s tabs and the active one; Review's only where the extra is installed. */
+// Surfaces that are a whole page of their own slot, there only where the layout has that slot: Review (the extra),
+// Pull requests (t3-pulls) and Issues (Branch Issue).
+const PAGE_SLOTS = ["review", "pulls", "issues"];
+
+/** `space`'s tabs and the active one; a page surface's only where its slot is installed. */
 export function surfacesFor(space = activeSpaceId(), slots = panelSlots()) {
-  const kept = shared(KEY.panels)?.[space], tabs = (kept?.tabs ?? []).filter(t => t.id !== "review" || slots.includes("review"));
+  const kept = shared(KEY.panels)?.[space], tabs = (kept?.tabs ?? []).filter(t => !PAGE_SLOTS.includes(t.id) || slots.includes(t.id));
   return { tabs, active: tabs.some(t => t.id === kept?.active) ? kept.active : tabs[0]?.id ?? null };
 }
 
@@ -61,7 +65,7 @@ function sizeWindowEnd(open, space, force = false) {
   if (force || end.size?.px !== px) run("layout.resize", { id: "window-end", px });
 }
 
-const slot = (active) => active === "review" ? "review" : active ? "files" : "panel-empty";
+const slot = (active) => PAGE_SLOTS.includes(active) ? active : active ? "files" : "panel-empty";
 
 // The active space's record, only its fields: what an older build kept beside them goes at the first write.
 function save(want) {
@@ -87,7 +91,7 @@ export function activateSurface(id, keepDetails = false) {
   return true;
 }
 
-/** "files" or "review" added, or picked if it's there. In Herdr's own layout, its page shown. */
+/** "files" or a page surface ("review", "pulls", "issues") added, or picked if it's there. In Herdr's own layout, its page shown. */
 export function showPage(page, keepDetails = false) {
   const s = panelState();
   if (!s.pages.includes(page)) return false;

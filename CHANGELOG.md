@@ -2,6 +2,10 @@
 
 English · [中文](CHANGELOG.zh-CN.md)
 
+## 2026-11-26
+
+- New **Pull requests** page in the space panel (`t3-pulls`, `cmd-shift-u`, or + → Pull requests): **Branch** lists the pull requests of the branch the tab works on (open, closed or merged; a fork's same-named branch left out) and opens the detail at once when there is only one; **Repo** lists the repository's 100 most recently updated open pull requests, with a search by title, number or branch. Rows show state, title, number, `head → base`, the checks' mark and when it was last updated. A pull request's detail shows author and branches, Checks, Reviews and Merge state in one line, then its Stack (when stacked), Checks (click opens one), Reviewers and Description. **Review** fetches the pull request's head and base into the tab's repository and opens Review on what GitHub shows (Review extra, local spaces only); **Open in pulls.review** and **Open on GitHub** sit beside it. It reads through your `gh` login only while the page shows, at once and then every minute, and says what to run when `gh` is missing or logged out. Read only. It replaces the Branch PR extra, which is gone from `extras/`.
+
 ## 2026-11-23
 
 - Removed the right-end status mark (`working`, `blocked`, `done`, and Inbox `Settled` / `Snoozed` marks plus their snooze countdown timer) from pane headers (`t3-pane`); status stays in the sidebar and tabs. The sub-agent button remains and shows the working mark whenever any descendant is working.

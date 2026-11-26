@@ -244,6 +244,7 @@ root: row, background=canvas, terminal_menu=t3-menu
    ├─ panel-body: stack, active=panel-empty
    │  ├─ files: t3-files
    │  ├─ panel-empty: t3-chrome {part:"surface-empty"}
+   │  ├─ pulls: t3-pulls
    │  └─ review: review [可选]
 floating root: tabs-keys:t3-tabs {part:"keys"}, bottom/end, 不画内容
 ```
