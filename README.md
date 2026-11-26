@@ -38,7 +38,7 @@ Each in detail: [the guide](docs/user/guide.md).
 
 Requires Herdr 0.1.16 or newer.
 
-Ask your Herdr agent to add `herdr.dev/layouts/JinJieBeWater/herdr-t3`. By hand: copy `layouts/herdr-t3.json`, `layouts/herdr-t3.svg` and every `mods/t3-*` into `~/.config/herdr-app/`, and merge `keys.json` into yours.
+Ask your Herdr agent to add `herdr.dev/layouts/JinJieBeWater/herdr-t3`. By hand: copy `layouts/herdr-t3.json`, `layouts/herdr-t3.svg` and every `mods/t3-*` into `~/.config/herdr-app/`, and merge `keys.json` (`keys.linux.json` on Linux) into yours.
 
 Only want the Inbox? It is also published alone: [herdr-t3-inbox](https://github.com/JinJieBeWater/herdr-t3-inbox).
 
@@ -68,7 +68,7 @@ Dragging, sweeping across rows, pins and the rest: [Everyday use](docs/user/guid
 | `cmd-shift-i` | Open Issues, or close the panel showing it |
 | `cmd-t` | New tab here; at Home, pick the space first |
 
-All of them: [Keys](docs/user/guide.md#keys).
+On Linux `cmd` is the Super key, which the desktop keeps, so the layout binds `ctrl-alt` there instead: `ctrl-alt-shift-b` for Details, `ctrl-alt-p` for Go to, and so on. All of them: [Keys](docs/user/guide.md#keys).
 
 ## Update
 

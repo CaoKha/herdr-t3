@@ -81,6 +81,12 @@ for f in $(grep -rlE --include='*.js' --exclude=gpui-kit.d.ts 'openOverlay|mod\.
   done
 done
 
+# keys.linux.json is keys.json for Linux, where cmd is Super: each section binds the same commands, none on cmd.
+jq -e -n --slurpfile mac keys.json --slurpfile linux keys.linux.json '
+  def actions: map_values([.[]] | unique); ($mac[0] | actions) == ($linux[0] | actions)
+  and ([$linux[0][] | keys[] | select(startswith("cmd-"))] | length == 0)' >/dev/null \
+  || { echo "FAIL keys.linux.json doesn't bind keys.json's commands in each section, or binds a cmd key"; fail=1; }
+
 # render-guard.cjs: what Herdr refuses while a view draws (cx.notify and the rest) fails the check, as it would in the app.
 for f in $(find shared mods extras/mods -name 'check*.cjs'); do
   out=$(cd "$app" && node -r "$src/scripts/render-guard.cjs" "$src/$f" 2>&1) || { echo "FAIL $f"; echo "$out" | tail -20; fail=1; }

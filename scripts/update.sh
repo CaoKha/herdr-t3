@@ -6,6 +6,9 @@ src=$(cd "$(dirname "$0")/.." && pwd)
 app=${HERDR_APP_HOME:-$HOME/.config/herdr-app}
 layout="$app/layouts/herdr-t3.json"
 keys="$app/keys.json"
+# Off macOS cmd is Super, which desktops keep for themselves: Linux gets the same bindings on ctrl-alt.
+src_keys="$src/keys.json"
+[ "${HERDR_T3_PLATFORM:-$(uname -s)}" != Linux ] || src_keys="$src/keys.linux.json"
 
 # The checks run from the repo: they aren't sent, and -s lets --delete take an older update's copies.
 copy_mod() {
@@ -66,16 +69,16 @@ layout_input="$staging/layout.old"
 keys_input="$staging/keys.old"
 [ -f "$layout_input" ] || layout_input="$staging/empty.json"
 [ -f "$keys_input" ] || keys_input="$staging/empty.json"
-require_object "$src/keys.json" "$src/keys.json"
+require_object "$src_keys" "$src_keys"
 
 # The repo's bindings win in sections it owns. Keep the user's other bindings and report the differences.
-if ! jq -e --slurpfile new "$src/keys.json" '
+if ! jq -e --slurpfile new "$src_keys" '
   reduce ($new[0] | to_entries[]) as $e (.; .[$e.key] = ((.[$e.key] // {}) + $e.value))
 ' "$keys_input" > "$staging/keys.new"; then
   printf '%s\n' "cannot merge bindings, nothing changed: $keys" >&2
   exit 1
 fi
-key_changes=$(jq -r --slurpfile new "$src/keys.json" '
+key_changes=$(jq -r --slurpfile new "$src_keys" '
   . as $old | $new[0] | to_entries[] | .key as $s | .value as $n | ($old[$s] // {}) | to_entries[]
   | .key as $k | .value as $v
   | if $n | has($k) | not then "kept, not in the repo: \($k) = \($v) in \($s)"
