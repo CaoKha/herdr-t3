@@ -14,7 +14,8 @@ const read = (file) => fs.readFileSync(path.join(__dirname, file), "utf8");
 const m = (() => {
   const c = vm.createContext({});
   vm.runInContext(`${kit.strip(read("model.js"))}\nglobalThis.m = { repositoryFromRemote, parseDiscovery, ownBranchPRs, ghProblem, prState, checkKind, rollupKind, checksOf,
-    reviewersOf, prStats, mergeState, stackOf, matches, timeAgo, reviewProblem, fetchArgs, prRefs, comparePage, CONFIG_KEYS };`, c);
+    reviewersOf, prStats, mergeState, stackOf, matches, timeAgo, reviewProblem, fetchArgs, prRefs, comparePage, CONFIG_KEYS, conversationEntries, threadPlace,
+    hunkTail, threadShut, sectionOpen, sectionSummary, writeError };`, c);
   return c.m;
 })();
 
@@ -108,12 +109,14 @@ const CONFIG = "remote.origin.url git@github.com:me/app.git\nremote.upstream.url
 
 // The page in a fake `herdr`: one or more spaces, the panel showing `page`, its slots. `w.gh(args)` answers gh as gh would;
 // `w.hold(cmd, args)` keeps an answer back in `w.held` until released.
-function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls", "review"], page = "pulls", open = true } = {}) {
+function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls", "review"], page = "pulls", open = true, store = new Map() } = {}) {
   const w = { spaces, panes, ran: [], commands: [], held: [], open, page, now: Date.parse("2026-01-01T01:00:00Z"), hold: null, fetched: null,
     lists: { branch: [card(7, "feat", "main", { headRepository: { nameWithOwner: "me/app" } }), card(9, "feat", "main", { headRepository: { nameWithOwner: "stranger/app" } })],
       open: [card(7, "feat", "main"), card(8, "feat-2", "feat"), card(5, "other", "main")], total: 3 },
     detail: (n) => ({ ...card(n, n === 8 ? "feat-2" : "feat", n === 8 ? "feat" : "main"), body: "Fixes **this**.", headRefOid: `h${n}`, baseRefOid: "b0", mergeable: "MERGEABLE",
-      mergeStateStatus: "CLEAN", reviewDecision: null, latestOpinionatedReviews: { nodes: [] }, ...rollup([]) }) };
+      mergeStateStatus: "CLEAN", reviewDecision: null, latestOpinionatedReviews: { nodes: [] }, ...rollup([]) }),
+    // What's been said on every PR, paged `pageSize` at a time and a thread's replies `replyPage` at a time, as GitHub would.
+    talk: TALK(), pageSize: 100, replyPage: 100, boxes: [], drawing: false };
   const sh = { "t3.panels": { s1: { tabs: [{ id: "pulls", born: 1 }], active: "pulls", open: true }, s2: { tabs: [{ id: "pulls", born: 2 }], active: "pulls", open: true } } };
   const answer = (cmd, args, o) => {
     const line = args.join(" ");
@@ -125,6 +128,23 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
     if (cmd === "gh") {
       if (w.gh) return w.gh(args);
       const query = args.find((a) => a.startsWith("query=")) ?? "", number = Number(args.find((a) => a.startsWith("number="))?.slice(7));
+      const field = (k) => args.find((a) => a.startsWith(`${k}=`))?.slice(k.length + 1);
+      const ok = (data) => ({ code: 0, stdout: JSON.stringify({ data }) });
+      if (args[1]?.startsWith("repos/") || query.startsWith("query=mutation")) {
+        return w.writeFails ? { code: 1, stdout: "", stderr: "HTTP 502: Bad Gateway\n" } : { code: 0, stdout: "{}" };
+      }
+      const page = (all, cursor, size) => {
+        const from = Number(cursor ?? 0), next = from + size < all.length;
+        return { pageInfo: { hasNextPage: next, endCursor: next ? String(from + size) : null }, nodes: all.slice(from, from + size) };
+      };
+      if (query.includes("node(id:")) return ok({ node: { comments: page(w.talk.threads.find((t) => t.id === field("id")).comments, field("cursor"), w.replyPage) } });
+      if (query.includes("reviewThreads(") || query.includes("after: $comments") || query.includes("after: $reviews")) {
+        const pr = {};
+        if (query.includes("after: $comments")) pr.comments = page(w.talk.comments, field("comments"), w.pageSize);
+        if (query.includes("after: $reviews")) pr.reviews = page(w.talk.reviews, field("reviews"), w.pageSize);
+        if (query.includes("after: $threads")) pr.reviewThreads = page(w.talk.threads.map((t) => ({ ...t, comments: page(t.comments, 0, w.replyPage) })), field("threads"), w.pageSize);
+        return ok({ repository: { pullRequest: pr } });
+      }
       if (query.includes("open: pullRequests")) return { code: 0, stdout: JSON.stringify({ data: { repository: { ...(query.includes("branch:") ? { branch: { nodes: w.lists.branch } } : {}), open: { totalCount: w.lists.total, nodes: w.lists.open } } } }) };
       if (query.includes("reviewRequests")) return { code: 0, stdout: JSON.stringify({ data: { repository: { pullRequest: { reviewRequests: { nodes: [{ requestedReviewer: { login: "bo" } }] } } } } }) };
       return { code: 0, stdout: JSON.stringify({ data: { repository: { pullRequest: w.detail(number) } } }) };
@@ -145,24 +165,54 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
   const settle = async () => { for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r)); if (failed.length) throw failed[0]; };
   const tick = async () => { for (const f of everies) f(cx); await settle(); };
   // In a box: a fake element answers every property, `then` too, so awaited bare it would never settle.
-  const draw = async () => { const root = view.render(cx); for (const f of timers.splice(0)) f(cx); await settle(); return { root }; };
+  const draw = async () => {
+    w.drawing = true;
+    let root;
+    try { root = view.render(cx); } finally { w.drawing = false; }
+    for (const f of timers.splice(0)) f(cx);
+    await settle();
+    return { root };
+  };
   const layout = () => ({ id: "root", children: [{ id: "work" }, { id: "panel", hidden: !w.open, children: [{ id: "panel-body", active: w.page, children: slots.map((id) => ({ id })) }] }] });
   const element = kit.elements({ args: "all" });
   class Clock extends Date { static now() { return w.now; } }
   const ctx = vm.createContext({ View: class {}, div: element, svg: element, image: (src) => element("image", src), h_flex: element, v_flex: element,
     Input: { new: element }, TextView: { markdown: (id, text) => element("markdown", text) }, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
     InputState: { new: () => { let v = ""; return { on() {}, value: () => v, set_value(x) { v = x; }, focus() {} }; } },
+    // A box the person types in with `type(text)`, as its change event would tell the page.
+    TextareaState: { new: (o) => {
+      let v = "";
+      const box = { placeholder: o.placeholder, events: {}, focused: 0, on(name, f) { box.events[name] = f; }, value: () => v, focus() { box.focused++; }, set_auto_grow() {},
+        set_value(x) { assert.ok(!w.drawing, "a box's text is set outside the draw"); v = x; }, type(x) { v = x; box.events.change?.({}, cx); } };
+      w.boxes.push(box);
+      return box;
+    } },
+    Textarea: { new: (state) => element("textarea", state) },
     checking: () => false, spaces: () => w.spaces, panes: () => w.panes, focused: () => null, exec, theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", input: "#222222", ansi1: "#ff0000" }),
-    window: () => ({ active: true, platform: "macos" }), nextCommand: () => new Promise(() => {}), keys: () => [], settings: () => ({ zoom: 1 }), layout,
+    window: () => ({ active: true, platform: "macos" }), nextCommand: () => new Promise(() => {}), keys: () => [], settings: () => ({ zoom: 1, font_family: "Mono" }), layout,
     run: (name, args) => w.commands.push([name, args]), shared: (k) => sh[k], setShared: (k, v) => { sh[k] = v; },
-    localStorage: { getItem: () => null, setItem() {} }, Date: Clock, Promise, Math, JSON, Map, Set, Object, Array, String, Number, Boolean, RegExp, Error });
+    localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)) }, Date: Clock, Promise, Math, JSON, Map, Set, Object, Array, String, Number, Boolean, RegExp, Error });
   // panel-states.js names button.js's button drawButton, an alias the bundle's stripped imports lose.
   vm.runInContext(kit.bundle(read, "main.js", (file, src, needs) => file === "button.js" ? `${needs()}\n${kit.strip(src)}\nconst drawButton = button;` : null), ctx);
   const view = new ctx.Mod();
   view.init({}, cx);
   const activate = (id) => { w.spaces = w.spaces.map((s) => ({ ...s, active: s.id === id })); };
-  return { view, cx, w, sh, settle, tick, draw, activate, st: (id = "s1") => view.states.get(id) };
+  return { view, cx, w, sh, store, settle, tick, draw, activate, st: (id = "s1") => view.states.get(id) };
 }
+
+const said = (id, login, at, body, extra = {}) => ({ id, body, url: `https://github.com/org/app/pull/7#${id}`, createdAt: at, author: { login }, ...extra });
+// A comment, an approval, a plain comment review with no words (says nothing), an unresolved thread and a resolved one.
+const TALK = () => ({
+  comments: [said("c1", "ann", "2026-01-01T00:10:00Z", "Looks close.")],
+  reviews: [{ ...said("r1", "bo", "2026-01-01T00:05:00Z", ""), state: "APPROVED", submittedAt: "2026-01-01T00:05:00Z" },
+    { ...said("r2", "cy", "2026-01-01T00:20:00Z", ""), state: "COMMENTED", submittedAt: "2026-01-01T00:20:00Z" }],
+  threads: [
+    { id: "T1", path: "src/a.js", line: 12, originalLine: 12, isResolved: false, isOutdated: false, viewerCanReply: true, viewerCanResolve: true, viewerCanUnresolve: true,
+      comments: [said("t1a", "bo", "2026-01-01T00:30:00Z", "Why?", { diffHunk: Array.from({ length: 9 }, (_, i) => `+line ${i + 1}`).join("\n") })] },
+    { id: "T2", path: "src/b.js", line: null, originalLine: 3, isResolved: true, isOutdated: true, viewerCanReply: true, viewerCanResolve: true, viewerCanUnresolve: true,
+      comments: [said("t2a", "cy", "2026-01-01T00:01:00Z", "Fixed?"), said("t2b", "ann", "2026-01-01T00:02:00Z", "Yes.")] },
+  ],
+});
 
 const space = (id, folder, active = false, machine = null) => ({ id, folder, machine, active, tabs: [{ id: `${id}-tab`, active: true }] });
 const listReads = (w) => w.ran.filter((r) => r.cmd === "gh" && r.args.some((a) => a.includes("open: pullRequests"))).length;
@@ -303,7 +353,206 @@ async function ghFailures() {
   assert.ok(find(root, "t3-pulls-detail") && !find(root, "t3-pulls-error"));
 }
 
+function sections() {
+  const checks = (...kinds) => rollup(kinds.map((k, i) => ({ __typename: "CheckRun", name: `c${i}`, status: k === "running" ? "IN_PROGRESS" : "COMPLETED", conclusion: k === "running" ? null : k })));
+  assert.equal(m.sectionOpen("checks", {}, checks("SUCCESS", "SKIPPED")), false, "every check passed or skipped: Checks starts shut");
+  assert.equal(m.sectionOpen("checks", {}, checks("SUCCESS", "FAILURE")), true, "one failing: it opens on its own");
+  assert.equal(m.sectionOpen("checks", {}, checks("SUCCESS", "running")), true, "one running: open too");
+  assert.equal(m.sectionOpen("checks", {}, rollup([])), true, "no checks: nothing to hide");
+  assert.equal(m.sectionOpen("checks", { checks: true }, checks("SUCCESS")), true, "the person's own choice wins over the default");
+  assert.equal(m.sectionOpen("checks", { checks: false }, checks("FAILURE")), false);
+  assert.deepEqual(["stack", "reviewers", "comments", "description"].map((k) => m.sectionOpen(k, {}, {})), [true, true, true, true]);
+  assert.equal(m.sectionOpen("comments", { comments: false }, {}), false);
+
+  same(m.sectionSummary("checks", checks(...Array(33).fill("SUCCESS"), "SKIPPED")), { text: "33/33 passed", tone: "none" });
+  same(m.sectionSummary("checks", checks("SUCCESS", "FAILURE", "TIMED_OUT", "running")), { text: "2 failing", tone: "danger" }, "failing before running");
+  same(m.sectionSummary("checks", checks("SUCCESS", "running", "running", "running")), { text: "3 running", tone: "waiting" });
+  const pr = { latestOpinionatedReviews: { nodes: [{ state: "APPROVED", author: { login: "bo" } }, { state: "COMMENTED", author: { login: "dee" } }] },
+    reviewRequests: { nodes: [{ requestedReviewer: { login: "cy" } }] }, ...TALK() };
+  same(m.sectionSummary("reviewers", pr), { text: "1/2 approved", tone: "none" }, "a plain comment isn't a review asked for");
+  same(m.sectionSummary("comments", pr), { text: "4, 1 unresolved", tone: "waiting" });
+
+  const entries = m.conversationEntries(TALK());
+  same(entries.map((e) => e.id), ["r1", "c1", "T2", "T1"], "comments and reviews by time (a wordless comment review says nothing), then threads");
+  same(entries.map((e) => e.kind ?? null), ["Approved", "Comment", null, null]);
+  same([m.threadPlace(TALK().threads[0]), m.threadPlace(TALK().threads[1]), m.threadPlace({ path: "x" })], ["src/a.js:12", "src/b.js:3", "x"], "an outdated thread keeps its old line");
+  same(m.hunkTail(TALK().threads[0].comments[0].diffHunk).split("\n"), ["+line 4", "+line 5", "+line 6", "+line 7", "+line 8", "+line 9"], "the hunk's last six lines");
+  same([m.threadShut({ isResolved: true }), m.threadShut({ isOutdated: true }), m.threadShut({})], [true, true, false]);
+  assert.match(m.writeError("reply", "GitHub: HTTP 502"), /may have gone through: refresh before sending it again/);
+  assert.equal(m.writeError("resolve", "GitHub: HTTP 502"), "GitHub: HTTP 502", "a resolve that failed just failed: it is put back");
+}
+
+const ghWrites = (w) => w.ran.filter((r) => r.cmd === "gh" && (r.args[1]?.startsWith("repos/") || r.args.some((a) => a.startsWith("query=mutation"))));
+const detailReads = (w) => w.ran.filter((r) => r.cmd === "gh" && r.args.some((a) => a.includes("latestOpinionatedReviews"))).length;
+const box = (w, placeholder) => w.boxes.find((b) => b.placeholder === placeholder);
+const disabled = (node) => node.style.opacity?.[0] === 0.64 && !node.handlers.on_click;
+
+async function conversation() {
+  // Paging: every part on its own cursor until done, a long thread's later replies read too.
+  {
+    const p = makePage({ spaces: [space("s1", "/r", true)] });
+    const talk = TALK();
+    talk.comments = Array.from({ length: 5 }, (_, i) => said(`c${i}`, "ann", `2026-01-01T00:1${i}:00Z`, `n${i}`));
+    talk.threads[0].comments = Array.from({ length: 5 }, (_, i) => said(`r${i}`, "bo", `2026-01-01T00:3${i}:00Z`, `reply ${i}`));
+    Object.assign(p.w, { talk, pageSize: 2, replyPage: 2 });
+    await p.tick(); await p.draw();
+    const pr = p.st().details.get(7).pr;
+    same([pr.comments.map((c) => c.id), pr.reviews.length, pr.threads.length, pr.threads.find((t) => t.id === "T1").comments.length, pr.conversationTruncated],
+      [["c0", "c1", "c2", "c3", "c4"], 2, 2, 5, false]);
+    const pages = p.w.ran.filter((r) => r.cmd === "gh" && r.args.some((a) => a.startsWith("query=") && a.includes("pullRequest(number: $number) { ") && !a.includes("latestOpinionated") && !a.includes("reviewRequests")))
+      .map((r) => r.args.find((a) => a.startsWith("query=")));
+    same(pages.map((q) => ["comments(", "reviews(", "reviewThreads("].filter((part) => q.includes(part))),
+      [["comments(", "reviews(", "reviewThreads("], ["comments("], ["comments("]], "a part read to its end isn't asked for again");
+    assert.ok(p.w.ran.some((r) => r.cmd === "gh" && r.args.includes("cursor=2") && r.args.includes("id=T1")), "the thread's later replies, from its cursor");
+  }
+  {
+    const p = makePage({ spaces: [space("s1", "/r", true)] });
+    p.w.talk.comments = Array.from({ length: 12 }, (_, i) => said(`c${i}`, "ann", `2026-01-01T00:${10 + i}:00Z`, `n${i}`));
+    p.w.pageSize = 1;
+    await p.tick(); await p.draw();
+    const root = (await p.draw()).root;
+    same([p.st().details.get(7).pr.comments.length, p.st().details.get(7).pr.conversationTruncated], [10, true], "ten pages at most");
+    assert.ok(strings(root).some((s) => s.includes("the rest is on GitHub")), "and it says so");
+  }
+
+  const p = makePage({ spaces: [space("s1", "/r", true)] });
+  await p.tick(); await p.draw();
+  let root = (await p.draw()).root;
+  same(strings(find(root, "t3-pulls-comments-head")).slice(0, 2), ["Comments", "4"], "its count in its heading");
+  assert.ok(find(root, "t3-pulls-said-c1") && find(root, "t3-pulls-said-r1-link"), "a comment, a review, each with its link");
+  assert.equal(find(root, "t3-pulls-said-r2"), null, "a wordless comment review says nothing");
+  assert.ok(strings(find(root, "t3-pulls-thread-T1")).includes("src/a.js:12"));
+  assert.ok(find(root, "t3-pulls-thread-T1-reply") && find(root, "t3-pulls-thread-T1-resolve"), "an unresolved thread: Reply and Resolve");
+  assert.equal(find(root, "t3-pulls-thread-T2-t2a"), null, "a resolved thread starts shut");
+  assert.ok(strings(find(root, "t3-pulls-thread-T2")).includes("cy, 2 comments"), "with a line saying what's in it");
+  find(root, "t3-pulls-thread-T2-head").handlers.on_click({}, p.cx);
+  root = (await p.draw()).root;
+  assert.ok(find(root, "t3-pulls-thread-T2-t2a") && find(root, "t3-pulls-thread-T2-reopen") && !find(root, "t3-pulls-thread-T2-reply"), "unfolded: its comments and Reopen");
+  assert.ok(find(root, "t3-pulls-comment-editor"), "a box for a new comment after the last thread");
+
+  // What the viewer can't do isn't offered.
+  p.w.talk.threads[0].viewerCanResolve = false; p.w.talk.threads[0].viewerCanReply = false;
+  p.view.refresh(p.cx); await p.settle();
+  root = (await p.draw()).root;
+  assert.ok(!find(root, "t3-pulls-thread-T1-resolve") && !find(root, "t3-pulls-thread-T1-reply"));
+  p.w.talk = TALK();
+  p.view.refresh(p.cx); await p.settle();
+  root = (await p.draw()).root;
+
+  // Reply: typed text goes as a raw field, whatever it looks like; Send waits for words.
+  find(root, "t3-pulls-thread-T1-reply").handlers.on_click({}, p.cx);
+  root = (await p.draw()).root;
+  const reply = box(p.w, "Reply");
+  assert.ok(reply.focused && disabled(find(root, "t3-pulls-thread-T1-editor-send")), "Send waits for words");
+  const tricky = `She said "hi" $(rm -rf ~) \`id\`\n@notes.txt`;
+  reply.type(tricky);
+  root = (await p.draw()).root;
+  find(root, "t3-pulls-thread-T1-editor-send").handlers.on_click({}, p.cx); await p.settle();
+  const sent = ghWrites(p.w).at(-1).args;
+  same([sent.slice(0, 2), sent.slice(3).filter((_, i) => i !== 0)], [["api", "graphql"], ["-f", "id=T1", "-f", `body=${tricky}`]], "the body as one raw -f field");
+  assert.ok(sent[2] === "-f" && sent[3].startsWith("query=mutation") && sent[3].includes("addPullRequestReviewThreadReply"));
+  assert.ok(!sent.includes("-F"), "never -F, which would read @file, numbers and true");
+  root = (await p.draw()).root;
+  same([p.view.replyTo, reply.value(), p.view.drafts.size], [null, "", 0], "sent: the box closes and its draft goes");
+  assert.equal(detailReads(p.w) >= 2, true, "and the detail is read again");
+
+  // A new comment: REST, the body raw even when it reads as a number or a boolean.
+  const comment = box(p.w, "Leave a comment");
+  for (const text of ["42", "true", "@me"]) {
+    comment.type(text);
+    root = (await p.draw()).root;
+    find(root, "t3-pulls-comment-editor-send").handlers.on_click({}, p.cx); await p.settle();
+    same(ghWrites(p.w).at(-1).args, ["api", "repos/org/app/issues/7/comments", "--method", "POST", "-f", `body=${text}`]);
+  }
+
+  // A failure keeps the draft and says it may have gone through.
+  p.w.writeFails = true;
+  comment.type("Keep me");
+  root = (await p.draw()).root;
+  find(root, "t3-pulls-comment-editor-send").handlers.on_click({}, p.cx); await p.settle();
+  root = (await p.draw()).root;
+  same([comment.value(), p.view.drafts.get("org/app#7")], ["Keep me", "Keep me"]);
+  assert.ok(strings(find(root, "t3-pulls-action-error")).some((s) => s.includes("refresh before sending it again")));
+  assert.equal(ghWrites(p.w).filter((r) => r.args.includes("body=Keep me")).length, 1, "and never tries again by itself");
+  p.w.writeFails = false;
+
+  // Drafts survive a refresh and moving to another PR and back.
+  p.view.refresh(p.cx); await p.settle();
+  root = (await p.draw()).root;
+  assert.equal(comment.value(), "Keep me");
+  p.view.pick(p.st(), 5, p.cx); await p.settle();
+  await p.draw(); await p.draw();
+  assert.equal(comment.value(), "", "#5 has a draft of its own");
+  p.view.pick(p.st(), 7, p.cx); await p.settle();
+  await p.draw();
+  root = (await p.draw()).root;
+  assert.equal(comment.value(), "Keep me", "#7's comes back");
+
+  // Resolve shows at once; while it's sent nothing else goes, and a read from before it doesn't land; Reopen undoes it.
+  p.w.hold = (cmd, args) => cmd === "gh" && args.some((a) => a.includes("latestOpinionatedReviews"));
+  p.view.refresh(p.cx); await p.settle();
+  const readsBefore = p.w.held.length;
+  assert.equal(readsBefore, 1, "a detail read under way");
+  p.w.hold = (cmd, args) => cmd === "gh" && args.some((a) => a.includes("resolveReviewThread"));
+  find(root, "t3-pulls-thread-T1-resolve").handlers.on_click({}, p.cx);
+  const pr = p.st().details.get(7).pr;
+  assert.equal(pr.threads.find((t) => t.id === "T1").isResolved, true, "resolved at once");
+  root = (await p.draw()).root;
+  assert.ok(disabled(find(root, "t3-pulls-comment-editor-send")) && disabled(find(root, "t3-pulls-thread-T1-reopen")), "nothing else is sent meanwhile");
+  p.w.held.shift()(); await p.settle();
+  assert.equal(p.st().details.get(7).pr, pr, "the read from before the write doesn't land");
+  p.w.hold = null;
+  p.w.talk.threads[0].isResolved = true;
+  p.w.held.shift()(); await p.settle();
+  root = (await p.draw()).root;
+  assert.notEqual(p.st().details.get(7).pr, pr, "done: read again");
+  assert.ok(find(root, "t3-pulls-thread-T1-reopen"), "Reopen where Resolve was, the thread left open");
+  p.w.writeFails = true;
+  find(root, "t3-pulls-thread-T1-reopen").handlers.on_click({}, p.cx);
+  assert.equal(p.st().details.get(7).pr.threads.find((t) => t.id === "T1").isResolved, false, "Reopen shows at once too");
+  await p.settle();
+  assert.equal(p.st().details.get(7).pr.threads.find((t) => t.id === "T1").isResolved, true, "failed: put back");
+  same(ghWrites(p.w).at(-1).args.slice(-2), ["-f", "id=T1"]);
+  assert.ok(ghWrites(p.w).at(-1).args.some((a) => a.includes("unresolveReviewThread")));
+  p.w.writeFails = false;
+
+  // On another machine too: gh runs here.
+  p.w.spaces.push(space("s2", "/q", false, "vps"));
+  p.activate("s2");
+  await p.draw(); await p.draw();
+  root = (await p.draw()).root;
+  box(p.w, "Leave a comment").type("From afar");
+  root = (await p.draw()).root;
+  find(root, "t3-pulls-comment-editor-send").handlers.on_click({}, p.cx); await p.settle();
+  const far = ghWrites(p.w).at(-1);
+  same([far.args.at(-1), far.on], ["body=From afar", null]);
+}
+
+async function sectionsKept() {
+  const store = new Map();
+  const p = makePage({ spaces: [space("s1", "/r", true)], store });
+  p.w.detail = (n) => ({ ...card(n, "feat", "main"), body: "", headRefOid: "h", baseRefOid: "b", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null,
+    latestOpinionatedReviews: { nodes: [] }, ...rollup([{ __typename: "CheckRun", name: "lint", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: null }]) });
+  await p.tick(); await p.draw();
+  let root = (await p.draw()).root;
+  assert.ok(!find(root, "t3-pulls-check-0") && strings(find(root, "t3-pulls-checks-head-summary")).includes("1/1 passed"), "all passed: shut, its summary on the right");
+  find(root, "t3-pulls-checks-head").handlers.on_click({}, p.cx);
+  root = (await p.draw()).root;
+  assert.ok(find(root, "t3-pulls-check-0") && !find(root, "t3-pulls-checks-head-summary"));
+  find(root, "t3-pulls-comments-head").handlers.on_click({}, p.cx);
+  same(JSON.parse(store.get("sections.open")), { checks: true, comments: false });
+  // Another PR, another run: the person's choices stand.
+  const q = makePage({ spaces: [space("s1", "/r", true)], store });
+  q.w.detail = p.w.detail;
+  q.view.setTab(q.st() ?? q.view.stateFor(q.w.spaces[0]), "repo", q.cx);
+  await q.tick(); q.view.pick(q.st(), 5, q.cx); await q.settle();
+  root = (await q.draw()).root;
+  assert.ok(find(root, "t3-pulls-check-0"), "Checks stays open");
+  assert.ok(!find(root, "t3-pulls-comment-editor") && strings(find(root, "t3-pulls-comments-head-summary")).includes("4, 1 unresolved"), "Comments stays shut, saying what's in it");
+}
+
 (async () => {
+  sections();
   discovery();
   summaries();
   stacks();
@@ -312,5 +561,7 @@ async function ghFailures() {
   await staleReads();
   await reviewHandoff();
   await ghFailures();
+  await conversation();
+  await sectionsKept();
   console.log("t3-pulls checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

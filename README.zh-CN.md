@@ -31,7 +31,7 @@
 - **断连警告**：机器上的 agent 会在断开后停止时，机器标题显示警告；点它打开 Herdr 的修复说明，不自动执行提权命令。
 - **Files**：照 T3 的只读文件树，与 Review 的同一种，每文件一个标签。搜索仍是树，目录面包屑保留返回路径，Preview／Code 切换时头部控件固定占位。隐藏保留，关闭释放；大树取消过时展开，只画可见行。 可把文件或文件夹行拖进终端插入路径，不按 Enter；跨机器复制与拒绝遵循 Herdr 的规则，菜单里的 Insert into terminal 保留。
 - **Review**（可选）：每 space 最多一个可关闭标签，独立保留范围和阅读位置；切换保留，关闭重加回默认范围。文件／文件夹行可拖进终端或用 Files 同一份右键菜单；已删除文件只能 Copy path、不能拖动，子组行两者都没有。右键不改当前文件和已看勾选。
-- **Pull requests**（`cmd-shift-u`）：面板里的一页，两个标签：Branch（标签所在分支的 pull request，只有一个时直接显示详情）和 Repo（仓库的 open pull request，可搜索），经你的 `gh` 登录读取。一个 pull request 先用一行给出 checks、reviews 和合并状态，再列出它的 stack、每项 check、reviewer 和描述。**Review** 把它 fetch 下来，在 Review 里显示 GitHub 所显示的改动（需 Review 扩展，仅本机 space）；也可在 pulls.review 或 GitHub 上打开。只读：不合并、不评论。
+- **Pull requests**（`cmd-shift-u`）：面板里的一页，两个标签：Branch（标签所在分支的 pull request，只有一个时直接显示详情）和 Repo（仓库的 open pull request，可搜索），经你的 `gh` 登录读取。一个 pull request 先用一行给出 checks、reviews 和合并状态，再列出它的 stack、每项 check、reviewer、描述和评论，每段都可折叠（全部通过时 Checks 自己收起）。在评论里可以回复评审线程、resolve 或重新打开它，也可以发表评论。**Review** 把它 fetch 下来，在 Review 里显示 GitHub 所显示的改动（需 Review 扩展，仅本机 space）；也可在 pulls.review 或 GitHub 上打开。不合并。
 
 每项的详细说明见[使用指南](docs/user/guide.zh-CN.md)。
 
@@ -92,7 +92,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 - `t3-files`：只读，在 space 所在的机器上执行：`git rev-parse`、`git status`、`git check-ignore` 和 `git ls-files`（带 `--no-optional-locks`，不会往 `.git` 里写东西），用 `sh` 列文件夹，在其他机器上也用它查文件大小、搜路径；不在 Git 里时用 `find`；其他机器上的图片用 `base64` 传回。显示的图片复制到 `cache/t3-files/`，mod 停止时删掉。macOS 上的右键菜单：Open、Reveal in Finder 和 Open with 执行 `open`；Insert into agent terminal 借剪贴板粘贴进本标签最后活动的终端，然后恢复你原来的剪贴板。
 - `t3-spaces`、`t3-agents`、`t3-inbox`、`t3-tabs`、`t3-new-menu`、`t3-picker`、`t3-actions`：为每个 space 的图标，在 space 所在的位置（它的机器上）运行 `git rev-parse --show-toplevel`、`sh` 文件检测和 `base64`；找到的图标复制到 `cache/t3-icons/`。
 - `t3-menu`：在 space 的目录里（它的机器上）运行 `git rev-parse`，为菜单区分链接工作树和仓库自己的 checkout。`t3-chrome`、`t3-tabs`、`t3-files`：在标签所在的目录里（本机）运行 `git rev-parse --show-toplevel`，判断 Review 能不能读。`t3-chrome`：`ls` 已安装的 `mods` 目录，列出设置里可选的 Home。
-- `t3-pulls`，仅在 Pull requests 显示时：在标签所在的目录里（它的机器上）运行 `git rev-parse` 和 `git config --get-regexp`（带 `--no-optional-locks`），得到分支和 GitHub remote；在本机用你的 `gh` 登录运行 `gh api graphql` 读取 pull request。**Review**：把 pull request 的 head 和 base 分支 `git fetch --no-tags` 进该仓库（只写对象和 `FETCH_HEAD`，不动任何分支或 ref）。**Open in pulls.review**：`jin.review -d owner/repo#N`。Open on GitHub 和 check 的链接：`open`。
+- `t3-pulls`，仅在 Pull requests 显示时：在标签所在的目录里（它的机器上）运行 `git rev-parse` 和 `git config --get-regexp`（带 `--no-optional-locks`），得到分支和 GitHub remote；在本机用你的 `gh` 登录运行 `gh api graphql` 读取 pull request，并在你发送时回复、resolve 或重新打开评审线程；发表评论用 `gh api repos/<repo>/issues/<n>/comments`。**Review**：把 pull request 的 head 和 base 分支 `git fetch --no-tags` 进该仓库（只写对象和 `FETCH_HEAD`，不动任何分支或 ref）。**Open in pulls.review**：`jin.review -d owner/repo#N`。Open on GitHub 和 check 的链接：`open`。
 
 布局不发送遥测；可选Review扩展使用它配置的分析服务。
 
@@ -107,7 +107,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 
 ## 致谢与许可证
 
-`extras/branch-issue` 是 [munza/herdr-mods](https://github.com/munza/herdr-mods) 的 Branch Issue（Apache-2.0，Copyright 2026 Tawsif Aqib）。Pull requests 的 stack 和经 `gh` 读取 GitHub 的方式改编自同一仓库的 Branch PR。
+`extras/branch-issue` 是 [munza/herdr-mods](https://github.com/munza/herdr-mods) 的 Branch Issue（Apache-2.0，Copyright 2026 Tawsif Aqib）。Pull requests 的 stack、评论区和经 `gh` 读写 GitHub 的方式改编自同一仓库的 Branch PR。
 
 `t3-chrome`、`t3-spaces`、`t3-agents`、`t3-tabs`、`t3-pane`、`t3-new-menu`、`t3-picker` 和布局本身，分别基于 Herdr App 自带的 `workspace-chrome`、`spaces`、`agents`、`tabs`、`pane`、`new-menu`、`picker` 和 `main` 修改。Settle 参照 T3 Code 的设计。Catppuccin 主题使用 [Catppuccin](https://github.com/catppuccin/catppuccin) 色板（MIT 许可证，Copyright (c) 2021 Catppuccin）；T3 Code 主题取自 [T3 Code](https://github.com/pingdotgg/t3code) 的默认配色（MIT 许可证，Copyright (c) 2026 T3 Tools Inc.）。图标来自 [Lucide](https://lucide.dev)（ISC 许可证，Copyright (c) Lucide Contributors）。Files 和 Review 的文件树以及面板标签使用 [T3 Code](https://github.com/pingdotgg/t3code)（MIT）和 [Pierre](https://github.com/pierrecomputer/trees)（Apache-2.0）的原图形，由当前主题着色。Review 用 [get-east-asian-width](https://github.com/sindresorhus/get-east-asian-width) 的表计算字符宽度（MIT 许可证，Copyright (c) Sindre Sorhus）。许可证与 Herdr App 相同，为 Apache-2.0。
 

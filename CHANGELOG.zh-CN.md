@@ -4,7 +4,8 @@
 
 ## 2026-11-26
 
-- space 面板新增 **Pull requests** 页（`t3-pulls`，`cmd-shift-u`，或 + → Pull requests）：**Branch** 列出标签所在分支的 pull request（open、closed 或 merged；fork 里同名分支的不算），只有一个时直接打开详情；**Repo** 列出仓库最近更新的 100 个 open pull request，可按标题、编号或分支搜索。每行显示状态、标题、编号、`head → base`、checks 标记和最近更新时间。详情先给出作者和分支，再用一行给出 Checks、Reviews 和合并状态，然后是 Stack（有堆叠时）、Checks（点击打开该项）、Reviewers 和 Description。**Review** 把 pull request 的 head 和 base fetch 进标签所在的仓库，在 Review 里打开 GitHub 所显示的改动（需 Review 扩展，仅本机 space）；旁边是 **Open in pulls.review** 和 **Open on GitHub**。只在这一页显示时经你的 `gh` 登录读取：显示时立即读，之后每分钟一次；`gh` 未安装或未登录时说明要运行什么。只读。它取代 Branch PR 扩展，`extras/` 里已移除。
+- Pull requests 详情新增 **Comments**：评论和 review 按时间排列，然后是评审线程（带 diff 末尾几行），已 resolve 和过时的线程收成一行。GitHub 允许时可回复线程、Resolve 或 Reopen（立即生效，互为撤销），并在末尾的输入框发表新评论；输入的内容保留到 GitHub 收下为止，发送失败也保留。长对话分页读取，读不完时说明其余在 GitHub 上。详情的每一段都可从标题折叠，折叠时右侧给出摘要，并保持你上次的开合；全部通过时 Checks 自己收起。
+- space 面板新增 **Pull requests** 页（`t3-pulls`，`cmd-shift-u`，或 + → Pull requests）：**Branch** 列出标签所在分支的 pull request（open、closed 或 merged；fork 里同名分支的不算），只有一个时直接打开详情；**Repo** 列出仓库最近更新的 100 个 open pull request，可按标题、编号或分支搜索。每行显示状态、标题、编号、`head → base`、checks 标记和最近更新时间。详情先给出作者和分支，再用一行给出 Checks、Reviews 和合并状态，然后是 Stack（有堆叠时）、Checks（点击打开该项）、Reviewers 和 Description。**Review** 把 pull request 的 head 和 base fetch 进标签所在的仓库，在 Review 里打开 GitHub 所显示的改动（需 Review 扩展，仅本机 space）；旁边是 **Open in pulls.review** 和 **Open on GitHub**。只在这一页显示时经你的 `gh` 登录读取：显示时立即读，之后每分钟一次；`gh` 未安装或未登录时说明要运行什么。它取代 Branch PR 扩展，`extras/` 里已移除。
 
 ## 2026-11-23
 

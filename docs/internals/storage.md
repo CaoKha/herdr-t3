@@ -108,4 +108,6 @@ Markdown 文件显示预览还是源码是 `t3-files.markdown`（`"code"` 或 `"
 
 Files 和 Review 各自保存 `lines.wrap`（布尔字符串）、`nav.width`（逻辑 px）和 `nav.open`。两页复用读写函数，但只访问自己副本的 `localStorage`。
 
+Pull requests 在 `sections.open` 保存详情各段（`stack`、`checks`、`reviewers`、`description`、`comments`）的开合，JSON 对象，只记用户点过的段，所有 PR 共用；没记的按默认（见 [pulls](specs/pulls.md#detail)）。评论和回复的草稿只记本次运行的内存（`main.js` 的 `drafts`，按 `owner/repo#n` 或 `owner/repo#n:<thread>`），重画、刷新、换 PR 都保留，GitHub 收下后才删；评审线程的展开也只记本次运行。
+
 两页的完整 space 数据都是本次运行的缓存，每页最多保留最近三个。较早的 space 只留轻量的选择、展开和评审范围等阅读设置；文件内容、Editor、diff 行、换行和布局缓存都要释放。驱逐时使已发出的异步读取失效；迟到的结果不能重新填满已释放的数据。两页使用仅可见时的有界刷新，不保留不可退订的目录监听。关闭 space 时一并清理它的内存记录。

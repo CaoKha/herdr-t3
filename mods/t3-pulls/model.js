@@ -191,6 +191,77 @@ export function timeAgo(iso, now = Date.now()) {
   return `${Math.floor(minutes / 43200)}mo ago`;
 }
 
+const REVIEW_WORD = { APPROVED: "Approved", CHANGES_REQUESTED: "Changes requested", COMMENTED: "Reviewed", DISMISSED: "Dismissed" };
+
+/**
+ * What's been said on a PR, in order: its comments and reviews (a review the viewer hasn't submitted, or a plain comment
+ * review with no words, says nothing here) by time, then its review threads by their first comment. After Branch PR's
+ * conversationEntries (munza/herdr-mods, Apache-2.0).
+ */
+export function conversationEntries(pr) {
+  const said = [
+    ...(pr.comments ?? []).map((c) => ({ ...c, kind: "Comment", at: c.createdAt })),
+    ...(pr.reviews ?? []).filter((r) => r.state !== "PENDING" && (r.body?.trim() || r.state !== "COMMENTED"))
+      .map((r) => ({ ...r, kind: REVIEW_WORD[r.state] ?? "Review", at: r.submittedAt })),
+  ];
+  const threads = (pr.threads ?? []).filter((t) => t.comments?.length).map((thread) => ({ id: thread.id, thread, at: thread.comments[0].createdAt }));
+  const byTime = (a, b) => (a.at ?? "") < (b.at ?? "") ? -1 : (a.at ?? "") > (b.at ?? "") ? 1 : 0;
+  return [...said.sort(byTime), ...threads.sort(byTime)];
+}
+
+/** `path:line` of a review thread; an outdated one's line is where it was. */
+export const threadPlace = (thread) => {
+  const line = thread.line ?? thread.originalLine;
+  return line == null ? thread.path : `${thread.path}:${line}`;
+};
+
+// A comment is about the end of its hunk, which can run to hundreds of lines.
+export const HUNK_LINES = 6;
+export const hunkTail = (hunk) => String(hunk ?? "").split("\n").slice(-HUNK_LINES).join("\n");
+
+/** A thread starts shut when it needs nothing now: resolved, or about code that has since changed. */
+export const threadShut = (thread) => Boolean(thread.isResolved || thread.isOutdated);
+
+// One draft per PR for a new comment, one per thread for a reply.
+export const draftKey = (repo, number, thread = null) => `${repo}#${number}${thread ? `:${thread}` : ""}`;
+
+/**
+ * Whether a detail section shows: what the person last chose for it (`kept`, by section, from localStorage), else open; Checks
+ * by default only while one is failing or still running.
+ */
+export function sectionOpen(key, kept, pr) {
+  if (typeof kept?.[key] === "boolean") return kept[key];
+  if (key !== "checks") return true;
+  const checks = checksOf(pr);
+  return !checks.length || checks.some((c) => c.kind === "failure" || c.kind === "pending");
+}
+
+/** What a shut section says on its heading's right, and in which tone; null when it has nothing to add. */
+export function sectionSummary(key, pr, stack = null) {
+  if (key === "checks") {
+    const counted = checksOf(pr).filter((c) => c.kind !== "skipped"), failing = counted.filter((c) => c.kind === "failure").length;
+    const running = counted.filter((c) => c.kind === "pending").length;
+    if (!counted.length) return { text: "None", tone: "none" };
+    if (failing) return { text: `${failing} failing`, tone: "danger" };
+    if (running) return { text: `${running} running`, tone: "waiting" };
+    return { text: `${counted.length}/${counted.length} passed`, tone: "none" };
+  }
+  if (key === "reviewers") {
+    const asked = reviewersOf(pr).filter((r) => r.state !== "COMMENTED" && r.state !== "DISMISSED");
+    return asked.length ? { text: `${asked.filter((r) => r.state === "APPROVED").length}/${asked.length} approved`, tone: "none" } : { text: "None", tone: "none" };
+  }
+  if (key === "comments") {
+    const n = conversationEntries(pr).length, open = (pr.threads ?? []).filter((t) => !t.isResolved).length;
+    return { text: `${n}${open ? `, ${open} unresolved` : ""}`, tone: open ? "waiting" : "none" };
+  }
+  if (key === "stack" && stack) return { text: `${stack.layers.length} layers`, tone: "none" };
+  return null;
+}
+
+/** What a failed write says: GitHub's words, and for text sent, that it may still have landed. */
+export const writeError = (kind, message) => kind === "comment" || kind === "reply"
+  ? `${message} It may have gone through: refresh before sending it again.` : message;
+
 /** Why Review (or pulls.review, `name`) can't show a PR of this space, or "" when it can: both read a local clone, through the Review extra. */
 export function reviewProblem({ installed, machine, root }, name = "Review") {
   if (!installed) return "Review isn't installed: add the Review extra.";
