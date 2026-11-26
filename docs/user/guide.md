@@ -61,7 +61,7 @@ Insert refuses paths containing control characters; use Copy path instead.
 
 ## Keys
 
-The layout's bindings live in the `layout:herdr-t3` section of `keys.json` and are merged on install. The table includes the supplied alternatives, such as `ctrl-alt-r` for Clean up. On Linux and Windows, you can also bind Herdr's native keys to the commands below in your own `keys.json` to use the layout's close confirmations and space numbering.
+The layout's bindings live in the `layout:herdr-t3` section of `keys.json` and are merged on install. The table includes the supplied alternatives, such as `ctrl-alt-r` for Clean up. On Linux, install and update put `keys.linux.json` there instead, since `cmd` is the Super key that the desktop keeps: every `cmd-` key below is `ctrl-alt-` (`cmd-shift-b` is `ctrl-alt-shift-b`), except `cmd-alt-b` (the space panel), which is `ctrl-alt-shift-p`; `cmd-]` / `cmd-[` (next or previous agent), which are `ctrl-alt-j` / `ctrl-alt-k`, as `ctrl-alt-]` / `[` already walk tabs; and `cmd-t`, which is `ctrl-alt-c`, as GNOME opens a terminal on `ctrl-alt-t`. A `cmd-` key whose command already has a `ctrl-alt` key in the table has no second one. On Linux and Windows, you can also bind Herdr's native keys to the commands below in your own `keys.json` to use the layout's close confirmations and space numbering.
 
 | Key | Command | Does |
 | --- | --- | --- |
@@ -113,7 +113,7 @@ git clone --depth 1 https://github.com/JinJieBeWater/herdr-t3 && herdr-t3/script
 Or tell your Herdr agent: "Update Herdr T3: clone github.com/JinJieBeWater/herdr-t3, run its `scripts/update.sh`, then run `herdr-app check` on each `mods/t3-*`." Mods reload by themselves on save; no restart. It needs `jq` and `rsync`, and stops before changing anything if one is missing or your `keys.json` or layout isn't valid JSON.
 
 - It overwrites `mods/t3-*` and `layouts/herdr-t3.*`, deleting files that are gone, and the Review and theme-export extras and the extra themes you've installed. Extras you haven't are left out.
-- It merges `keys.json`: the repo's keys go into your `layout:herdr-t3` section and the popups' `mod:…` sections, replacing the same key, and it prints each one it replaced so a remap can go back. Your other keys and sections stay. It also prints keys of yours that aren't in the repo: an old one (`"cmd-shift-a": "t3-tabs.view"`, say) can be deleted.
+- It merges `keys.json` (`keys.linux.json` on Linux): the repo's keys go into your `layout:herdr-t3` section and the popups' `mod:…` sections, replacing the same key, and it prints each one it replaced so a remap can go back. Your other keys and sections stay. It also prints keys of yours that aren't in the repo: an old one (`"cmd-shift-a": "t3-tabs.view"`, say) can be deleted.
 - Kept: pins, folds, sort, the layout's settings, the Settled shelf, settled agents, projects remembered by New, and your actions. From the installed layout: the theme, the sidebar you were on, the focus ring color, the panel's Review slot and the settings of any Review bar or theme-export block whose extra is still installed. Uninstalling an extra removes its blocks on the next update.
 - Lost: your other edits to the overwritten files; make those again. Going on to the next card after a Settle is a setting now, not an edit.
 - If the first install renamed something because of a clash, the script doesn't know: it installs the original names, so point the layout back at your copy or delete it.

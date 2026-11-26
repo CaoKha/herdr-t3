@@ -205,7 +205,7 @@ Every control is a Tab stop clicked by Enter or Space, with a 2px inset `accent`
 | `cmd-1…9`, `ctrl-alt-1…9` | `t3-tabs.tab:<n>`, displayed tabs |
 | `cmd-shift-]` / `[`, `ctrl-tab` / `ctrl-shift-tab`, `ctrl-alt-]` / `[` | `t3-tabs.tab-next` / `tab-prev`, wrap |
 
-Key labels follow Herdr's platform (`cmd` is Super off macOS). `cmd-d` stays Herdr's split. In Files or Review, `cmd-t` opens the panel's `+` menu and `cmd-w` closes the active surface tab, never the terminal. With a popup or dialog owning the keyboard, the four close keys close the overlay instead.
+Key labels follow Herdr's platform (`cmd` is Super off macOS). `keys.linux.json` binds the same commands with no `cmd` key, for Linux: `cmd-` becomes `ctrl-alt-`, a command that already has a `ctrl-alt` key keeps only that, and `cmd-alt-b`, `cmd-]` / `[` and `cmd-t` become `ctrl-alt-shift-p`, `ctrl-alt-j` / `k` and `ctrl-alt-c`. `cmd-d` stays Herdr's split. In Files or Review, `cmd-t` opens the panel's `+` menu and `cmd-w` closes the active surface tab, never the terminal. With a popup or dialog owning the keyboard, the four close keys close the overlay instead.
 While Files or Review has keyboard focus, the two pane-close keys only dismiss menus. Closing a terminal pane with these keys requires returning focus to the terminal.
 
 ## Built from

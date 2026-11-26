@@ -1,0 +1,136 @@
+{
+  "layout:herdr-t3": {
+    "ctrl-alt-r": "t3-tabs.cleanup",
+    "ctrl-alt-shift-x": "t3-tabs.close-tab",
+    "ctrl-alt-x": "t3-tabs.close-pane",
+    "ctrl-alt-c": "t3-tabs.new",
+    "ctrl-1": "t3-tabs.space:1",
+    "ctrl-alt-shift-1": "t3-tabs.space:1",
+    "ctrl-2": "t3-tabs.space:2",
+    "ctrl-alt-shift-2": "t3-tabs.space:2",
+    "ctrl-3": "t3-tabs.space:3",
+    "ctrl-alt-shift-3": "t3-tabs.space:3",
+    "ctrl-4": "t3-tabs.space:4",
+    "ctrl-alt-shift-4": "t3-tabs.space:4",
+    "ctrl-5": "t3-tabs.space:5",
+    "ctrl-alt-shift-5": "t3-tabs.space:5",
+    "ctrl-6": "t3-tabs.space:6",
+    "ctrl-alt-shift-6": "t3-tabs.space:6",
+    "ctrl-7": "t3-tabs.space:7",
+    "ctrl-alt-shift-7": "t3-tabs.space:7",
+    "ctrl-8": "t3-tabs.space:8",
+    "ctrl-alt-shift-8": "t3-tabs.space:8",
+    "ctrl-9": "t3-tabs.space:9",
+    "ctrl-alt-shift-9": "t3-tabs.space:9",
+    "ctrl-alt-shift-]": "t3-tabs.space-next",
+    "ctrl-alt-shift-[": "t3-tabs.space-prev",
+    "ctrl-alt-1": "t3-tabs.tab:1",
+    "ctrl-alt-2": "t3-tabs.tab:2",
+    "ctrl-alt-3": "t3-tabs.tab:3",
+    "ctrl-alt-4": "t3-tabs.tab:4",
+    "ctrl-alt-5": "t3-tabs.tab:5",
+    "ctrl-alt-6": "t3-tabs.tab:6",
+    "ctrl-alt-7": "t3-tabs.tab:7",
+    "ctrl-alt-8": "t3-tabs.tab:8",
+    "ctrl-alt-9": "t3-tabs.tab:9",
+    "ctrl-tab": "t3-tabs.tab-next",
+    "ctrl-alt-]": "t3-tabs.tab-next",
+    "ctrl-shift-tab": "t3-tabs.tab-prev",
+    "ctrl-alt-[": "t3-tabs.tab-prev",
+    "ctrl-alt-b": "t3-tabs.toggle-sidebar",
+    "ctrl-alt-shift-l": "t3-tabs.sidebar",
+    "ctrl-alt-shift-b": "t3-tabs.details",
+    "ctrl-alt-shift-e": "t3-tabs.files",
+    "ctrl-alt-shift-g": "t3-tabs.review",
+    "ctrl-alt-shift-u": "t3-tabs.pulls",
+    "ctrl-alt-shift-i": "t3-tabs.issues",
+    "ctrl-alt-shift-p": "t3-tabs.panel",
+    "ctrl-alt-shift-s": "t3-tabs.settle",
+    "ctrl-alt-shift-z": "t3-tabs.undo",
+    "ctrl-alt-p": "mod.open:t3-picker",
+    "ctrl-alt-j": "t3-tabs.next",
+    "ctrl-alt-k": "t3-tabs.prev",
+    "ctrl-alt-shift-h": "t3-tabs.home",
+    "ctrl-alt-shift-,": "t3-tabs.settings"
+  },
+  "mod:t3-picker": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-new-menu": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-menu": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-actions": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-inbox": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-agents": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-pane": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:pulls-review": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:help": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:confirm": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:prompt": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:machine-add": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:worktree": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-chrome": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  },
+  "mod:t3-files": {
+    "ctrl-alt-shift-x": "t3-files.close",
+    "ctrl-alt-x": "t3-files.close:menu",
+    "ctrl-alt-c": "t3-chrome.surface-menu"
+  },
+  "mod:review": {
+    "ctrl-alt-shift-x": "review.close",
+    "ctrl-alt-x": "review.close:menu",
+    "ctrl-alt-c": "t3-chrome.surface-menu"
+  },
+  "mod:t3-pulls": {
+    "ctrl-alt-shift-x": "t3-pulls.close",
+    "ctrl-alt-x": "t3-pulls.close:menu",
+    "ctrl-alt-c": "t3-chrome.surface-menu"
+  },
+  "mod:t3-issues": {
+    "ctrl-alt-shift-x": "t3-issues.close",
+    "ctrl-alt-x": "t3-issues.close:menu",
+    "ctrl-alt-c": "t3-chrome.surface-menu"
+  },
+  "mod:asciicn-wallpaper": {
+    "ctrl-alt-shift-x": "overlay.close",
+    "ctrl-alt-x": "overlay.close"
+  }
+}

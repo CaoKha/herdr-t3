@@ -14,6 +14,8 @@ trap '
 app="$tmp/home"
 layout="$app/layouts/herdr-t3.json"
 fail=0
+# The cases below expect the cmd keys; the Linux one sets its own platform.
+export HERDR_T3_PLATFORM=Darwin
 ok() { "$@" || { echo "FAIL check-update: $*"; exit 1; }; }
 is() {
   actual=$(jq -crS "$1" "$2")
@@ -119,6 +121,15 @@ is '.["layout:herdr-t3"]["cmd-x"]' "$app/keys.json" mine
 is '.["mod:t3-picker"]["cmd-w"]' "$app/keys.json" overlay.close
 case "$out" in *"replaced: cmd-p = old"*) ;; *) echo "FAIL check-update: no word of the replaced key"; exit 1 ;; esac
 case "$out" in *"kept, not in the repo: cmd-x = mine"*) ;; *) echo "FAIL check-update: no word of the kept key"; exit 1 ;; esac
+
+# Linux takes keys.linux.json: the same commands on ctrl-alt, merged the same way.
+linux="$tmp/linux-home"
+cp -R "$app/." "$linux"
+echo '{"global":{"a":"b"}}' > "$linux/keys.json"
+HERDR_APP_HOME="$linux" HERDR_T3_PLATFORM=Linux "$src/scripts/update.sh" >/dev/null
+is .global.a "$linux/keys.json" b
+is '.["layout:herdr-t3"]["ctrl-alt-p"]' "$linux/keys.json" mod.open:t3-picker
+is '[.[] | keys[] | select(startswith("cmd-"))] | length' "$linux/keys.json" 0
 
 # The Review extra's review is a space panel page after the layout's own (Files, Pull requests, Issues); no id twice.
 pages='[.. | objects | select(.id? == "panel-body") | .children[].id] | join(",")'
