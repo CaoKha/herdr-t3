@@ -178,17 +178,21 @@ export default class Pulls extends View {
     cx.notify();
   }
 
-  // Why Review (or `name`, which hands its work to the same clone) can't take this PR, as Review itself words it; "" when it can.
-  reviewReason(st, sp, pages, name = "Review") {
+  // Why Review can't take this PR, as Review itself words it; "" when it can.
+  reviewReason(st, pages) {
     if (!pages.includes("review")) return REVIEW_PROBLEMS.missing;
-    if (sp.machine) return REVIEW_PROBLEMS.remote(name);
     return st.info?.root ? "" : REVIEW_PROBLEMS.noRepo;
+  }
+
+  // pulls.review takes the same clone, and its daemon opens the PR in a browser on the machine it runs on.
+  pullsReason(st, sp, pages) {
+    return sp.machine ? "pulls.review is unavailable on remote spaces: it opens in that machine's browser." : this.reviewReason(st, pages);
   }
 
   // One fetch brings the PR's head and its base branch into the space's clone, then Review shows what GitHub does: head since
   // it forked from base. FETCH_HEAD lists the two in the order asked.
   review(st, sp, pr, pages, cx) {
-    if (st.busy || this.reviewReason(st, sp, pages)) return;
+    if (st.busy || this.reviewReason(st, pages)) return;
     const { root, remote } = st.info, o = { cwd: root, on: st.on, timeout: FETCH_TIMEOUT };
     st.busy = "review"; st.actionError = null; cx.notify();
     cx.spawn(async (cx) => {
@@ -207,7 +211,7 @@ export default class Pulls extends View {
 
   // The fork's daemon opens a GitHub PR in the browser; it registers the folder it starts in, so a local clone.
   pullsReview(st, sp, pr, pages, cx) {
-    if (this.reviewReason(st, sp, pages, "pulls.review")) return;
+    if (this.pullsReason(st, sp, pages)) return;
     const { repo, root } = st.info;
     st.actionError = null;
     cx.spawn(async (cx) => {
@@ -238,7 +242,7 @@ export default class Pulls extends View {
     const n = this.shownNumber(st), pr = n != null ? st.details.get(n)?.pr ?? this.card(st, n) : null;
     const searching = st.tab === "repo" && n == null && Boolean(st.open?.length);
     const tab = (id, label, count) => ({ id: `t3-pulls-tab-${id}`, label, count, on: st.tab === id, pick: (cx) => { if (st.tab !== id) this.setTab(st, id, cx); } });
-    const reason = pr ? this.reviewReason(st, sp, pages) : "", busy = st.busy === "review";
+    const reason = pr ? this.reviewReason(st, pages) : "", busy = st.busy === "review";
     return h_flex().id("t3-pulls-bar").flex_1().min_w(0).h_full().gap(8).items_center()
       .child(st.picked != null
         ? control(this, t, "t3-pulls-back", "arrow-left", st.tab === "repo" ? "Back to the repository's pull requests" : "Back to the branch's pull requests",
@@ -254,7 +258,7 @@ export default class Pulls extends View {
 
   // ⋯: the PR in pulls.review (greyed with why where it can't) and on GitHub, its link copied.
   moreMenu(st, sp, pr, pages, t) {
-    const pullsReason = this.reviewReason(st, sp, pages, "pulls.review");
+    const pullsReason = this.pullsReason(st, sp, pages);
     return inlineMenu(this, t, "t3-pulls-more", { label: "More", icon: icon("ellipsis"), items: [
       { label: "Open in pulls.review", icon: image(`${MOD}/icons/pulls-review.svg`).size(16), disabled: Boolean(pullsReason), hint: pullsReason, pick: (cx) => this.pullsReview(st, sp, pr, pages, cx) },
       { label: "Open on GitHub", icon: icon("external-link"), pick: (cx) => this.browse(st, pr.url, cx) },

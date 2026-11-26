@@ -2232,11 +2232,10 @@ async function checkInbox() {
     const scope = f.scopes.get("t3-tabs"), reviewSpace = { id: "review-test", active: true, machine: "remote", folder: "/repo", tabs: [] };
     scope.spaces = () => [reviewSpace];
     f.slots.panel = { id: "panel", hidden: true, children: [{ id: "panel-body", active: "panel-empty", children: ["files", "panel-empty", "review"].map(id => ({ id })) }] };
-    let gitReads = 0, gitCode = 128;
-    scope.exec = async () => { gitReads++; return { code: gitCode, stdout: gitCode ? "" : "/repo\n" }; };
-    assert.deepEqual(await press("review"), []); assert.equal(gitReads, 0, "remote never asks local Git");
-    reviewSpace.machine = null;
+    const gitOn = []; let gitCode = 128;
+    scope.exec = async (_cmd, _args, options) => { gitOn.push(options.on); return { code: gitCode, stdout: gitCode ? "" : "/repo\n" }; };
     assert.deepEqual(await press("review"), [], "not a repository: no surface added");
+    assert.deepEqual(gitOn, ["remote"], "a remote space's Git runs on its machine");
     gitCode = 0;
     assert.ok((await press("review")).some(([cmd, a]) => cmd === "layout.select" && a.child === "review"));
   }

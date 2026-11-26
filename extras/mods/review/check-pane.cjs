@@ -1007,12 +1007,15 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
     detached = true; panel.bySpace.delete("s1"); sharedStore.set("review.shown", {}); sharedStore.set("review.bases", null);
     panel.render(cx); await new Promise(setImmediate); await new Promise(setImmediate);
     assert.equal(panel.shown().page, "/worktree");
-    // A space on another machine has no review: jin.review listens on this one only.
-    activeSpace = "r1"; delete styles["review-nav-toggle"]; drawn.clear(); panel.render(cx);
-    assert.ok(drawn.has("review-note") && texts.get("review-empty-title") === "Not on this computer" && !panel.bySpace.has("r1"), "the empty state: icon, title, hint");
-    // With no review, the toolbar stays: the page's name, and the tree's switch greyed.
-    assert.ok(drawn.has("review-header") && texts.get("review-title") === "Review" && styles["review-nav-toggle"].opacity === 0.64);
-    assert.equal(styles["review-header"].h, 32, "the same bar with no review, so nothing moves as one loads");
+    // A space on another machine has its review there: its git and every daemon call run on that machine.
+    const ons = [], asked = [], ownReview = mainScope.review;
+    mainScope.exec = async (_cmd, args, options) => { ons.push(options.on); return args.includes("--show-toplevel") ? { code: 0, stdout: "/srv\n" } : args.includes("symbolic-ref") ? { code: 0, stdout: "main\n" } : { code: 0, stdout: "" }; };
+    mainScope.review = (repo, ...rest) => { asked.push(plain(repo)); return ownReview(repo, ...rest); };
+    activeSpace = "r1"; drawn.clear(); panel.render(cx); await new Promise(setImmediate); await new Promise(setImmediate);
+    const r1 = panel.bySpace.get("r1");
+    assert.ok(r1?.root === "/srv" && r1.page && ons.length && ons.every(on => on === "kvm"), "its git runs there");
+    assert.ok(asked.length && asked.every(repo => repo.root === "/srv" && repo.on === "kvm"), "and so does each daemon call");
+    mainScope.review = ownReview; panel.bySpace.delete("r1");
     activeSpace = "s1"; panel.bySpace.set("s1", pane); sharedStore.set("review.shown", was); mainScope.exec = env.exec;
     sharedStore.set("review", { space: "s1", root: "/repo", page: firstPage, n: pane.handled });
     drawn.clear(); panel.render(cx);

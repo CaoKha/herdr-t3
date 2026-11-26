@@ -1,5 +1,5 @@
 // A pulls.review review, the one `review` surface of the space panel (docs/adr/0017), showing the active space's. Others ask
-// for a page through shared(PANE); all of it comes from the jin.review daemon, on this machine only: a remote space has none.
+// for a page through shared(PANE); all of it comes from the jin.review daemon on the space's machine (daemon.js).
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, VirtualListScrollHandle, InputState, TextView } from "gpui-base";
@@ -100,7 +100,7 @@ export default class ReviewPanel extends View {
         const sp = byId.get(id);
         if (!sp || !s.surfaceAlive()) { s.evict(); this.bySpace.delete(id); if (this.front === s) this.front = null; }
         else if (!s.readable()) s.deferRead();
-        else if (s.noRepo && !s.root && !s.loading) { if (!sp.machine && workFolder(id) !== s.startFolder) s.start(sp, cx); }
+        else if (s.noRepo && !s.root && !s.loading) { if (workFolder(id) !== s.startFolder) s.start(sp, cx); }
         else if (s.dirty) s.load(cx);
       }
     });
@@ -166,6 +166,8 @@ export default class ReviewPanel extends View {
     this.surfaceBorn = surfaceBorn("review", space);
     // What it showed, if that was this tab's: closed and added again, it starts from the default.
     const was = reviewShown(space);
+    // Where its git and daemon run: the space's machine, null for this one.
+    this.on = spaces().find(s => s.id === space)?.machine ?? null;
     this.space = space; this.root = was?.root ?? null; this.page = was?.page ?? null; this.base = was?.base ?? this.page;
     this.handled = Date.now() - FRESH; this.noRepo = false; this.startFolder = null; this.startId = 0; this.evicted = false; this.awayAnalysis = null;
     // The width wrapped lines are cut at (`at`), a moment behind a width that's moving (nav-column.js holdWidth).
@@ -193,7 +195,7 @@ export default class ReviewPanel extends View {
       if (this.root || !root) { this.noRepo = !this.root; return cx.notify(); }
       this.noRepo = false;
       this.root = root;
-      const head = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "symbolic-ref", "--short", "-q", "HEAD"], { cwd: root }).catch(() => null);
+      const head = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "symbolic-ref", "--short", "-q", "HEAD"], { cwd: root, on: this.on }).catch(() => null);
       const branch = head?.code === 0 && head.stdout.trim();
       if (!live()) return;
       if (!this.page) { this.page = this.base = branch ? changesPage(chosenBase(this), branch) : "/worktree"; this.load(cx); }
@@ -458,7 +460,6 @@ export default class ReviewPanel extends View {
     const starting = () => note(loadingState("mods/review", t, "review-loading", "Loading the review…"));
     if (!space) return starting();
     if (panelState().owns && !surfacesFor(space.id).tabs.some(t => t.id === "review")) return div().size_full();
-    if (space.machine) return note(emptyState(t, "review-empty", `${LU}/file-diff.svg`, "Not on this computer", `Review reads repositories on this machine only, and this space is on ${space.machine}.`));
     const s = this.spaceReview(space, cx);
     s.follow(cx);
     if (!s.scroll) return starting();

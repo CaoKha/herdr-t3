@@ -8,7 +8,7 @@ const context = vm.createContext({ KEY: { panels: 't3.panels' }, GROUP_GAP: 4, l
   spaces: () => (spaceReads++, Object.keys(machines)).map(id => ({ id, active: id === ui.space, folder: '/space', machine: machines[id], tabs: [{ id: `${id}-tab`, active: true }] })),
   focused: () => cwd[ui.space] ? { space: ui.space, tab: `${ui.space}-tab`, terminal: `${ui.space}-t` } : null,
   panes: () => Object.entries(cwd).map(([s, dir]) => ({ tab: `${s}-tab`, terminal: `${s}-t`, cwd: dir })),
-  exec: async (_cmd, args, { cwd: dir }) => { const root = Object.keys(repos).find(r => dir === r || dir.startsWith(r + '/')); return root ? { code: 0, stdout: root + '\n' } : { code: 128, stdout: '' }; },
+  exec: async (_cmd, args, { cwd: dir, on = null }) => { const root = Object.keys(repos).find(r => (repos[r] === true ? null : repos[r]) === on && (dir === r || dir.startsWith(r + '/'))); return root ? { code: 0, stdout: root + '\n' } : { code: 128, stdout: '' }; },
   shared: k => saved[k], setShared: (k, v) => { saved[k] = v; },
   run: (cmd, a = {}) => { if (cmd === 'layout.select') ui.page = a.child; else if (cmd === 'layout.resize' && a.id === 'window-end') ui.end = a.px; else if (cmd === 'layout.resize' && a.id === 'panel') ui.panelSize = a.weight != null ? { weight: a.weight } : { px: a.px }; else if (a.id === 'panel') ui.open = cmd === 'layout.show'; else if (a.id === 'work') ui.wide = cmd === 'layout.hide'; },
 });
@@ -66,7 +66,9 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   assert.deepEqual({ ...await p.reviewRepo() }, { root: '/work/repo', problem: '' });
   cwd = {}; assert.match((await p.reviewRepo()).problem, /not in a Git repository/);
   repos = { '/space': true }; assert.equal((await p.reviewRepo()).root, '/space', 'no terminal: the space folder');
-  assert.match((await p.reviewRepo('far')).problem, /remote/);
+  // A space on another machine: git there finds its repository; the same path here is none of its.
+  assert.match((await p.reviewRepo('far')).problem, /not in a Git repository/);
+  repos = { '/space': 'devbox' }; assert.deepEqual({ ...await p.reviewRepo('far') }, { root: '/space', problem: '' });
   // An outside pick opens Review for its source only, then names the live tab in the request.
   const pick = { space: 'a', root: '/work/repo', page: '/worktree', analyze: true };
   const prior = saved.review = { n: Date.now() + 5000 }, laid = () => JSON.stringify([ui, saved['t3.panels']]);

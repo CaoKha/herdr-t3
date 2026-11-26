@@ -206,22 +206,20 @@ export function openReview({ space, root, page, base = undefined, analyze = fals
   return "opened";
 }
 
-// What Review says when it can't read, as the pages that hand work to it say it too; `remote` names who can't.
-export const REVIEW_PROBLEMS = { missing: "Review isn't installed: add the Review extra.", remote: (name = "Review") => `${name} is unavailable on remote spaces.`,
-  noRepo: "This tab's folder is not in a Git repository." };
+// What Review says when it can't read, as the pages that hand work to it say it too.
+export const REVIEW_PROBLEMS = { missing: "Review isn't installed: add the Review extra.", noRepo: "This tab's folder is not in a Git repository." };
 
 /**
- * Why Review can't read `space` now, or "" when it can: a space on another machine, or no Git repository where its tab works
- * (terminal-context.js workFolder: the last terminal's cwd, else the space folder), as T3's diff panel follows its thread's
+ * Why Review can't read `space` now, or "" when it can: no Git repository where its tab works (terminal-context.js
+ * workFolder: the last terminal's cwd, else the space folder), on the space's machine, as T3's diff panel follows its thread's
  * folder. `root` is that repository, Review's default. Not installed: no Review to ask about (panelState().pages).
  * @returns {Promise<{ root: string | null, problem: string }>}
  */
 export const reviewRepo = async (space = activeSpaceId()) => {
   const sp = spaces().find(s => s.id === space);
   if (!sp) return { root: null, problem: "No space is open." };
-  if (sp.machine) return { root: null, problem: REVIEW_PROBLEMS.remote() };
   const folder = workFolder(sp.id);
-  const top = folder ? await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"], { cwd: folder }).catch(() => null) : null;
+  const top = folder ? await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"], { cwd: folder, on: sp.machine ?? null }).catch(() => null) : null;
   const root = top?.code === 0 && top.stdout?.trim();
   return root ? { root, problem: "" } : { root: null, problem: REVIEW_PROBLEMS.noRepo };
 };

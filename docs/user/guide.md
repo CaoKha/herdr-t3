@@ -22,7 +22,7 @@ Each part in more detail than the [README](../../README.md).
   - The machine it works on: hover the folder icon for the folder, right-click the row to copy its path.
   - **Open in**: the main half opens the folder in Finder or the installed T3 editor last picked (Cursor, Trae, Kiro, VS Code/Insiders/VSCodium, Zed, Antigravity or JetBrains); the arrow only picks which, shared with Files. An uninstalled one falls back to Finder; on a remote space it says why it's off.
   - **Actions** (global): Add action when there are none, else the last one run and a menu of the rest, with Edit on hover. Editing keeps Details behind the dialog. A cut-off name shows whole on hover.
-  - **Review**: the main half shows Review; its end names the range Review shows. The arrow lists the ranges with their counts (`3 commits`, `1 file`), the one shown checked, and Commits opens beside them with a search. Picking one shows Review on it. It needs the Review extra and a local space.
+  - **Review**: the main half shows Review; its end names the range Review shows. The arrow lists the ranges with their counts (`3 commits`, `1 file`), the one shown checked, and Commits opens beside them with a search. Picking one shows Review on it. It needs the Review extra.
   - From the keyboard: opened with `cmd-shift-b` (or Enter on its button), its first control is ringed. ↑ and ↓ move between rows, ← and → between a row's two halves, Enter presses; a menu opened that way has its first row lit and, once closed, gives the keyboard back to its arrow. Escape closes Details and returns to your terminal.
   - Right-click the card to show or hide these, or Reset; with all hidden, Choose what to show brings them back.
   - Opening the panel puts Details away; with the panel maximized, the shortcut brings the terminals back first. Home has no Actions.
@@ -124,7 +124,7 @@ Or tell your Herdr agent: "Update Herdr T3: clone github.com/JinJieBeWater/herdr
 
 - Home is a space of its own: switch to another layout, run `herdr-app ls` or look from another machine, and it shows as one.
 - Rename Home and another window on the same Herdr core won't know it: it makes a second Home.
-- On a space on another machine, Review is greyed in the panel, and a Review bar you've added shows nothing.
+- On a space on another machine, Review runs `jin.review` there: install it on that machine too. It stays running only with a systemd user session there. A Review bar you've added counts there every 10 seconds, not on each change, and its `pwa`, `browser` and `official` modes open local folders only.
 - Files on another machine: text changes usually show up within 10 seconds while visible (slower for expensive reads); select an image again to reload it. Images over 512 KB aren't previewed.
 - Files previews text up to 1 MB, and colors only common languages (JavaScript and TypeScript, JSON, YAML, Rust, Go, Python, shell, CSS, C and C++, Java, Kotlin, Ruby, PHP, SQL, Lua, GraphQL, Makefiles); TOML, HTML, Swift and others show plain. While an agent rewrites a file over 16 KB you're looking at, or after you switch Wrap on one, it shows plain for a moment and takes its colours once it has stopped changing for about 10 s (0.3 s after a Wrap switch); if you scroll meanwhile, it stays plain until you open it again. Over 256 KB it stays plain unless you press **Highlight anyway** above the code, and colouring it holds the window for a moment.
 - Files shows code in Herdr's native read-only editor, so its line-number gutter can't match T3's background and height. You can still select text.

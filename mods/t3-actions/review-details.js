@@ -26,7 +26,7 @@ const roots = new Map();
 
 
 function reviewReason(source) {
-  return source.machine ? "Review is unavailable on remote spaces." : !source.folder ? "No working directory."
+  return !source.folder ? "No working directory."
     : !panelState().pages.includes("review") ? "Install the Review extra to use it." : "";
 }
 
@@ -69,7 +69,7 @@ export function prefetchRange(cx) {
     const root = (await sourceRepo(source))?.root;
     if (!root) return;
     roots.set(source.space, root);
-    readScope({ space: source.space, root }, cx);
+    readScope({ space: source.space, root, on: source.machine || null }, cx);
   });
 }
 
@@ -86,7 +86,7 @@ export function initRangeMenu(view, cx) {
   const at = (root, confirmed, cx) => {
     const shown = root ? reviewShown(source.space) : null;
     const page = shown?.root === root ? shown.page : null, base = page ? shown.base || page : undefined;
-    const scope = { root, space: source.space, page, base, scopeSearch, confirmed, pending: null,
+    const scope = { root, on: source.machine || null, space: source.space, page, base, scopeSearch, confirmed, pending: null,
       scopeAt: -1, closePopup: () => closeOverlay(p.overlay),
       openCommits: (cx, lit) => { if (view.scope === scope && !view.closed) openCommits(view, scope, lit, cx); },
       pick: (page, { base = undefined, analyze = false }) => {
@@ -158,7 +158,7 @@ export function rangeMenu(view) {
 export function initCommits(view) {
   const range = /** @type {any} */ (globalThis).t3DetailsRange, overlay = props().overlay, scope = range?.scope;
   if (!scope || range.closed || range.sub?.id !== overlay) return closeOverlay(overlay);
-  for (const k of ["space", "root", "page", "base", "scopeGit", "picks", "refs", "scopeRoot", "scopeBase"]) view[k] = scope[k];
+  for (const k of ["space", "root", "on", "page", "base", "scopeGit", "picks", "refs", "scopeRoot", "scopeBase"]) view[k] = scope[k];
   view.pick = (page, options) => { if (range.sub?.id === overlay) scope.pick(page, options); };
   view.scopeListAt = propsLit();
   view.scopeSearch = InputState.new({ placeholder: "Search commits" });

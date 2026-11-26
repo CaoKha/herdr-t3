@@ -78,8 +78,8 @@ export function setReviewed(view, files, reviewed, cx) {
     reviewed ? view.collapsed.add(file.path) : view.collapsed.delete(file.path);
   }
   view.version++; view.marks++; view.marking++;
-  const { root, page } = view;
-  const shas = files.map(file => file.sha), write = markWrites.then(() => review(root, "/api/review/reviewed", { page, shas, reviewed }));
+  const { root, on, page } = view;
+  const shas = files.map(file => file.sha), write = markWrites.then(() => review({ root, on }, "/api/review/reviewed", { page, shas, reviewed }));
   markWrites = write.catch(() => {});
   cx.spawn(async (cx) => {
     try { await write; }

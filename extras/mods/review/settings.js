@@ -27,15 +27,15 @@ function openUrl(url) {
 // Each lands on its own: the agents take seconds after the daemon starts, settings shown meanwhile can be picked. Only the
 // latest read's settings count, and none read before a save: they'd put back what the save changed.
 export function loadSettings(view, cx) {
-  const root = view.root, read = view.settingsRead = {};
+  const { root, on } = view, read = view.settingsRead = {};
   view.settingsError = null;
   const failed = (e) => { view.settingsError = e?.message ?? String(e); cx.notify(); };
   cx.spawn(async (cx) => {
-    try { view.agents = await request(root, "GET", "/api/agents"); cx.notify(); } catch (e) { failed(e); }
+    try { view.agents = await request({ root, on }, "GET", "/api/agents"); cx.notify(); } catch (e) { failed(e); }
   });
   cx.spawn(async (cx) => {
     try {
-      const shared = await request(root, "GET", "/api/settings");
+      const shared = await request({ root, on }, "GET", "/api/settings");
       if (view.settingsRead === read) { view.shared = shared; cx.notify(); }
     } catch (e) { failed(e); }
   });
@@ -55,8 +55,8 @@ function saveShared(view, patch, cx, reload = false) {
   const merged = (s) => ({ ...s, ...patch, ...patch.llm && { llm: { ...s?.llm, ...patch.llm } } });
   view.shared = merged(view.shared); view.settingsRead = null;
   cx.notify();
-  const root = view.root;
-  const turn = saving.then(async () => request(root, "PUT", "/api/settings", merged(await request(root, "GET", "/api/settings"))));
+  const { root, on } = view;
+  const turn = saving.then(async () => request({ root, on }, "PUT", "/api/settings", merged(await request({ root, on }, "GET", "/api/settings"))));
   saving = turn.catch(() => {});
   cx.spawn(async (cx) => {
     try { await turn; view.settingsError = null; }

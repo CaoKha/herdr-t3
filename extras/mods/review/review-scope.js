@@ -63,7 +63,7 @@ const scopeCache = new Map();
 // last read of this repository and base shows (`scopeCached`); with none, the rows' counts stay blank, `…` once slow.
 export function readScope(view, cx) {
   releaseScope(view);
-  const { root, space } = view, base = chosenBase(view), token = {}, key = `${root}\n${base ?? ""}`;
+  const { root, space, on = null } = view, base = chosenBase(view), token = {}, key = `${on ?? ""}\n${root}\n${base ?? ""}`;
   view.scopeRead = token;
   const live = () => view.scopeRead === token && !view.evicted && root === view.root && space === view.space && base === chosenBase(view);
   const kept = !repo(view) && scopeCache.get(key);
@@ -71,12 +71,12 @@ export function readScope(view, cx) {
   view.scopeCached = Boolean(repo(view));
   if (!view.scopeCached) cx.timer.after(150, (cx) => { if (live() && !repo(view)) { view.scopeSlow = true; cx.notify(); } });
   cx.spawn(async (cx) => {
-    const r = await readReview(root).catch(() => null);
+    const r = await readReview(root, on).catch(() => null);
     if (!live()) return;
-    const ab = r && base && r.branch !== "(detached)" ? await git(root, ["rev-list", "--left-right", "--count", `${base}...HEAD`]).catch(() => null) : null;
+    const ab = r && base && r.branch !== "(detached)" ? await git(root, ["rev-list", "--left-right", "--count", `${base}...HEAD`], on).catch(() => null) : null;
     if (!live()) return;
     if (ab?.code === 0) r.chosen = { ref: base, unmerged: parseInt(ab.stdout.trim().split(/\s+/)[1], 10) || 0 };
-    const [picks, refs] = r ? await Promise.all([readPicks(r.chosen ? { ...r, baseRef: r.chosen.ref, unmerged: r.chosen.unmerged } : r).catch(() => null), readRefs(root).catch(() => [])]) : [null, []];
+    const [picks, refs] = r ? await Promise.all([readPicks(r.chosen ? { ...r, baseRef: r.chosen.ref, unmerged: r.chosen.unmerged } : r).catch(() => null), readRefs(root, on).catch(() => [])]) : [null, []];
     if (!live()) return;
     const read = { scopeGit: r, picks, refs, scopeRoot: root, scopeBase: base };
     if (r) scopeCache.set(key, read);

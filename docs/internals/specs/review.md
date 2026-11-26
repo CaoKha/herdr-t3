@@ -68,8 +68,17 @@ Language, Agent and Model are settings submenus (Model searchable); a pick close
 ## Standalone Review bar
 
 - A count or `mod.open:pulls-review` keeps the space and working directory it was invoked for. The logo's menu opens only if that source is still current after Git returns, and its rows inherit that source. Switching spaces cannot carry an old selection into the new space, even if both show the same working directory.
-- In Herdr mode the count may request analysis; a commit or branch picked from the menu never does. The menu closes after the panel handoff, not before it. PWA, browser and official CLI modes still open outside Herdr with the selected repository and range.
+- In Herdr mode the count may request analysis; a commit or branch picked from the menu never does. The menu closes after the panel handoff, not before it. PWA, browser and official CLI modes still open outside Herdr with the selected repository and range, for a local folder only; on a remote space they say so. A remote repository is read every 10 s: `watchFolder` sees this machine only.
 
 ## Programs
 
-`jin.review` and the shared read-only Git range/base/ref helpers; the local daemon and Review's `config.json`. No remote Review.
+`jin.review` and the shared read-only Git range/base/ref helpers, run on the space's machine (`on`); Review's `config.json`.
+
+## Remote transport
+
+A remote space's Review talks to the daemon on that space's machine (`daemon.js`, one connection per machine):
+
+- State: `sh -c` there reads `~/.pulls.review/daemon.pid`, writes the session's `Cookie`, `Origin` and `Content-Type` lines to `~/.pulls.review/herdr-headers` (umask 077, the shell's own `printf`), and prints the port and that file's path. The session never reaches an argv.
+- Calls: `curl -sS -X <method> -H @<headers file> [--data-raw <json>] -w "\n%{http_code}" http://127.0.0.1:<port><path>` there, its last line the status. A curl that fails (exit ≠ 0) is a failed fetch; the same one retry, and one more on 401, as the local path.
+- Start, when none answers: herdr-core kills everything a remote command started once it returns, `setsid` and the daemon's own fork included; a systemd user unit survives. With `systemctl --user` there: `systemctl --user stop jin-review` (a dead daemon's unit stays active under RemainAfterExit), then `systemd-run --user --collect --unit=jin-review -p Type=oneshot -p RemainAfterExit=yes --working-directory=<root> jin.review -d --no-open --worktree`. Without one: plain `jin.review -d --no-open --worktree`, and a daemon gone right after says Review can't keep it running there. No `jin.review` there says how to install it.
+- Another worktree on a running daemon needs nothing: every review route registers the path it is given (the daemon's `reviewTree`).

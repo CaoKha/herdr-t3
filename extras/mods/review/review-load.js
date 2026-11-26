@@ -68,13 +68,13 @@ export function loadReview(view, cx, poll = false) {
   if (!view.root || !view.page) return;
   if (view.loading?.root === view.root && view.loading.page === view.page) { view.again = true; return; }
   // Switching, the group shown is the old page's: the new page's first group comes with the read instead.
-  const { root, page } = view, switched = view.switching, t = theme(), group = switched ? null : view.group(), marks = view.marks, id = startRead(view, cx);
+  const { root, on, page } = view, switched = view.switching, t = theme(), group = switched ? null : view.group(), marks = view.marks, id = startRead(view, cx);
   // Rows only for the files in view or just after that have none: apply() keeps the rest, and each asked-for file is highlighted anew.
   const rows = poll || !group ? [] : view.rowsWanted();
   const key = JSON.stringify(colors(t));
   readVisible(view, cx, {
     current: () => id === view.loadId,
-    request: () => review(root, "/api/review", { page, colors: colors(t), rows, firstRows: !group }),
+    request: () => review({ root, on }, "/api/review", { page, colors: colors(t), rows, firstRows: !group }),
     commit: (r, cx) => {
       // The theme changed meanwhile: these rows have the old colors, and later reads ask only for files without rows.
       if (JSON.stringify(colors(theme())) !== key) { view.again = true; return; }
@@ -121,13 +121,13 @@ export function loadRows(view, cx) {
   const rows = view.rowsWanted(), more = rows.length ? null : view.pageWanted();
   if (!rows.length && !more) return;
   if (view.stale || view.loading) return view.load(cx);
-  const { root, page, review: shown } = view, t = theme(), key = JSON.stringify(colors(t)), id = startRead(view, cx);
+  const { root, on, page, review: shown } = view, t = theme(), key = JSON.stringify(colors(t)), id = startRead(view, cx);
   const whole = more && view.full.get(more);
   readVisible(view, cx, {
     current: () => id === view.loadId,
     request: () => whole
-      ? review(root, "/api/review/file", { page, file: more, colors: colors(t), from: whole.rows.length })
-      : review(root, "/api/review/rows", { page, colors: colors(t), files: more ? [more] : rows, base: shown.base?.sha ?? "", head: shown.head?.sha ?? "", ...more ? { from: rowCount(view.fileAt(more).hunks) } : {} }),
+      ? review({ root, on }, "/api/review/file", { page, file: more, colors: colors(t), from: whole.rows.length })
+      : review({ root, on }, "/api/review/rows", { page, colors: colors(t), files: more ? [more] : rows, base: shown.base?.sha ?? "", head: shown.head?.sha ?? "", ...more ? { from: rowCount(view.fileAt(more).hunks) } : {} }),
     commit: (r) => {
       if (JSON.stringify(colors(theme())) !== key) { view.again = true; return; }
       if (r.stale) { view.stale = view.again = true; return; }
@@ -195,7 +195,7 @@ export function recolorFulls(view, cx) {
 // on when the old attempt answers or on the page/row lane's read id.
 function readFulls(view, cx, { afterPage = false } = {}) {
   if (!view.fullReads.size || view.switching || !canRead(view) || view.dirty) return;
-  const { root, page } = view, palette = colors(theme()), key = JSON.stringify(palette);
+  const { root, on, page } = view, palette = colors(theme()), key = JSON.stringify(palette);
   for (const [path, intent] of view.fullReads) {
     if (intent.period !== view.hiddenId && !afterPage) continue;
     const sameFile = () => { const file = view.fileAt(path); return canFull(file) && file.sha === intent.sha; };
@@ -205,7 +205,7 @@ function readFulls(view, cx, { afterPage = false } = {}) {
     intent.period = view.hiddenId;
     readVisible(view, cx, {
       current: () => view.fullReads.get(path) === intent && intent.attempt === attempt && sameFile() && JSON.stringify(colors(theme())) === key,
-      request: () => review(root, "/api/review/file", { page, file: path, colors: palette }),
+      request: () => review({ root, on }, "/api/review/file", { page, file: path, colors: palette }),
       commit: (result, cx) => {
         clipRows(result.rows);
         view.fullReads.delete(path); view.full.set(path, result); view.collapsed.delete(path);
@@ -225,7 +225,7 @@ function dropFull(view, path) { view.full.delete(path); view.fullReads.delete(pa
 export function pollReview(view, cx) {
   if (view.surfaceAlive?.() === false) return;
   if (view.polling) return;
-  const { root, page } = view;
+  const { root, on, page } = view;
   view.polling = true;
   const current = () => view.surfaceAlive() && root === view.root && page === view.page;
   const ended = (cx, error) => {
@@ -240,7 +240,7 @@ export function pollReview(view, cx) {
   };
   cx.spawn(async (cx) => {
     try {
-      const s = await review(root, "/api/review/status", { page });
+      const s = await review({ root, on }, "/api/review/status", { page });
       if (!current()) return;
       const a = view.runState();
       if (!a) return;
@@ -296,25 +296,25 @@ export function applyReview(view, r) {
 // One commit's page lists only itself: the diff's commits come from its base, read without rows after each read of none, so a new
 // commit reaches the header's list. A failed read leaves the list as it was.
 function loadBaseCommits(view, cx) {
-  const { root, base } = view;
+  const { root, on, base } = view;
   if (view.page === base) return;
   readVisible(view, cx, {
     current: () => root === view.root && base === view.base,
-    request: () => review(root, "/api/review", { page: base, colors: colors(theme()), rows: [] }),
+    request: () => review({ root, on }, "/api/review", { page: base, colors: colors(theme()), rows: [] }),
     commit: (r, cx) => { view.baseCommits = r.commits; cx.notify(); },
   });
 }
 
 export function analyzeReview(view, cx, force) {
   if (view.surfaceAlive?.() === false) return;
-  const { root, page } = view;
+  const { root, on, page } = view;
   // shortcut: 10 s is a guess at the slowest start, and a start that fails says nothing; replace it once the worktree server answers when it has started.
   view.startingUntil = Date.now() + 10000; view.analyzeError = null;
   cx.timer.after(10000, (cx) => { view.report(); cx.notify(); });
   cx.notify();
   const current = () => view.surfaceAlive() && root === view.root && page === view.page;
   cx.spawn(async (cx) => {
-    try { await review(root, "/api/review/analyze", { page, force }); }
+    try { await review({ root, on }, "/api/review/analyze", { page, force }); }
     catch (e) { if (current()) { view.startingUntil = 0; view.analyzeError = e?.message ?? String(e); view.report(); } }
     if (!current()) return;
     cx.notify();

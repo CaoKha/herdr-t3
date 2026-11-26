@@ -95,11 +95,12 @@ export function watchReview(view, cx) {
     view.reviewAt.set(key, Date.now());
     cx.spawn(async (cx) => {
       try {
-        const review = where.cwd && !where.on ? await readReview(where.cwd) : null;
+        const review = where.cwd ? await readReview(where.cwd, where.on) : null;
         if (view.reviewClosed) return;
         view.reviews.set(key, review);
         const root = review?.root;
-        if (root && view.reviewKey === key && !view.reviewWatching.has(root)) {
+        // watchFolder sees this machine only: another's repository is read every 10 s.
+        if (root && !where.on && view.reviewKey === key && !view.reviewWatching.has(root)) {
           const token = { wait: null };
           view.reviewWatching.set(root, token);
           cx.spawn(async () => {

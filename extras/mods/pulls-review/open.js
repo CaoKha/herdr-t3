@@ -32,10 +32,10 @@ async function core([command, ...args]) {
 }
 
 // The page the CLI opens for `args` (its pageFor), for a server that is already running.
-async function pageFor(root, args) {
+async function pageFor(root, args, on = null) {
   if (args[0]) return argPage(args);
-  const [head, base] = await Promise.all([git(root, ["symbolic-ref", "--short", "-q", "HEAD"]),
-    git(root, ["symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD"])]);
+  const [head, base] = await Promise.all([git(root, ["symbolic-ref", "--short", "-q", "HEAD"], on),
+    git(root, ["symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD"], on)]);
   const branch = head.stdout.trim(), main = base.stdout.trim().replace(/^origin\//, "");
   // shortcut: without origin/HEAD, main and master count as the default branch even if absent; read the CLI's resolveDefaultBranch if that matters.
   return branch && branch !== main && (main || !["main", "master"].includes(branch)) ? argPage([], branch) : "/";
@@ -80,21 +80,21 @@ export async function launch(input) {
   const fail = (body) => notify({ title: "pulls.review", body, level: "error" }), { source } = input;
   try {
     let { root } = input;
+    const { cwd, on } = source;
     if (!root) {
-      const { cwd, on } = source;
-      // The servers listen on this machine's loopback only.
-      if (on) return fail(`Only local folders, not ${on}.`);
       if (!cwd) return fail("No folder for the focused pane.");
-      const top = await git(cwd, ["rev-parse", "--show-toplevel"]);
+      const top = await git(cwd, ["rev-parse", "--show-toplevel"], on);
       if (top.code !== 0) return fail("Not a git repository.");
       root = top.stdout.trim();
     }
-    const status = input.args ? "" : (await git(root, ["status", "--porcelain"])).stdout;
-    const args = input.args ?? (await changedFiles(root, status.split("\n").filter(Boolean).length) ? ["--worktree"] : []);
+    const status = input.args ? "" : (await git(root, ["status", "--porcelain"], on)).stdout;
+    const args = input.args ?? (await changedFiles(root, status.split("\n").filter(Boolean).length, on) ? ["--worktree"] : []);
     const mode = await readMode();
-    if (mode === "official") return await official(root, args, input.page);
     // The pane starts the analysis itself, and only with its Analyze automatically setting on, as the app never does unasked.
-    if (mode === "herdr") return herdr(root, input.page ?? await pageFor(root, args), input.analyze, source.space);
+    if (mode === "herdr") return herdr(root, input.page ?? await pageFor(root, args, on), input.analyze, source.space);
+    // The other servers open in this machine's browser, on its loopback.
+    if (on) return fail(`"open": "${mode}" in config.json opens local folders only, not ${on}.`);
+    if (mode === "official") return await official(root, args, input.page);
     // `--analyze` starts the AI analysis, or follows the one running; the official CLI has no such flag.
     const r = await cli("jin.review", ["-d", ...(mode === "pwa" ? ["--pwa"] : []), ...(input.analyze ? ["--analyze"] : []), ...args], { cwd: root });
     if (r.code !== 0) fail((r.stderr || r.stdout).trim() || `exit ${r.code}`);

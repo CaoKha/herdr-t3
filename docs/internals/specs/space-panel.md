@@ -48,6 +48,6 @@ On a layout jump to a known space, restore the destination's panel slot, visibil
 
 ## Which repository Review reads
 
-The repository where the tab works: its last active terminal's cwd, else the space folder (as T3's diff follows its thread). Remote, or not a repository, greys Review with the reason, in `+` too. `panel.js` `reviewRepo` decides it once for the menu, the empty page, `cmd-shift-g` and Review itself.
+The repository where the tab works, found by git on the space's machine: its last active terminal's cwd, else the space folder (as T3's diff follows its thread). Not a repository greys Review with the reason, in `+` too. `panel.js` `reviewRepo` decides it once for the menu, the empty page, `cmd-shift-g` and Review itself.
 
 Details and the standalone Review bar pass the source space and the selected repository and range to `panel.js` `openReview`. It rejects a different active space or a missing Review slot without changing the panel or the request, otherwise shows Review and publishes the request for the tab it showed. The native Herdr stack still takes a request without `born` and keeps no T3 tabs. Review's own range choices only publish to its current tab, without showing it again or taking focus.

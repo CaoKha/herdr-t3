@@ -55,14 +55,19 @@ const launch = (scope, input) => scope.launch({ source: scope.reviewLocation(), 
   let status = ["# branch.oid 1a2b", "# branch.head feat", "# branch.upstream origin/feat", "# branch.ab +2 -1",
     "1 .M N... 100644 100644 100644 1a2b 1a2b src/a.js", "2 R. N... 100644 100644 100644 1a2b 1a2b R100 new.js\told.js", "? notes.md", ""].join("\n");
   const refs = { "main...HEAD": "0\t4\n" }; // No origin/HEAD, no origin/main: the local main.
-  scope.exec = async (_command, args) => args.includes("--show-toplevel") ? { code: 0, stdout: "/repo\n" }
+  const ons = new Set();
+  scope.exec = async (_command, args, { on }) => (ons.add(on), args.includes("--show-toplevel")) ? { code: 0, stdout: "/repo\n" }
     : args.includes("symbolic-ref") ? { code: 1, stdout: "" }
     : args.includes("rev-list") ? (refs[args.at(-1)] ? { code: 0, stdout: refs[args.at(-1)] } : { code: 128, stdout: "" })
     : _command === "sh" ? { code: 1, stdout: "" } // No net diff to read: status's count, as without sh. A real repo's is below.
     : (assert.ok(args.includes("--untracked-files=all"), "a new folder counts its files, as the page it opens"), { code: 0, stdout: status });
   const review = await scope.readReview("/repo/src");
   const show = r => bar.reviews.set(location(scope), r);
-  assert.deepEqual(plain(review), { root: "/repo", branch: "feat", upstream: "origin/feat", base: "main", baseRef: "main", changed: 3, ahead: 2, behind: 1, unmerged: 4, newer: 0, gone: false });
+  assert.deepEqual(plain(review), { root: "/repo", on: null, branch: "feat", upstream: "origin/feat", base: "main", baseRef: "main", changed: 3, ahead: 2, behind: 1, unmerged: 4, newer: 0, gone: false });
+  // On another machine every read runs there, and the counts name it for the reads that follow (readPicks).
+  ons.clear();
+  assert.equal((await scope.readReview("/repo/src", "vps")).on, "vps");
+  assert.deepEqual([...ons], ["vps"]);
   show(review);
   const drawn = bar.render();
   assert.deepEqual(strings(find(drawn, "review-open")), ["4", "ahead of main"], "the branch's count says what it is against");

@@ -268,16 +268,16 @@ async function reads() {
   assert.ok(find(root, "t3-pulls-detail-5"), "t3-pulls.open:5 shows #5");
   p.st().picked = null;
 
-  // A space on another machine: its own read, there; Review can't take it.
+  // A space on another machine: its own read, there; Review takes it, fetched there, and pulls.review, a browser there, can't.
   p.w.spaces.push(space("s2", "/q", false, "vps"));
   p.activate("s2");
   root = (await p.draw()).root;
   same(p.w.ran.filter((r) => r.cmd === "git").slice(-2).map((r) => [r.cwd, r.on]), [["/q", "vps"], ["/q", "vps"]], "switching spaces reads the new one on its machine");
   root = (await p.draw()).root;
-  const review = find(root, "t3-pulls-review");
-  same([review.style.opacity?.[0], review.handlers.on_click], [0.64, undefined]);
-  assert.equal(p.view.reviewReason(p.st("s2"), p.w.spaces[1], ["pulls", "review"]), "Review is unavailable on remote spaces.");
-  assert.equal(p.w.ran.filter((r) => r.args.includes("fetch")).length, 0);
+  assert.equal(p.view.pullsReason(p.st("s2"), p.w.spaces[1], ["pulls", "review"]), "pulls.review is unavailable on remote spaces: it opens in that machine's browser.");
+  find(root, "t3-pulls-review").handlers.on_click({}, p.cx); await p.settle();
+  same(p.w.ran.filter((r) => r.args.includes("fetch")).map((r) => r.on), ["vps"], "fetched on its machine");
+  same([p.sh.review?.space, p.sh.review?.root], ["s2", "/q"], "and handed to Review for that space");
 }
 
 async function staleReads() {
@@ -375,7 +375,7 @@ async function reviewHandoff() {
   const q = makePage({ spaces: [space("s1", "/r", true)], slots: ["files", "panel-empty", "pulls"] });
   await q.tick(); await q.draw();
   root = (await q.draw()).root;
-  assert.equal(q.view.reviewReason(q.st(), q.w.spaces[0], ["files", "panel-empty", "pulls"]), "Review isn't installed: add the Review extra.");
+  assert.equal(q.view.reviewReason(q.st(), ["files", "panel-empty", "pulls"]), "Review isn't installed: add the Review extra.");
   assert.equal(find(root, "t3-pulls-review").handlers.on_click, undefined);
   find(root, "t3-pulls-more").handlers.on_click({}, q.cx);
   root = (await q.draw()).root;
