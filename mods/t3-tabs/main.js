@@ -1,6 +1,6 @@
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
+import { checking, spaces, panes, agents, terminals, run, openOverlay, focused, notify, theme, window, layout, settings, props, shared, setShared, nextCommand } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, terminalByAddress, treeStatus } from "./tree.js";
 import { statusMark } from "./status-mark.js";
@@ -10,7 +10,8 @@ import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { registerSpaceArrival } from "./space-arrival.js";
 import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
-import { opener, popupOpen, hang } from "./trigger.js";
+import { opener, popupOpen, hang, trigger } from "./trigger.js";
+import { agentsOn, lookAgents } from "./known-agents.js";
 import { litProp } from "./list.js";
 import { sidebarParts, toggleLeft } from "./sidebar.js";
 import { navigation } from "./navigation.js";
@@ -83,6 +84,9 @@ function homeLone(home) {
 }
 const homeWhole = (home) => Boolean(homeLone(home));
 
+// New tab's menu, as wide as the layout's other menus (t3-menu's).
+const NEW_MENU_W = 220;
+
 export default class Tabs extends View {
   /** @type {{ space?: string }} */
   panelPending = null; // Written by panel.js on this block only.
@@ -94,6 +98,8 @@ export default class Tabs extends View {
     this.nameW = {};
     this.dragKeys = cx.focus_handle();
     const part = props()?.part;
+    // What New tab's menu lists here, asked by the copy drawing + before it first opens, so it opens at its height.
+    if (part === "end" && !checking()) cx.spawn(() => lookAgents(null));
     if (part !== "measure" && part !== "keys") stopsInit(this, cx);
     // A close may ask first: the dialog covers the strip, and nothing reports the pointer's leaving until it moves, so the
     // strip, which hears the commands too, clears its hover then. Herdr's own wait, so a reload ends it.
@@ -120,9 +126,6 @@ export default class Tabs extends View {
         else if (command === "toggle-sidebar") this.toggleSidebar();
         else if (command === "settle") await this.settle(cx);
         // The space panel (docs/adr/0017), keyed as VS Code's: a surface opens on it, or puts away the panel showing it; `panel` keeps it as it was.
-        else if (command === "files") togglePanel("files");
-        else if (command === "pulls") togglePanel("pulls");
-        else if (command === "issues") togglePanel("issues");
         else if (command === "review") {
           const p = panelState(), sp = spaces().find(s => s.active);
           if (!p.pages.includes("review")) continue;
@@ -132,6 +135,8 @@ export default class Tabs extends View {
           if (!problem) togglePanel("review");
           else notify({ title: "Review unavailable", body: problem, level: "warning" });
         }
+        // Any other of the panel's surfaces by its slot's name (`files`, `pulls`, `issues`, a page mod's own).
+        else if (panelState().pages.includes(command)) togglePanel(command);
         else if (command === "panel") togglePanel();
         else if (command === "details") {
           if (this.navigation.atHome) continue;
@@ -395,7 +400,7 @@ export default class Tabs extends View {
       return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
         .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
           // One size with the panel toggle beside it (「规则」R2).
-          .when(newTabShown, el => el.child(button("tab-new", "mods/t3-tabs/icons/plus.svg", "New tab", () => run("t3-tabs.new"), "t3-tabs.new")))));
+          .when(newTabShown, el => el.child(this.newTabMenu(t)))));
     }
     if (part === "window") {
       const panel = panelState(), toggleShown = !this.navigation.atHome && panel.pages.length > 0 && !panel.open;
@@ -543,6 +548,15 @@ export default class Tabs extends View {
           // A cut end fades out, in both modes: one way for the strip to run out of room, and a tab cut short reads as cut, not as
           // a narrow tab. 16px of the bar's own color in steps, there being no gradient fill for an element.
           .children(stripFades(t.chrome, this.tabStrip)))));
+  }
+
+  // Lists' +: what the new tab runs, as Herdr's New menu, under it (t3-menu's "new-tab": Terminal, then each installed agent);
+  // t3-tabs.new (its key) is still a terminal at once. The menu is as tall as its rows: the agents this machine last reported.
+  newTabMenu(t) {
+    const sp = spaces().find(p => p.active), agents = agentsOn(sp?.machine), rows = 1 + (agents ? agents.length : 1);
+    return trigger(this, t, "tab-new", { icon: "mods/t3-tabs/icons/plus.svg", label: "New tab", action: "t3-tabs.new", below: true,
+      closed: closedKey("t3-menu"), onOpen: (b) => sp && openOverlay({ mod: "t3-menu", kind: "popup", width: NEW_MENU_W, height: 8 + rows * 28 + (rows > 1 ? 9 : 0),
+        ...hang(b, NEW_MENU_W, { align: "end" }), props: { tab: "new-tab", target: { space: sp.id }, ...litProp(!b) } }) });
   }
 
   // With the Inbox showing, who's in view, as T3's thread header: the space, a sub-agent's parent, then the agent in view

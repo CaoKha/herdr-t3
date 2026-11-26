@@ -12,6 +12,7 @@ import { presets } from "./snooze-presets.js";
 import { agentKids, kidStatus, ownStatus, stillSettled, subAgents, treeStatus } from "./tree.js";
 import { isSubAgent, namer, programOf } from "./name.js";
 import { programIcon } from "./program.js";
+import { agentsOn, lookAgents } from "./known-agents.js";
 import { statusMark, took } from "./status-mark.js";
 import { alpha } from "./color.js";
 import { focusAgent, focusPane } from "./zoom.js";
@@ -111,7 +112,7 @@ const grouped = (...groups) => groups.flatMap((g, n) => g.map((it) => [it[0], it
 // An intent includes the arguments and the displayed verb: e.g. Settle and Un-settle run the same command but are not interchangeable.
 const itemId = (it) => JSON.stringify(it.slice(0, 3));
 
-function items(p, git) {
+function items(p, git, agents = null) {
   p = p ?? {};
   const tg = p.target ?? {};
   switch (p.tab) {
@@ -160,6 +161,13 @@ function items(p, git) {
     }
     case "agent":
       return agentItems(tg.address);
+    // New tab's menu (the tab bar's +): a terminal, then each agent installed where the space is, started there (t3-tabs).
+    case "new-tab": {
+      const sp = spaces().find((s) => s.id === tg.space);
+      if (!sp) return [];
+      return grouped([["Terminal", "tab.new", { space: sp.id }, newTabKey(sp)]],
+        agents ? agents.map((a) => [a.name, "new-agent", { space: sp.id, program: a }]) : [["Checking installed agents…", "none", { disabled: true }]]);
+    }
     // Its Snooze: the card's times, when each wakes on the right, then Custom (the Inbox's dialog).
     case "snooze":
       return grouped(presets(Date.now()).map((p) => [p.label, "snooze-preset", { address: tg.address, ...(p.hours ? { hours: p.hours } : { at: p.at }) }, p.when]),
@@ -192,7 +200,8 @@ function items(p, git) {
 // Every icon is this mod's own, Lucide's at the layout's 1.75 (t3-tokens P4; check-menu.cjs reads each). Null: a Snooze
 // time, drawn as the card's menu draws them, with none.
 function menuIcon(command, label, args) {
-  if (command === "snooze-preset" || command === "custom-snooze") return null;
+  if (command === "snooze-preset" || command === "custom-snooze" || command === "none") return null;
+  if (command === "tab.new" && label === "Terminal") return "mods/t3-menu/icons/terminal.svg";
   const name = command === "copy" ? "copy" : command.startsWith("t3-tabs.settle") ? (label === "Settle" ? "check" : "undo") : command.startsWith("t3-tabs.pin:") ? "pin"
     : command.startsWith("t3-tabs.unpin:") ? "pin-off" : command === "snooze" ? "alarm-clock" : command.startsWith("t3-tabs.wake:") ? "alarm-clock-off"
     : command.startsWith("t3-tabs.unread:") ? "circle-dot"
@@ -314,6 +323,10 @@ export default class Menu extends View {
     this.typed = "";
     this.typedAt = -Infinity;
     this.git = null;
+    // New tab's agents where its space is: as last reported at once, then asked again.
+    const target = p?.tab === "new-tab" && spaces().find((s) => s.id === p.target?.space);
+    this.agents = target ? agentsOn(target.machine) : null;
+    if (target && !checking()) cx.spawn(async (cx) => { this.agents = await lookAgents(target.machine); cx.notify(); });
     // The submenu's pointer state (submenu.js), the one open { id, row }, and each row's bounds as the pointer last found it.
     this.s = {};
     this.sub = null;
@@ -338,7 +351,7 @@ export default class Menu extends View {
       const space = spaces().find((s) => s.id === p.target?.id);
       if (space && space.machine === this.git.machine && place(space) === this.git.folder) git = this.git.kind;
     }
-    return items(p, git);
+    return items(p, git, this.agents);
   }
 
   // For the control that opened it: a press on it that closed this mustn't reopen it (justClosed in focus.js); for the menu
@@ -366,6 +379,7 @@ export default class Menu extends View {
     const p = props() ?? {};
     const it = /** @type {any} */ (this.liveItems(p).find((candidate) => itemId(candidate) === id));
     if (!it || (p.tab === "snooze" && !agentItems(p.target?.address).some((candidate) => candidate[1] === "snooze"))) return;
+    if (it[1] === "none") return;
     // Its times, beside it: this stays open.
     if (it[1] === "snooze") return this.openSub(id, it, lit);
     const wake = it[1] === "snooze-preset" ? (it[2].hours ? Date.now() + it[2].hours * 3_600_000 : it[2].at) : null;
@@ -379,6 +393,7 @@ export default class Menu extends View {
     else if (it[1] === "copy") cx.write_to_clipboard(it[2].text);
     else if (wake !== null) run(`t3-tabs.snooze:${it[2].address}:${wake}`, {});
     else if (it[1] === "custom-snooze") openOverlay({ mod: "t3-inbox", kind: "dialog", frame: "none", width: 384, props: { customSnooze: it[2].address, answer: "t3-tabs.snooze" } });
+    else if (it[1] === "new-agent") run(`t3-tabs.new-agent:${encodeURIComponent(it[2].space)}:${encodeURIComponent(it[2].program.name)}`);
     else if (it[1] === "tab.new") { const sp = spaces().find((s) => it[2].space ? s.id === it[2].space : s.active); if (sp) startTab(sp); }
     else run(it[1], it[2]);
   }
@@ -547,13 +562,14 @@ export default class Menu extends View {
       // Off the menu, nothing pending opens; a submenu open stays.
       .on_hover((on) => { if (!on) subLeft(this.s); })
       // A submenu's ← goes back to its menu, as its Esc does.
-      .on_key_down(menuKeys(selection, list.map((it) => it[0]), (at, cx, lit) => this.choose(ids[at], cx, lit), { back: Boolean(p.parents?.length), sub: (at) => at === snooze }))
+      .on_key_down(menuKeys(selection, list.map((it) => it[0]), (at, cx, lit) => this.choose(ids[at], cx, lit), { back: Boolean(p.parents?.length), sub: (at) => at === snooze, disabled: (at) => Boolean(list[at]?.[2]?.disabled) }))
       .children(
         list.map((it, i) =>
           v_flex()
             .when(i > 0 && list[i - 1][4] !== it[4], el => el.child(menuRule(t)))
             .child(menuRow(this, t, `mi-${ids[i]}`, {
-              at: [selection, "at", i], label: it[0], open: ids[i] === this.sub?.row, icon: menuIcon(it[1], it[0], it[2]) || null, sub: it[1] === "snooze" && "mods/t3-menu/icons",
+              at: [selection, "at", i], label: it[0], open: ids[i] === this.sub?.row, sub: it[1] === "snooze" && "mods/t3-menu/icons", disabled: Boolean(it[2]?.disabled),
+              icon: it[2]?.program ? programIcon(it[2].program, 16, t.muted) : menuIcon(it[1], it[0], it[2]) || null,
               // Only what deletes something is red, in words, as T3's destructive item: a Close asks first while a program runs.
               color: it[1] === "worktree" && it[2].action === "remove" ? t.ansi1 : null,
               trail: it[1] === "snooze" ? null : menuHint(t, it[3] ?? shortcut(it[1], it[2], bound)),

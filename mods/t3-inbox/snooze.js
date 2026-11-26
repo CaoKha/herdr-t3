@@ -1,6 +1,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Popover, Popup, Select, InputState, Input, NumberInput } from "gpui-base";
 import { run, theme, props, settings, closeOverlay } from "herdr";
+import { segmented } from "./segmented.js";
 import { stopsInit, stop, focusRoot, onStop } from "./focus.js";
 import { menuJump, openLit } from "./list.js";
 import { menuRow, menuRule, menuHint } from "./menu-row.js";
@@ -130,10 +131,6 @@ export function customView(view) {
   // 11 and T3's 1px border, as its controls count their padding.
   const input = (state) => h_flex().h(32).px(11).rounded(8).border(1).border_color(t.border).bg(t.input).items_center()
     .child(Input.new(state).flex_1().h_full().text_size(14).text_color(t.foreground));
-  const choice = (id, on, name, pick) => stop(view, t, id, h_flex().id(id).h(24).flex_1().px(10).rounded(6).items_center().justify_center().text_size(12).font_medium()
-    .when(on, (el) => el.bg(t.selected)).text_color(on ? t.foreground : t.dim).hover((s) => s.text_color(t.foreground))
-    .role("button").accessibility_label(name)
-    .on_click((_e, cx) => { pick(); view.error = null; cx.notify(); }).child(name));
   const dialogButton = (id, text, primary, act) => stop(view, t, id, button(t, id, { text, variant: primary ? "primary" : "outline", size: "default", surface: "card" })
     .cursor_pointer().on_click(act), radiusOf("default"));
   // NumberInput replays these onto its own step buttons (their ids are its own); inside the frame's 1px, so 7 round.
@@ -223,10 +220,10 @@ export function customView(view) {
         .child(div().text_size(12).text_color(t.dim).child("Esc")))
       .child(div().line_height("20px").text_color(t.muted).child("Choose when snoozed agents return to your inbox.")))
     .child(v_flex().flex_none().px(24).pt(4).pb(24).gap(16)
-      // T3's segmented group: the track and 2 around its toggles.
-      .child(h_flex().gap(2).p(2).rounded(8).bg(t.input)
-        .child(choice("mode-date", view.mode === "date", "Date and time", () => { view.mode = "date"; view.time.focus(); }))
-        .child(choice("mode-duration", view.mode === "duration", "Duration", () => { view.mode = "duration"; view.amount.focus(); })))
+      .child(segmented(view, t, [
+        { id: "mode-date", label: "Date and time", on: view.mode === "date", pick: () => { view.mode = "date"; view.time.focus(); view.error = null; } },
+        { id: "mode-duration", label: "Duration", on: view.mode === "duration", pick: () => { view.mode = "duration"; view.amount.focus(); view.error = null; } },
+      ], { fill: true }))
       .child(when)
       .when(Boolean(view.error), (el) => el.child(div().id("custom-error").role("alert").line_height("20px").text_color(t.blocked).child(view.error))))
     .child(h_flex().flex_none().px(24).py(16).gap(8).items_center().justify_end().border_t(1).border_color(t.border)

@@ -32,6 +32,7 @@ function fixture() {
     run: (name, args) => calls.push([name, plain(args ?? {})]),
     exec: async () => ({ code: 0, stdout: "", stderr: "" }),
     folderExists: async () => true,
+    knownAgents: async ({ on }) => [{ name: "Claude Code", run: ["claude"], installed: true }, { name: "Pi", run: ["pi"], installed: on === "vps" }],
     hc: args => { labelled.push([...args]); return Promise.resolve(hcAnswer(args)); },
     notify: n => notifications.push(n),
     openOverlay: spec => { events.push("open"); overlays.push(spec); return overlays.length; },
@@ -441,7 +442,7 @@ async function checkCleanup() {
 function keysBlock(f, over = {}) {
   const pending = [];
   const scope = vm.createContext({
-    ...f, View: class {}, props: () => ({ part: "keys" }), layoutNode: () => null, restorePanel() {},
+    ...f, View: class {}, props: () => ({ part: "keys" }), layoutNode: () => null, restorePanel() {}, panelState: () => ({ pages: [] }),
     nextCommand: () => new Promise(resolve => pending.push(resolve)), ...over,
   });
   vm.runInContext([source, kit.strip(read("pins.js")), kit.strip(read("notice.js")), kit.strip(read("main.js")).replace("export default class", "globalThis.Mod = class")].join("\n"), scope);
@@ -624,7 +625,7 @@ async function checkUnread() {
 async function checkDetailsKey() {
   const f = fixture();
   let wide = false;
-  const send = keysBlock(f, { panelState: () => ({ wide }), toggleWide: () => { f.calls.push(["wide"]); } });
+  const send = keysBlock(f, { panelState: () => ({ wide, pages: [] }), toggleWide: () => { f.calls.push(["wide"]); } });
   await send("details");
   assert.deepEqual([plain(f.calls.splice(0)), f.timers.length], [[["t3-actions.details", {}]], 0], "nothing to wait for: it opens with the press");
   wide = true;
@@ -1631,6 +1632,20 @@ async function checkNewTabMissingFolder() {
       ["tab.new", { space: "s2", folder: "/work/s2" }],
     ]);
     assert.deepEqual(f.notifications, []);
+  }
+  {
+    // New tab's menu: `new-agent:<space>:<agent>`, each part URI-encoded, starts that installed agent where the space is now,
+    // with its own command; one not installed there says so and starts nothing.
+    const f = fixture();
+    const view = f.navigation();
+    await view.handle(`new-agent:${encodeURIComponent("s2")}:${encodeURIComponent("Claude Code")}`, f.cx);
+    await view.handle(`new-agent:${encodeURIComponent("s2")}:Pi`, f.cx);
+    await view.handle(`new-agent:${encodeURIComponent("s1")}:Pi`, f.cx);
+    assert.deepEqual(plain(f.calls), [
+      ["tab.new", { space: "s2", folder: "/work/s2", name: "Claude Code", argv: ["claude"] }],
+      ["tab.new", { space: "s2", folder: "/work/s2", name: "Pi", argv: ["pi"] }],
+    ], "the agent's own command, in the space's live folder");
+    assert.deepEqual(f.notifications.map((n) => n.title), ["Agent not found"], "Pi isn't installed on this computer");
   }
   {
     // checking() skips folder probing.

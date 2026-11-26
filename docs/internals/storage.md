@@ -108,6 +108,12 @@ Markdown 文件显示预览还是源码是 `t3-files.markdown`（`"code"` 或 `"
 
 Files 和 Review 各自保存 `lines.wrap`（布尔字符串）、`nav.width`（逻辑 px）和 `nav.open`。两页复用读写函数，但只访问自己副本的 `localStorage`。
 
-Pull requests 在 `sections.open` 保存详情各段（`stack`、`checks`、`reviewers`、`description`、`comments`）的开合，JSON 对象，只记用户点过的段，所有 PR 共用；没记的按默认（见 [pulls](specs/pulls.md#detail)）。评论和回复的草稿只记本次运行的内存（`main.js` 的 `drafts`，按 `owner/repo#n` 或 `owner/repo#n:<thread>`），重画、刷新、换 PR 都保留，GitHub 收下后才删；评审线程的展开也只记本次运行。
+Pull requests 在 `sections.open` 保存详情各段（`stack`、`checks`、`reviewers`、`description`、`comments`）的开合，JSON 对象，只记用户点过的段，所有 PR 共用；没记的按默认（见 [pulls](specs/pulls.md#detail)）。评论和回复的草稿只记本次运行的内存（`composer.js` 的 `drafts`，按 `owner/repo#n` 或 `owner/repo#n:<thread>`），重画、刷新、换 PR 都保留，GitHub 收下后才删；评审线程的展开也只记本次运行。
+
+Pull requests 的 `sections.open` 另有 `passed`：Checks 里通过和跳过的那一行是否展开，没点过就收起。
+
+PR 正文和评论里的图片下载到应用目录的 `cache/t3-pulls/`（`image()` 只读应用目录下的文件），文件名是资源 id（GitHub 上传地址里的 UUID，签名地址里也有；没有 UUID 的地址取其哈希）加按 content type 定的扩展名，所以新一次读取带来的新签名不会重下。下载先写 `<id>.part`，类型对了才改名，否则删掉。哪些已下载、失败用的是哪个签名地址，只记本次运行的内存（`images`）；副本停止时删掉自己下的文件，启动时清空整个目录（上次崩溃留下的），和 Files 的 `cache/t3-files/` 一样。
+
+Issues（`t3-issues`）照此：`sections.open` 存它自己详情各段（`prs`、`description`、`comments`）的开合，草稿按 issue id（回复再加线程首条评论的 id）只记本次运行的内存，图片在 `cache/t3-issues/`。Linear API key 只在这个副本的内存里（找不到或被拒是 `null`），不写共享状态、`localStorage`、磁盘或日志，不画出来，也不作为任何程序的参数；每次运行启动后第一次显示时重新查找（Keychain、Herdr 的环境、登录 shell）。没有 key 时选择改看 GitHub issues 也只记本次运行。
 
 两页的完整 space 数据都是本次运行的缓存，每页最多保留最近三个。较早的 space 只留轻量的选择、展开和评审范围等阅读设置；文件内容、Editor、diff 行、换行和布局缓存都要释放。驱逐时使已发出的异步读取失效；迟到的结果不能重新填满已释放的数据。两页使用仅可见时的有界刷新，不保留不可退订的目录监听。关闭 space 时一并清理它的内存记录。

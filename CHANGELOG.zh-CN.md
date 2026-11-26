@@ -4,6 +4,10 @@
 
 ## 2026-11-26
 
+- 标签栏的 `+` 在下方打开菜单：**Terminal**，然后是 space 所在机器上装了的每个 agent（Claude Code、Codex、Pi…），选中后在 space 当前所在的位置新开标签启动，和 Herdr 自带的 New 菜单一样。`cmd-t` 仍然直接新开终端。
+- space 面板新增 **Issues** 页（`t3-issues`，`cmd-shift-i`，或 + → Issues），取代 Branch Issue 扩展（及其 Go helper）：**Branch** 显示标签所在分支指向的 issue，**Mine** 列出你的，可搜索；找到 API key 时读 Linear（Keychain 里的 `linear-api-key`，再看 Herdr 环境或登录 shell 的 `LINEAR_API_KEY`；只留在内存），否则可选择改看仓库的 GitHub issues（只读）。详情给出状态、负责人、优先级、标签、项目和周期、关联 PR（本仓库的在 Pull requests 里打开）、带图片的描述和评论；在 Linear 上可从页头改状态（立即生效，被拒时恢复）、回复和评论。
+- Pull requests 详情更紧凑：操作移到页头（Review，以及 `⋯` 里的 Open in pulls.review、Open on GitHub、Copy link），Back 占据 Branch／Repo 开关的位置，编号紧跟标题，状态行说明能否合并及最要紧的原因，通过和跳过的 checks 合成一行、可就地展开。
+- Pull requests 现在显示 PR 描述和评论里的图片，宽度随面板（点击在浏览器里打开）。图片只在这一页显示时、从 GitHub 给你的登录签发的地址各下载一次；取不到的图片显示其替代文字和 Open image 链接。
 - Pull requests 详情新增 **Comments**：评论和 review 按时间排列，然后是评审线程（带 diff 末尾几行），已 resolve 和过时的线程收成一行。GitHub 允许时可回复线程、Resolve 或 Reopen（立即生效，互为撤销），并在末尾的输入框发表新评论；输入的内容保留到 GitHub 收下为止，发送失败也保留。长对话分页读取，读不完时说明其余在 GitHub 上。详情的每一段都可从标题折叠，折叠时右侧给出摘要，并保持你上次的开合；全部通过时 Checks 自己收起。
 - space 面板新增 **Pull requests** 页（`t3-pulls`，`cmd-shift-u`，或 + → Pull requests）：**Branch** 列出标签所在分支的 pull request（open、closed 或 merged；fork 里同名分支的不算），只有一个时直接打开详情；**Repo** 列出仓库最近更新的 100 个 open pull request，可按标题、编号或分支搜索。每行显示状态、标题、编号、`head → base`、checks 标记和最近更新时间。详情先给出作者和分支，再用一行给出 Checks、Reviews 和合并状态，然后是 Stack（有堆叠时）、Checks（点击打开该项）、Reviewers 和 Description。**Review** 把 pull request 的 head 和 base fetch 进标签所在的仓库，在 Review 里打开 GitHub 所显示的改动（需 Review 扩展，仅本机 space）；旁边是 **Open in pulls.review** 和 **Open on GitHub**。只在这一页显示时经你的 `gh` 登录读取：显示时立即读，之后每分钟一次；`gh` 未安装或未登录时说明要运行什么。它取代 Branch PR 扩展，`extras/` 里已移除。
 

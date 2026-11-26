@@ -207,7 +207,8 @@
           "children": [
             { "id": "files", "type": "block", "content": { "mod": "t3-files" } },
             { "id": "panel-empty", "type": "block", "content": { "mod": "t3-chrome", "props": { "part": "surface-empty" } } },
-            { "id": "pulls", "type": "block", "content": { "mod": "t3-pulls" } }
+            { "id": "pulls", "type": "block", "content": { "mod": "t3-pulls" } },
+            { "id": "issues", "type": "block", "content": { "mod": "t3-issues" } }
           ]
         }
       ],

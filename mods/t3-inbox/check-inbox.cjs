@@ -98,7 +98,7 @@ function fixture() {
     setShared: (k, v) => { f.writes.push(k); if (k === "t3.pins") f.pins = Array.from(v); else f.state[k] = v; },
     setAgentOrder: (xs) => { f.orderWrites++; f.order = Array.from(xs); },
     run: (...args) => f.calls.push(args), notify: (n) => f.notifications.push(n), openOverlay() {}, closeOverlay() {},
-    hc: async (args) => { f.labelled.push(args.join(" ")); return { code: 0 }; }, nextCommand: () => new Promise((resolve) => { receive = resolve; }),
+    hc: async (args) => { f.labelled.push(args.join(" ")); return { code: 0 }; }, knownAgents: async () => [], nextCommand: () => new Promise((resolve) => { receive = resolve; }),
     t3Notice: { current: null, gen: 0 },
   };
   // name.js is the fake above: these cards are titled by what each test sets.

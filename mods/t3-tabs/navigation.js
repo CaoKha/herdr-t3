@@ -5,6 +5,7 @@ import { focusAgent, focusPane } from "./zoom.js";
 import { sidebarParts } from "./sidebar.js";
 import { agentStep } from "./agent-step.js";
 import { newTab, placeOf } from "./project.js";
+import { lookAgents } from "./known-agents.js";
 import { rememberProjects } from "./projects.js";
 import { t3Settings } from "./layout-settings.js";
 import { KEY } from "./store.js";
@@ -709,10 +710,17 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       else if (command === "next" || command === "prev") step(command);
       // New work doesn't start in Home, and with no space open there is none to start it in: New picks its space.
       // `new:<space>` names the space (New's pick, a menu's New tab); bare, the one in view.
-      else if (command === "new" || command.startsWith("new:")) {
-        const all = spaces(), id = command.slice("new:".length), space = all.find(s => id ? s.id === id : s.active);
-        if (!space || space.id === knownHome(all)?.id) run("mod.open", { name: "t3-new-menu" });
+      // `new-agent:<space>:<agent>` (New tab's menu, each part URI-encoded): that installed agent, started there the same way.
+      else if (command === "new" || command.startsWith("new:") || command.startsWith("new-agent:")) {
+        const agent = command.startsWith("new-agent:"), [rawId = "", rawName = ""] = agent ? command.slice("new-agent:".length).split(":") : [command.slice("new:".length)];
+        const all = spaces(), id = agent ? decodeURIComponent(rawId) : rawId, space = all.find(s => id ? s.id === id : s.active);
+        if (!space || space.id === knownHome(all)?.id) { if (!agent) run("mod.open", { name: "t3-new-menu" }); }
         else {
+          const program = agent ? (await lookAgents(space.machine))?.find(a => a.name === decodeURIComponent(rawName)) : null;
+          if (agent && !program) {
+            notify({ title: "Agent not found", body: `${decodeURIComponent(rawName)} isn't installed ${space.machine ? `on ${space.machine}` : "on this computer"}.`, level: "warning" });
+            return;
+          }
           const folder = !space.machine && !checking() ? placeOf(space, panes()) : null;
           if (folder && !(await checkFolder(folder))) {
             const h = home();
@@ -723,7 +731,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
           const live = spaces().find(s => s.id === space.id);
           if (!live) return;
           fresh.add(live.id);
-          newTab(live);
+          newTab(live, program);
         }
       }
       else if (command.startsWith("space:")) selectSpace(Number(command.slice("space:".length)));

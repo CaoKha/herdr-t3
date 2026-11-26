@@ -13,72 +13,60 @@ const same = (a, b, message) => assert.deepEqual(json(a), json(b), message);
 const read = (file) => fs.readFileSync(path.join(__dirname, file), "utf8");
 const m = (() => {
   const c = vm.createContext({});
-  vm.runInContext(`${kit.strip(read("model.js"))}\nglobalThis.m = { repositoryFromRemote, parseDiscovery, ownBranchPRs, ghProblem, prState, checkKind, rollupKind, checksOf,
-    reviewersOf, prStats, mergeState, stackOf, matches, timeAgo, reviewProblem, fetchArgs, prRefs, comparePage, CONFIG_KEYS, conversationEntries, threadPlace,
-    hunkTail, threadShut, sectionOpen, sectionSummary, writeError };`, c);
+  vm.runInContext(`${kit.strip(read("model.js"))}\nglobalThis.m = { ownBranchPRs, prState, checkKind, rollupKind, checksOf,
+    reviewersOf, verdict, tallies, stackOf, matches, fetchArgs, fetchHeadShas, comparePage, conversationEntries, threadPlace,
+    hunkTail, threadShut, checksOpenByDefault, sectionSummary };`, c);
   return c.m;
 })();
+const os = require("node:os");
+// Each page's app home, a real folder for its picture cache; all gone when the check ends.
+const homes = [];
+const tempHome = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), "t3-pulls-check-")); homes.push(d); return d; };
+process.on("exit", () => { for (const d of homes) fs.rmSync(d, { recursive: true, force: true }); });
 
 const card = (number, head, base, extra = {}) => ({ number, title: `PR ${number}`, url: `https://github.com/org/app/pull/${number}`, state: "OPEN", isDraft: false,
   updatedAt: "2026-01-01T00:00:00Z", headRefName: head, baseRefName: base, author: { login: "ann" }, commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] }, ...extra });
 const rollup = (contexts, extra = {}) => ({ commits: { nodes: [{ commit: { statusCheckRollup: { state: "PENDING", contexts: { nodes: contexts } } } }] }, ...extra });
 
-function discovery() {
-  const config = ["remote.origin.url git@github.com:Me/app.git", "remote.upstream.url https://github.com/org/app.git", "remote.work.url git@github-work:corp/app",
-    "remote.gl.url git@gitlab.com:me/app.git", "branch.feat.x.remote work", "branch.main.remote origin", "branch.local.remote ."].join("\n");
-  same(json(m.parseDiscovery("/r\nfeat.x\n", config)), { root: "/r", branch: "feat.x", remote: "upstream", repo: "org/app", heads: ["me/app", "org/app", "corp/app"] },
-    "upstream names the repository first; every GitHub remote is a place the branch may be pushed");
-  const noUpstream = config.split("\n").filter((l) => !l.startsWith("remote.upstream")).join("\n");
-  assert.equal(m.parseDiscovery("/r\nfeat.x\n", noUpstream).remote, "work", "then the branch's tracking remote");
-  assert.equal(m.parseDiscovery("/r\nlocal\n", noUpstream).remote, "origin", "a branch tracking the clone itself (.) falls to origin");
-  same([m.parseDiscovery("/r\nHEAD\n", config).branch, m.parseDiscovery("/r\nHEAD\n", config).repo], [null, "org/app"], "a detached HEAD has no branch, still a repository");
-  assert.throws(() => m.parseDiscovery("", config), /not in a Git repository/);
-  assert.throws(() => m.parseDiscovery("/r\nmain\n", "remote.gl.url git@gitlab.com:me/app.git"), /no GitHub remote/);
-  assert.throws(() => m.parseDiscovery("/r\nmain\n", "remote.origin.url git@gitlab.com:me/app.git"), /origin remote isn't a GitHub repository/);
-  for (const [url, repo] of [["https://github.com/a/b", "a/b"], ["https://x@github.com/a/b.git/", "a/b"], ["ssh://git@ssh.github.com:443/a/b.git", "a/b"],
-    ["git@github.com:a/b.git", "a/b"], ["git@github.com:a/b/c.git", null], ["https://github.example.com/a/b", null], ["/srv/b.git", null]]) assert.equal(m.repositoryFromRemote(url), repo, url);
+function forks() {
   const prs = [{ number: 1, headRepository: { nameWithOwner: "Me/App" } }, { number: 2, headRepository: { nameWithOwner: "stranger/app" } }, { number: 3, headRepository: null }];
   same(m.ownBranchPRs(prs, ["me/app", "org/app"]).map((p) => p.number), [1], "a fork's same-named branch isn't this branch");
 }
 
 function summaries() {
-  const open = (extra) => ({ state: "OPEN", isDraft: false, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", ...extra });
-  const merge = (extra) => m.prStats(open(extra)).find((s) => s.key === "merge");
-  same(json(merge({})), { key: "merge", label: "Merge", value: "Ready", tone: "good" });
-  assert.equal(merge({ isDraft: true, mergeable: "CONFLICTING" }).value, "Draft", "a draft says so before anything else");
-  assert.equal(merge({ mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" }).value, "Conflicts");
-  assert.equal(merge({ mergeStateStatus: "BEHIND" }).value, "Behind");
-  assert.equal(merge({ mergeStateStatus: "BLOCKED" }).value, "Blocked");
-  assert.equal(merge({ mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }).value, "Checking", "GitHub still working it out isn't Ready");
-  assert.equal(merge({ mergeStateStatus: "UNSTABLE" }).value, "Ready", "failing checks that don't block are the Checks stat's to say");
-  same(m.prStats({ state: "MERGED" }).map((s) => s.key), ["checks", "reviews"], "no merge state once merged or closed");
-
+  const open = (extra) => ({ state: "OPEN", isDraft: false, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", baseRefName: "main", ...extra });
   const contexts = [{ __typename: "CheckRun", name: "lint", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: "u1" },
     { __typename: "CheckRun", name: "build", status: "IN_PROGRESS", conclusion: null, detailsUrl: "u2" },
     { __typename: "StatusContext", context: "ci/legacy", state: "FAILURE", targetUrl: "u3" },
     { __typename: "CheckRun", name: "docs", status: "COMPLETED", conclusion: "SKIPPED", detailsUrl: null }];
   same(m.checksOf(rollup(contexts)).map((c) => [c.name, c.kind, c.url]),
     [["ci/legacy", "failure", "u3"], ["build", "pending", "u2"], ["lint", "success", "u1"], ["docs", "skipped", null]], "failures first, a status context's words too");
-  const checks = m.prStats(open(rollup(contexts))).find((s) => s.key === "checks");
-  same([checks.value, checks.tone], ["1/3", "danger"], "passed of the counted ones; a skipped check isn't counted");
-  assert.equal(m.prStats(open(rollup(contexts.slice(0, 2)))).find((s) => s.key === "checks").tone, "waiting");
-  same([m.prStats(open({})).find((s) => s.key === "checks").value, m.rollupKind({})], ["–", null], "no checks: nothing to say");
   assert.equal(m.rollupKind(card(1, "a", "b", { commits: { nodes: [{ commit: { statusCheckRollup: { state: "EXPECTED" } } }] } })), "pending");
 
+  // The verdict: the worst reason first, as Branch PR's mergeBlockers ranks them.
+  const failing = rollup(contexts.slice(2, 3)), running = rollup(contexts.slice(1, 2)), changes = { reviewDecision: "CHANGES_REQUESTED" };
+  const v = (extra) => { const r = m.verdict(open(extra)); return [r.text, r.tone, r.section ?? null]; };
+  same([v({ isDraft: true, mergeable: "CONFLICTING", ...failing }), v({ mergeable: "CONFLICTING", ...failing, ...changes }), v({ ...rollup([contexts[2], contexts[1]]), ...changes }),
+    v({ ...changes, ...running }), v({ ...running, reviewDecision: "REVIEW_REQUIRED" }), v({ reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BEHIND" }),
+    v({ mergeStateStatus: "BEHIND" }), v({ mergeStateStatus: "BLOCKED" }), v({ mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }), v({ mergeStateStatus: "UNSTABLE" }), v({})],
+  [["Draft", "none", null], ["Conflicts with main", "danger", null], ["Blocked: 1 check failing", "danger", "checks"], ["Blocked: changes requested", "danger", "reviewers"],
+    ["Waiting: 1 check running", "waiting", "checks"], ["Blocked: review required", "waiting", "reviewers"], ["Behind main", "waiting", null], ["Blocked", "waiting", null],
+    ["Checking…", "none", null], ["Ready to merge", "good", null], ["Ready to merge", "good", null]], "each verdict over every one ranked after it");
+  same([m.verdict({ state: "MERGED" }).text, m.verdict({ state: "CLOSED", isDraft: true }).text], ["Merged", "Closed"]);
+  assert.equal(m.verdict(open(rollup([...contexts.slice(2, 3), contexts[2]]))).text, "Blocked: 2 checks failing");
+
   const pr = open({ reviewDecision: "REVIEW_REQUIRED", latestOpinionatedReviews: { nodes: [{ state: "APPROVED", author: { login: "bo" } }, { state: "CHANGES_REQUESTED", author: { login: "cy" } }] },
-    reviewRequests: { nodes: [{ requestedReviewer: { login: "cy" } }, { requestedReviewer: { combinedSlug: "org/core" } }] } });
+    reviewRequests: { nodes: [{ requestedReviewer: { login: "cy" } }, { requestedReviewer: { combinedSlug: "org/core" } }] }, ...rollup(contexts) });
   same(json(m.reviewersOf(pr)), [{ login: "bo", state: "APPROVED" }, { login: "cy", state: "REQUESTED" }, { login: "org/core", state: "REQUESTED" }],
     "asked again, a reviewer owes a review whatever they said before");
-  const reviews = m.prStats(pr).find((s) => s.key === "reviews");
-  same([reviews.value, reviews.tone], ["1/3", "waiting"]);
-  assert.equal(m.prStats({ ...pr, reviewDecision: "CHANGES_REQUESTED" }).find((s) => s.key === "reviews").tone, "danger", "changes requested reads red");
+  same(m.tallies(pr), { checks: "1/3 checks", reviews: "1/3 reviews" }, "passed of the counted checks (skipped aside), approved of those asked");
+  same(m.tallies(open({})), { checks: "No checks", reviews: "No reviews" });
 
-  same(["open", "draft", "merged", "closed"], [open({}), open({ isDraft: true }), { state: "MERGED", isDraft: true }, { state: "CLOSED" }].map((p) => m.prState(p).key));
+  same(["Open", "Draft", "Merged", "Closed"], [open({}), open({ isDraft: true }), { state: "MERGED", isDraft: true }, { state: "CLOSED" }].map((p) => m.prState(p).label));
   assert.ok(m.matches(card(42, "fix-login", "main", { title: "Sign in fails" }), "#42"));
   assert.ok(!m.matches(card(142, "x", "main", { title: "Other" }), "42"), "a number matches that PR, not every number containing it");
   assert.ok(m.matches(card(1, "fix-login", "main", { title: "Sign in fails" }), "SIGN login"), "every word, in the title or branch");
   assert.ok(!m.matches(card(1, "fix-login", "main", { title: "Sign in fails" }), "sign logout"));
-  assert.equal(m.timeAgo("2026-01-01T00:00:00Z", Date.parse("2026-01-01T03:30:00Z")), "3h ago");
 }
 
 function stacks() {
@@ -93,23 +81,19 @@ function stacks() {
 }
 
 function handoff() {
-  assert.equal(m.reviewProblem({ installed: false, machine: null, root: "/r" }), "Review isn't installed: add the Review extra.");
-  assert.equal(m.reviewProblem({ installed: true, machine: "vps", root: "/r" }), "Review is unavailable on remote spaces.");
-  assert.equal(m.reviewProblem({ installed: true, machine: "vps", root: "/r" }, "pulls.review"), "pulls.review is unavailable on remote spaces.");
-  assert.equal(m.reviewProblem({ installed: true, machine: null, root: "/r" }), "");
-  same(json(m.prRefs({ number: 7, baseRefName: "release/1.2" })), { head: "refs/pull/7/head", base: "refs/heads/release/1.2" });
-  same(json(m.fetchArgs("upstream", "refs/pull/7/head")), ["fetch", "--no-tags", "--quiet", "upstream", "refs/pull/7/head"]);
+  same(json(m.fetchArgs("upstream", { number: 7, baseRefName: "release/1.2" })), ["fetch", "--no-tags", "--quiet", "upstream", "refs/pull/7/head", "refs/heads/release/1.2"]);
+  same(json(m.fetchHeadShas(`${HEAD_SHA}\t\t'refs/pull/7/head' of github.com:org/app\n${BASE_SHA}\tnot-for-merge\tbranch 'main' of github.com:org/app\n`)), [HEAD_SHA, BASE_SHA],
+    "FETCH_HEAD in the order the fetch asked");
   assert.equal(m.comparePage("b1", "h1"), "/compare/b1...h1", "three dots: what GitHub shows of a PR");
-  assert.equal(m.ghProblem("GitHub CLI (gh) is not installed.").command, "gh auth login");
-  assert.match(m.ghProblem("GitHub CLI is not logged in.").title, /logged in/);
-  assert.equal(m.ghProblem("GitHub: something else"), null);
 }
 
+const HEAD_SHA = "a".repeat(40), BASE_SHA = "b".repeat(40);
 const CONFIG = "remote.origin.url git@github.com:me/app.git\nremote.upstream.url https://github.com/org/app.git\nbranch.feat.remote origin\n";
 
 // The page in a fake `herdr`: one or more spaces, the panel showing `page`, its slots. `w.gh(args)` answers gh as gh would;
 // `w.hold(cmd, args)` keeps an answer back in `w.held` until released.
-function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls", "review"], page = "pulls", open = true, store = new Map() } = {}) {
+function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls", "review"], page = "pulls", open = true, store = new Map(),
+  appDir = tempHome() } = {}) {
   const w = { spaces, panes, ran: [], commands: [], held: [], open, page, now: Date.parse("2026-01-01T01:00:00Z"), hold: null, fetched: null,
     lists: { branch: [card(7, "feat", "main", { headRepository: { nameWithOwner: "me/app" } }), card(9, "feat", "main", { headRepository: { nameWithOwner: "stranger/app" } })],
       open: [card(7, "feat", "main"), card(8, "feat-2", "feat"), card(5, "other", "main")], total: 3 },
@@ -120,11 +104,21 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
   const sh = { "t3.panels": { s1: { tabs: [{ id: "pulls", born: 1 }], active: "pulls", open: true }, s2: { tabs: [{ id: "pulls", born: 2 }], active: "pulls", open: true } } };
   const answer = (cmd, args, o) => {
     const line = args.join(" ");
-    if (cmd === "git" && line.includes("--show-toplevel")) return { code: 0, stdout: `${o.cwd === "/q" ? "/q" : "/r"}\nfeat\n` };
+    if (cmd === "git" && line.includes("--show-toplevel")) return { code: 0, stdout: `${o.cwd === "/q" ? "/q" : "/r"}\n${w.head ?? "feat"}\n` };
     if (cmd === "git" && line.includes("--get-regexp")) return { code: 0, stdout: CONFIG };
-    if (cmd === "git" && args.includes("fetch")) { w.fetched = args.at(-1); return w.fetchFails ? { code: 1, stderr: "fatal: couldn't find remote ref\n" } : { code: 0, stdout: "" }; }
-    if (cmd === "git" && line.includes("FETCH_HEAD")) return { code: 0, stdout: `${w.fetched.startsWith("refs/pull/") ? "headsha" : "basesha"}\n` };
+    if (cmd === "git" && args.includes("fetch")) { w.fetched = args.slice(-2); return w.fetchFails ? { code: 1, stderr: "fatal: couldn't find remote ref\n" } : { code: 0, stdout: "" }; }
+    if (cmd === "git" && line.includes("--git-path FETCH_HEAD")) return { code: 0, stdout: ".git/FETCH_HEAD\n" };
+    if (cmd === "cat" && args[0] === ".git/FETCH_HEAD") return { code: 0, stdout: w.fetched.map((ref) => `${ref.startsWith("refs/pull/") ? HEAD_SHA : BASE_SHA}\t\t'${ref}' of org/app\n`).join("") };
     if (cmd === "jin.review") return { code: 0, stdout: "" };
+    // The web, by address: what `w.web[src]` serves, written where curl's -o says; else curl's HTTP failure.
+    if (cmd === "curl") {
+      const got = w.web?.[args.at(-1)];
+      if (!got) return { code: 22, stdout: "", stderr: "curl: (22) The requested URL returned error: 404\n" };
+      fs.writeFileSync(args[args.indexOf("-o") + 1], got.bytes);
+      return { code: 0, stdout: got.type };
+    }
+    if (cmd === "mv") { fs.renameSync(args.at(-2), args.at(-1)); return { code: 0, stdout: "" }; }
+    if (cmd === "rm") { fs.rmSync(args.at(-1), { recursive: true, force: true }); return { code: 0, stdout: "" }; }
     if (cmd === "gh") {
       if (w.gh) return w.gh(args);
       const query = args.find((a) => a.startsWith("query=")) ?? "", number = Number(args.find((a) => a.startsWith("number="))?.slice(7));
@@ -142,7 +136,7 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
         const pr = {};
         if (query.includes("after: $comments")) pr.comments = page(w.talk.comments, field("comments"), w.pageSize);
         if (query.includes("after: $reviews")) pr.reviews = page(w.talk.reviews, field("reviews"), w.pageSize);
-        if (query.includes("after: $threads")) pr.reviewThreads = page(w.talk.threads.map((t) => ({ ...t, comments: page(t.comments, 0, w.replyPage) })), field("threads"), w.pageSize);
+        if (query.includes("after: $threads")) pr.threads = page(w.talk.threads.map((t) => ({ ...t, comments: page(t.comments, 0, w.replyPage) })), field("threads"), w.pageSize);
         return ok({ repository: { pullRequest: pr } });
       }
       if (query.includes("open: pullRequests")) return { code: 0, stdout: JSON.stringify({ data: { repository: { ...(query.includes("branch:") ? { branch: { nodes: w.lists.branch } } : {}), open: { totalCount: w.lists.total, nodes: w.lists.open } } } }) };
@@ -157,12 +151,23 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
     const r = answer(cmd, args, o);
     return w.hold?.(cmd, args) ? new Promise((go) => w.held.push(() => go(r))) : r;
   };
-  const timers = [], everies = [], failed = [];
+  const timers = [], everies = [], failed = [], queue = [];
+  let wake = null;
+  const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else queue.push(c); };
   const task = () => ({ cancel() {} });
-  const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }),
+  const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }), write_to_clipboard(text) { w.clipboard = text; },
     spawn(f) { Promise.resolve().then(() => f(cx)).catch((e) => failed.push(e)); return task(); },
     timer: { every(ms, f) { everies.push(f); return task(); }, after(ms, f) { timers.push(f); return task(); } } };
-  const settle = async () => { for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r)); if (failed.length) throw failed[0]; };
+  // The page's real file work (its picture cache) is awaited itself, not given time: a loaded machine takes longer.
+  const io = [];
+  const disk = (p) => { io.push(p.catch(() => {})); return p; };
+  const settle = async () => {
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setImmediate(r));
+      if (io.length) { await Promise.all(io.splice(0)); i = 0; }
+    }
+    if (failed.length) throw failed[0];
+  };
   const tick = async () => { for (const f of everies) f(cx); await settle(); };
   // In a box: a fake element answers every property, `then` too, so awaited bare it would never settle.
   const draw = async () => {
@@ -189,15 +194,19 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
     } },
     Textarea: { new: (state) => element("textarea", state) },
     checking: () => false, spaces: () => w.spaces, panes: () => w.panes, focused: () => null, exec, theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", input: "#222222", ansi1: "#ff0000" }),
-    window: () => ({ active: true, platform: "macos" }), nextCommand: () => new Promise(() => {}), keys: () => [], settings: () => ({ zoom: 1, font_family: "Mono" }), layout,
+    window: () => ({ active: true, platform: "macos" }), nextCommand: () => queue.length ? Promise.resolve(queue.shift()) : new Promise((r) => { wake = r; }), keys: () => [], settings: () => ({ zoom: 1, font_family: "Mono" }), layout,
     run: (name, args) => w.commands.push([name, args]), shared: (k) => sh[k], setShared: (k, v) => { sh[k] = v; },
-    localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)) }, Date: Clock, Promise, Math, JSON, Map, Set, Object, Array, String, Number, Boolean, RegExp, Error });
+    localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)) }, Date: Clock, Uint8Array,
+    appHome: () => appDir,
+    fs: { mkdir: (p, o) => disk(fs.promises.mkdir(p, o).then(() => {})), unlink: (p) => disk(fs.promises.unlink(p)),
+      readFile: (p) => disk(fs.promises.readFile(p).then((b) => new Uint8Array(b))) }, Promise, Math, JSON, Map, Set, Object, Array, String, Number, Boolean, RegExp, Error });
   // panel-states.js names button.js's button drawButton, an alias the bundle's stripped imports lose.
   vm.runInContext(kit.bundle(read, "main.js", (file, src, needs) => file === "button.js" ? `${needs()}\n${kit.strip(src)}\nconst drawButton = button;` : null), ctx);
   const view = new ctx.Mod();
   view.init({}, cx);
   const activate = (id) => { w.spaces = w.spaces.map((s) => ({ ...s, active: s.id === id })); };
-  return { view, cx, w, sh, store, settle, tick, draw, activate, st: (id = "s1") => view.states.get(id) };
+  return { view, cx, w, sh, store, appDir, settle, tick, draw, activate, send, st: (id = "s1") => view.states.get(id),
+    refresh: () => ctx.refreshPage(view, cx), stateFor: (sp) => ctx.stateFor(view, sp) };
 }
 
 const said = (id, login, at, body, extra = {}) => ({ id, body, url: `https://github.com/org/app/pull/7#${id}`, createdAt: at, author: { login }, ...extra });
@@ -220,16 +229,18 @@ const listReads = (w) => w.ran.filter((r) => r.cmd === "gh" && r.args.some((a) =
 async function reads() {
   const p = makePage({ spaces: [space("s1", "/r", true)], panes: [{ tab: "s1-tab", terminal: "t1", cwd: "/r/src" }], open: false });
   await p.tick();
-  assert.equal(p.w.ran.length, 0, "nothing is read while the page is hidden");
+  assert.equal(p.w.ran.filter((r) => r.cmd !== "rm").length, 0, "nothing is read while the page is hidden (the start only clears the picture cache)");
   p.w.open = true;
   let root = (await p.draw()).root;
   same(p.w.ran.filter((r) => r.cmd === "git").map((r) => [r.args.slice(3).join(" "), r.cwd, r.on]),
-    [["rev-parse --show-toplevel --abbrev-ref HEAD", "/r/src", null], [`config --get-regexp ${m.CONFIG_KEYS}`, "/r/src", null]], "read in the tab's working folder");
+    [["rev-parse --show-toplevel --abbrev-ref HEAD", "/r/src", null], [`config --get-regexp ^(remote\\..*\\.url|branch\\..*\\.remote)$`, "/r/src", null]], "read in the tab's working folder");
   assert.ok(p.w.ran.find((r) => r.cmd === "gh").args.includes("owner=org"), "upstream's repository");
   root = (await p.draw()).root;
   same([p.st().branch.map((x) => x.number), p.st().openTotal], [[7], 3], "the fork's same-named branch is left out");
   assert.ok(find(root, "t3-pulls-detail"), "a branch's only PR shows its detail at once");
   assert.equal(find(root, "t3-pulls-back"), null, "with no list behind it to go back to");
+  same(strings(find(root, "t3-pulls-title")), ["PR 7", "#7"], "the number right after the title");
+  assert.ok(find(root, "t3-pulls-tab-branch"), "the switch stays: no list to go back to");
   same(strings(find(root, "t3-pulls-stack")).filter((s) => /^#/.test(s)), ["#8", "#7"], "the stack: #8 is based on #7's head");
   assert.ok(strings(find(root, "t3-pulls-reviewers")).includes("bo"));
   await p.tick();
@@ -251,6 +262,12 @@ async function reads() {
   root = (await p.draw()).root;
   assert.ok(find(root, "t3-pulls-row-5"), "back at the list");
 
+  // `open:<n>` (Issues' linked PRs): that PR's detail, as a row's pick.
+  p.send("open:5"); await p.settle();
+  root = (await p.draw()).root;
+  assert.ok(find(root, "t3-pulls-detail-5"), "t3-pulls.open:5 shows #5");
+  p.st().picked = null;
+
   // A space on another machine: its own read, there; Review can't take it.
   p.w.spaces.push(space("s2", "/q", false, "vps"));
   p.activate("s2");
@@ -259,7 +276,7 @@ async function reads() {
   root = (await p.draw()).root;
   const review = find(root, "t3-pulls-review");
   same([review.style.opacity?.[0], review.handlers.on_click], [0.64, undefined]);
-  assert.equal(p.view.reviewReason(p.st("s2"), p.w.spaces[1]), "Review is unavailable on remote spaces.");
+  assert.equal(p.view.reviewReason(p.st("s2"), p.w.spaces[1], ["pulls", "review"]), "Review is unavailable on remote spaces.");
   assert.equal(p.w.ran.filter((r) => r.args.includes("fetch")).length, 0);
 }
 
@@ -270,7 +287,7 @@ async function staleReads() {
   assert.equal(p.w.held.length, 1);
   p.w.hold = null;
   p.w.lists = { ...p.w.lists, open: [card(11, "new", "main")], total: 1 };
-  p.view.refresh(p.cx); await p.settle();
+  p.refresh(); await p.settle();
   same(p.st().open.map((x) => x.number), [11]);
   p.w.held.shift()(); await p.settle();
   same(p.st().open.map((x) => x.number), [11], "an older read's late answer doesn't land over a newer one");
@@ -284,17 +301,25 @@ async function staleReads() {
   await p.settle();
   same([...p.st().details.keys()], [7, 8], "#5's late detail doesn't land");
 
-  // The tab's folder moves: what was asked for the folder before is dropped, even before the next read starts.
+  // The tab's folder moves: once the tick sees it, what was asked for the folder before is dropped and the new one read.
   p.w.lists = { ...p.w.lists, open: [card(12, "old", "main")], total: 1 };
   p.w.hold = (cmd, args) => cmd === "gh" && args.some((a) => a.includes("open: pullRequests"));
-  p.view.refresh(p.cx); await p.settle();
-  p.w.hold = null;
+  p.refresh(); await p.settle();
   p.w.panes = [{ tab: "s1-tab", terminal: "t1", cwd: "/r/elsewhere" }];
-  await p.draw();
-  p.w.held.shift()(); await p.settle();
-  same(p.st().open.map((x) => x.number), [11], "a read for the folder before doesn't land");
   await p.tick();
   assert.ok(p.w.ran.some((r) => r.cwd === "/r/elsewhere"), "the new folder is read");
+  p.w.held.shift()(); await p.settle();
+  same(p.st().open.map((x) => x.number), [11], "a read for the folder before doesn't land");
+  p.w.hold = null;
+
+  // A PR already picked reads its detail beside the lists, not after them.
+  const q = makePage({ spaces: [space("s1", "/r", true)] });
+  await q.tick();
+  q.view.pick(q.st(), 5, q.cx); await q.settle();
+  const before = detailReads(q.w);
+  q.w.hold = (cmd, args) => cmd === "gh" && args.some((a) => a.includes("open: pullRequests"));
+  q.refresh(); await q.settle();
+  same([q.w.held.length, detailReads(q.w)], [1, before + 1], "#5 is read while the lists are still out");
 }
 
 async function reviewHandoff() {
@@ -302,11 +327,10 @@ async function reviewHandoff() {
   await p.tick(); await p.draw();
   let root = (await p.draw()).root;
   find(root, "t3-pulls-review").handlers.on_click({}, p.cx); await p.settle();
-  const git = p.w.ran.filter((r) => r.cmd === "git" && (r.args.includes("fetch") || r.args.includes("FETCH_HEAD^{commit}"))).map((r) => [r.args.slice(3).join(" "), r.cwd, r.on]);
-  same(git, [["fetch --no-tags --quiet upstream refs/pull/7/head", "/r", null], ["rev-parse --verify --quiet FETCH_HEAD^{commit}", "/r", null],
-    ["fetch --no-tags --quiet upstream refs/heads/main", "/r", null], ["rev-parse --verify --quiet FETCH_HEAD^{commit}", "/r", null]],
-  "the PR's head and its base from the remote that has it, in the repository's root");
-  same([p.sh.review.space, p.sh.review.root, p.sh.review.page], ["s1", "/r", "/compare/basesha...headsha"], "Review asked for what GitHub shows");
+  const git = p.w.ran.filter((r) => (r.cmd === "git" && (r.args.includes("fetch") || r.args.includes("FETCH_HEAD"))) || r.cmd === "cat").map((r) => [[r.cmd, ...r.args.slice(r.cmd === "git" ? 3 : 0)].join(" "), r.cwd, r.on]);
+  same(git, [["git fetch --no-tags --quiet upstream refs/pull/7/head refs/heads/main", "/r", null], ["git rev-parse --git-path FETCH_HEAD", "/r", null], ["cat .git/FETCH_HEAD", "/r", null]],
+  "one fetch of the PR's head and its base from the remote that has it, in the repository's root, read back from FETCH_HEAD");
+  same([p.sh.review.space, p.sh.review.root, p.sh.review.page], ["s1", "/r", `/compare/${BASE_SHA}...${HEAD_SHA}`], "Review asked for what GitHub shows");
   assert.ok(p.w.commands.some(([name, args]) => name === "layout.select" && args.child === "review"), "and shown");
   assert.equal(p.st().busy, null);
 
@@ -319,17 +343,43 @@ async function reviewHandoff() {
   assert.equal(p.sh.review, undefined);
   assert.ok(strings(find(root, "t3-pulls-action-error")).some((s) => s.includes("couldn't find remote ref")));
 
-  // pulls.review: the fork's daemon, from the clone.
-  find(root, "t3-pulls-pulls-review").handlers.on_click({}, p.cx); await p.settle();
+  // ⋯: pulls.review (the fork's daemon, from the clone), GitHub, the link copied.
+  const press = (id) => { const n = find(root, id); n.handlers["on_mouse_down:left"]({ bounds: { x: 0, y: 0, width: 24, height: 24 } }, p.cx); n.handlers.on_click({}, p.cx); };
+  assert.equal(find(root, "t3-pulls-actions"), null, "no row of its own above the title");
+  assert.ok(find(root, "t3-pulls-refresh") && find(root, "t3-pulls-review") && find(root, "t3-pulls-more"), "one header row: Refresh, Review, ⋯");
+  press("t3-pulls-more");
+  root = (await p.draw()).root;
+  same(["t3-pulls-more-item-0", "t3-pulls-more-item-1", "t3-pulls-more-item-2"].map((id) => strings(find(root, id)).find((x) => /^(Open|Copy)/.test(x))),
+    ["Open in pulls.review", "Open on GitHub", "Copy link"]);
+  find(root, "t3-pulls-more-item-0").handlers.on_click({}, p.cx); await p.settle();
   const jin = p.w.ran.find((r) => r.cmd === "jin.review");
-  same([jin.args, jin.cwd], [["-d", "org/app#7"], "/r"]);
+  same([jin.args, jin.cwd, p.view.menu], [["-d", "org/app#7"], "/r", null]);
+  root = (await p.draw()).root;
+  press("t3-pulls-more");
+  root = (await p.draw()).root;
+  find(root, "t3-pulls-more-item-2").handlers.on_click({}, p.cx);
+  assert.equal(p.w.clipboard, "https://github.com/org/app/pull/7", "Copy link");
+  root = (await p.draw()).root;
+  press("t3-pulls-more");
+  root = (await p.draw()).root;
+  find(root, "t3-pulls").handlers["on_mouse_down:left"]({}, p.cx);
+  assert.equal(p.view.menu, null, "a press elsewhere in the page closes it");
+  root = (await p.draw()).root;
+  press("t3-pulls-more");
+  root = (await p.draw()).root;
+  find(root, "t3-pulls").handlers.on_key_down({ key: "down" }, p.cx); find(root, "t3-pulls").handlers.on_key_down({ key: "down" }, p.cx);
+  find(root, "t3-pulls").handlers.on_key_down({ key: "enter" }, p.cx); await p.settle();
+  same(p.w.ran.at(-1).args, ["https://github.com/org/app/pull/7"], "keys: ↓ ↓ Enter opens it on GitHub");
 
   // No Review page in this layout: both greyed with the reason.
   const q = makePage({ spaces: [space("s1", "/r", true)], slots: ["files", "panel-empty", "pulls"] });
   await q.tick(); await q.draw();
   root = (await q.draw()).root;
-  assert.equal(q.view.reviewReason(q.st(), q.w.spaces[0]), "Review isn't installed: add the Review extra.");
-  same([find(root, "t3-pulls-review").handlers.on_click, find(root, "t3-pulls-pulls-review").handlers.on_click], [undefined, undefined]);
+  assert.equal(q.view.reviewReason(q.st(), q.w.spaces[0], ["files", "panel-empty", "pulls"]), "Review isn't installed: add the Review extra.");
+  assert.equal(find(root, "t3-pulls-review").handlers.on_click, undefined);
+  find(root, "t3-pulls-more").handlers.on_click({}, q.cx);
+  root = (await q.draw()).root;
+  same([find(root, "t3-pulls-more-item-0").style.opacity?.[0], find(root, "t3-pulls-more-item-0").handlers.on_click], [0.64, undefined], "pulls.review greyed in ⋯");
 }
 
 async function ghFailures() {
@@ -344,7 +394,7 @@ async function ghFailures() {
   root = (await p.draw()).root;
   assert.ok(strings(root).includes("GitHub CLI isn't logged in"));
   p.w.gh = () => ({ code: 1, stdout: "", stderr: "HTTP 502: Bad Gateway\n" });
-  p.view.refresh(p.cx); await p.settle();
+  p.refresh(); await p.settle();
   root = (await p.draw()).root;
   assert.ok(strings(find(root, "t3-pulls-error")).includes("GitHub: HTTP 502: Bad Gateway"), "any other failure is a bar with Retry");
   p.w.gh = null;
@@ -355,15 +405,8 @@ async function ghFailures() {
 
 function sections() {
   const checks = (...kinds) => rollup(kinds.map((k, i) => ({ __typename: "CheckRun", name: `c${i}`, status: k === "running" ? "IN_PROGRESS" : "COMPLETED", conclusion: k === "running" ? null : k })));
-  assert.equal(m.sectionOpen("checks", {}, checks("SUCCESS", "SKIPPED")), false, "every check passed or skipped: Checks starts shut");
-  assert.equal(m.sectionOpen("checks", {}, checks("SUCCESS", "FAILURE")), true, "one failing: it opens on its own");
-  assert.equal(m.sectionOpen("checks", {}, checks("SUCCESS", "running")), true, "one running: open too");
-  assert.equal(m.sectionOpen("checks", {}, rollup([])), true, "no checks: nothing to hide");
-  assert.equal(m.sectionOpen("checks", { checks: true }, checks("SUCCESS")), true, "the person's own choice wins over the default");
-  assert.equal(m.sectionOpen("checks", { checks: false }, checks("FAILURE")), false);
-  assert.deepEqual(["stack", "reviewers", "comments", "description"].map((k) => m.sectionOpen(k, {}, {})), [true, true, true, true]);
-  assert.equal(m.sectionOpen("comments", { comments: false }, {}), false);
-
+  same([checks("SUCCESS", "SKIPPED"), checks("SUCCESS", "FAILURE"), checks("SUCCESS", "running"), rollup([])].map(m.checksOpenByDefault), [false, true, true, true],
+    "Checks starts open only while one is failing or running, or there are none to hide");
   same(m.sectionSummary("checks", checks(...Array(33).fill("SUCCESS"), "SKIPPED")), { text: "33/33 passed", tone: "none" });
   same(m.sectionSummary("checks", checks("SUCCESS", "FAILURE", "TIMED_OUT", "running")), { text: "2 failing", tone: "danger" }, "failing before running");
   same(m.sectionSummary("checks", checks("SUCCESS", "running", "running", "running")), { text: "3 running", tone: "waiting" });
@@ -378,8 +421,6 @@ function sections() {
   same([m.threadPlace(TALK().threads[0]), m.threadPlace(TALK().threads[1]), m.threadPlace({ path: "x" })], ["src/a.js:12", "src/b.js:3", "x"], "an outdated thread keeps its old line");
   same(m.hunkTail(TALK().threads[0].comments[0].diffHunk).split("\n"), ["+line 4", "+line 5", "+line 6", "+line 7", "+line 8", "+line 9"], "the hunk's last six lines");
   same([m.threadShut({ isResolved: true }), m.threadShut({ isOutdated: true }), m.threadShut({})], [true, true, false]);
-  assert.match(m.writeError("reply", "GitHub: HTTP 502"), /may have gone through: refresh before sending it again/);
-  assert.equal(m.writeError("resolve", "GitHub: HTTP 502"), "GitHub: HTTP 502", "a resolve that failed just failed: it is put back");
 }
 
 const ghWrites = (w) => w.ran.filter((r) => r.cmd === "gh" && (r.args[1]?.startsWith("repos/") || r.args.some((a) => a.startsWith("query=mutation"))));
@@ -432,11 +473,11 @@ async function conversation() {
 
   // What the viewer can't do isn't offered.
   p.w.talk.threads[0].viewerCanResolve = false; p.w.talk.threads[0].viewerCanReply = false;
-  p.view.refresh(p.cx); await p.settle();
+  p.refresh(); await p.settle();
   root = (await p.draw()).root;
   assert.ok(!find(root, "t3-pulls-thread-T1-resolve") && !find(root, "t3-pulls-thread-T1-reply"));
   p.w.talk = TALK();
-  p.view.refresh(p.cx); await p.settle();
+  p.refresh(); await p.settle();
   root = (await p.draw()).root;
 
   // Reply: typed text goes as a raw field, whatever it looks like; Send waits for words.
@@ -477,7 +518,7 @@ async function conversation() {
   p.w.writeFails = false;
 
   // Drafts survive a refresh and moving to another PR and back.
-  p.view.refresh(p.cx); await p.settle();
+  p.refresh(); await p.settle();
   root = (await p.draw()).root;
   assert.equal(comment.value(), "Keep me");
   p.view.pick(p.st(), 5, p.cx); await p.settle();
@@ -490,7 +531,7 @@ async function conversation() {
 
   // Resolve shows at once; while it's sent nothing else goes, and a read from before it doesn't land; Reopen undoes it.
   p.w.hold = (cmd, args) => cmd === "gh" && args.some((a) => a.includes("latestOpinionatedReviews"));
-  p.view.refresh(p.cx); await p.settle();
+  p.refresh(); await p.settle();
   const readsBefore = p.w.held.length;
   assert.equal(readsBefore, 1, "a detail read under way");
   p.w.hold = (cmd, args) => cmd === "gh" && args.some((a) => a.includes("resolveReviewThread"));
@@ -529,31 +570,112 @@ async function conversation() {
 }
 
 async function sectionsKept() {
-  const store = new Map();
+  const store = new Map(), run = (name, status, conclusion) => ({ __typename: "CheckRun", name, status, conclusion, detailsUrl: `https://ci/${name}` });
   const p = makePage({ spaces: [space("s1", "/r", true)], store });
   p.w.detail = (n) => ({ ...card(n, "feat", "main"), body: "", headRefOid: "h", baseRefOid: "b", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null,
-    latestOpinionatedReviews: { nodes: [] }, ...rollup([{ __typename: "CheckRun", name: "lint", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: null }]) });
+    latestOpinionatedReviews: { nodes: [] }, ...rollup([run("lint", "COMPLETED", "SUCCESS"), run("docs", "COMPLETED", "SKIPPED"), run("unit", "COMPLETED", "SUCCESS")]) });
   await p.tick(); await p.draw();
   let root = (await p.draw()).root;
-  assert.ok(!find(root, "t3-pulls-check-0") && strings(find(root, "t3-pulls-checks-head-summary")).includes("1/1 passed"), "all passed: shut, its summary on the right");
-  find(root, "t3-pulls-checks-head").handlers.on_click({}, p.cx);
+  assert.ok(!find(root, "t3-pulls-checks-passed") && strings(find(root, "t3-pulls-checks-head-summary")).includes("2/2 passed"), "all passed: shut, its summary on the right");
+  same(strings(find(root, "t3-pulls-status")), ["Ready to merge", "·", "2/2 checks", "·", "0/1 reviews"], "the verdict in words, then the counts");
+  find(root, "t3-pulls-tally-checks").handlers.on_click({}, p.cx);
   root = (await p.draw()).root;
-  assert.ok(find(root, "t3-pulls-check-0") && !find(root, "t3-pulls-checks-head-summary"));
+  assert.ok(find(root, "t3-pulls-checks-passed") && !find(root, "t3-pulls-checks-head-summary"), "the counts open their section");
+  assert.ok(strings(find(root, "t3-pulls-checks-passed")).includes("2 passed · 1 skipped") && !find(root, "t3-pulls-check-0"), "the passed and skipped are one row, folded");
+  find(root, "t3-pulls-checks-passed").handlers.on_click({}, p.cx);
+  root = (await p.draw()).root;
+  same(["t3-pulls-check-0", "t3-pulls-check-1", "t3-pulls-check-2"].map((id) => strings(find(root, id)).at(-1)), ["lint", "unit", "docs"], "opened in place, without words the icon says");
   find(root, "t3-pulls-comments-head").handlers.on_click({}, p.cx);
-  same(JSON.parse(store.get("sections.open")), { checks: true, comments: false });
-  // Another PR, another run: the person's choices stand.
+  same(JSON.parse(store.get("sections.open")), { checks: true, passed: true, comments: false });
+  // Another PR, another run: the person's choices stand; a failing check has its own red row and the verdict says so.
   const q = makePage({ spaces: [space("s1", "/r", true)], store });
-  q.w.detail = p.w.detail;
-  q.view.setTab(q.st() ?? q.view.stateFor(q.w.spaces[0]), "repo", q.cx);
+  q.w.detail = (n) => ({ ...p.w.detail(n), ...rollup([run("lint", "COMPLETED", "SUCCESS"), run("e2e", "COMPLETED", "FAILURE"), run("build", "IN_PROGRESS", null)]) });
+  q.view.setTab(q.st() ?? q.stateFor(q.w.spaces[0]), "repo", q.cx);
   await q.tick(); q.view.pick(q.st(), 5, q.cx); await q.settle();
   root = (await q.draw()).root;
-  assert.ok(find(root, "t3-pulls-check-0"), "Checks stays open");
+  same(strings(find(root, "t3-pulls-verdict")), ["Blocked: 1 check failing"]);
+  same([strings(find(root, "t3-pulls-check-0")).at(-1), strings(find(root, "t3-pulls-check-1")).at(-1)], ["e2e", "build"], "the failing and the running first, each its own row");
+  assert.equal(kit.walk(find(root, "t3-pulls-check-0")).find((x) => x.items.includes("e2e")).style.text_color?.[0], "#ff0000", "a failing check reads red");
+  assert.ok(strings(find(root, "t3-pulls-check-2")).includes("lint") && strings(find(root, "t3-pulls-checks-passed")).includes("1 passed"), "the passed row stays open, as left");
   assert.ok(!find(root, "t3-pulls-comment-editor") && strings(find(root, "t3-pulls-comments-head-summary")).includes("4, 1 unresolved"), "Comments stays shut, saying what's in it");
 }
 
+const be32 = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const png = (w, h) => Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, ...be32(w), ...be32(h), 8, 6, 0, 0, 0]);
+const curl = (src, to) => ["-fsSL", "--proto", "=https", "--max-time", "30", "--max-filesize", String(5 * 1024 * 1024), "-o", to, "-w", "%{content_type}", src];
+
+async function picturesOnPage() {
+  const id1 = "c523b8b3-e7f2-4520-bb42-8a68ab28c022", id2 = "6b723918-8152-463e-859c-6a1d71e4de16";
+  const signed = (id, jwt) => `https://private-user-images.githubusercontent.com/1/9-${id}.png?jwt=${jwt}`;
+  const body = `Intro\n\n![Chart](https://github.com/user-attachments/assets/${id1})\n\nMiddle\n\n<img width="300" alt="Settings" src="https://github.com/user-attachments/assets/${id2}" />\n`;
+  let jwt = "A";
+  const p = makePage({ spaces: [space("s1", "/r", true)] });
+  const cache = path.join(p.appDir, "cache/t3-pulls");
+  p.w.detail = (n) => ({ ...card(n, "feat", "main"), body, headRefOid: "h", baseRefOid: "b", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null,
+    latestOpinionatedReviews: { nodes: [] }, ...rollup([]),
+    bodyHTML: n === 7 ? `<p>Intro</p><p><a href="#"><img src="${signed(id1, jwt)}" alt="Chart"></a></p><p>Middle</p><img width="300" alt="Settings" src="${signed(id2, jwt)}">` : "<p>Intro</p><p>Middle</p>" });
+  p.w.web = { [signed(id1, "A")]: { type: "image/png", bytes: png(1600, 900) }, [signed(id2, "A")]: { type: "text/html; charset=utf-8", bytes: "<html>login</html>" } };
+  const curls = () => p.w.ran.filter((r) => r.cmd === "curl");
+  await p.tick(); await p.settle();
+  assert.ok(p.w.ran.some((r) => r.cmd === "rm" && r.args.join(" ") === `-rf ${cache}`), "what a crash left is cleared at the start");
+  p.w.open = false;
+  await p.draw();
+  assert.equal(curls().length, 0, "nothing is downloaded while the page is hidden");
+  p.w.open = true;
+  await p.draw();
+  same(curls().map((r) => [r.args, r.on]).sort((a, b) => (a[0].at(-1) < b[0].at(-1) ? -1 : 1)),
+    [[curl(signed(id2, "A"), `${cache}/${id2}.part`), null], [curl(signed(id1, "A"), `${cache}/${id1}.part`), null]], "each picture once, from its signed address, here");
+  same(fs.readdirSync(cache), [`${id1}.png`], "kept by asset id; a page that isn't a picture is dropped");
+  let root = (await p.draw()).root;
+  const at = (i) => find(root, `t3-pulls-body-s1-7-image-${i}`), picture = (node) => kit.walk(node).find((x) => x.kind === "image");
+  same([picture(at(1)).source, picture(at(1)).style.w, picture(at(1)).style.h], [`cache/t3-pulls/${id1}.png`, [384], [216]], "drawn as wide as the column, its shape kept");
+  assert.ok(strings(at(3)).includes("Settings") && strings(at(3)).includes("Open image"), "failed: its alt text and a link");
+  same(strings(find(root, "t3-pulls-body-s1-7")).filter((s) => s === "Chart"), [], "a picture drawn isn't also its alt text");
+  p.view.width = 600;
+  root = (await p.draw()).root;
+  same([picture(at(1)).style.w, picture(at(1)).style.h], [[564], [317]]);
+  at(1).handlers.on_click({}, p.cx); await p.settle();
+  same(p.w.ran.at(-1).args, [`https://github.com/user-attachments/assets/${id1}`], "a click opens the original");
+
+  // A later read signs every address anew: what's kept is drawn as it is, and the one that failed is tried once more.
+  jwt = "B";
+  p.refresh(); await p.settle();
+  await p.draw(); await p.draw();
+  same(curls().map((r) => r.args.at(-1)).slice(2), [signed(id2, "B")]);
+
+  // GitHub's rendering doesn't line up: nothing is downloaded, a picture not already kept is its alt and a link.
+  p.view.pick(p.st(), 5, p.cx); await p.settle();
+  root = (await p.draw()).root;
+  assert.equal(curls().length, 3);
+  assert.ok(strings(find(root, "t3-pulls-body-s1-5-image-3")).includes("Open image"));
+  assert.equal(picture(find(root, "t3-pulls-body-s1-5-image-1")).source, `cache/t3-pulls/${id1}.png`, "the same asset kept from #7 is drawn");
+
+  await p.view.close();
+  same(fs.readdirSync(cache), [], "the copy's files go when it stops");
+}
+
+// Every empty list says why in one line; none is blank.
+async function emptyStates() {
+  const said = async (p, id) => { await p.tick(); await p.settle(); const root = (await p.draw()).root; return strings(find(root, id)).join(" "); };
+  let p = makePage({ spaces: [space("s1", "/r", true)] });
+  p.w.lists = { branch: [], open: [], total: 0 };
+  assert.equal(await said(p, "t3-pulls-empty-branch"), "No pull request from feat.");
+  p.view.setTab(p.st(), "repo", p.cx);
+  assert.equal(await said(p, "t3-pulls-empty-repo"), "No open pull requests in org/app.");
+  p = makePage({ spaces: [space("s1", "/r", true)] });
+  p.view.setTab(p.stateFor(p.w.spaces[0]), "repo", p.cx);
+  await p.tick();
+  p.view.search.set_value("zzz");
+  assert.equal(await said(p, "t3-pulls-empty-repo"), 'No pull requests match "zzz".');
+  p = makePage({ spaces: [space("s1", "/r", true)] });
+  p.w.head = "HEAD";
+  assert.equal(await said(p, "t3-pulls-empty-branch"), "HEAD is detached: no branch to match.");
+}
+
 (async () => {
+  await emptyStates();
   sections();
-  discovery();
+  forks();
   summaries();
   stacks();
   handoff();
@@ -563,5 +685,6 @@ async function sectionsKept() {
   await ghFailures();
   await conversation();
   await sectionsKept();
+  await picturesOnPage();
   console.log("t3-pulls checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

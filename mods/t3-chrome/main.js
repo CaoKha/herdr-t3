@@ -21,9 +21,10 @@ import { tab as closableTab } from "./tab.js";
 import { keycap } from "./palette.js";
 import { alpha } from "./color.js";
 
-// The space panel's surfaces (docs/adr/0017) that aren't a file: their names and icons. Review wears pulls.review's own mark,
-// as the Review bar does: a review, not a git command. In its colors, so an image.
-const PAGES = { files: ["Files", "folder-tree"], review: ["Review", "pulls-review", true], pulls: ["Pull requests", "git-pull-request"], issues: ["Issues", "circle-dot"] };
+// The space panel's surfaces (docs/adr/0017) that aren't a file, in the order + lists them: their names, icons and + keys. Review
+// wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image. A page slot
+// not named here (another mod's) shows by its slot's id.
+const PAGES = { files: ["Files", "folder-tree", false, "f"], review: ["Review", "pulls-review", true, "r"], pulls: ["Pull requests", "git-pull-request", false, "p"], issues: ["Issues", "circle-dot", false, "i"] };
 // The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md「菜单行」).
 const MENU_W = 220, menuHeight = (rows) => rows * MENU_ROW + 8;
 const zoomOf = () => Number(settings()?.zoom) || 1;
@@ -217,7 +218,7 @@ export default class WorkspaceChrome extends View {
   // + 's menu: under its press, else (the panel's cmd-t) under where + stands: the head's mod ends its padding in from the
   // window's right, + after the tabs as the strip has them scrolled. A popup's `at` is in zoomed px.
   openSurfaceMenu(press) {
-    const pages = panelState().pages, z = zoomOf(), rows = 1 + ["review", "pulls", "issues"].filter(page => pages.includes(page)).length;
+    const z = zoomOf(), rows = this.pageItems(panelState()).length;
     let at = hang(press, 0, { align: "start", gap: 6 }).at;
     if (!at && this.headW) {
       const root = layout(), high = layoutNode(root, "panel-head")?.size?.px ?? 40;
@@ -281,6 +282,17 @@ export default class WorkspaceChrome extends View {
       .when(Boolean(w?.buttons), el => el.child(h_flex().flex_none().items_center().children([["minimize", "Minimize", "−", "win-min"], ["maximize", w.maximized ? "Restore" : "Maximize", w.maximized ? "❐" : "□", w.maximized ? "win-restore" : "win-max"], ["close", "Close window", "×", "win-close"]].map(([cmd, label, text, icon]) => own(drawButton(t, `panel-window-${cmd}`, { size: "sm", label, ...(w.platform === "windows" ? { icon: `mods/t3-chrome/icons/${icon}.svg` } : { text }) }).w(28).px(0).on_click(() => run(`window.${cmd}`))))))));
   }
 
+  // What + and Open a surface offer: Files, then each page surface this layout has (any other slot of panel-body), named and in
+  // PAGES' order, Review greyed with its reason when it can't read here.
+  pageItems(s) {
+    const order = Object.keys(PAGES), rank = id => id in PAGES ? order.indexOf(id) : order.length;
+    return ["files", ...s.pages.filter(id => id !== "files" && id !== "panel-empty")].sort((a, b) => rank(a) - rank(b)).map(id => {
+      const [label, art, colored, key] = PAGES[id] ?? [id, "folder-tree", false, undefined];
+      return { label, key, icon: colored ? image(`mods/t3-chrome/icons/${art}.svg`).size(16) : `mods/t3-chrome/icons/${art}.svg`, act: () => showPage(id),
+        ...(id === "review" ? { disabled: Boolean(this.reviewReason), reason: this.reviewReason } : {}) };
+    });
+  }
+
   // The surface menus: the docked empty page (Open a surface), + 's popup, and a tab's right-click menu.
   surfaceView(t) {
     const p = props(), s = panelState(), empty = p.part === "surface-empty", context = p.part === "surface-context";
@@ -292,12 +304,7 @@ export default class WorkspaceChrome extends View {
       { label: "Close others", disabled: s.tabs.length < 2, act: () => closeSurface(p.target, "others") },
       { label: "Close to the right", disabled: at === s.tabs.length - 1, act: () => closeSurface(p.target, "right") },
       { label: "Close all", act: () => closeSurface(p.target, "all") },
-    ] : [
-      { label: "Files", key: "f", icon: "mods/t3-chrome/icons/folder-tree.svg", act: () => showPage("files") },
-      ...(s.pages.includes("review") ? [{ label: "Review", key: "r", icon: image("mods/t3-chrome/icons/pulls-review.svg").size(16), disabled: Boolean(this.reviewReason), reason: this.reviewReason, act: () => showPage("review") }] : []),
-      ...(s.pages.includes("pulls") ? [{ label: "Pull requests", key: "p", icon: "mods/t3-chrome/icons/git-pull-request.svg", act: () => showPage("pulls") }] : []),
-      ...(s.pages.includes("issues") ? [{ label: "Issues", key: "i", icon: "mods/t3-chrome/icons/circle-dot.svg", act: () => showPage("issues") }] : []),
-    ];
+    ] : this.pageItems(s);
     const choose = (i, cx) => {
       // The popup's tab can disappear or be reopened before a repaint; its path isn't its instance.
       if (context && (p.space !== spaces().find(sp => sp.active)?.id || !panelState().tabs.some(tab => tab.id === p.target && tab.born === p.born))) return finish();

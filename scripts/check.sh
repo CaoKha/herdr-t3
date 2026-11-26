@@ -88,10 +88,6 @@ for f in $(find shared mods extras/mods -name 'check*.cjs'); do
   out=$(cd "$app" && node -r "$src/scripts/render-guard.cjs" "$src/$f" 2>&1) || { echo "FAIL $f"; echo "$out" | tail -20; fail=1; }
 done
 
-# Branch Issue, from munza/herdr-mods: its own node tests and its Go helper.
-out=$(node --test extras/branch-issue/tests/*.test.cjs 2>&1) || { echo "FAIL extras/branch-issue tests"; echo "$out" | tail -20; fail=1; }
-out=$(cd extras/branch-issue/helper && go vet ./... && go test ./... 2>&1) || { echo "FAIL extras/branch-issue/helper"; echo "$out" | tail -20; fail=1; }
-
 scripts/check-update.sh || fail=1
 scripts/check-demo.sh || fail=1
 

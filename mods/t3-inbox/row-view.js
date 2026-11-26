@@ -11,7 +11,7 @@ import { statusMark, took } from "./status-mark.js";
 import { stop, within } from "./focus.js";
 import { snoozeButton } from "./snooze.js";
 import { SLIM } from "./list-view.js";
-import { ago } from "./row-model.js";
+import { ago } from "./ago.js";
 import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
 import { worktreeLabel } from "./worktree.js";

@@ -44,7 +44,7 @@ function fixture(from, { hidden = false, buttons = false, home = "t3-home" } = {
   }
   const cx = { spawn() {}, notify() {}, focus_handle() {} };
   const globals = {
-    View: class {}, div: el, h_flex: el, v_flex: el, theme: () => ({}), props: () => ({ part: "keys" }), settings: () => ({}),
+    View: class {}, checking: () => true, div: el, h_flex: el, v_flex: el, theme: () => ({}), props: () => ({ part: "keys" }), settings: () => ({}),
     shared: key => saved[key], setShared: (key, val) => { saved[key] = val; }, window: () => ({ buttons }),
     spaces, panes, agents: () => [], terminals: () => [], machines: () => [], focused: () => null,
     layout: () => ++layouts && ({ children: [{ id: "sidebar", hidden, children: [{ id: "sidebar-lists", active: "lists" }] },

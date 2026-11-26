@@ -133,10 +133,11 @@ export function placeOf(s, ps) {
   return hit?.cwd || s.folder;
 }
 
-// A terminal tab where the space is now, as its mark and folder say: Herdr's tab.new alone starts where the space was made.
-export const newTab = (s) => {
+// A tab where the space is now, as its mark and folder say: Herdr's tab.new alone starts where the space was made. A terminal,
+// or `program` (a knownAgents entry) started with its own command, as Herdr's New menu starts one.
+export const newTab = (s, program = null) => {
   prepareSpace(s.id);
-  return run("tab.new", { space: s.id, folder: placeOf(s, panes()) });
+  return run("tab.new", { space: s.id, folder: placeOf(s, panes()), ...(program ? { name: program.name, argv: program.run } : {}) });
 };
 
 // Shared KEY.spaceIcons: [machine, folder] -> the copy's path or null, so every mod shows what one found.

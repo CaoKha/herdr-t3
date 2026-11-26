@@ -18,13 +18,13 @@ function newBorn(space = activeSpaceId()) {
   return (globalThis.t3LastBorn = Math.max(Date.now(), globalThis.t3LastBorn, maxTab) + 1);
 }
 
-// Surfaces that are a whole page of their own slot, there only where the layout has that slot: Review (the extra),
-// Pull requests (t3-pulls) and Issues (Branch Issue).
-const PAGE_SLOTS = ["review", "pulls", "issues"];
+// A page surface is any other slot of panel-body than Files' and the empty page: the whole page of its own mod, there only
+// where the layout has that slot.
+const isFile = (id) => id === "files" || id.startsWith("file:");
 
 /** `space`'s tabs and the active one; a page surface's only where its slot is installed. */
 export function surfacesFor(space = activeSpaceId(), slots = panelSlots()) {
-  const kept = shared(KEY.panels)?.[space], tabs = (kept?.tabs ?? []).filter(t => !PAGE_SLOTS.includes(t.id) || slots.includes(t.id));
+  const kept = shared(KEY.panels)?.[space], tabs = (kept?.tabs ?? []).filter(t => isFile(t.id) || slots.includes(t.id));
   return { tabs, active: tabs.some(t => t.id === kept?.active) ? kept.active : tabs[0]?.id ?? null };
 }
 
@@ -65,7 +65,7 @@ function sizeWindowEnd(open, space, force = false) {
   if (force || end.size?.px !== px) run("layout.resize", { id: "window-end", px });
 }
 
-const slot = (active) => PAGE_SLOTS.includes(active) ? active : active ? "files" : "panel-empty";
+const slot = (active) => !active ? "panel-empty" : isFile(active) ? "files" : active;
 
 // The active space's record, only its fields: what an older build kept beside them goes at the first write.
 function save(want) {
@@ -91,10 +91,10 @@ export function activateSurface(id, keepDetails = false) {
   return true;
 }
 
-/** "files" or a page surface ("review", "pulls", "issues") added, or picked if it's there. In Herdr's own layout, its page shown. */
+/** "files" or a page surface (any other slot of panel-body) added, or picked if it's there. In Herdr's own layout, its page shown. */
 export function showPage(page, keepDetails = false) {
   const s = panelState();
-  if (!s.pages.includes(page)) return false;
+  if (!s.pages.includes(page) || page === "panel-empty") return false;
   if (!s.owns) { run("layout.select", { stack: "panel-body", child: page }); showPanel(true); return true; }
   showSurfaces(surfaceAdd(s, page, newBorn()), keepDetails);
   return true;
@@ -206,6 +206,10 @@ export function openReview({ space, root, page, base = undefined, analyze = fals
   return "opened";
 }
 
+// What Review says when it can't read, as the pages that hand work to it say it too; `remote` names who can't.
+export const REVIEW_PROBLEMS = { missing: "Review isn't installed: add the Review extra.", remote: (name = "Review") => `${name} is unavailable on remote spaces.`,
+  noRepo: "This tab's folder is not in a Git repository." };
+
 /**
  * Why Review can't read `space` now, or "" when it can: a space on another machine, or no Git repository where its tab works
  * (terminal-context.js workFolder: the last terminal's cwd, else the space folder), as T3's diff panel follows its thread's
@@ -215,11 +219,11 @@ export function openReview({ space, root, page, base = undefined, analyze = fals
 export const reviewRepo = async (space = activeSpaceId()) => {
   const sp = spaces().find(s => s.id === space);
   if (!sp) return { root: null, problem: "No space is open." };
-  if (sp.machine) return { root: null, problem: "Review is unavailable on remote spaces." };
+  if (sp.machine) return { root: null, problem: REVIEW_PROBLEMS.remote() };
   const folder = workFolder(sp.id);
   const top = folder ? await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"], { cwd: folder }).catch(() => null) : null;
   const root = top?.code === 0 && top.stdout?.trim();
-  return root ? { root, problem: "" } : { root: null, problem: "This tab's folder is not in a Git repository." };
+  return root ? { root, problem: "" } : { root: null, problem: REVIEW_PROBLEMS.noRepo };
 };
 
 // Each space keeps its panel, as T3 keeps one per thread; the width stays the window's.

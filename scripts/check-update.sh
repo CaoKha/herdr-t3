@@ -120,10 +120,10 @@ is '.["mod:t3-picker"]["cmd-w"]' "$app/keys.json" overlay.close
 case "$out" in *"replaced: cmd-p = old"*) ;; *) echo "FAIL check-update: no word of the replaced key"; exit 1 ;; esac
 case "$out" in *"kept, not in the repo: cmd-x = mine"*) ;; *) echo "FAIL check-update: no word of the kept key"; exit 1 ;; esac
 
-# The Review extra's review is a space panel page after the layout's own (Files, Pull requests); no id twice.
+# The Review extra's review is a space panel page after the layout's own (Files, Pull requests, Issues); no id twice.
 pages='[.. | objects | select(.id? == "panel-body") | .children[].id] | join(",")'
 unique='[.. | objects | .id? | strings] | length == (unique | length)'
-is "$pages" "$layout" files,panel-empty,pulls,review
+is "$pages" "$layout" files,panel-empty,pulls,issues,review
 is "$unique" "$layout" true
 
 # rsync --delete would remove the installed entry, so the copied source must have one too.
@@ -151,23 +151,14 @@ update >/dev/null
 is "$review_blocks" "$layout" "$(printf '%s\n' "$legacy" | jq -cS '[.]')"
 is '(.. | objects | select(.content?.mod? == "t3-theme-export"))' "$layout" "$(printf '%s\n' "$export_block" | jq -cS .)"
 is '(.. | objects | select(.id? == "panel-body") | .active)' "$layout" review
-is "$pages" "$layout" files,panel-empty,pulls,review
+is "$pages" "$layout" files,panel-empty,pulls,issues,review
 is "$unique" "$layout" true
-
-# Branch Issue, installed on its own, is the Issues page after Review; the update never copies or removes it.
-mkdir "$app/mods/branch-issue"
-touch "$app/mods/branch-issue/main.js"
-update >/dev/null
-is "$pages" "$layout" files,panel-empty,pulls,review,issues
-is "$unique" "$layout" true
-rm -rf "$app/mods/branch-issue"
 
 # Uninstall the extras while the layout still names them, including the Review bar in the tab row.
 rm -rf "$app/mods/pulls-review" "$app/mods/review" "$app/mods/t3-theme-export"
 update >/dev/null
-is '[.. | objects | .mod? | strings | select(. == "branch-issue")]' "$layout" '[]'
 is '[.. | objects | .mod? | strings | select(. == "pulls-review" or . == "review" or . == "t3-theme-export")]' "$layout" '[]'
-is "$pages" "$layout" files,panel-empty,pulls
+is "$pages" "$layout" files,panel-empty,pulls,issues
 is '(.. | objects | select(.id? == "panel-body") | .active)' "$layout" panel-empty
 ok test ! -e "$app/mods/pulls-review"
 ok test ! -e "$app/mods/review"

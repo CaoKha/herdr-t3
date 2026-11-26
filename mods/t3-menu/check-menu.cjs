@@ -53,10 +53,11 @@ const context = vm.createContext({
   window: { viewport_size: () => view, mouse_position: () => mouse },
   theme: () => theme, keys: () => { keyReads++; return keyList; }, settings: () => ({ zoom }), terminals: () => [...terms], agents: () => [...agentList], spaces: () => spaceList, panes: () => paneList, focused: () => focusState, exec: async () => ({ code: 1 }),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, hc: async () => ({ code: 0 }), notify() {},
+  knownAgents: async () => [{ name: "Claude Code", run: ["claude"], installed: true, icon: "agents/claude.svg" }, { name: "Codex", run: ["codex"], installed: false }],
   layout: () => ({ id: "root", children: [{ id: "sidebar-lists", active: list, children: [] }] }),
   keyLabel: (k) => tipScope.keyLabel(k),
 });
-const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "space-arrival.js", "name.js", "program.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "space-arrival.js", "name.js", "program.js", "known-agents.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Menu = class").replace(/^export /gm, "");
 vm.runInContext(src, context);
 // Timers run when the test says time has passed.
@@ -99,6 +100,16 @@ for (const active of [true, false]) {
 }
 spaceList[0].active = true;
 assert.deepEqual(choose({ tab: "tab", target: { id: "b1" } }, "New tab"), [["t3-tabs.new:s1"]], "with no space named, the one in view");
+// New tab's menu (the tab bar's +): Terminal, then the agents installed where the space is, as last reported; one picked starts
+// through t3-tabs with its name, each part URI-encoded.
+{
+  const items = vm.runInContext("items", context), labels = (agents) => JSON.parse(JSON.stringify(items({ tab: "new-tab", target: { space: "s1" } }, null, agents).map((it) => [it[0], it[4]])));
+  assert.deepEqual(labels(null), [["Terminal", 0], ["Checking installed agents…", 1]], "before any answer, saying so");
+  assert.deepEqual(labels([{ name: "Claude Code", run: ["claude"] }]), [["Terminal", 0], ["Claude Code", 1]]);
+  vm.runInContext('globalThis.t3KnownAgents = new Map([["", [{ name: "Claude Code", run: ["claude"], installed: true }]]])', context);
+  assert.deepEqual(choose({ tab: "new-tab", target: { space: "s1" } }, "Terminal"), [["t3-tabs.new:s1"]], "Terminal: t3-tabs' own new tab, in that space");
+  assert.deepEqual(choose({ tab: "new-tab", target: { space: "s1" } }, "Claude Code"), [["t3-tabs.new-agent:s1:Claude%20Code"]]);
+}
 spaceList[0].active = true;
 assert.deepEqual(choose({ tab: "space", target: { id: "s1" } }, "Close"), [["space.close", { id: "s1" }]], "a space's Close is Herdr's, which asks itself");
 

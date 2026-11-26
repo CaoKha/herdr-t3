@@ -14,11 +14,11 @@ export function loadingState(mod, t, id, text) {
     .child(div().id(`${id}-text`).child(text));
 }
 
-/** Empty: an icon (a path in the mod's folder), a title and a `dim` hint, centered. */
+/** Empty: an icon (a path in the mod's folder), a title and a `dim` hint, centered; without icon and title, the hint alone, one line saying why. */
 export function emptyState(t, id, icon, title, hint) {
   return v_flex().id(id).size_full().p(24).gap(8).items_center().justify_center().text_center().text_color(t.dim)
-    .child(svg(icon).size(24).flex_none().text_color(t.dim))
-    .child(div().id(`${id}-title`).text_size(13).font_medium().child(title))
+    .when(Boolean(icon), (el) => el.child(svg(icon).size(24).flex_none().text_color(t.dim)))
+    .when(Boolean(title), (el) => el.child(div().id(`${id}-title`).text_size(13).font_medium().child(title)))
     .when(Boolean(hint), (el) => el.child(div().id(`${id}-hint`).text_size(12).child(hint)));
 }
 

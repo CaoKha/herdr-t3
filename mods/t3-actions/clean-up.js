@@ -6,6 +6,7 @@ import { theme, run, closeOverlay, props, panes, spaces, focused, agents, termin
 import { stopsInit, stop, focusRoot, onStop, within } from "./focus.js";
 import { button, radiusOf, tint } from "./button.js";
 import { glow } from "./tip.js";
+import { shelfHead } from "./shelf.js";
 import { programIcon } from "./program.js";
 import { ownStatus, stillSettled, subAgents } from "./tree.js";
 import { alpha } from "./color.js";
@@ -24,11 +25,6 @@ export function initCleanUp(view, cx) {
   view.closing = false;
   stopsInit(view, cx, "modal");
 }
-
-const hovers = (view, id) => (over, cx) => {
-  const to = over ? id : view.hot === id ? null : view.hot;
-  if (to !== view.hot) { view.hot = to; cx.notify(); }
-};
 
 const hoverCleanRow = (view, id) => (over, cx) => {
   const to = over ? id : view.overRow === id ? null : view.overRow;
@@ -56,24 +52,6 @@ function actionButton(view, t, id, { text, label, act }) {
   }).w(54).cursor_pointer()
     .on_hover(glow(view, id))
     .on_click((_e, cx) => { cx.stop_propagation(); act(); }), radiusOf("micro"));
-}
-
-// As Inbox's shelf header: a dim label, its count, a chevron when it folds; what it implies and a per-shelf Close at the right.
-/** @param {any} view @param {any} t @param {string} id @param {string} label @param {number} count
- *  @param {{ open?: boolean, side?: string | null, toggle?: (e: any, cx: any) => void, action?: { id: string, label: string, act: () => void } | null }} o */
-function shelfHead(view, t, id, label, count, { open = false, side = null, toggle = undefined, action = null }) {
-  const lit = view.hot === id || within(view, [id]);
-  const actBtn = action ? actionButton(view, t, action.id, { text: "Close", label: action.label, act: action.act }) : null;
-  const head = h_flex().id(id).h(32).px(8).gap(6).items_center().rounded(6).text_size(12)
-    .child(div().flex_none().text_color(lit ? t.muted : t.dim).child(label))
-    .child(div().flex_none().text_color(t.muted).child(String(count)))
-    .when(Boolean(toggle), (el) => el.child(svg(`mods/t3-actions/icons/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim)))
-    .when(Boolean(side), (el) => el.child(div().flex_1().min_w(0).truncate().text_right().text_color(t.dim).child(side)))
-    .when(!side && Boolean(actBtn), (el) => el.child(div().flex_1()))
-    .when(Boolean(actBtn), (el) => el.child(side ? actBtn.ml(2) : actBtn));
-  if (!toggle) return head;
-  return stop(view, t, id, head.cursor_pointer().on_hover(hovers(view, id)).on_click(toggle)
-    .role("button").accessibility_label(`${open ? "Hide" : "Show"} ${count} ${label.toLowerCase()}`), 6);
 }
 
 // What closes: Settled's slim row with fixed columns (mark, icon, name, space, Close) so hover never shifts widths.
@@ -211,23 +189,23 @@ export function cleanUpView(view, cx = undefined) {
     .child(div().px(24).pt(24).pb(12).child(dialogTitle(t, "Clean up")))
     .child(v_flex().id("clean-up-body").px(16).gap(8).max_h(420).overflow_y_scrollbar()
       .when(settled.length > 0, (el) => el.child(v_flex()
-        .child(shelfHead(view, t, "clean-up-settled", "Settled", settled.length, {
+        .child(shelfHead(view, t, "t3-actions", "clean-up-settled", "Settled", { count: settled.length,
           open: view.openSettled,
           toggle: toggleSettled,
           side: closingSettled.length ? `closes ${cleanUpAnd(closingSettled.map((s) => s.name))}` : null,
-          action: p.command ? { id: "clean-up-close-settled", label: `Close ${settled.length} settled ${settled.length === 1 ? "agent" : "agents"}`, act: () => runScoped("settled") } : null,
+          trail: p.command ? actionButton(view, t, "clean-up-close-settled", { text: "Close", label: `Close ${settled.length} settled ${settled.length === 1 ? "agent" : "agents"}`, act: () => runScoped("settled") }) : null,
         }))
         .when(view.openSettled, (el) => el.child(v_flex().gap(1).children(settled.map((r) => closeRow(view, t, "clean-up-settled", r, done, mark, closePane)))))))
       .when(shells.length > 0, (el) => el.child(v_flex()
-        .child(shelfHead(view, t, "clean-up-shells", "Idle shells", shells.length, {
+        .child(shelfHead(view, t, "t3-actions", "clean-up-shells", "Idle shells", { count: shells.length,
           open: view.openShells,
           toggle: toggleShells,
           side: closingShells.length ? `closes ${cleanUpAnd(closingShells.map((s) => s.name))}` : null,
-          action: p.command ? { id: "clean-up-close-shells", label: `Close ${shells.length} idle ${shells.length === 1 ? "shell" : "shells"}`, act: () => runScoped("shells") } : null,
+          trail: p.command ? actionButton(view, t, "clean-up-close-shells", { text: "Close", label: `Close ${shells.length} idle ${shells.length === 1 ? "shell" : "shells"}`, act: () => runScoped("shells") }) : null,
         }))
         .when(view.openShells, (el) => el.child(v_flex().gap(1).children(shells.map((r) => closeRow(view, t, "clean-up-shell", r, done, mark, closePane)))))))
       .when(cards.length > 0, (el) => el.child(v_flex()
-        .child(shelfHead(view, t, "clean-up-left", "Left behind", cards.length, { side: "no agent at work" }))
+        .child(shelfHead(view, t, "t3-actions", "clean-up-left", "Left behind", { count: cards.length, side: "no agent at work" }))
         .child(v_flex().gap(5).children(cards.map((c) => card(view, t, c, done, mark)))))))
     // The reason last (P9), on a line of its own level with the title, clear of the buttons.
     .child(div().id("clean-up-note").px(24).pt(12).text_size(12).line_height("16px").text_color(t.dim)

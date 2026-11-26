@@ -1,0 +1,4 @@
+The icons in icons/ are from Lucide (https://lucide.dev), ISC License, Copyright (c) Lucide Contributors.
+model.js's identifiersIn, branch bindings (`branch.<name>.herdr-issue`), commentThreads and workflow order, and linear.js's key
+lookup, Linear queries and writes are adapted from Branch Issue in munza/herdr-mods (https://github.com/munza/herdr-mods),
+Apache-2.0, Copyright 2026 Tawsif Aqib.

@@ -122,7 +122,7 @@ const tabs = () => p.panelState().tabs.map(t => (t.id === p.panelState().active 
   p.closeSurface('pulls'); assert.deepEqual([ui.page, tabs()], ['files', '*files']);
   p.showPage('pulls'); assert.deepEqual([ui.page, tabs()], ['pulls', 'files *pulls']);
   p.togglePanel('pulls'); assert.equal(ui.open, false);
-  // Issues (Branch Issue) likewise.
+  // Issues (t3-issues) likewise.
   assert.equal(p.showPage('issues'), false);
   ui.slots.push('issues');
   p.showPage('issues'); assert.deepEqual([ui.open, ui.page, tabs()], [true, 'issues', 'files pulls *issues']);

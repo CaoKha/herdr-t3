@@ -56,7 +56,7 @@ function fixture(width) {
       if (name === "layout.select" && slots[args.stack]) slots[args.stack].active = args.child;
     },
     openOverlay: spec => overlays.push(spec), closeOverlay: id => closed.push(id), updates: () => ui.updates,
-    nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise(() => {}),
+    knownAgents: async () => [], nextCommand: () => commands.length ? Promise.resolve(commands.shift()) : new Promise(() => {}),
     keys: () => [{ section: "layout:herdr-t3", keys: "cmd-t", action: "t3-tabs.new" }, { section: "layout:herdr-t3", keys: "cmd-shift-z", action: "t3-tabs.undo" }, { section: "global", keys: "cmd-n", action: "space.new" }],
   };
   function load(name, props = {}) {
@@ -2161,7 +2161,7 @@ async function checkInbox() {
     f.also("t3-tabs", { part: "measure" });
     f.also("t3-tabs", { part: "keys" });
     cx.spawn = spawn;
-    assert.equal(jobs.length, 2, "the strip listens for closes; of the layout's copies only keys answers, or one close opens several dialogs");
+    assert.equal(jobs.length, 3, "the strip listens for closes and + asks which agents are installed; of the layout's copies only keys answers, or one close opens several dialogs");
     Object.assign(view, { overTab: "tab-b0", hot: "tab-b0-close", details: "b0" });
     // Each shown copy hears a command: one each for the strip and keys.
     f.commands.push("close-tab", "close-tab"); for (const job of jobs) job(cx); await new Promise(setImmediate);
@@ -2183,7 +2183,7 @@ async function checkInbox() {
     cx.spawn = fn => jobs.push(fn);
     f.load("t3-tabs", { part: "keys" }); f.also("t3-tabs", { part: "end" }); f.also("t3-tabs", { part: "measure" }); f.load("t3-chrome"); f.load("t3-chrome", { footer: true });
     cx.spawn = spawn;
-    assert.equal(jobs.length, 1, "only the keys copy listens");
+    assert.equal(jobs.length, 2, "only the keys copy listens; + asks which agents are installed");
     assert.deepEqual(Object.values(JSON.parse(fs.readFileSync(path.join(modRoot, "..", "keys.json"), "utf8"))["layout:herdr-t3"]).filter(a => /^t3-(chrome|inbox)\./.test(a)), [], "a key's command goes to the mod that always shows: another's would miss it, or toast");
     f.slots.lists = { id: "sidebar-lists", active: "inbox" };
     const press = async (command, rows) => {

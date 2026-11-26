@@ -28,6 +28,7 @@ const env = {
   terminalByAddress: all => new Map(all.map(k => [k.address, k])),
   POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
   openMenu: (_view, kind, target) => calls.push([kind, target]), openOverlay: value => calls.push(["overlay", value]),
+  agentsOn: () => [{ name: "Claude Code", run: ["claude"] }, { name: "Pi", run: ["pi"] }], lookAgents: async () => null, checking: () => true,
 };
 function load(dir) {
   const scope = vm.createContext({ ...env });
@@ -57,8 +58,10 @@ for (const id of ["minimize", "maximize", "close-window"]) {
   const el = click(root, id);
   assert.equal(el.style.h, 28); assert.equal(el.style.w, 28); assert.equal(el.items[0].style.size, 16);
 }
-// Lists' + is the New tab its label's key is: the one command, so the breadcrumb reads the same after either (navigation.js `fresh`).
-assert.deepEqual(calls.splice(0), [["t3-tabs.new", undefined], ["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
+// Lists' + opens New tab's menu under it (t3-menu's "new-tab"), as tall as Terminal, a rule and the agents last reported.
+const opened = calls.shift();
+assert.deepEqual(JSON.parse(JSON.stringify([opened[0], opened[1].mod, opened[1].props.tab, opened[1].props.target, opened[1].width, opened[1].height])), ["overlay", "t3-menu", "new-tab", { space: "s" }, 220, 8 + 3 * 28 + 9]);
+assert.deepEqual(calls.splice(0), [["panel"], ["window.minimize", undefined], ["window.maximize", undefined], ["window.close", undefined]]);
 panelOpen = true;
 assert.equal(find(tabs.render(), "close-window"), null, "platform buttons move to the panel head");
 assert.equal(find(tabs.render(), "panel-toggle"), null, "open panel owns its rightmost toggle");

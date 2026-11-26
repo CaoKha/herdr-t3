@@ -110,6 +110,8 @@ const mod = (p) => { props = p; const v = new c.Mod(); v.init({}, cx); return v;
   assert.equal(menu.props.part, 'surface-menu');
   assert.deepEqual({ ...menu.at }, { x: 1800 - (12 + 450) * 2 + 2 * 104 * 2, y: (32 + 6) * 2 });
   assert.equal(menu.height, 2 * 28 + 8, 'as tall as its rows');
+  assert.deepEqual([...head.pageItems({ pages: ['panel-empty', 'issues', 'files', 'notes', 'review', 'pulls'] }).map(i => i.label)], ['Files', 'Review', 'Pull requests', 'Issues', 'notes'],
+    'every page slot, named ones in their order, another mod\'s by its id');
   // A press on + : under its box.
   calls.length = 0; const add = find(root, 'surface-add');
   add.handlers["on_mouse_down:left"]({ bounds: { x: 500, y: 10, width: 48, height: 48 } }, cx); add.handlers.on_click({}, cx);

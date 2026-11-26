@@ -5,7 +5,8 @@ import { glow, undoLabel } from "./tip.js";
 import { MOTION, planMotion, flying } from "./motion.js";
 import { focusStop, onStop, stop } from "./focus.js";
 import { inboxTop } from "./filter.js";
-import { FIRST, MORE, ago } from "./row-model.js";
+import { FIRST, MORE } from "./row-model.js";
+import { ago } from "./ago.js";
 import { projectMark } from "./project.js";
 
 // T3's slim rows and Show more (h-9) and its shelves' headers (h-8), logical px.

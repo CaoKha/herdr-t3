@@ -21,7 +21,7 @@ import { MENU_ROW } from "./menu-row.js";
 import { LIST, join, parseListing } from "./file-listing.js";
 import { IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, parentOf, nameOf, ancestors, filesRoot, parseIgnored, markIgnored, folderEntries, terms, narrows,
   filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket } from "./model.js";
-import { alpha } from "./color.js";
+import { compactField } from "./field.js";
 
 const MOD = "mods/t3-files";
 const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
@@ -822,12 +822,9 @@ export default class Files extends View {
       })
       .child(this.control(t, "t3-files-refresh", "refresh-cw", "Refresh files", cx => this.recheck(st, cx)))
       // A tab stop as every control is; Enter or Space on it goes into the field.
-      .child(stop(this, t, "t3-files-search-field", div().id("t3-files-search-field").relative().flex_1().min_w(0).h(28).px(9).rounded(6).border_1().border_color(this.searchFocused ? t.accent : "#00000000")
-        .when(Boolean(this.searchFocused), el => el.bg(t.background))
-        .on_mouse_down("left", (_e, cx) => { this.search.focus(); cx.stop_propagation(); })
-        .child(this.search.value() === st.query ? Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files")
-          : div().h_full().flex().items_center().truncate().text_size(12).text_color(st.query ? t.foreground : t.dim).child(st.query || "Search files"))
-        .when(Boolean(this.searchFocused), el => el.child(div().id("t3-files-search-ring").absolute().inset_0().rounded(6).border(3).border_color(alpha(t.accent, "3d")))), 6, { enter: () => this.search.focus() }))
+      .child(compactField(this, t, "t3-files-search-field", { focused: Boolean(this.searchFocused), focus: () => this.search.focus(),
+        child: this.search.value() === st.query ? Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files")
+          : div().h_full().flex().items_center().truncate().text_size(12).text_color(st.query ? t.foreground : t.dim).child(st.query || "Search files") }))
       .when(folders > 0, el => el.child(this.control(t, "t3-files-fold-all", this.allExpanded(st) ? "chevrons-down-up" : "chevrons-up-down", this.allExpanded(st) ? "Collapse all" : "Expand all", cx => this.foldAll(st, cx))));
   }
 
