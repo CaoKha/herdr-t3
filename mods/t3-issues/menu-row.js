@@ -1,4 +1,4 @@
-// A popup menu's row, as T3's MenuItem (ui/menu.tsx): docs/internals/t3-tokens.md「菜单行」. The menu keeps its own keys,
+// A popup menu's row, as T3's MenuItem (ui/menu.tsx): docs/internals/t3-tokens.md "Menu rows". The menu keeps its own keys,
 // scrolling and submenus.
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";

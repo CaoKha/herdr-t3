@@ -1,4 +1,4 @@
-// The layout's buttons, as T3's Button (`ui/button.tsx`); docs/internals/t3-tokens.md「按钮」 is the table this draws.
+// The layout's buttons, as T3's Button (`ui/button.tsx`); docs/internals/t3-tokens.md "Buttons" is the table this draws.
 // The caller adds on_click (unless `act`), hover tracking for `hot`, stop() for the keyboard and tip() for a label.
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
@@ -17,7 +17,7 @@ const SIZES = {
 // An icon-only button's icon, as T3's icon, icon-sm and icon-xs sizes.
 const ICON = { default: 16, sm: 16, compact: 14, xs: 14, micro: 12, tiny: 12 };
 export const DISABLED = 0.64;
-// Within a group each button fills its own square; groups stand 8 apart (docs/internals/t3-tokens.md「规则」P3).
+// Within a group each button fills its own square; groups stand 8 apart (docs/internals/t3-tokens.md "Rules" P3).
 export const GROUP_GAP = 4;
 
 /** The radius a size draws, for the focus ring stop() draws over it. @param {string} [size] */

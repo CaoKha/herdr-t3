@@ -8,7 +8,7 @@ import { button, tint as ghostTint } from "./button.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
 
 /**
- * The tab shown on `chrome`'s on fill, another hovered on its hover fill (t3-tokens「按钮」). Hovered or keyboard-focused, ×
+ * The tab shown on `chrome`'s on fill, another hovered on its hover fill (t3-tokens "Buttons"). Hovered or keyboard-focused, ×
  * covers the leading `icon`, as T3's; `mark` stays at the end, and `slot` keeps its room with no mark, so the width doesn't move.
  * × and a middle press call `close`, a right press `menu(cx)`. A cut name shows whole in a label below (t3-tokens P5); `quiet`
  * keeps it down (a drag). `mod` holds icons/x.svg. `extend(el)` adds what only one bar does before the wrappers.

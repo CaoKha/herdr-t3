@@ -1,17 +1,17 @@
-# 详情是主工作区按钮下的原生 popup
+# The details are a native popup under the main workspace button
 
-和 [0017](0017-space-panel-surfaces.md) 的面板标签是两件事。
+This is a separate matter from the panel tabs of [0017](0017-space-panel-surfaces.md).
 
-详情是主工作区按钮下的原生 popup，不是标签。Workspace 放 locked 机器／目录、Open in、全局 Actions，下面是 Review 行：主半边显示Review，箭头开Review范围菜单；不含分支切换、PR信息或Git写操作。打开时捕获来源，space／终端标签改变即失效。面板入口在窗口右上，打开面板收起详情；放大时进入详情先恢复工作列。
+The details are a native popup under the main workspace button, not a tab. Workspace holds the locked machine/directory, Open in and the global Actions, with the Review row below: its main half shows Review and its arrow opens the Review range menu; no branch switching, PR info or Git write actions. On opening it captures its source, and becomes invalid as soon as the space/terminal tab changes. The panel entry point is at the top right of the window; opening the panel closes the details; while maximized, entering the details first restores the work column.
 
-宿主验证已确认本机 `open -Ra`／`open -a`：Open in 列 Finder 和已装编辑器，全局记上次目标，缺失回退 Finder，远程置灰。
+Host verification has confirmed `open -Ra`/`open -a` on this machine: Open in lists Finder and installed editors, remembers the last target globally, falls back to Finder when it's missing, and is greyed out for remote.
 
-详情按 T3 `threadDetailsPanelStyles.ts` 的整行／locked／split 结构实现，尺寸颜色取本仓 token。机器行无 hover／chevron，folder 仅 tooltip，整行右键复制；Open in 菜单只选偏好、主按钮执行。Actions 保持全局数据，有动作 split、空时 Add action，编辑保留父详情。split 菜单同整行宽、开启时保留中线／on底。卡片右键可切四个实际实现的项的显隐并Reset，全隐藏保留恢复入口。Review 行的范围选择和Review页同源，计数／提交在绘制外异步读取，每次打开重读、不缓存，来源变更即作废。
+The details follow the full-row/locked/split structure of T3's `threadDetailsPanelStyles.ts`, with sizes and colours from this repo's tokens. The machine row has no hover/chevron, the folder only a tooltip, and right-clicking the whole row copies; the Open in menu only picks the preference, and the main button runs it. Actions stay global data: a split when there are actions, Add action when empty, and editing keeps the parent details open. The split menu is as wide as the whole row, and keeps the centre line/on background while open. Right-clicking the card toggles the visibility of the four items actually implemented and offers Reset; with all hidden, a way to restore them remains. The Review row's range picker has the same source as the Review page; counts/commits are read asynchronously outside drawing, reread on every opening without caching, and discarded as soon as the source changes.
 
-Review 行选范围时先添加或选中 Review 标签，再写带该标签 `born` 的请求（见 0017），所以关闭后再加的 Review 不接手旧请求；它显示的当前范围只取 `born` 与当前 Review 标签相同的 `review.shown` 记录。
+When the Review row picks a range, it first adds or selects the Review tab, then writes a request carrying that tab's `born` (see 0017), so a Review added after closing doesn't take over old requests; the current range it shows comes only from the `review.shown` record whose `born` matches the current Review tab.
 
-菜单打开时不预先高亮任何行；Review 还没显示过范围时范围菜单不打勾；动作名被截断时才给提示；文案用 GLOSSARY 的词，不照抄 T3；删掉范围快照缓存，每次打开重读；Review 行的来源规则与详情相同，只看 space／标签／终端是否还在。每层菜单都是独立的原生 popup，挂在它的行下或旁边，和 t3-menu、Files 的级联同一套做法；不再用一块透明大画布装下范围、Commits 和 base 三层，因为透明部分也挡输入。范围菜单只选范围，base 和 commit 的 ‹ › 留给 Review 页。主半边不恢复已关闭 Review 标签的范围（同 0017 的「关闭即释放」）。只有详情本身盯来源，下级菜单随它关闭；共享的 `review-scope.js` 不认识详情，宿主视图提供 `pick` 和 `openCommits`，请求一律由 `panel.js` 的 `reviewRequest` 写。
+When a menu opens, no row is highlighted in advance; while Review hasn't shown a range yet, the range menu has no check mark; an action name gets a tooltip only when truncated; copy uses the GLOSSARY's words instead of copying T3; the range snapshot cache is removed and every opening rereads; the Review row's source rule is the same as the details', only checking whether the space/tab/terminal is still there. Each menu level is its own native popup, attached below or beside its row, the same approach as the cascades in t3-menu and Files; a single large transparent canvas holding the range, Commits and base levels is no longer used, because its transparent parts block input too. The range menu only picks the range; base and commit ‹ › are left to the Review page. The main half doesn't restore the range of a closed Review tab (as in 0017's "closing releases"). Only the details themselves watch the source, and submenus close with them; the shared `review-scope.js` doesn't know about the details: the host view provides `pick` and `openCommits`, and requests are always written by `reviewRequest` in `panel.js`.
 
-详情可用键盘操作：键盘打开时第一个控件带焦点环，↑／↓ 换行、←／→ 换 split 的两半；键盘打开的行菜单首行点亮，关闭后键盘回到它的箭头；电脑名行不进方向键。
+The details can be used with the keyboard: when opened by keyboard the first control has the focus ring, ↑/↓ change rows, ←/→ switch between a split's two halves; a row menu opened by keyboard lights its first row, and after closing, the keyboard returns to its arrow; the computer name row isn't reached by arrow keys.
 
-后续范围菜单保留同一仓库、同一基准上次读到的数字供打开时显示，每次打开仍会重读。提前选中的范围要等新结果确认后才执行。当前行为见 [Details 规格](../internals/specs/details.md)。
+Later, the range menu keeps the numbers last read for the same repository and base to show on opening, and still rereads on every opening. A range picked early only runs once the new result confirms it. The current behaviour is in the [Details spec](../internals/specs/details.md).

@@ -1,17 +1,17 @@
-# 按钮共用一个 helper
+# Buttons share one helper
 
-修订 [t3-tokens.md](../internals/t3-tokens.md) 规则 2「不要新建共享常量文件」在按钮上的适用。
+Revises how rule 2 in [t3-tokens.md](../internals/t3-tokens.md) "Rules", "don't create a shared constants file", applies to buttons.
 
-按钮原先各 mod 自己画：文字按钮四处、图标按钮二十来处，尺寸照着 T3 对齐了，颜色和状态没有。结果是同一个状态多种画法：悬停有 `hover`、foreground 4%、6%、7% 四种底，禁用有 0.3、0.5 和换底色，`hover` 在弹层上（部分主题等于 `popover`）看不见，壁纸 mod 的主按钮用 `accent` 填色、禁用后几乎读不出字。尺寸三处一样就够，颜色和状态组合多、靠复制守不住。
+Buttons used to be drawn by each mod itself: text buttons in four places, icon buttons in about twenty; sizes were aligned with T3, colours and states weren't. The result was several ways of drawing the same state: hover had four backgrounds (`hover`, foreground 4%, 6%, 7%), disabled had 0.3, 0.5 and a changed background, `hover` was invisible on popups (on some themes it equals `popover`), and the wallpaper mod's primary button was filled with `accent` and nearly unreadable when disabled. For sizes, three places agreeing is enough; colours and states have too many combinations to hold by copying.
 
-按钮改由 `shared/button.js` 的 `button()` 画，照 T3 `ui/button.tsx` 的 variant × size：`primary`、`outline`、`danger`、`ghost`（T3 的 ghost-muted）、`plain`（T3 的 ghost），底面分 `chrome`、`card`、`row`、`tab`，颜色和状态表在 t3-tokens.md「按钮」。`scripts/sync.sh` 分发副本，和其他共享模块一样。
+Buttons are now drawn by `button()` in `shared/button.js`, following T3 `ui/button.tsx`'s variant × size: `primary`, `outline`, `danger`, `ghost` (T3's ghost-muted), `plain` (T3's ghost), on the surfaces `chrome`, `card`, `row`, `tab`; the colour and state table is in t3-tokens.md "Buttons". `scripts/sync.sh` distributes the copies, like the other shared modules.
 
 ## Considered Options
 
-- **只写一张状态→token 表，各处照抄**：成本最低，但现状就是「照着约定各写各的」走样出来的。
-- **shadcn 式完整组件库（按钮、输入框、select、toggle 一起）**：输入框和 select 已用宿主的 `Input`、`Select`，菜单和列表已在 `shared/`；没有同样的走样证据，先不做。
+- **Just write one state → token table and copy it everywhere**: cheapest, but the current state is exactly what drifted out of "each writing its own following a convention".
+- **A full shadcn-style component library (buttons, inputs, select, toggle together)**: inputs and selects already use the host's `Input` and `Select`, and menus and lists are already in `shared/`; there's no comparable evidence of drift, so not for now.
 
 ## Consequences
 
-- helper 只管外观和 `role`；点击（或传 `act`）、`hot` 的悬停追踪、`stop()`、`tip()` 仍由调用方加：键盘停靠和提示各有自己的状态（`focus.js`、`tip.js`），不是每个画按钮的视图都要。打开弹层的按钮另有 `trigger()` 把这几样接好。
-- 行、标签、分段切换、日历格、select 触发框、按钮组、输入框的 stepper、行内链接、Inbox 行上的悬停控件不算按钮，保留各自画法（表下列出）。侧栏行里的按钮走 `row` 底面：照 T3 行控件只变亮、没有底色。
+- The helper handles only looks and `role`; clicks (or passing `act`), `hot` hover tracking, `stop()` and `tip()` are still added by the caller: keyboard stops and tooltips each have their own state (`focus.js`, `tip.js`), and not every view that draws a button needs them. Buttons that open a popup have `trigger()`, which wires these up.
+- Rows, tabs, segmented switches, calendar cells, select triggers, button groups, input steppers, inline links and the hover controls on Inbox rows are not buttons and keep their own drawing (listed below the table). Buttons in sidebar rows use the `row` surface: like T3's row controls they only brighten, with no background.

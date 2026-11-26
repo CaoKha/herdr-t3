@@ -1,5 +1,5 @@
 // A menu drawn in the page under its trigger: trigger.js's kind for a menu drawn in the view (t3-tokens P6), the panel and rows
-// of a popup menu (t3-tokens「菜单行」), 220 wide, right edges together, 4 below. One is open at a time per view (`view.menu`);
+// of a popup menu (t3-tokens "Menu rows"), 220 wide, right edges together, 4 below. One is open at a time per view (`view.menu`);
 // a pick, Escape, the trigger again or a press elsewhere in the page closes it (the page calls closeInlineMenu from its
 // root's press and inlineMenuKey from its root's keys).
 import { v_flex, Popup } from "gpui-base";

@@ -10,11 +10,9 @@ app=${HERDR_APP_HOME:-$HOME/.config/herdr-app}
 cd "$src"
 fail=0
 
-# Gallery skips recipes over 64 KB; leave room in both translations.
-for recipe in RECIPE.md RECIPE.zh-CN.md; do
-  bytes=$(wc -c < "$recipe") || exit 1
-  [ "$bytes" -le 60000 ] || { echo "FAIL $recipe is $bytes bytes; maximum 60000 for Gallery"; exit 1; }
-done
+# Gallery skips recipes over 64 KB; leave some room.
+bytes=$(wc -c < RECIPE.md) || exit 1
+[ "$bytes" -le 60000 ] || { echo "FAIL RECIPE.md is $bytes bytes; maximum 60000 for Gallery"; exit 1; }
 
 # shared/ holds the one source; scripts/sync.sh makes the copies.
 for s in shared/*.js; do
@@ -45,7 +43,7 @@ for p in $(grep -rhoE --include='*.js' --exclude=gpui-kit.d.ts 'mods/(t3-[a-z-]+
   [ -f "$p" ] || [ -f "extras/$p" ] || { echo "FAIL no such icon: $p"; fail=1; }
 done
 
-# UI icons are Lucide's 24 grid at one 1.75 stroke (docs/internals/t3-tokens.md「规则」P4): a currentColor stroke at any other
+# UI icons are Lucide's 24 grid at one 1.75 stroke (docs/internals/t3-tokens.md "Rules" P4): a currentColor stroke at any other
 # width, or at Lucide's default 2 by leaving it out, fails. Pierre's vendored set and the Windows caption glyphs (1px) are drawn so.
 for f in $(grep -rl --include='*.svg' 'stroke="currentColor"' shared/icons mods extras/mods | grep -vE '/icons/(pierre|cat)/|/win-[a-z]+\.svg$'); do
   [ "$(grep -o 'stroke-width="[^"]*"' "$f" | sort -u)" = 'stroke-width="1.75"' ] || { echo "FAIL $f: a UI icon's stroke is 1.75"; fail=1; }
@@ -66,7 +64,7 @@ grep -rnE --include='*.js' --exclude=gpui-kit.d.ts --exclude=color.js \
     -e '\+ *"[0-9a-fA-F]{2}"' -e '\+ *\([^)]*\? *"[0-9a-fA-F]{2}" *:' -e '`\$\{[^}]+\}[0-9a-fA-F]{2}`' shared mods extras/mods | grep -v '/vendor/' \
   && { echo "FAIL a color + two hex digits (above): use color.js alpha(color, share)"; fail=1; }
 
-# accent is the focus ring's and emphasis's color, never a button's fill (docs/internals/t3-tokens.md「按钮」): its foreground
+# accent is the focus ring's and emphasis's color, never a button's fill (docs/internals/t3-tokens.md "Buttons"): its foreground
 # only goes on the few non-buttons filled with it, listed here.
 for f in $(grep -rlE --include='*.js' --exclude=gpui-kit.d.ts 'accent_foreground' shared mods extras/mods); do
   case $f in extras/mods/review/controls.js) ;; *) echo "FAIL $f uses accent_foreground: a button takes shared/button.js's colors"; fail=1 ;; esac

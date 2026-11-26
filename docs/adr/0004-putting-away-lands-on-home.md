@@ -1,10 +1,10 @@
-# 收起当前查看的 agent 后回 Home，不跳到下一张卡片
+# Putting away the viewed agent goes back to Home, not to the next card
 
-这是对 T3 Code 的有意偏离。自动跳到下一张，等于替人决定下一步看什么；留在原处也不对，Settle 的意思是“这个我不想再看了”。所以收起正在查看的 agent（Settle、Snooze、拖动、划选）后默认回到 Home，连续处理时多按一次 `cmd-]`，换来跳转结果固定。收起后台 agent 不跳转。
+This is a deliberate departure from T3 Code. Jumping to the next card automatically decides for you what to look at next; staying in place is wrong too, since Settle means "I don't want to look at this any more". So putting away the agent you're viewing (Settle, Snooze, drag, swipe) goes back to Home by default: working through cards in a row costs one more `cmd-]` press, in exchange for a fixed landing place. Putting away a background agent doesn't jump.
 
 ## Consequences
 
-- 只在侧栏选中 Inbox 时生效（见 [0002](0002-inbox-rules-stay-in-inbox.md)）。Lists 里没有 Settle；关闭当前查看的 agent 的标签时，回到这个 space 上一次看的标签。
+- Applies only while the sidebar has the Inbox selected (see [0002](0002-inbox-rules-stay-in-inbox.md)). Lists has no Settle; closing the viewed agent's tab goes back to the tab last seen in this space.
 
-- 单独发布的 `herdr-t3-inbox` 不传 `home` prop，保持跳到下一张的行为。
-- 连续清卡片的人可以在设置里选 Next card（见 [0009](0009-settings-hold-real-preferences.md)）：跳到下一张，没有下一张就回 Home。`home` prop 仍只表示“这里有 Home 可去”，选哪种是 `t3.settings` 里的偏好。关闭标签不受这项设置影响，仍回 Home：关闭是销毁，不是看完了。
+- The separately published `herdr-t3-inbox` doesn't pass the `home` prop and keeps jumping to the next card.
+- People who clear cards in a row can pick Next card in settings (see [0009](0009-settings-hold-real-preferences.md)): jump to the next card, or back to Home when there is none. The `home` prop still only means "there is a Home to go to"; which behaviour is a preference in `t3.settings`. Closing a tab is unaffected by this setting and still goes back to Home: closing destroys, it doesn't mean done looking.

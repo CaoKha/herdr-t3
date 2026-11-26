@@ -578,7 +578,7 @@ for (const width of [208, 256]) {
   const m0 = menu.render(cx);
   assert.equal(find(m0, "sort-priority").style.bg, undefined, "no highlight on opening");
   assert.equal(find(m0, "sort-priority").style.h, 28);
-  // Lit only while the pointer is on the row, as every menu's (t3-tokens「菜单行」).
+  // Lit only while the pointer is on the row, as every menu's (t3-tokens "Menu rows").
   const sortLit = () => find(menu.render(cx), "sort-priority").style.bg;
   fire(find(menu.render(cx), "sort-priority"), "on_hover", true, cx);
   assert.equal(sortLit(), f2.theme().selected, "the pointer on it lights it");
@@ -1561,7 +1561,7 @@ async function checkInbox() {
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 34 }, cx);
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 34 }, cx);
   assert.deepEqual(f.calls.splice(0), [["layout.resize", { id: "tabs-end", px: 34 }]], "once per change");
-  // Zoomed 1.1, a 28 button is 30.8 px, which the window snaps to 31: its block is still 28, not 29, so it touches Details (「规则」P3).
+  // Zoomed 1.1, a 28 button is 30.8 px, which the window snaps to 31: its block is still 28, not 29, so it touches Details ("Rules" P3).
   const wasSettings = f.scopes.get("t3-tabs").settings;
   f.scopes.get("t3-tabs").settings = () => ({ ...wasSettings(), zoom: 1.1 });
   fire(find(end.render(cx), "tabs-end"), "on_size_change", { width: 31 }, cx);

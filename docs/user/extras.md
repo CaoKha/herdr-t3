@@ -1,7 +1,5 @@
 # Herdr T3 extras
 
-English · [中文](extras.zh-CN.md)
-
 Not part of the layout and not copied by an install; add them by hand if you want them.
 
 ## pulls.review

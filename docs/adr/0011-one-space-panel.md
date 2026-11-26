@@ -1,26 +1,26 @@
-# Review 和 Files 在唯一的 space 面板里
+# Review and Files live in the single space panel
 
-开关只有一份、不按 space 记这一条，已由 [0012](0012-each-space-keeps-its-panel.md) 取代。
+The point that the open state is kept once and not per space is superseded by [0012](0012-each-space-keeps-its-panel.md).
 
-[0007](0007-review-belongs-to-the-space.md) 让 Review 属于 space，但它实际是某个标签里的窗格，于是要靠规则补：别的标签已开着就跳过去、标签和分屏都有卡片、关闭或 Settle 回到打开前的地方，而切到同一 space 的别的标签就看不见它。现在 Review 和新的 Files 都放进窗口右侧唯一的 space 面板：全高、和侧栏对称，跨标签固定，内容跟随当前 space。两者是面板的两页，同时只显示一页；面板只有一个，开关和宽度也只有一份，不按 space 记。
+[0007](0007-review-belongs-to-the-space.md) made Review belong to the space, but in practice it was a pane in some tab, so rules had to patch it up: jump there when it's already open in another tab, cards for both tabs and splits, closing or Settle going back to where you were before opening it, while switching to another tab of the same space hid it. Now Review and the new Files both go into the single space panel on the right of the window: full height, symmetric with the sidebar, fixed across tabs, with content following the current space. The two are the panel's two pages, one shown at a time; there is one panel, so one open state and one width, not kept per space.
 
-面板沿用 Herdr 自带布局的结构和 id：`panel` 列里一个 `panel-body` stack，用 `layout.select`、`layout.show`、`layout.hide` 切换。顶上 40px 的面板头由 `t3-chrome` 画，列出 stack 里实际有的页。Review 是 extra，安装时把自己的块加进 `panel-body`；没装就只有 Files。
+The panel keeps the structure and ids of Herdr's built-in layout: a `panel-body` stack in the `panel` column, switched with `layout.select`, `layout.show` and `layout.hide`. The 40px panel header at the top is drawn by `t3-chrome` and lists the pages actually in the stack. Review is an extra that adds its own block to `panel-body` on install; without it there is only Files.
 
-面板里内容在左、导航在右：导航贴窗口外沿、内容贴标签区，和左侧栏对称。Files 是右边文件树、左边文件内容；Review 的组侧栏和文件列表也移到 diff 右边，和 pulls.review 网页版方向相反。
+In the panel, content is on the left and navigation on the right: navigation against the window's outer edge, content against the tab area, symmetric with the left sidebar. Files has the file tree on the right and the file content on the left; Review's group sidebar and file list also move to the right of the diff, the opposite direction to the pulls.review web version.
 
-Inbox 的卡片只代表一个 agent 或一个窗格。Review 不再是窗格，也就没有卡片；它的状态（AI 分析中、分析好了还没看）显示在标签栏的 Review 栏和面板头的 Review 页签上。
+An Inbox card stands for just one agent or one pane. Review is no longer a pane, so it has no card; its state (AI analysis running, analysed but not yet looked at) shows on the tab bar's Review bar and on the Review tab in the panel header.
 
 ## Considered Options
 
-- **Review 留在标签里，再加一个右侧 Files 栏**：两套位置规则，Review 的补救规则全部留着。
-- **面板放在标签栏下面（Herdr 自带布局的位置）**：看起来属于当前标签，和“跨标签固定”相反。
-- **每个 space 记自己的面板开关**（Herdr 自带布局的做法）：面板只有一个位置，切 space 时忽开忽关，人得猜它会不会在。
-- **Review 保留 Inbox 卡片**：卡片的单位是 agent 和窗格，space 的状态放进去，卡片就不再一一对应焦点能去的地方。
+- **Review stays in tabs, plus a Files bar on the right**: two sets of placement rules, with all of Review's patch-up rules kept.
+- **The panel below the tab bar (where Herdr's built-in layout puts it)**: looks like it belongs to the current tab, the opposite of "fixed across tabs".
+- **Each space keeps its own panel open state** (how Herdr's built-in layout does it): the panel has only one position, so it would open and close as you switch spaces, and you'd have to guess whether it will be there.
+- **Review keeps an Inbox card**: a card's unit is an agent or pane; putting space state in would break the one-to-one match between cards and places focus can go.
 
 ## Consequences
 
-- 一个 mod 副本服务所有 space：Review 和 Files 按 space id 记各自的状态（Review 的页、Files 的展开和选中文件）。
-- Review 的位置改用 space 的 folder，不再跟焦点窗格的 cwd。
-- Review 的 `Open in`（窗格或标签）设置项删除。
-- 面板默认和标签区一样宽，可以拖；窄时 Review 按原有规则改用页签和 unified diff。（已由 [0013](0013-space-panel-pages-share-one-frame.md) 取代：两页共用一套框架，Review 不再按宽度变形。）
-- 单独发布的 herdr-pulls-review 也改成面板：在 Herdr 自带布局里，把 `review` 块加进它的 `panel-body`。
+- One mod instance serves all spaces: Review and Files each keep their state per space id (Review's page, Files' expanded folders and selected file).
+- Review's location now comes from the space's folder, no longer from the focused pane's cwd.
+- Review's `Open in` (pane or tab) setting is removed.
+- The panel defaults to the width of the tab area and can be dragged; when narrow, Review switches to page tabs and a unified diff by its existing rules. (Superseded by [0013](0013-space-panel-pages-share-one-frame.md): the two pages share one frame, and Review no longer changes shape with width.)
+- The separately published herdr-pulls-review becomes a panel too: in Herdr's built-in layout, add the `review` block to its `panel-body`.

@@ -1,6 +1,6 @@
 # Menus
 
-Context menus (`t3-menu`, opened through `shared/menu.js`), submenus (`shared/submenu.js`) and the keyboard rules every popup list follows. The [RECIPE](../../../RECIPE.md) has the table of what each object's menu offers; panel, row and position tokens are in [t3-tokens](../t3-tokens.md)「组件」and「菜单行」.
+Context menus (`t3-menu`, opened through `shared/menu.js`), submenus (`shared/submenu.js`) and the keyboard rules every popup list follows. The [RECIPE](../../../RECIPE.md) has the table of what each object's menu offers; panel, row and position tokens are in [t3-tokens](../t3-tokens.md) "Components" and "Menu rows".
 
 ## Context menus
 
@@ -52,7 +52,7 @@ T3's `MenuSub`. Used by the agent menu's Snooze, Files' Open with, Details' Comm
 ## Popup lists and keys
 
 - Arrows wrap and scroll the highlight into view, except a row held by the pointer (the wheel follows the pointer).
-- Menus without a search: opened by keys (Enter or Space on their button, →, a shortcut), the first row is lit; opened by the pointer, nothing is, and an immediate Enter does nothing until navigation or hover ([t3-tokens「菜单行」](../t3-tokens.md)). Leaving a row clears it.
+- Menus without a search: opened by keys (Enter or Space on their button, →, a shortcut), the first row is lit; opened by the pointer, nothing is, and an immediate Enter does nothing until navigation or hover ([t3-tokens "Menu rows"](../t3-tokens.md)). Leaving a row clears it.
 - Home and End jump in menus without a search; in a search field they stay caret keys.
 - Typeahead lasts 750ms; repeating a letter cycles through items starting with it.
 - Pressing the opening button again closes the popup rather than reopening it (`trigger()`, t3-tokens P6).

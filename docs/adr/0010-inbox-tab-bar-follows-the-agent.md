@@ -1,21 +1,21 @@
-# Inbox 的标签栏以 agent 为主角，折叠用 Herdr 原生 zoom
+# The Inbox's tab bar leads with the agent; folding uses Herdr's native zoom
 
-Inbox 的单位是 agent，Herdr 的标签却可以装几个 pane、几个同级 agent 和程序。原来 Inbox 的标签栏长得和 Lists 一样，让人以为规则也一样，还把一个标签当成了一个 agent。所以显示 Inbox 时，标签栏照 T3 的 thread 标题分成两半：左边是面包屑（space / 父 agent / 当前查看的 agent），说“在和谁说话”；右边是胶囊，说“有什么工具”（被 zoom 挡住的程序、子 agent 的标签、space 的程序标签）。“在看谁”和 Inbox 点亮卡片用同一条规则，标签栏、卡片和焦点永远指向同一个 agent。
+The Inbox's unit is the agent, but a Herdr tab can hold several panes, several sibling agents and programs. The Inbox's tab bar used to look the same as Lists', which suggested the rules were the same too and treated one tab as one agent. So when the Inbox shows, the tab bar splits in two halves like T3's thread title: on the left the breadcrumb (space / parent agent / viewed agent) says "who you're talking to"; on the right, pills say "what tools there are" (programs hidden by zoom, sub-agent tabs, the space's program tabs). "Who you're looking at" uses the same rule that lights up the Inbox card, so the tab bar, the card and focus always point at the same agent.
 
-折叠只用 Herdr 原生 zoom：它按标签记住、只改这一屏、不动分屏结构。布局不替人 zoom，也不把 pane 搬走（park）；从卡片进入分屏的标签只移动焦点。
+Folding uses only Herdr's native zoom: it is remembered per tab, changes only this screen and leaves the split structure alone. The layout doesn't zoom for you, nor move panes away (park); entering a split tab from a card only moves focus.
 
 ## Considered Options
 
-- **进入分屏标签时自动 zoom 到 agent**：否决。zoom 是人的选择，自动 zoom 会藏起人刚分出来的程序，还原后再进来又被 zoom，状态说不清是谁设的。
-- **同标签的 agent 放到右侧，和程序一起做分段**：否决。左右的意义就混了：右边该是工具，同级 agent 是说话的对象，切换它们应该和卡片高亮一起动。
-- **同标签的 agent 在面包屑里并排成切换器**（实现过一版）：否决。标题位置该说的是正在看谁，并排几个就成了第二份卡片列表，还要为当前那项另画底色；同一标签里的其他 agent 本来就有卡片，也能点它的窗格。
-- **只在 agent 标签和程序标签之间加分隔线**：否决。外观仍和 Lists 一样，一个标签仍被当成一个 agent，同标签的几个 agent 分不出来。
+- **Auto-zoom to the agent on entering a split tab**: rejected. Zoom is the person's choice; auto-zoom would hide the program they just split out, and after unzooming, coming back in zooms again, so it's unclear who set the state.
+- **Agents in the same tab on the right, as segments alongside programs**: rejected. It mixes up what left and right mean: the right is for tools, while sibling agents are who you talk to, and switching between them should move together with the card highlight.
+- **Agents in the same tab side by side in the breadcrumb as a switcher** (one version was built): rejected. The title position should say who you're looking at; several side by side become a second card list, and the current one needs its own background drawn; the other agents in the same tab already have cards, and their panes can be clicked.
+- **Only a divider between agent tabs and program tabs**: rejected. It still looks the same as Lists, one tab is still treated as one agent, and several agents in the same tab can't be told apart.
 
 ## Consequences
 
-- 标签栏多了一份记忆：每个标签最后看的 agent（`navigation.js` 的 `lastIn`），只在内存里，重启后回退到标签里的第一个 agent。
-- 焦点在程序或 Inbox 列出的 mod 卡片上时，面包屑留着这个标签最后看的 agent，不亮。不含 agent 的标签按进入方式分：从标签条进入的工具标签属于这份工作，面包屑留着这个 space 最后看的 agent，变暗，点它回去；开了新标签、开始新的事之后只有 space，直到再看某个 agent；不管从哪里开（`cmd-t`、Lists 的 `+`、New、各菜单的 New tab）都一样。两头都试过：一律沿用会把上一个 agent 的名字带进新开的终端，一律只显示 space 会让点一下工具就丢掉上下文。
-- Inbox 下 agent 的窗格单独显示时，窗格标题不再写名字，名字只在面包屑里说一次。
-- zoom 中的标签展开成各个窗格在两种模式下相同，这不是 Inbox 的规则（[0002](0002-inbox-rules-stay-in-inbox.md)）。
-- 面包屑的 space 项是与右侧标题一致的下拉菜单，列出 `New tab` 和当前 space 下的全部 agent（含子 agent）及非 agent 终端程序；这不把其他顶层 agent 放回标签条或面包屑行内，仍保持“标签栏只跟随当前查看的 agent、切换其他工作有明确入口”的分工。
-- 侧栏隐藏时，标签栏也不回答“谁在等你”，在 Home 和别处、Inbox 和 Lists 下都一样：开关后面直接是面包屑或标签，也不放回 Home 的品牌：T3 收起侧栏后只剩开关；回 Home 仍有 `cmd-shift-h`，或找回侧栏后点品牌，所以不是单向门，只是鼠标要多点一下。不在 Home 的标签栏列出 Inbox 卡片，也不在别处把卡住的 agent 画成卡片排在面包屑前面，原因：两处规则不一样；出现与否取决于侧栏显隐、模式和在不在 Home 三个条件；还要等 Inbox 启动；T3 收起侧栏后只剩开关（P8）；卡片会把面包屑的起点挤来挤去（P1）；Herdr 自己的通知已经说过一遍（P5）。侧栏是人自己隐藏的：有 agent 需要人时由 Herdr 的通知提醒，`cmd-b` 把状态找回来。以后要再加这类提示，先改这一条。
+- The tab bar gains one memory: the agent last viewed in each tab (`lastIn` in `navigation.js`), only in memory; after a restart it falls back to the first agent in the tab.
+- When focus is on a program or on a mod card listed by the Inbox, the breadcrumb keeps the agent last viewed in this tab, unlit. Tabs with no agent depend on how they were entered: a tool tab entered from the tab strip belongs to this work, so the breadcrumb keeps the agent last viewed in this space, dimmed, and clicking it goes back; after opening a new tab to start something new there is only the space until you look at some agent again; it's the same wherever it was opened from (`cmd-t`, the `+` in Lists, New, each menu's New tab). Both ends were tried: always carrying over brings the previous agent's name into a freshly opened terminal, and always showing only the space loses the context on a single click on a tool.
+- In the Inbox, when an agent's pane shows on its own, the pane title no longer gives the name; the name is said once, in the breadcrumb.
+- Expanding a zoomed tab into its panes is the same in both modes; it is not an Inbox rule ([0002](0002-inbox-rules-stay-in-inbox.md)).
+- The breadcrumb's space item is a dropdown matching the title on the right, listing `New tab` and all agents in the current space (sub-agents included) and non-agent terminal programs; this doesn't put other top-level agents back into the tab strip or inline in the breadcrumb row, keeping the split of duties: "the tab bar follows only the viewed agent, and switching to other work has an explicit entry point".
+- With the sidebar hidden, the tab bar doesn't answer "who's waiting for you" either, the same in Home and elsewhere, in the Inbox and in Lists: the toggle is followed directly by the breadcrumb or the tabs, and Home's brand isn't put back: after collapsing the sidebar T3 keeps only the toggle; back to Home still has `cmd-shift-h`, or bring the sidebar back and click the brand, so it's not a one-way door, just one more mouse click. Home's tab bar doesn't list Inbox cards, and elsewhere stuck agents aren't drawn as cards in front of the breadcrumb, because: the rules in the two places differ; whether they appear would depend on three conditions (sidebar shown or hidden, the mode, and being in Home or not); it would have to wait for the Inbox to start; after collapsing the sidebar T3 keeps only the toggle (P8); cards would push the breadcrumb's starting point around (P1); Herdr's own notifications have already said it once (P5). The person hid the sidebar themselves: when an agent needs them, Herdr's notifications remind them, and `cmd-b` brings the state back. To add this kind of hint later, change this point first.

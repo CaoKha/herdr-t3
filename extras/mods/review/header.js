@@ -66,7 +66,7 @@ export function head(view) {
 export function header(view, t, head) {
   // As T3's DiffPanel header: the scope and what it compares, the counts as its DiffStatLabel, then the tools. Narrow, the
   // words give way and the buttons never.
-  // 12 in, as the panel head above it (t3-tokens「规则」R1); the bar's buttons sm on chrome, their icons 14 (T3's diff toolbar),
+  // 12 in, as the panel head above it (t3-tokens "Rules" R1); the bar's buttons sm on chrome, their icons 14 (T3's diff toolbar),
   // the icons a group's gap apart (P3). No rule under it, as T3's subheaders in the panel.
   const icons = head.buttons.filter(b => !b.text), words = head.buttons.filter(b => b.text), open = view.treeOpen();
   return h_flex().id("review-header").h(HEADER).flex_none().px(12).gap(8).items_center().overflow_hidden()

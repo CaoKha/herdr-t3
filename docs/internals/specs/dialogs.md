@@ -1,10 +1,10 @@
 # New, Go to, Actions and dialogs
 
-Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (`t3-actions`), confirmations and Layout Settings. The [RECIPE](../../../RECIPE.md) says what they do; dialog and palette tokens are in [t3-tokens](../t3-tokens.md)「组件」 and「做不到」.
+Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (`t3-actions`), confirmations and Layout Settings. The [RECIPE](../../../RECIPE.md) says what they do; dialog and palette tokens are in [t3-tokens](../t3-tokens.md) "Components" and "Not possible".
 
 ## New and Go to
 
-- Top-centred popups, offset 96 (t3-tokens「做不到」), 576 wide, content-sized up to 420, radius 16, 1px border, `shadow_2xl`. Content shows from the first frame.
+- Top-centred popups, offset 96 (t3-tokens "Not possible"), 576 wide, content-sized up to 420, radius 16, 1px border, `shadow_2xl`. Content shows from the first frame.
 - Rows 48: 20px title line and 16px second line, radius 4, 6 vertical padding.
 - A ruled footer with 20px keycaps (radius 4, 12px medium).
 - Go to has a borderless 36px search, 6 above and below. New's list caps at 285, Go to's at 313; both scroll with the keyboard highlight.
@@ -54,8 +54,8 @@ Geometry and rules of the command popups (`t3-new-menu`, `t3-picker`), Actions (
 
 ## Actions editor and confirmations
 
-- 512 wide, radius 16, content-sized, padding 24, 20px semibold titles, 32px fields and buttons of radius 8; the shell is drawn by the mod (t3-tokens「做不到」).
-- Confirmation titles wrap. Cancel comes before the named action (Close, Delete, Confirm). The action is red text (`ansi1`) on `raised`, not a red slab; the footer is bare, with no rule (t3-tokens「有意不同」).
+- 512 wide, radius 16, content-sized, padding 24, 20px semibold titles, 32px fields and buttons of radius 8; the shell is drawn by the mod (t3-tokens "Not possible").
+- Confirmation titles wrap. Cancel comes before the named action (Close, Delete, Confirm). The action is red text (`ansi1`) on `raised`, not a red slab; the footer is bare, with no rule (t3-tokens "Deliberate differences").
 
 ## Layout Settings
 

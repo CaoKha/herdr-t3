@@ -1,16 +1,16 @@
-# Review 属于 space，每个 space 一个
+# Review belongs to the space, one per space
 
-> Review 的位置（标签里的窗格、卡片、跳转和回到原处）已被 [0011](0011-one-space-panel.md) 取代；Review 栏的部分仍然有效。
+> Review's placement (a pane in a tab, the card, jumping and going back to where you were) is superseded by [0011](0011-one-space-panel.md); the part about the Review bar still holds.
 
-agent 和 space 是多对一：决定时的快照里，9 个有 agent 的 space 没有一个跨仓库，4 个有多个 agent，最多 7 个共用一个 worktree，diff 没法归到某个 agent 头上。所以每个 space 一个 Review、一张卡片，标签和分屏都有卡片；入口在别的标签已开着时跳过去，不再新开；关闭或 Settle 回到打开它之前的地方。
+Agents and spaces are many-to-one: in the snapshot at decision time, none of the 9 spaces with agents spanned repositories, 4 had several agents, and up to 7 shared one worktree, so a diff can't be attributed to one agent. So each space gets one Review and one card, and both tabs and splits have cards; the entry point jumps to it when it's already open in another tab instead of opening a new one; closing or Settle goes back to where you were before opening it.
 
-Review 栏是当前 space 的状态和入口，留在标签栏右侧、和 Actions 同一组；在 commit 之间切换是 Review 窗格自己顶栏的事。计数常驻、每段可点，agent 工作时照常更新；不用彩色，因为颜色在这个布局里表示 agent 状态，窄窗口改用图标；logo 固定在最右。自动分析只在点计数打开时触发。
+The Review bar is the current space's state and entry point, staying on the right of the tab bar in the same group as Actions; switching between commits is the job of the Review pane's own top bar. Counts are always shown, each segment is clickable, and they keep updating while agents work; no colour, because colour means agent state in this layout, and narrow windows use icons instead; the logo stays at the far right. Automatic analysis is triggered only by clicking a count to open it.
 
 ## Considered Options
 
-- **Review 是 agent 的一步**：见上面的多对一。这也是保留 Review 卡片的原因，它是 Inbox 里唯一的 space 级对象。
-- **`[Review ▾]` 单按钮**：用户会扫一眼计数，收进菜单就看不到了。
+- **Review as one step of an agent**: see the many-to-one above. This is also why the Review card is kept: it's the only space-level object in the Inbox.
+- **A single `[Review ▾]` button**: users glance at the counts; tucked into a menu they can't be seen.
 
 ## Consequences
 
-远程 space 没有 Review 栏：jin.review 的 daemon 只监听本机。
+Remote spaces have no Review bar: jin.review's daemon listens only on this machine.

@@ -274,7 +274,7 @@ Terminal facts are labels (`settled`, `snoozed`), cross-mod facts and preference
 - Keep the confirmations: close and Clean up stop terminals and clear history, Remove worktree deletes, wallpaper Delete removes source and cache. Actions run arbitrary `sh -c`. Write the traffic lights with an expected-content write of that one field; `layout.set` discards remembered layout state.
 - A wrong icon path draws nothing and raises nothing; check runtime-built paths in the demo window. Opaque surfaces stand in for blur, scale and letter-spacing the host lacks; transparent popups still block input. Recover missing pointer leave and release; closing a popup must neither reopen it nor close the tab beneath.
 - Before changing render or timers, focus or hover, measurement or scrolling, Review text or wallpaper conversion, read [layout implementation](docs/internals/layout-implementation.md).
-- Keep this brief and the [Chinese one](RECIPE.zh-CN.md) aligned, each at most 60,000 UTF-8 bytes (Gallery skips larger recipes). Change it when what a rebuild produces changes; values and edge rules belong in the specs and t3-tokens.
+- Keep this brief at most 60,000 UTF-8 bytes (Gallery skips larger recipes). Change it when what a rebuild produces changes; values and edge rules belong in the specs and t3-tokens.
 
 ## Done when
 
@@ -282,7 +282,7 @@ At default sidebar width, search within Inbox and open a matching agent directly
 
 Record transitions at the default sidebar width. On returning from Home or switching between spaces with different panel states, the first frame showing the destination terminal has its final position, width and panel. On a cached file-tab switch, the selected tab, breadcrumb and preview identify the same file from the first frame.
 
-1. `wc -c RECIPE.md RECIPE.zh-CN.md`: each at most 60,000, same coverage, local links and preview resolve. `scripts/check.sh` prints `all checks passed` (after `scripts/sync.sh`, which also writes outside the repo): shared copies, mod checks and types, icons, overlays, render and update guards.
+1. `wc -c RECIPE.md`: at most 60,000, local links and preview resolve. `scripts/check.sh` prints `all checks passed` (after `scripts/sync.sh`, which also writes outside the repo): shared copies, mod checks and types, icons, overlays, render and update guards.
 2. `layout.switch {"name":"herdr-t3"}` succeeds and `herdr-app status` shows no missing mods or render warnings. In a separate demo window (`scripts/demo/stage.sh up`, `scene <name>`, `do herdr-app shot <file>`, `down`), whole-window screenshots at the default 256px sidebar, narrow, light, dark and zoomed show every region unclipped and the traffic lights in place.
 3. Inbox: Settle, Un-settle, Undo, new work, pins from both modes, drag and sweep with cancel behave as described. The Settled header shows the label, count and fold chevron. Filter by space omits a shell-only space with no Inbox entries and retains a selected space after its last Inbox entry disappears. Putting away the viewed agent follows the preference. Background actions never navigate. The Settle key does nothing in Lists. With the sidebar hidden, navigation order, no-wrap and the 5s Undo still hold.
 4. Snooze of working and pinned agents, permission prompts, failure or a new viewed turn (also before Inbox has started), foreground and background expiry: Needs you, `Woke` and pins follow the rules; invalid Custom input keeps the dialog open; cancel changes nothing.

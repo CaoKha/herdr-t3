@@ -1,26 +1,26 @@
-# Files 和 Review 各自独立
+# Files and Review stay independent
 
-标签模型及关闭释放规则由 [0017](0017-space-panel-surfaces.md) 修订：隐藏／切换保留，关闭 Review 即按标签实例放下它的范围和阅读位置，再次添加从默认开始。
+The tab model and the close-releases rule are revised by [0017](0017-space-panel-surfaces.md): hiding/switching keeps it, closing Review drops its range and reading position per tab instance, and adding it again starts from the defaults.
 
-修订 [0013](0013-space-panel-pages-share-one-frame.md) 里的双向跨页操作、共用导航列宽度，以及之后两页共用换行偏好的做法。
+Revises the two-way cross-page actions and the shared navigation column width in [0013](0013-space-panel-pages-share-one-frame.md), and the later approach of both pages sharing the line-wrap preference.
 
-Files 浏览当前工作目录，Review 阅读选定范围的变更。同一个路径在两页不一定代表同一份内容；跨页定位还会隐含切换评审范围、等待另一页加载和换算仓库路径。两页不再相互发请求。
+Files browses the current working directory; Review reads the changes in a selected range. The same path on the two pages doesn't necessarily mean the same content; locating across pages would also implicitly switch the review range, wait for the other page to load and convert repository paths. The two pages no longer send each other requests.
 
-- 删除两页工具栏和右键菜单中的 Open in Files / Open in Review，以及共享状态里的跨页定位协议。
-- 点页签只恢复该页自己的文件、展开状态和阅读位置。Review 的范围、分组和 diff 定位留在 Review 内部。
-- 导航列宽度和长行换行偏好各页独立，保存在各自 mod 的 `localStorage`。
-- 面板开关、页签和放大仍属于每个 space 的面板；两页继续复用外框、树行、菜单、空态和主题样式的实现。
-- 两页共用“宽度稳定 300ms 后重排”的算法，各自持有宽度状态。Review 保留之前的换行列数；Files 把 Editor 固定在之前的宽度并裁切溢出。
-- 文件树共用目录优先、忽略大小写的名称自然排序。Review 在读入评审时规范化每组的文件顺序一次，diff、行请求和前后文件导航沿用同序；子组仍在本组文件之后。
-- 每页只为最近显示的三个 space 保留完整数据。更早的 space 留轻量阅读设置，释放文件内容、Editor、diff 行和布局缓存，再次显示时重新读取。
-- Files 只在自己的页面和 space 都可见时读取，刷新还要窗口在前；显示时立即补读，之后本地通常每 5s、远程每 10s 检查，大仓库适当放慢。Review 沿用可见时每 15s 刷新和重新显示时补读，分析状态仍轻量报告。两页还没读到内容时，第一次读取不等窗口到前面：页面显示着就读，否则会一直停在加载。两页都轮询，不用递归目录监听：轮询在页面隐藏、space 被驱逐时自然停下，不用为每页、每个 space 管理监听的释放。
+- Remove Open in Files / Open in Review from both pages' toolbars and context menus, along with the cross-page locate protocol in shared state.
+- Clicking a page tab restores only that page's own file, expanded folders and reading position. Review's range, groups and diff position stay inside Review.
+- Navigation column width and the long-line wrap preference are independent per page, saved in each mod's `localStorage`.
+- Panel open state, page tabs and maximize still belong to each space's panel; the two pages keep reusing the implementation of the frame, tree rows, menus, empty states and theme styles.
+- The two pages share the "reflow once the width has been stable for 300ms" algorithm, each holding its own width state. Review keeps the previous wrap column count; Files pins the Editor at the previous width and clips the overflow.
+- The file trees share a directories-first, case-insensitive natural sort by name. Review normalizes each group's file order once when loading the review; the diff, line requests and previous/next file navigation keep that order; subgroups still come after the group's own files.
+- Each page keeps full data only for the three most recently shown spaces. Older spaces keep lightweight reading settings and release file content, the Editor, diff lines and layout caches, reading them again when shown.
+- Files reads only while both its page and its space are visible, and refreshes only with the window in front too; on showing it reads at once, then usually checks every 5s locally and every 10s remotely, slower for large repositories. Review keeps refreshing every 15s while visible and catching up when shown again, and analysis status is still reported lightly. While a page has no content yet, its first read doesn't wait for the window to come to the front: it reads as long as the page is shown, or it would stay loading forever. Both pages poll instead of using recursive directory watching: polling stops naturally when the page is hidden or the space is evicted, with no watcher release to manage per page and per space.
 
 ## Considered Options
 
-- **统一跨页请求协议**：能够减少重复，但仍需规定目标范围、已删除文件、不同仓库根和延迟请求的行为。用户选择直接取消两页的关联。
-- **合并两页的当前文件和文件树状态**：工作目录和评审范围的内容不同，会让普通切页改变阅读位置。
+- **A unified cross-page request protocol**: would reduce duplication, but would still need behaviour defined for the target range, deleted files, different repository roots and delayed requests. The user chose to drop the link between the two pages outright.
+- **Merge the two pages' current file and file tree state**: the working directory and the review range hold different content, so an ordinary page switch would change the reading position.
 
 ## Consequences
 
-- 在另一页查看内容改为手动切页、在该页选择文件。
-- Review 仍能单独安装，Files 仍支持远程 space；复用实现不引入两页的运行时依赖。
+- Viewing content on the other page now means switching pages by hand and picking the file on that page.
+- Review can still be installed on its own, and Files still supports remote spaces; the reused implementation adds no runtime dependency between the two pages.

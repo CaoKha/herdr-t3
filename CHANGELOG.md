@@ -1,9 +1,8 @@
 # Changelog
 
-English · [中文](CHANGELOG.zh-CN.md)
-
 ## 2026-11-26
 
+- Review works on spaces on another machine: the panel's Review, Details' Review row, Pull requests' Review button and the Review bar read the repository there, through the `jin.review` installed on that machine. Review starts it there in a systemd user unit, so it keeps running, and calls it with `curl` there; its session stays in a private file on that machine. Open in pulls.review, and the Review bar's browser modes, still open local folders only.
 - The tab bar's `+` opens a menu under it: **Terminal**, then each agent installed on the space's machine (Claude Code, Codex, Pi…), started in a new tab where the space is now, as Herdr's own New menu does. `cmd-t` is still a terminal at once.
 - New **Issues** page in the space panel (`t3-issues`, `cmd-shift-i`, or + → Issues), replacing the Branch Issue extra (and its Go helper): **Branch** shows the issue the tab's branch names, **Mine** yours, with search; from Linear when an API key is found (Keychain item `linear-api-key`, else `LINEAR_API_KEY` in Herdr's environment or your login shell; kept in memory only), else, if you choose, the repository's GitHub issues, read only. An issue's detail shows its state, assignee, priority, labels, project and cycle, its linked PRs (this repository's open in Pull requests), its description with pictures and its comments; on Linear you change its state from the header (at once, put back if refused), reply and comment.
 - Pull requests' detail is tidier: its actions are in the page's header (Review, and `⋯` with Open in pulls.review, Open on GitHub and Copy link), Back takes the Branch/Repo switch's place, the number follows the title, a status line says whether it can merge and the worst reason why not, and the passed and skipped checks fold into one row that opens in place.

@@ -1,7 +1,7 @@
-# 侧栏隐藏时，当前模式继续生效
+# With the sidebar hidden, the current mode keeps applying
 
-Herdr 隐藏的 mod 副本仍然存活、定时器照跑，只是不绘制，也收不到 `<mod>.<command>`。所以 Inbox 的计算从 `render()` 里抽出来，隐藏时由定时器驱动，维持已启动副本的顺序。读 `settled` 标签的各方仍按 `shared/tree.js` 的共享规则解释它。命令走 `shared`，按键命令（包括 Settle）由一直显示的 `t3-tabs` 独立处理，不依赖 Inbox 副本。
+A mod instance Herdr hides stays alive and its timers keep running; it just doesn't draw and doesn't receive `<mod>.<command>`. So the Inbox's computation is pulled out of `render()` and driven by a timer while hidden, keeping the order of an instance that has already started. Everyone who reads the `settled` tag still interprets it by the shared rules in `shared/tree.js`. Commands go through `shared`; key commands (Settle included) are handled independently by the always-shown `t3-tabs`, without depending on the Inbox instance.
 
 ## Consequences
 
-Inbox 副本第一次显示后才启动：这次运行里还没显示过 Inbox 时，隐藏状态下不维护它自己的行顺序。Settle 快捷键不受影响；Snooze 在失败或当面开始新一轮时结束，也由 `t3-tabs` 处理。醒来后的 Woke 要等 Inbox 显示后，才会在被看过时清除。
+The Inbox instance starts only after it is first shown: if the Inbox hasn't been shown yet in this run, its own row order isn't kept while hidden. The Settle shortcut is unaffected; Snooze ending on a failure or on a new round starting in front of you is also handled by `t3-tabs`. Woke after waking is cleared on being looked at only once the Inbox shows.

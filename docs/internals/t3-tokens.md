@@ -1,144 +1,144 @@
-# T3 视觉基准
+# T3 visual baseline
 
-布局的圆角、边距、尺寸、字号统一到 T3 Code。本文是统一时的查表入口，**T3 源码优先于本表**：`pingdotgg/t3code` 的 `apps/web/src`，提交 `337c5858`（2026-11-05）。本机副本在 `/private/tmp/t3code-terminal-research`，没有时重新 clone 这个提交。
+The layout's radii, padding, sizes and font sizes follow T3 Code. This file is the lookup table for that, and **T3 source wins over this table**: `apps/web/src` in `pingdotgg/t3code`, commit `337c5858` (2026-11-05). A local copy lives at `/private/tmp/t3code-terminal-research`; if it is missing, clone that commit again.
 
-本文只放全布局共用的规则和 token。只属于一个界面的尺寸和细节（面板标签、详情 popup、Files、Review、壁纸……）在 [specs](specs/) 的对应文件里。
+This file holds only the rules and tokens shared by the whole layout. Sizes and details that belong to one surface (panel tabs, the details popup, Files, Review, wallpaper…) are in the matching file under [specs](specs/).
 
-## 规则
+## Rules
 
-1. 每个数值都能指向 T3 的一个组件。没有直接对应时，用用途最接近的组件，并在代码注释里写一句为什么。
-2. 同一种用途全布局只有一个值。三处相同就够了，不要新建共享常量文件。
-3. 宿主做不到的（Herdr 弹窗外壳、玻璃效果、缩放动画）记进下面的「做不到」，不写模拟层。
-4. 只统一视觉。行为、颜色（由主题决定）和下面的「有意不同」不改。例外是按钮和标签的悬停、on 底：取 `foreground` 的固定比例（见「按钮」），不取主题的 `hover`／`selected`，所以浅色、深色主题深浅一致。T3 的 `destructive` 取 `ansi1`，不取 Herdr 的 `destructive`（即 `blocked`，部分主题是琥珀色）；只用作文字色，不填色块（见「有意不同」）。
+1. Every value points to a T3 component. When there is no direct match, use the component with the closest purpose and say why in one code comment.
+2. One purpose has one value across the layout. Three identical copies are fine; don't create a shared constants file.
+3. What the host can't do (Herdr's popup shell, glass effects, scale animations) goes into "Not possible" below; no emulation layers.
+4. Only the visuals are unified. Behaviour, colours (set by the theme) and the "Deliberate differences" below don't change. The exception is the hover and on fill of buttons and tabs: a fixed ratio of `foreground` (see "Buttons"), not the theme's `hover`/`selected`, so light and dark themes have the same contrast. T3's `destructive` maps to `ansi1`, not Herdr's `destructive` (that is `blocked`, amber in some themes); it is a text colour only, never a fill (see "Deliberate differences").
 
-换算：T3 `1rem = 16px`，`spacing(1) = 4px`，Herdr 的逻辑 px 与之一比一。带 `sm:` 的取 `sm:` 的值，这是桌面尺寸。
+Conversion: T3 `1rem = 16px`, `spacing(1) = 4px`, and Herdr's logical px map one to one. Where there is an `sm:` value, take it: that is the desktop size.
 
-### 设计原则
+### Design principles
 
-每块重写都按这九条自查：
+Check every rewritten block against these nine:
 
-- **P1 一列一条边**：同一列上下相邻的两行，首个图标或文字用同一条左缘，末个控件用同一条右缘。对的是所在列的内容边，不是窗口边。截图量，误差 ≤1px。
-- **P2 中心一致**：同一条栏里的元素垂直中心相同（40px 栏是 20）；图标在按钮框里居中；同一组按钮尺寸相同。
-- **P3 同组 4，组间 8**：同一组相邻的按钮间距 4，取 `shared/button.js` 的 `GROUP_GAP`（T3 `PanelLayoutControls`、`DiffPanel` 的 `gap-1`），每个按钮的悬停和 on 底各是一块完整的圆角方块；组与组之间、按钮与文字或输入框之间 8。本来就是一个控件的才相接：分体按钮（`split()`，含 Actions 的 ▶|⌄）和分段切换。窗口按钮（最小化、最大化、关闭）照系统相接。侧栏头照 T3 侧栏头：Inbox 顶行和 Lists 两个标题行的按钮组相接，顶行 Search 框和按钮组之间 4。全布局只有一个组内间距：T3 面板头 ‹ › 的 `gap-0.5`、文件头的 `gap-2` 都取 4。品牌栏见 [sidebar](specs/sidebar.md#brand-bar)。
-- **P4 一套笔画**：UI 图标用 Lucide 24 网格、1.75px 笔画，并排图标的视觉重量相近。`scripts/check.sh` 拦其他笔画（Pierre 图标和 Windows 窗口按钮除外），借用的 Herdr `workspace-chrome` 图标也照查（读 Herdr 自带的那份），运行时拼出的借用路径直接判失败。Herdr 自带的是 2px，要用就在 mod 自己的 `icons/` 放 1.75 的副本；共享模块要用的（`menu-row.js` 的 `›`、`project.js` 的文件夹、`status-mark.js` 的工作圈、`panel-states.js` 的加载弧）放在 `shared/icons/ui/`，由 `scripts/sync.sh` 复制给用到的 mod。
-- **P5 不写自明或重复的字**：提示只补控件自己说不出的东西（动作名、按键、被截掉的全文、禁用原因）；说明文字不重复标签已说过的话。
-- **P6 打开弹层的按钮一种做法**：照侧栏 Filter by space，用 `shared/trigger.js`。提示是布局自己的卡片，可带第二行说明；弹层开着时提示收起，按钮保持 on；再点一次是关闭。见下文「按钮」。
-- **P7 静止时安静，颜色只表达状态**：ghost 按钮和详情卡里的 split（`row`）静止时无底、无分隔线；栏上的 split（`xs`）照 T3 头部是 outline，静止时只有描边和中线，没有底；同一条栏上的按钮用同一种悬停面和 on 面；`accent` 不做按钮的底。
-- **P8 T3 优先，偏离写明**：每个数值都能指到一个 T3 组件；跨界面的不同之处写进「有意不同」，只属于一个界面的写进它的 spec。
-- **P9 层级从上往下**：卡片和弹层先放标题或内容，再放控件，说明放最后。
+- **P1 One edge per column**: in two adjacent rows of the same column, the first icon or text shares one left edge and the last control shares one right edge. The edge is the content edge of that column, not the window edge. Measure on a screenshot, within 1px.
+- **P2 Shared centres**: elements in one bar share a vertical centre (20 in a 40px bar); an icon is centred in its button box; buttons in one group are the same size.
+- **P3 4 within a group, 8 between groups**: adjacent buttons in one group are 4 apart, `GROUP_GAP` in `shared/button.js` (T3 `PanelLayoutControls`, `DiffPanel`'s `gap-1`), and each button's hover and on fill is a whole rounded square; between groups, and between a button and text or an input, 8. Only what is really one control touches: split buttons (`split()`, Actions' ▶|⌄ included) and segmented toggles. Window buttons (minimise, maximise, close) touch as the system draws them. The sidebar head follows T3's sidebar head: the button groups of the Inbox top row and of the two Lists title rows touch, and the top row's Search box sits 4 from its button group. The layout has one in-group gap: T3's panel head ‹ › `gap-0.5` and the file header's `gap-2` both become 4. Brand bar: see [sidebar](specs/sidebar.md#brand-bar).
+- **P4 One stroke**: UI icons use the Lucide 24 grid with a 1.75px stroke, and icons side by side have similar visual weight. `scripts/check.sh` blocks other strokes (except Pierre icons and the Windows window buttons), checks borrowed Herdr `workspace-chrome` icons too (reading Herdr's own copy), and fails any borrowed path built at runtime. Herdr's own are 2px; to use one, put a 1.75 copy in the mod's own `icons/`. The ones shared modules need (`menu-row.js`'s `›`, `project.js`'s folder, `status-mark.js`'s working circle, `panel-states.js`'s loading arc) live in `shared/icons/ui/`, and `scripts/sync.sh` copies them to the mods that use them.
+- **P5 No self-evident or repeated words**: a tip adds only what the control can't say itself (action name, key, truncated full text, why it is disabled); a description doesn't repeat what the label already says.
+- **P6 One way to build a button that opens a layer**: like the sidebar's Filter by space, with `shared/trigger.js`. The tip is the layout's own card and may carry a second line of description; while the layer is open the tip hides and the button stays on; clicking again closes it. See "Buttons" below.
+- **P7 Quiet at rest, colour only for state**: ghost buttons and the split in detail cards (`row`) have no fill and no divider at rest; a split on a bar (`xs`) is outline like T3's headers, with only its border and middle line at rest and no fill; buttons in one bar share one hover fill and one on fill; `accent` is never a button fill.
+- **P8 T3 first, deviations written down**: every value points to a T3 component; cross-surface differences go into "Deliberate differences", and ones that belong to a single surface go into its spec.
+- **P9 Top-down hierarchy**: cards and layers put the title or content first, then controls, and descriptions last.
 
-### 对齐
+### Alignment
 
-- **R1 末端对齐**：每条顶栏最右的按钮，框的右缘对齐正下方那一行最右的控件。侧栏是两行都离侧栏边 8；工作列对齐窗格头末端（离窗口边 12）；面板列对齐页头：面板没有卡片，面板头和页面同为 `chrome` 一整面，内容离列边 12（面板头由布局的 padding 给，页内各行自己留），所以开关也离窗口边 12，面板开合时不动。左侧同理：面板头首个标签的框和页头的面包屑框都离列边 12。面板页内每一行都按这条边：首末控件的框（静止无底的 ghost 也按框算，与未选中标签一样）或无框的文字，在所在列内 12，行首静止无底、带文字的按钮也是框在 12、左右用该尺寸按钮的标准内边距，悬停底与面板头首个标签的框左缘对齐；Files 面包屑首级与 Review 范围按钮的文字同在一处，切页时首字不动（数值见 [Files](specs/files.md#file-header)、[Review](specs/review.md#toolbar)）（导航列从左边线内侧算）。Review：顶栏、组页签行、diff 文件头、hunk 行、文件注释、行注释卡、组说明、导航列头和树行；Files：文件头、树头、树行、Markdown 预览。右对齐的代码行号栏（Review 的 diff 与 Files 的宿主 `Editor`）是一列 gutter，不算。
-- **R2 列内同尺寸**：上下对齐的两行用同一尺寸的按钮，同一组也一样。
-- **R3 内容右缘**：侧栏卡片、slim 行和 Lists 的 Spaces／Agents 行（含子 agent 行和树线）横向内边距 8，状态文字和程序图标的右缘落在按钮图标的右缘上，左缘与 Search 图标、底栏齿轮同线。
-- **R4 子菜单挂在行旁**：子菜单贴着打开它的那一行的右缘，首行与那一行同高（照 T3 `MenuSubPopup` 的 alignOffset，子菜单顶比行顶高 5，抵掉它的边框和内边距）。右侧放得下就放右侧；只有左侧放得下就翻到左侧，右缘贴着行的左缘；两边都放不下，放在空间大的一侧并收窄到那一侧的宽度。无论哪种情况都不盖住那一行。原生 popup 和 Review 页内的子菜单都用 `shared/submenu.js` 的 `subPlace` 定位（页内留出面板两端各 8）；垂直方向只为留在窗口或面板内而移动。
+- **R1 End alignment**: the rightmost button of every top bar has its box's right edge on the rightmost control of the row directly below. In the sidebar both rows sit 8 from the sidebar edge; the work column aligns with the end of the pane header (12 from the window edge); the panel column aligns with the page header: the panel has no card, the panel header and the page are one `chrome` surface, and content sits 12 from the column edge (the layout's padding gives it to the panel header, each page row leaves it itself), so the toggle is also 12 from the window edge and doesn't move when the panel opens or closes. The left side is the same: the box of the panel header's first tab and the page header's breadcrumb box are both 12 from the column edge. Every row in a panel page follows this edge: the box of the first and last control (a ghost with no fill at rest counts by its box, like an unselected tab) or unboxed text sits 12 inside its column; a button at the start of a row that has text and no fill at rest also has its box at 12, uses the standard padding of its size, and its hover fill lines up with the left edge of the panel header's first tab box; the first breadcrumb level in Files and the text of Review's scope button sit at the same spot, so the first letter doesn't move when switching pages (values in [Files](specs/files.md#file-header), [Review](specs/review.md#toolbar)) (the navigation column counts from inside its left border). Review: top bar, group tab row, diff file header, hunk rows, file comments, line comment cards, group descriptions, navigation column header and tree rows; Files: file header, tree header, tree rows, Markdown preview. The right-aligned code line number column (Review's diff and Files' host `Editor`) is a gutter and doesn't count.
+- **R2 Same size within a column**: two vertically aligned rows use buttons of the same size, and so does one group.
+- **R3 Content right edge**: sidebar cards, slim rows and the Lists Spaces/Agents rows (sub-agent rows and tree lines included) have 8 horizontal padding; the right edge of status text and program icons lands on the right edge of button icons, and the left edge lines up with the Search icon and the bottom bar gear.
+- **R4 Submenus hang beside their row**: a submenu touches the right edge of the row that opened it, and its first row is level with that row (like T3 `MenuSubPopup`'s alignOffset, the submenu top is 5 above the row top, cancelling its border and padding). If it fits on the right, it goes on the right; if only the left fits, it flips left with its right edge on the row's left edge; if neither fits, it goes on the side with more room, narrowed to that side's width. In every case it doesn't cover the row. Native popups and submenus inside Review pages are both placed by `subPlace` in `shared/submenu.js` (inside a page it keeps 8 from both panel ends); vertically it moves only to stay inside the window or panel.
 
-## 圆角
+## Radii
 
-| T3 | px | 用途 |
+| T3 | px | Use |
 | --- | --- | --- |
-| `rounded-sm` | 4 | 菜单和 combobox 的行、20px 及更小的按钮、标签的 ×、徽章、键帽 |
-| `rounded-md` | 6 | tooltip、compact 输入框、28px 高的小按钮 |
-| `rounded-lg`、`--control-radius` | 8 | 菜单、popover、combobox、select 的面板，输入框，默认按钮 |
-| `rounded-2xl` | 16 | 对话框、命令面板 |
+| `rounded-sm` | 4 | menu and combobox rows, buttons 20px and smaller, tab ×, badges, keycaps |
+| `rounded-md` | 6 | tooltips, compact inputs, small 28px buttons |
+| `rounded-lg`, `--control-radius` | 8 | menu, popover, combobox and select panels, inputs, default buttons |
+| `rounded-2xl` | 16 | dialogs, command palette |
 
-## 组件
+## Components
 
-| 组件 | T3 文件 | 数值 |
+| Component | T3 file | Values |
 | --- | --- | --- |
-| 菜单面板 | `ui/menu.tsx` | 内边距 4，圆角 8，大阴影 |
-| 菜单位置 | `ui/menu.tsx` 的 `sideOffset`、各处 `align` | 按钮下方 4；对齐按钮朝窗口那侧的边：靠右的按钮右边对齐（`align="end"`），靠左的左边对齐（`start`）；位置取按下时按钮的 `e.bounds`，没有按下（辅助技术）就用 app 默认的指针处。右键菜单在指针处，命令面板顶部居中 |
-| 菜单行 | `ui/menu.tsx` | 最小高 28，横向 8、纵向 4，间距 8，字号 14，圆角 4；图标 16 muted、左右各内缩 2；子菜单箭头 16 muted 80%、右内缩 2；行尾提示 12 medium dim；分隔线 1、横 8、纵 4。由 `shared/menu-row.js` 统一绘制，见下文「菜单行」 |
-| 菜单搜索框 | `ui/menu.tsx` | 外层横向 8、上 6、下 4；输入框高 26，下 6 后 1px 下划线，图标 16，文字起点 20 |
-| Combobox 搜索框 | `ui/combobox.tsx` | 外层横向 12、上 10；其余同菜单搜索框 |
-| Combobox 行 | `ui/combobox.tsx` | 见源码，横向 8、纵向 4，圆角 4 |
-| Tooltip | `ui/tooltip.tsx` | 横向 8、纵向 4，字号 12，圆角 6，最宽 320；通常在控件上方，40px 顶栏上的控件在下方；卡片由 `shared/tip.js` 的 `tipCard` 画，`measured-text.js` 的 `named()` 也用它 |
-| Popover | `ui/popover.tsx` | 圆角 8；default 纵向 16、横向 16，compact 纵向 8、横向 12 |
-| 输入框 | `ui/input.tsx` | 默认高 30、横向 11、圆角 8；sm 高 26、横向 9；compact 高 28、横向 9、字号 12、圆角 6 |
-| Select | `ui/select.tsx` | 同尺寸的按钮；面板内边距 4，圆角 8；箭头 14 |
-| 按钮 | `ui/button.tsx` | 默认高 32；sm 高 28；xs 高 24，字号 12，图标 14 |
-| 图标按钮 | `ui/button.tsx` | 32、28、24（图标 14）、20（圆角 4，图标 12）、16（图标 12） |
-| 键帽 | `ui/kbd.tsx` | 高 20，最小宽 20，横向 4，字号 12 medium，圆角 4；`foreground` 7% 底、75% 字；全布局一种，`shared/palette.js` `keycap` |
-| 徽章 | `ui/badge.tsx` | 见源码，圆角 4 |
-| 对话框 | `ui/dialog.tsx`、`dialog-styles.ts` | 最宽 512，圆角 16；头部内边距 24、间距 8；标题 20 半粗；正文 24；底部横向 24、纵向 16；默认有上边线，`bare` 变体没有（Actions 编辑器用它） |
-| 确认框 | `ui/alert-dialog.tsx` | 同对话框 |
-| 命令面板 | `ui/command.tsx`、`CommandPalette*.tsx` | 最宽 576，最高 420，圆角 16；搜索纵向 6；底部纵向 10，上边线 |
-| 标签关闭 | `ui/panel-tab-close-button.tsx` | 16，圆角 4，图标 12 |
-| 标题栏按钮 | `index.css`、`ui/sidebar.tsx` 的 `SidebarTrigger` | 28，间距 12，图标 16 |
-| 侧栏 | `Sidebar*.tsx`、`ui/sidebar.tsx` | 见源码；[specs](specs/) 里写的是量过的值，仍以源码为准 |
+| Menu panel | `ui/menu.tsx` | padding 4, radius 8, large shadow |
+| Menu position | `ui/menu.tsx`'s `sideOffset`, each `align` | 4 below the button; aligned to the button's edge on the window side: a right-hand button aligns right (`align="end"`), a left-hand one aligns left (`start`); the position comes from the button's `e.bounds` at press time, and with no press (assistive tech) the app's default pointer position. Context menus at the pointer, command palette centred at the top |
+| Menu row | `ui/menu.tsx` | min height 28, horizontal 8, vertical 4, gap 8, font 14, radius 4; icon 16 muted, inset 2 on each side; submenu arrow 16 muted 80%, inset 2 on the right; trailing hint 12 medium dim; divider 1, horizontal 8, vertical 4. Drawn by `shared/menu-row.js`, see "Menu rows" below |
+| Menu search box | `ui/menu.tsx` | outer horizontal 8, top 6, bottom 4; input height 26, then a 1px underline 6 below, icon 16, text starts at 20 |
+| Combobox search box | `ui/combobox.tsx` | outer horizontal 12, top 10; the rest as the menu search box |
+| Combobox row | `ui/combobox.tsx` | see source, horizontal 8, vertical 4, radius 4 |
+| Tooltip | `ui/tooltip.tsx` | horizontal 8, vertical 4, font 12, radius 6, max width 320; usually above the control, below it for controls on a 40px top bar; the card is drawn by `tipCard` in `shared/tip.js`, also used by `named()` in `measured-text.js` |
+| Popover | `ui/popover.tsx` | radius 8; default vertical 16, horizontal 16, compact vertical 8, horizontal 12 |
+| Input | `ui/input.tsx` | default height 30, horizontal 11, radius 8; sm height 26, horizontal 9; compact height 28, horizontal 9, font 12, radius 6 |
+| Select | `ui/select.tsx` | button of the same size; panel padding 4, radius 8; arrow 14 |
+| Button | `ui/button.tsx` | default height 32; sm height 28; xs height 24, font 12, icon 14 |
+| Icon button | `ui/button.tsx` | 32, 28, 24 (icon 14), 20 (radius 4, icon 12), 16 (icon 12) |
+| Keycap | `ui/kbd.tsx` | height 20, min width 20, horizontal 4, font 12 medium, radius 4; `foreground` 7% fill, 75% text; one kind across the layout, `shared/palette.js` `keycap` |
+| Badge | `ui/badge.tsx` | see source, radius 4 |
+| Dialog | `ui/dialog.tsx`, `dialog-styles.ts` | max width 512, radius 16; header padding 24, gap 8; title 20 semibold; body 24; footer horizontal 24, vertical 16; top border by default, none in the `bare` variant (used by the Actions editor) |
+| Confirm dialog | `ui/alert-dialog.tsx` | as dialog |
+| Command palette | `ui/command.tsx`, `CommandPalette*.tsx` | max width 576, max height 420, radius 16; search vertical 6; footer vertical 10, top border |
+| Tab close | `ui/panel-tab-close-button.tsx` | 16, radius 4, icon 12 |
+| Title bar button | `index.css`, `SidebarTrigger` in `ui/sidebar.tsx` | 28, gap 12, icon 16 |
+| Sidebar | `Sidebar*.tsx`, `ui/sidebar.tsx` | see source; [specs](specs/) holds measured values, the source still wins |
 
-## 按钮
+## Buttons
 
-按钮一律用 `shared/button.js` 的 `button()` 画，对照 T3 `ui/button.tsx`；为什么按钮例外于规则 2，见 [ADR 0016](../adr/0016-buttons-share-one-helper.md)。颜色只从这张表取，`accent` 不做按钮的底（它是焦点环和强调文字的色），`accent_foreground` 只配 `accent` 底的非按钮元素（`check.sh` 查）。
+Every button is drawn with `button()` from `shared/button.js`, matching T3 `ui/button.tsx`; why buttons are an exception to rule 2: see [ADR 0016](../adr/0016-buttons-share-one-helper.md). Colours come only from this table; `accent` is never a button fill (it is the colour of focus rings and emphasised text), and `accent_foreground` only goes with non-button elements on an `accent` fill (`check.sh` checks).
 
-| variant | T3 | 静止 | 悬停 | on（按下、弹层开着） |
+| variant | T3 | Rest | Hover | on (pressed, layer open) |
 | --- | --- | --- | --- | --- |
-| `primary` | `default` | `solid` 底和边、`solid_foreground` 字 | 透明度 0.9 | — |
-| `outline` | `outline` | `raised` 底、`input` 边、`foreground` 字 | 透明度 0.9 | — |
-| `danger` | `destructive-outline` | 同 outline，字 `ansi1` | 透明度 0.9 | — |
-| `ghost` | `ghost-muted` | 无底无边，`dim` 字；`hot` 时 `foreground` | 底见下 | 底见下，字 `foreground` |
-| `plain` | `ghost` | 无底无边，`foreground` 字（工具栏里的文字动作，如 Review 的 Analyze、Retry） | 底见下 | 底见下 |
+| `primary` | `default` | `solid` fill and border, `solid_foreground` text | opacity 0.9 | — |
+| `outline` | `outline` | `raised` fill, `input` border, `foreground` text | opacity 0.9 | — |
+| `danger` | `destructive-outline` | as outline, text `ansi1` | opacity 0.9 | — |
+| `ghost` | `ghost-muted` | no fill, no border, `dim` text; `foreground` when `hot` | fill below | fill below, text `foreground` |
+| `plain` | `ghost` | no fill, no border, `foreground` text (text actions in toolbars, like Review's Analyze, Retry) | fill below | fill below |
 
-- ghost 和 plain 的底随它所在的面（`surface`），取 `foreground` 的固定比例，浅色、深色主题都按这个比例：`chrome` 上悬停 4%、on 7%（T3 深色的 `accent` 和 Toggle 按下的 `input/64`；不取主题的 `hover`／`selected`，它们在 maple-dark 等主题里是一块实色）；终端标签栏和面板头的标签也一样，当前标签 7%，悬停 4%；`card`（`background` 卡片、`popover`、对话框）上悬停 7%、on 12%；`row`（侧栏的行和卡片里的控件，T3 行控件）没有底，只变亮；`tab`（标签的 ×）悬停 `raised`，照 T3 tab close 的 `bg-muted`。
-- 禁用：整体透明度 0.64（T3 `disabled:opacity-64`），不换底色和字色，没有悬停，不响应点击；禁用的 toggle 不算按下，不画 on 底。
-- 焦点：`stop()` 的 2px `accent` 内环，半径取 `radiusOf(size)`。
-- 指针（全布局）：ghost 按钮、`trigger()` 和分段切换悬停时是箭头，`button()` 不传 `act`、`ghostButton()` 即如此；实底按钮（primary、outline、danger）、菜单行、split 两半和列表行是手形，`button()` 传 `act` 或调用方加 `cursor_pointer()`；能拖动的画面（壁纸取景）是 `cursor_grab()`。
-- 打开弹层或菜单的按钮一律用 `shared/trigger.js` 的 `trigger()`（P6）：它画按钮、提示卡和焦点停靠，弹层开着时按钮 on、提示收起；这次按下刚关掉弹层时，点击不再打开它。是否开着、是否刚关掉，都由弹层 `close()` 写的时间戳键判断（键名见 [storage.md](storage.md)）。不是按钮的触发处（split 的箭头半、详情行、标题、面包屑 ›）用同文件的 `opener()` 接同样的按下和点击，on 态自己画。
-- svg 不吃悬停样式，ghost 的字色变化靠调用方传 `hot`（`view.hot === id`）。卡片上的 ghost 图标按钮一律用同文件的 `ghostButton()`（默认 `card` 面，40px 顶栏上用 `chrome`）：它接好悬停、按下不下传和点击，调用方只加 `stop()` 和 `tip()`。
-- 不是按钮却按 ghost 方式点亮的元素（标签、详情行、Review 分组标签、面包屑 ›），底色取同文件导出的 `tint(t, surface, on)`。
-- 从主题色取比例（悬停底、淡底、焦点环、徽章底）一律经 `shared/color.js` 的 `alpha(color, "12")`：主题色可以是 `#rgb`、`#rrggbb` 或带透明度的 `#rrggbbaa`，后者按自身透明度再乘比例；直接拼两位会得到宿主不认的 5 位或 10 位色。`scripts/check.sh` 拦直接拼接。
-- 尺寸：`default` 32、`sm` 28、`compact` 28（字 12、圆角 6）、`xs` 24、`micro` 20（字 11、圆角 4）、`tiny` 16（圆角 4）；只有图标时是正方形，图标 16/16/14/14/12/12。子标题栏（Files 文件头、Review 顶栏）的 `sm` 按钮传 `iconSize: 14`，照 T3 文件和 diff 工具栏的 `size-3.5`；面板头和其他 40 栏仍是 16。
+- Ghost and plain fills follow the surface they sit on (`surface`), as a fixed ratio of `foreground`, the same ratio in light and dark themes: on `chrome` hover 4%, on 7% (T3 dark's `accent` and the pressed Toggle's `input/64`; not the theme's `hover`/`selected`, which are a solid block in themes like maple-dark); terminal tab bar and panel header tabs match, current tab 7%, hover 4%; on `card` (`background` cards, `popover`, dialogs) hover 7%, on 12%; `row` (sidebar rows and controls inside cards, T3 row controls) has no fill and only brightens; `tab` (the tab ×) hovers `raised`, like T3 tab close's `bg-muted`.
+- Disabled: opacity 0.64 overall (T3 `disabled:opacity-64`), fill and text colour unchanged, no hover, no click; a disabled toggle doesn't count as pressed and draws no on fill.
+- Focus: `stop()`'s 2px `accent` inner ring, radius from `radiusOf(size)`.
+- Pointer (whole layout): ghost buttons, `trigger()` and segmented toggles show the arrow on hover, which is what `button()` without `act` and `ghostButton()` do; solid buttons (primary, outline, danger), menu rows, split halves and list rows show the hand, via `button()` with `act` or the caller adding `cursor_pointer()`; draggable surfaces (wallpaper framing) use `cursor_grab()`.
+- A button that opens a layer or menu always uses `trigger()` from `shared/trigger.js` (P6): it draws the button, the tip card and the focus stop; while the layer is open the button is on and the tip hides; when this press has just closed the layer, the click doesn't reopen it. Whether it is open, and whether it has just closed, is judged from the timestamp key the layer's `close()` writes (key names in [storage.md](storage.md)). Triggers that aren't buttons (the arrow half of a split, detail rows, titles, the breadcrumb ›) use `opener()` from the same file for the same press and click, and draw their on state themselves.
+- svg doesn't take hover styles; a ghost's text colour change relies on the caller passing `hot` (`view.hot === id`). Ghost icon buttons on cards always use `ghostButton()` from the same file (`card` surface by default, `chrome` on 40px top bars): it wires hover, stops the press from propagating and handles the click; the caller only adds `stop()` and `tip()`.
+- Elements that aren't buttons but light up the ghost way (tabs, detail rows, Review group tabs, the breadcrumb ›) take their fill from `tint(t, surface, on)`, exported from the same file.
+- A ratio of a theme colour (hover fill, faint fill, focus ring, badge fill) always goes through `alpha(color, "12")` in `shared/color.js`: a theme colour can be `#rgb`, `#rrggbb` or `#rrggbbaa` with its own alpha, which is multiplied by the ratio; appending two digits directly yields a 5- or 10-digit colour the host rejects. `scripts/check.sh` blocks direct appending.
+- Sizes: `default` 32, `sm` 28, `compact` 28 (font 12, radius 6), `xs` 24, `micro` 20 (font 11, radius 4), `tiny` 16 (radius 4); icon-only buttons are square, icons 16/16/14/14/12/12. `sm` buttons in sub-headers (the Files file header, the Review top bar) pass `iconSize: 14`, like T3's file and diff toolbars' `size-3.5`; the panel header and other 40 bars stay at 16.
 
-分体控件（T3 OpenInPicker、ProjectScriptsControl、ThreadDetailsControl 的 primary＋secondary）一律用同文件的 `split()`，mod 不自己画描边。T3 按所在位置分两种画法，`size` 二选一：
+Split controls (T3 OpenInPicker, ProjectScriptsControl, ThreadDetailsControl's primary + secondary) always use `split()` from the same file; mods don't draw their own border. T3 draws them two ways depending on where they sit, picked with `size`:
 
-- `xs`：栏上（T3 头部，`variant="outline"` 的 xs 按钮组）。高 24，一圈 `input` 描边和一根全高 `input` 中线，静止时就在，没有底（T3 的 `input/32` 底在 chrome 上读作一块按钮，布局不画：底会像选中的标签）；指针下的那一半单独填 `surface` 的悬停底，菜单开着时箭头那半填 on 底。主半边只有图标时宽 25（含左描边），有文字时传 `wide`，左 5 右 7、间距 4（T3 xs 的 `px-[7px]` 加 svg 的 `-mx-0.5`）；箭头半宽 24（含右描边），箭头 16。整体禁用时连描边一起降到 0.64。用于 Files 文件头的 Open in、Actions 栏的 ▶|⌄（见 [Files](specs/files.md#open-in)）。
-- `row`：详情卡里（T3 `isPanel`，`variant="ghost"`）。一体 ghost 组，底和中线属于整组，见[详情](specs/details.md#splits)。
+- `xs`: on a bar (T3 headers, an xs button group with `variant="outline"`). Height 24, one ring of `input` border and one full-height `input` middle line, present at rest, no fill (T3's `input/32` fill reads as a button block on chrome; the layout doesn't draw it: the fill would look like a selected tab); the half under the pointer gets the `surface` hover fill on its own, and while the menu is open the arrow half gets the on fill. The main half is 25 wide (left border included) when icon-only; with text pass `wide`, left 5, right 7, gap 4 (T3 xs's `px-[7px]` plus the svg's `-mx-0.5`); the arrow half is 24 wide (right border included), arrow 16. When the whole control is disabled the border drops to 0.64 too. Used for Open in on the Files file header and the Actions bar's ▶|⌄ (see [Files](specs/files.md#open-in)).
+- `row`: in detail cards (T3 `isPanel`, `variant="ghost"`). One ghost group, the fill and middle line belong to the whole group, see [details](specs/details.md#splits).
 
-不走 `button()` 的：列表行、菜单行（`shared/menu-row.js`，见下）、标签、分段切换（ToggleGroup）、日历格、select 的触发框、输入框自带的 stepper（`NumberInput` 的 − +）、行内链接（Undo，悬停下划线）、命令面板底部的文字动作（只变亮）、Inbox 卡片和行上的悬停控件（T3 行控件，无底）、Update 胶囊、品牌栏 Home。
+Not drawn with `button()`: list rows, menu rows (`shared/menu-row.js`, below), tabs, segmented toggles (ToggleGroup), calendar cells, select triggers, an input's own stepper (`NumberInput`'s − +), inline links (Undo, underline on hover), text actions in the command palette footer (brighten only), hover controls on Inbox cards and rows (T3 row controls, no fill), the Update pill, the brand bar's Home.
 
-## 菜单行
+## Menu rows
 
-所有弹出菜单的行用 `shared/menu-row.js` 的 `menuRow()`，照 T3 `ui/menu.tsx` 的 MenuItem：
+Every popup menu row uses `menuRow()` from `shared/menu-row.js`, like T3 `ui/menu.tsx`'s MenuItem:
 
-- 打开时：用键盘打开的菜单和子菜单（按钮上 Enter／Space、→、快捷键）点亮第一行；用指针打开的什么都不亮，直到第一次按方向键或指针停到行上。由 `shared/list.js` 统一给出：页内菜单打开时取 `openLit(keys)`；原生 popup 由打开方在 props 里放 `litProp(keys)`（`popup-menu.js` 的 `openPopup`／`openBeside` 收 `keys` 参数代放），popup 启动时取 `propsLit()`。按钮的 `opener`／`trigger` 的 `onOpen(b)` 没有按下坐标（`b` 为空）就是按键打开，传 `!b`；命令和快捷键传 `true`；右键传 `false`。带搜索框的选择器（Go to、New、Review 栏菜单、base 选择器）按各自的首项规则，不在此列。
-- 只在指针停在行上或键盘选中时用 `selected` 底；指针离开就熄灭，宿主晚到的 leave 不熄灭指针已进入的下一行（`shared/list.js` 的 `litOnHover`）。子菜单开着时（`open`）父行保持点亮。
-- 禁用：整行透明度 0.64（`DISABLED`），不点亮、不响应点击；`hint` 用 `tip()` 说明原因，不用宿主 `.tooltip()`。
-- 行尾提示用 `menuHint`，分隔线用 `menuRule`。按键用 `list.js` 的 `menuKeys`，滚动用 `scrollList`，子菜单用 `popup-menu.js`／`submenu.js`，由各菜单自己接。`label` 不是文字（元素）时，调用方自己设 `accessibility_label`；role 不是按钮的（设置页 Select 的选项 `list_box_option`、base 的 `radio_button`）在调用方覆盖。
-- 行内关闭是唯一例外，只在面包屑的 space 菜单：能关的行在指针点亮时，`trail` 换成 `micro` 的 ghost `×`（`ghostButton`，`x.svg`），键盘点亮的行保持原标记；按下走 `t3-tabs.close-pane` 的确认，菜单保持打开、列表随之更新，方便连续关掉几个。T3 的菜单没有这种控件，别的菜单不照搬。
-- 子 agent 列表也用 `menuRow`：每级缩进 16 用 `lead` 放 `16 × 层级 − 8` 的占位（加上行的 gap 8），状态用 `trail`。Review 的 base 和 Commits 列表、Review 设置的语言／agent／model 子菜单、设置页 Select 的选项也用 `menuRow`：指针离开即熄灭，和其余菜单一致。
+- On open: menus and submenus opened by keyboard (Enter/Space on a button, →, a shortcut) light the first row; ones opened by pointer light nothing until the first arrow key or the pointer rests on a row. `shared/list.js` provides this: an in-page menu takes `openLit(keys)` on open; for a native popup the opener puts `litProp(keys)` in the props (`popup-menu.js`'s `openPopup`/`openBeside` take a `keys` argument and do it for you), and the popup takes `propsLit()` on start. A button's `opener`/`trigger` `onOpen(b)` with no press coordinates (`b` empty) means it was opened by key, so pass `!b`; commands and shortcuts pass `true`; context menus pass `false`. Pickers with a search box (Go to, New, the Review bar menus, the base picker) follow their own first-item rules and are not covered here.
+- The `selected` fill shows only while the pointer rests on the row or the keyboard selects it; it goes out when the pointer leaves, and a late host leave doesn't put out the next row the pointer has already entered (`litOnHover` in `shared/list.js`). While a submenu is open (`open`) the parent row stays lit.
+- Disabled: opacity 0.64 for the whole row (`DISABLED`), no lighting, no click; `hint` explains why with `tip()`, not the host's `.tooltip()`.
+- Trailing hints use `menuHint`, dividers `menuRule`. Keys use `menuKeys` from `list.js`, scrolling `scrollList`, submenus `popup-menu.js`/`submenu.js`, each menu wiring them itself. When `label` isn't text (an element), the caller sets `accessibility_label` itself; roles that aren't button (settings Select options `list_box_option`, base's `radio_button`) are overridden by the caller.
+- Inline close is the only exception, and only in the breadcrumb space menu: on a closable row lit by the pointer, `trail` becomes a `micro` ghost `×` (`ghostButton`, `x.svg`); a row lit by the keyboard keeps its original mark; pressing it goes through `t3-tabs.close-pane`'s confirmation, the menu stays open and the list updates, so several can be closed in a row. T3's menus have no such control, and other menus don't copy it.
+- The sub-agent list also uses `menuRow`: each level indents 16, using `lead` for a `16 × level − 8` spacer (plus the row's gap of 8), and the status in `trail`. Review's base and Commits lists, Review settings' language/agent/model submenus and the settings Select options also use `menuRow`: the row goes out when the pointer leaves, like every other menu.
 
-## 程序标志
+## Program icons
 
-程序标志直接使用 Herdr 官方资源，各组件沿用 T3 的图标槽尺寸，由 `shared/program.js` 的 `programIcon` 统一绘制。素材的画布、内部留白、宽高比与配色由 Herdr 维护，布局随官方资源更新。mod 提供的自定义图标也按其原画布绘制。
+Program icons use Herdr's official assets directly, each component keeps T3's icon slot size, and `programIcon` in `shared/program.js` draws them all. The assets' canvas, inner padding, aspect ratio and colours are Herdr's to maintain, and the layout follows official asset updates. Custom icons from mods are also drawn on their own canvas.
 
-## 有意不同
+## Deliberate differences
 
-有意保留，不要改回 T3（见 [ADR 0002](../adr/0002-inbox-rules-stay-in-inbox.md) 和 [ADR 0004](../adr/0004-putting-away-lands-on-home.md)）：
+Kept on purpose; don't change them back to T3 (see [ADR 0002](../adr/0002-inbox-rules-stay-in-inbox.md) and [ADR 0004](../adr/0004-putting-away-lands-on-home.md)):
 
-- Lists 的终端标签名字很短时最小 96px，末尾留一格 16 放状态标记，没有状态也留着，宽度不随状态变；悬停时 × 照 T3 盖住左端图标，状态标记不被盖住。Inbox 右侧的工具标签不显示状态（ADR 0002），不留末尾那格，按内容收紧、不设最小宽度。两条标签栏的标签由 `shared/tab.js` 画。
-- 确认框的执行按钮照 Actions 编辑器的 Delete：`raised` 底、`ansi1` 文字，写出动作；底部 bare。T3 的红色实心按钮在浅色调主题里是一块粉色，和布局别处不搭。
-- 收起当前查看的 agent 后回 Home，不跳到下一张。
-- `cmd-]` 在 Lists 下也走折叠的组。
-- 标签栏高度、工作列框架等 T3 没有的结构，以及 Review 的 diff 内容区。
-- 侧栏卡片和 slim 行横向内边距 8，T3 是 10（R3）。
-- ghost 按钮和分段切换悬停时指针不变，T3 的 `Button` 一律 `cursor-pointer`：规则见「按钮」的指针一条。
-- Files 和 Review 的内容区（导航列左边那块）一律 `background`，导航列和页头是面板的 `chrome`：T3 只有代码和 diff 用 `--code-background`，Markdown 预览和图片在 `bg-background` 上；布局让 Files 的 Markdown、图片也在 `background` 上，换文件类型时内容区和树的分界不变。
-- 面板页的边一律12（R1）：树行不取 Pierre 的16，Markdown 预览不取 T3 的 `px-6`，Review 文件头不取 T3 的左8。
-- 文件树没有折叠箭头：目录图标开合两态已经表示展开，再加 chevron 是同一件事说两遍；T3 的 Pierre 树是 chevron。Files 与 Review 两棵树是同一种行。
-- Spaces 行之间 1，T3 的文件夹之间 8：space 多了太占高度。
-- 子 agent 的 Failed 用 `!` 徽章，`ansi1` 的 15% 底，和 Needs you 同形只换颜色：两者共用一个标记（`shared/status-mark.js`），12px 的底不会成一块粉色。
-- 加载标记是 T3 `ui/spinner.tsx` 的 `LoaderCircleIcon`，画成静止：T3 只在看得见时转，宿主没有这道开关，转动的 svg 让整个窗口每帧重绘。工作中的 `CircleDashedIcon` 在 T3 本来就是静止的。
+- A Lists terminal tab with a very short name is at least 96px, with a 16 slot at the end for the status mark, kept even with no status, so the width doesn't change with status; on hover the × covers the left icon as in T3, and the status mark isn't covered. The tool tabs on the right of Inbox show no status (ADR 0002), keep no end slot, and shrink to their content with no minimum width. Both tab bars' tabs are drawn by `shared/tab.js`.
+- A confirm dialog's action button follows the Actions editor's Delete: `raised` fill, `ansi1` text, naming the action; bare footer. T3's solid red button is a pink block in light themes and doesn't fit the rest of the layout.
+- Putting away the agent being viewed goes back to Home, not to the next card.
+- `cmd-]` also walks folded groups under Lists.
+- Structures T3 doesn't have, like the tab bar height and the work column frame, and Review's diff content area.
+- Sidebar cards and slim rows have 8 horizontal padding; T3 has 10 (R3).
+- Ghost buttons and segmented toggles don't change the pointer on hover, while T3's `Button` is always `cursor-pointer`: the rule is the pointer item under "Buttons".
+- The content area of Files and Review (the part left of the navigation column) is always `background`, and the navigation column and page header are the panel's `chrome`: in T3 only code and diffs use `--code-background`, and the Markdown preview and images sit on `bg-background`; the layout puts Files' Markdown and images on `background` too, so the boundary between content area and tree doesn't change with the file type.
+- Panel page edges are always 12 (R1): tree rows don't take Pierre's 16, the Markdown preview doesn't take T3's `px-6`, the Review file header doesn't take T3's left 8.
+- The file tree has no fold arrows: the open and closed folder icons already show expansion, and a chevron would say the same thing twice; T3's Pierre tree uses chevrons. The Files and Review trees use the same row.
+- Spaces rows are 1 apart, T3's folders 8: with many spaces it takes too much height.
+- A sub-agent's Failed uses a `!` badge with a 15% `ansi1` fill, the same shape as Needs you with only the colour changed: both share one mark (`shared/status-mark.js`), and a 12px fill doesn't become a pink block.
+- The loading mark is T3 `ui/spinner.tsx`'s `LoaderCircleIcon`, drawn still: T3 only spins it while visible, the host has no such switch, and a spinning svg makes the whole window redraw every frame. The working `CircleDashedIcon` is already still in T3.
 
-## 做不到
+## Not possible
 
-- 玻璃效果（背景模糊）和弹窗的缩放动画。
-- 字距（`tracking-widest`）：kit 没有字距 API。
-- 命令面板的背景遮罩：New 和 Go to 是 popup，改 dialog 就不能固定在顶部。顶部 `offset` 96 是 T3 `10vh` 的近似值，宿主只收固定值。
-- Herdr 自带的 `space.close` 确认框和 worktree 对话框：数值写死，mod 碰不到。
-- 数字框内容居中：`NumberInput` 不接受。
-- 竖向滚动条的尺寸由宿主决定。
+- Glass effects (background blur) and popup scale animations.
+- Letter spacing (`tracking-widest`): the kit has no letter-spacing API.
+- The command palette's backdrop: New and Go to are popups, and as dialogs they couldn't stay pinned to the top. The top `offset` 96 approximates T3's `10vh`; the host only takes fixed values.
+- Herdr's own `space.close` confirm dialog and worktree dialog: values are hard-coded, and mods can't reach them.
+- Centred number input content: `NumberInput` doesn't accept it.
+- The vertical scrollbar's size is set by the host.
 
-外壳圆角能做到：`frame: "none"` 由 mod 自画，已用于 16 圆角的 New、Go to、Actions 编辑器、确认框和 Custom snooze。菜单类弹层的宿主外壳本来就接近 8，不用自画。
+Shell radii are possible: with `frame: "none"` the mod draws its own, already used for the 16-radius New, Go to, Actions editor, confirm dialogs and Custom snooze. The host shell of menu-type layers is already close to 8 and needs no custom drawing.
 
-确认框放在 `t3-actions` 的 `actions: "confirm"` 里，因为宿主 `confirm` 改不了圆角；单独发布的 Inbox 没有 `t3-actions`，回退到宿主 `confirm`。
+Confirm dialogs live in `t3-actions` under `actions: "confirm"`, because the host `confirm` can't change its radius; Inbox shipped on its own has no `t3-actions` and falls back to the host `confirm`.

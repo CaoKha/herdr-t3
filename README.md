@@ -1,7 +1,5 @@
 # Herdr T3
 
-English · [中文](README.zh-CN.md)
-
 A layout for [Herdr App](https://herdr.dev) that lets you keep many agents running and look only at the ones that need you.
 
 ![Herdr T3](preview.png)

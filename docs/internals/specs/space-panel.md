@@ -14,7 +14,7 @@ On a layout jump to a known space, restore the destination's panel slot, visibil
 
 - The head's ends sit 12 inside the column, by `panel-head`'s layout padding (t3-tokens R1): the first tab's box and the last button's box on the same edges as the page header below. The head's mod draws no inset of its own.
 - Tabs: `shared/tab.js`, the tab bar's. 24 high, at most 144 wide, radius 6, padding 6 left and 8 right, children 2 apart, 12px text. A 16px slot on the left holds the 12px surface icon; on tab hover or keyboard focus it becomes a 12px `×` (radius 4, `tab` surface), a keyboard stop only then. Review's run status sits in a 16px slot at the end and stays while `×` shows. A clipped name says itself whole in a tooltip below; any press hides it.
-- Active and hovered tabs take the `chrome` on and hover fills, as the tab bar's (t3-tokens「按钮」); text `foreground` / `muted`, as the tab strip's unselected tabs.
+- Active and hovered tabs take the `chrome` on and hover fills, as the tab bar's (t3-tokens "Buttons"); text `foreground` / `muted`, as the tab strip's unselected tabs.
 - `+` follows the last tab, 4 apart, inside the same scrolled strip: `trigger()`, xs ghost (24 square, 14px icon).
 - Overflow: wheel scrolls; T3's `‹ ›` (xs, 4 apart, P3) sit after the strip, greyed at the ends (`DISABLED`). Both ends of the strip fade over 16px (`shared/scroll-strip.js`, shared with the tab bar). The active tab, and a last tab's `+`, scroll into view.
 - Then maximize/restore and panel-right (sm, 4 apart, 16px icons), 8 after the arrows; their `chrome` hover and on are the bar's. Layout controls are rightmost. With the panel open, the window buttons move here too, under the tab bar's names (Minimize, Maximize or Restore, Close window).
@@ -22,7 +22,7 @@ On a layout jump to a known space, restore the destination's panel slot, visibil
 
 ## Surface menu
 
-- `+`'s menu: left-aligned, 6 below; opened by keyboard, it computes the same position from the head's width and scroll. 220 wide, rows × 28 + 8 high; rows from t3-tokens「菜单行」.
+- `+`'s menu: left-aligned, 6 below; opened by keyboard, it computes the same position from the head's width and scroll. 220 wide, rows × 28 + 8 high; rows from t3-tokens "Menu rows".
 - Rows: Files (F), Review (R) when installed, Pull requests (P), Issues (I). Letters pick, arrows skip greyed rows, Enter runs; letters with modifiers, or with an input focused, pass through. Review greyed with its reason when unavailable; no "checking" flash.
 - In Files, Review or Pull requests, `cmd-t` opens this menu under `+` and `cmd-w` closes the active tab, never the terminal: both through `keys.json`'s `mod:t3-files` / `mod:review` / `mod:t3-pulls` contexts (`t3-chrome.surface-menu`, `t3-files.close`, `review.close`, `t3-pulls.close`), not `on_key_down`.
 

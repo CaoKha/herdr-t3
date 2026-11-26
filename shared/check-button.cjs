@@ -1,4 +1,4 @@
-// The buttons' colors and states (docs/internals/t3-tokens.md「按钮」): primary on `solid`, never `accent`; a ghost's fill by
+// The buttons' colors and states (docs/internals/t3-tokens.md "Buttons"): primary on `solid`, never `accent`; a ghost's fill by
 // its surface; disabled faded, with no hover and no click.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

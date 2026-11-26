@@ -1,16 +1,16 @@
-# 每个 space 记自己的面板
+# Each space keeps its own panel
 
-取代 [0011](0011-one-space-panel.md) 里“面板只有一份开关，不按 space 记”这一条。面板仍是窗口右侧唯一的一列，跨标签固定；但它开没开、显示哪一页、放没放大，按 space 各记一份，照 T3 按 thread 记右侧面板（`rightPanelStore` 的 `isOpen`、`activeSurfaceId`、`maximized`）。宽度和 T3 一样，整个窗口一份。没记过的 space 里面板关着。
+Supersedes the point in [0011](0011-one-space-panel.md) that "the panel has one open state, not kept per space". The panel is still the single column on the right of the window, fixed across tabs; but whether it's open, which page it shows and whether it's maximized are kept per space, like T3 keeps the right panel per thread (`isOpen`, `activeSurfaceId`, `maximized` in `rightPanelStore`). The width, as in T3, is one for the whole window. In a space with nothing recorded, the panel is closed.
 
-快捷键也照 T3：`cmd-alt-b` 是 `rightPanel.toggle`；键盘在面板里时 `cmd-w` 关闭面板，对应 T3 焦点不在终端时的 `rightPanel.close`（已由 [0017](0017-space-panel-surfaces.md) 取代：`cmd-w` 关闭当前 surface 标签，不关面板）。T3 的 `diff.toggle`（`cmd-d`）只在焦点不在终端时生效，而 Herdr 的焦点几乎总在终端上，所以 `cmd-d` 留给 Herdr 的向右分屏，Review 用 `cmd-shift-g`。T3 没有打开 Files 的键；本布局后来给 Files 设了 `cmd-shift-e`，和 Review 的 `cmd-shift-g` 成对。
+Shortcuts follow T3 too: `cmd-alt-b` is `rightPanel.toggle`; with the keyboard in the panel, `cmd-w` closes the panel, matching T3's `rightPanel.close` when focus isn't in the terminal (superseded by [0017](0017-space-panel-surfaces.md): `cmd-w` closes the current surface tab, not the panel). T3's `diff.toggle` (`cmd-d`) only works when focus isn't in the terminal, while Herdr's focus is almost always in a terminal, so `cmd-d` stays Herdr's split right and Review uses `cmd-shift-g`. T3 has no key to open Files; this layout later gave Files `cmd-shift-e`, paired with Review's `cmd-shift-g`.
 
 ## Considered Options
 
-- **整个窗口一份开关（0011）**：在一个 space 里打开的 Review 或 Files，切到别的 space 还盖着，那里不一定有要看的。0011 担心切 space 时面板忽开忽关、人得猜；T3 的做法说明，面板跟着正在看的东西恢复，反而不用猜。
-- **Review 用 `cmd-d`**：要把 Herdr 的向右分屏挪到别的键，动的是 Herdr 的基础操作。
+- **One open state for the whole window (0011)**: a Review or Files opened in one space still covers the next space you switch to, where there may be nothing to look at. 0011 worried the panel would open and close on switching spaces and you'd have to guess; T3's approach shows that a panel restored along with what you're looking at needs no guessing.
+- **`cmd-d` for Review**: would move Herdr's split right to another key, changing one of Herdr's basic operations.
 
 ## Consequences
 
-- 状态记在共享状态 `t3.panels`，按 space id。由始终显示的 `t3-tabs` 的 `keys` 浮动块在绘制时同步；放大面板时它仍显示。面板头 `t3-chrome` 读取状态并发出切页、放大和关闭动作。
-- Home 也是 space：回 Home 时面板按 Home 自己的记录显示，默认关着。
-- 单独发布的 herdr-pulls-review 用在 Herdr 自带布局里，那里由自带的 `tabs` 按 space 记，不受影响。
+- The state lives in the shared state `t3.panels`, keyed by space id. It is synced on draw by the `keys` floating block of the always-shown `t3-tabs`, which still shows while the panel is maximized. The panel header `t3-chrome` reads the state and sends page switch, maximize and close actions.
+- Home is a space too: going back to Home shows the panel by Home's own record, closed by default.
+- The separately published herdr-pulls-review is used in Herdr's built-in layout, where the built-in `tabs` keeps it per space, so it's unaffected.

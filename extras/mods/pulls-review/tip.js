@@ -61,7 +61,7 @@ export const dragGone = (box) => window()?.active === false || pointerGone(box);
 // is laid out, so each opening takes a new id. A popup blocks what it covers even when clear.
 const tips = new Map();
 export const FADE = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
-/** The label's card, as T3's TooltipPopup: docs/internals/t3-tokens.md「Tooltip」. measured-text.js's named() draws it too. */
+/** The label's card, as T3's TooltipPopup: docs/internals/t3-tokens.md "Tooltip". measured-text.js's named() draws it too. */
 export const tipCard = (t, id) => v_flex().id(id).max_w(320).px(8).py(4).gap(2).rounded(6).border(1).border_color(t.border).bg(t.chrome).shadow_md()
   .text_size(12).font_normal().line_height(1.375).text_color(t.foreground);
 let opened = 0;

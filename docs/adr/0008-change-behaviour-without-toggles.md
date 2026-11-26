@@ -1,3 +1,3 @@
-# 直接改行为，不加开关，不做迁移
+# Change behaviour directly: no toggles, no migrations
 
-行为变化直接生效，不做开关保留旧行为，也不自动迁移旧版本的设置：改名或改义的设置从默认值开始。需要用户手动做的事写进 CHANGELOG。
+A behaviour change takes effect directly: no toggle keeps the old behaviour, and settings from older versions are not migrated automatically; a setting that is renamed or changes meaning starts from its default. Anything users have to do by hand goes in the CHANGELOG.

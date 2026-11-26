@@ -714,7 +714,7 @@ export default class Files extends View {
     const md = kindOf(st.file ?? "") === "markdown", code = shared(KEY.markdown) === "code";
     const parts = (st.trail ?? st.file)?.split("/").filter(Boolean) ?? [], current = st.folder ?? st.file;
     const crumb = (label, path, last) => {
-      // The root's words sit where Review's scope button has them, so switching pages doesn't move the first letter (t3-tokens「规则」R1).
+      // The root's words sit where Review's scope button has them, so switching pages doesn't move the first letter (t3-tokens "Rules" R1).
       const id = `crumb-${path}`, el = div().id(id).flex_none().max_w(160).truncate().px(2).when(path === "", el => el.pl(10)).rounded(4).text_color(last ? t.foreground : t.dim).when(last, el => el.font_medium())
         .when(!last, el => el.cursor_pointer().role("button").accessibility_label(`Go to ${label}`).hover(s => s.text_color(t.foreground)).on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => this.navigate(st, path, cx)))
         .child(label);
@@ -783,7 +783,7 @@ export default class Files extends View {
                 this.reveal(st, st.file, cx, true);
               })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
-          // The page's edge (t3-tokens「规则」R1), not T3's px-6.
+          // The page's edge (t3-tokens "Rules" R1), not T3's px-6.
           : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
           // Laid out at the width its room last held (nav-column.js holdWidth), cut off or short of it while the room moves.
           : v.code && v.lang && !v.colored && !this.fits(v) ? v_flex().size_full().min_h(0)
@@ -812,7 +812,7 @@ export default class Files extends View {
   searchHead(st, t) {
     this.rows(st);
     const folders = st.index.folders;
-    // t3-tokens「规则」P3.
+    // t3-tokens "Rules" P3.
     return h_flex().id("t3-files-search").flex_1().min_w(0).h_full().gap(8).items_center()
       .on_key_down((e, cx) => {
         if (e.key !== "escape") return;

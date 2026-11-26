@@ -208,7 +208,7 @@ function diffItem(view, t, item) {
       // As the app's file header: the reviewed box, the path and its marks; the counts, the status, the whole file and the fold.
       // A row holds no handlers: headerPress places a press by these parts' positions.
       const f = item.file, open = !view.collapsed.has(f.path), full = view.full.has(f.path), loading = full && !view.full.get(f.path);
-      // 12 in on both sides, the page's edge (t3-tokens「规则」R1); its controls icon-micro. As Pierre's header: on the code's
+      // 12 in on both sides, the page's edge (t3-tokens "Rules" R1); its controls icon-micro. As Pierre's header: on the code's
       // ground, no rules, the file in front unlit (the tree's selected row says which).
       const slot = () => div().size(20).flex_none().flex().items_center().justify_center();
       return h_flex().w_full().h(item.size).px(12).gap(8).items_center()

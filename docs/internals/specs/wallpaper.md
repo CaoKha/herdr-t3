@@ -1,6 +1,6 @@
 # asciicn wallpaper Home
 
-The optional Home mod `extras/mods/asciicn-wallpaper`: its controls, waits, framing and file rules. The [RECIPE](../../../RECIPE.md) says what it does. Files, caches, saving and deletion internals are in [storage](../storage.md)「壁纸草稿」; conversion traps in [layout implementation](../layout-implementation.md)「壁纸转换」. Shared sizes are in [t3-tokens](../t3-tokens.md).
+The optional Home mod `extras/mods/asciicn-wallpaper`: its controls, waits, framing and file rules. The [RECIPE](../../../RECIPE.md) says what it does. Files, caches, saving and deletion internals are in [storage](../storage.md) "Wallpaper drafts"; conversion traps in [layout implementation](../layout-implementation.md) "Wallpaper conversion". Shared sizes are in [t3-tokens](../t3-tokens.md).
 
 ## Pictures
 
@@ -45,7 +45,7 @@ Rows, each a fixed height:
 - The slider (T3 has none): 4 high track, radius 4, `border` with the chosen part `foreground`, 16px `foreground` knob; logarithmic. Disabled, the whole control is at 0.64.
 - Zoom presets 100 / 125 / 150 / 200 / 250 / 300 / 400%.
 - Reset and − + are `ghostButton`s (`card` surface).
-- Pointer shapes follow [t3-tokens](../t3-tokens.md)「按钮」.
+- Pointer shapes follow [t3-tokens](../t3-tokens.md) "Buttons".
 
 ## Framing input
 
@@ -70,7 +70,7 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 ## Waits
 
 - Nothing shows for waits under 150ms; once shown, an indicator stays at least 300ms (`main.js` `track`). A picture that fails to draw ends its wait: no loader stays on Home, and a draft's last picture isn't left dimmed.
-- The last picture stays up until the next one has loaded, then the next replaces it whole in one frame, without fading in, so Home never blanks. Meanwhile the last one keeps its own framing, a new draft's included. How the mod knows it has loaded: [layout implementation](../layout-implementation.md)「壁纸转换」.
+- The last picture stays up until the next one has loaded, then the next replaces it whole in one frame, without fading in, so Home never blanks. Meanwhile the last one keeps its own framing, a new draft's included. How the mod knows it has loaded: [layout implementation](../layout-implementation.md) "Wallpaper conversion".
 - **Light/dark**: once the picture shows, the one for the layout's other appearance (its `theme_light` or `theme_dark`) is made and loaded out of sight, so switching shows it in the same frame as the new background. Another theme only recolours the picture, then loads it: its uncoloured tiles are kept on disk beside it, one set per side, so this holds after a restart too; the last picture stays up meanwhile. Going back to a palette whose file a newer one replaced makes it again.
 - **Compact card progress**: under the name, a 26 high block: the step name (12px `dim`, 16 high), 6 gap, a 4 high bar (track `border`, radius 4, `overflow_hidden`, progress `foreground`). Images have steps, so progress is determinate: the width follows the steps over 300ms ease-out, the last part linear to full within `FILL` (400ms). A picture framed again has no steps, so no bar, which would claim an amount: a 12px loader stands before the step name, gap 6. Before the indicator shows, the block is an empty 26 so the card's height doesn't change. Texts: *Reading image…*, *Drawing Dots…*.
 - **Mode switch**: the previous mode's picture stays at opacity 0.7 (150ms ease-out); the segment being drawn carries the loader; the footer status reads a 12px loader and "Drawing Braille…", then "Loading picture…" while it loads.
@@ -88,7 +88,7 @@ All modes come from one draft at Braille's sampling grid (columns × 2, rows × 
 
 ## Files
 
-- Each added picture is a `.ans` file in `<appHome>/asciicn-wallpaper/`, starting with the header only this mod writes ([storage](../storage.md)「壁纸草稿」). One copied in appears without preview, covering Home; edits redraw it. Any other `.ans` (asciicn Studio's, a hand-made one) fails once with a notice and isn't listed. While the picture shown is drawn again, Home keeps it under its name and the crop button is disabled until it's done; deleted meanwhile, from any Home, it leaves every list.
+- Each added picture is a `.ans` file in `<appHome>/asciicn-wallpaper/`, starting with the header only this mod writes ([storage](../storage.md) "Wallpaper drafts"). One copied in appears without preview, covering Home; edits redraw it. Any other `.ans` (asciicn Studio's, a hand-made one) fails once with a notice and isn't listed. While the picture shown is drawn again, Home keeps it under its name and the crop button is disabled until it's done; deleted meanwhile, from any Home, it leaves every list.
 - Home starts listening before its first scan and keeps listening while it draws. Changes received during a scan queue one follow-up scan, so a file copied in during another picture's conversion appears without a further folder edit. Closing Home cancels its pending watch.
 - Unicode, leading-dash and hidden names work; `.ans`, `..ans`, `...ans` are refused.
 - Updates keep user files outside the mod folder.

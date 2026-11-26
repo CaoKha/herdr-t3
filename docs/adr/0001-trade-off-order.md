@@ -1,3 +1,3 @@
-# 取舍顺序：行为省注意力，外观照 T3，实现只用 mod API
+# Order of trade-offs: behaviour saves attention, looks follow T3, implementation uses only the mod API
 
-布局要替同时开着很多 agent 的人节约注意力。行为有冲突时，选更省注意力的那个，“T3 这样做”不算理由。外观照 T3 Code，间距、动效、控件样式不逐个论证，数值见 [t3-tokens](../internals/t3-tokens.md)。实现只用 Herdr 的 mod API：贴合理想行为需要的模拟层成本过高时，放弃这个行为并记为已知限制；确实值得的能力单独列成给 Herdr 的需求。已有的模拟，只要它承载的行为还在，就不主动拆。
+The layout has to save attention for people who keep many agents open at once. When behaviours conflict, pick the one that saves more attention; "T3 does it this way" is not a reason. Looks follow T3 Code: spacing, motion and control styles are not argued one by one; the values are in [t3-tokens](../internals/t3-tokens.md). The implementation uses only Herdr's mod API: when the emulation layer needed to match the ideal behaviour costs too much, drop the behaviour and record it as a known limitation; a capability that is truly worth it goes on its own list of requests for Herdr. An existing emulation is not taken apart on purpose as long as the behaviour it carries is still there.

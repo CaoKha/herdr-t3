@@ -1,7 +1,5 @@
 # Herdr T3 guide
 
-English · [中文](guide.zh-CN.md)
-
 Each part in more detail than the [README](../../README.md).
 
 ## Features

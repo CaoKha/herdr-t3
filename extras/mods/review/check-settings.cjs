@@ -1,5 +1,5 @@
 // The Review settings' submenu (settings.js settingsSub): its rows are menu rows (menu-row.js), lit by the pointer or the keys
-// and put out when the pointer leaves, as t3-tokens「菜单行」. Real openPage, settingsSub, list.js and menu-row.js; a fake kit.
+// and put out when the pointer leaves, as t3-tokens "Menu rows". Real openPage, settingsSub, list.js and menu-row.js; a fake kit.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -79,6 +79,6 @@ assert.equal(rowBg(2), "SELECTED", "row 2 drawn with selected");
 rowsNow()[2].handlers.on_hover(false, cx);   // the pointer left row 2: the host's leave
 assert.equal(view.pageAt, -1, "leaving row 2 puts it out (list.js litOnHover)");
 assert.equal(rowBg(2), undefined, "row 2 no longer drawn lit");
-// T3's menu row: 28 high, 14px words (t3-tokens「菜单行」).
+// T3's menu row: 28 high, 14px words (t3-tokens "Menu rows").
 assert.deepEqual([rowsNow()[0].style.h], [28]);
 console.log("ok: Review settings submenu rows light and go out as menu rows");

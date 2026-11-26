@@ -75,7 +75,7 @@ panelOpen = false;
   assert.deepEqual(drawn({ part: "window" }), { layout: 0, panel: 1, home: 1 }, "the panel's toggle and the window's buttons");
 }
 
-// On a Mac only the closed panel's toggle, then the layout's 12, follow Details: Lists' + never pushes it (「规则」R1).
+// On a Mac only the closed panel's toggle, then the layout's 12, follow Details: Lists' + never pushes it ("Rules" R1).
 {
   const row = JSON.parse(fs.readFileSync(path.join(__dirname, "../../layouts/herdr-t3.json"), "utf8"));
   const walk = n => n?.id === "tabs-row" ? n : (n?.children ?? []).map(walk).find(Boolean);

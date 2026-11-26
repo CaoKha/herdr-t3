@@ -4,9 +4,9 @@ Geometry, constants and edge rules of the 40px tab row (`t3-tabs`, plus the `act
 
 ## Lists tabs
 
-- 24px, radius 6, 12px text; the active tab and a hovered one take the `chrome` on and hover fills (t3-tokens「按钮」).
+- 24px, radius 6, 12px text; the active tab and a hovered one take the `chrome` on and hover fills (t3-tokens "Buttons").
 - `shared/tab.js`, shared with the panel head's tabs. All the space's tabs: a 16px leading slot with the 12px program or terminal icon, the name, a trailing 16px state slot (kept empty without a state, so the width doesn't follow it). Hover or keyboard focus turns the leading slot into the close button (12px `×`, radius 4, `tab` surface), over the icon as T3's; the state stays at the end. The `×` is a keyboard stop only while it shows.
-- At least 96px for short names (t3-tokens「有意不同」).
+- At least 96px for short names (t3-tokens "Deliberate differences").
 - Full names until crowded. Then the longest shrink first, the active tab to 240px and the others to 144px; then the strip scrolls.
 - On active-tab or room changes only, bring the active tab into view with the least movement. Wheel scrolling is left alone.
 
@@ -76,7 +76,7 @@ Shaped as T3 `chat/PanelLayoutControls.tsx`: 28×28 ghost `sm` buttons, 16px `sq
 - The group's right edge comes from the layout's `tabs-end-inset` (12, owned by no mod), aligned with the pane header's last control (t3-tokens R1). On a Mac with the panel closed, the toggle is 12 from the window edge and Details 44; with the panel open, Details is 12 from the work column's edge, and the panel and window buttons move to the panel head, onto the same screen points: the panel head's padding puts its last button 12 from the window edge too (`check-buttons.cjs` and t3-chrome's `check-surfaces.cjs` hold both at 12).
 - The three blocks size themselves with `layout.resize`; leftovers under half a pixel after zoom aren't rounded up, or adjacent blocks gain a 1px gap.
 - That resize follows a frame's measure, so it lands a frame late. Whatever shows or hides the panel (`panel.js` `showPanel`) resizes `window-end` in the same go to what it will draw (`windowEndPx`), so the frame that shows the change already has Details where it ends up. `check-buttons.cjs` holds `windowEndPx` to the drawn width; `check-panel.cjs` checks every open and close sizes it.
-- On the 40px bar they take the `chrome` surface's fills (t3-tokens「按钮」), as the brand bar and panel head do. Details is a `trigger()`; tooltips sit below.
+- On the 40px bar they take the `chrome` surface's fills (t3-tokens "Buttons"), as the brand bar and panel head do. Details is a `trigger()`; tooltips sit below.
 
 ## Tab interactions
 

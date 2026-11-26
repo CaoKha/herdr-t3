@@ -18,11 +18,11 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 - Breadcrumbs on the left: each crumb at most 160 wide, padding 2; the first (the root's) 10 on its left, so its box is at 12, under the panel head's first tab's, and its words at 22, where Review's scope button has them (`check-files.cjs`). The `›` slot is 16×20, 2 outside, 14px icon; the `chrome` hover fill, on while its menu is open, as the bar's buttons. Crumbs scroll and truncate, with no strip of their own. A folder crumb's hover brightens text only, no fill; the keyboard focus ring stays. Crumbs are buttons to assistive tech.
 - On the right, two groups 8 apart (P3): the Open in split, then Preview/Code, Wrap and Tree, `sm` (28) buttons 4 apart with 14px icons (T3's file toolbar; the Open in icon too, its chevron 16). All take the `chrome` hover and on (`foreground` 4% / 7%, P7). Open in is 24 high, as T3's xs beside its 28 toolbar toggles.
 - Preview/Code, Wrap and Tree keep fixed slots and are disabled when they don't apply (T3 hides Preview/Code and Wrap where they don't apply; deliberate, so Tree keeps its place).
-- Pointer shapes are t3-tokens「按钮」's: the ghost toggles (Preview/Code, Wrap, Tree) and the crumbs' `›` keep the arrow; Open in's two halves, a folder crumb, menu rows and tree rows show the hand.
+- Pointer shapes follow t3-tokens "Buttons": the ghost toggles (Preview/Code, Wrap, Tree) and the crumbs' `›` keep the arrow; Open in's two halves, a folder crumb, menu rows and tree rows show the hand.
 
 ## Open in
 
-- `split()` `xs` (`surface: "chrome"`), T3's OpenInPicker in a header (`outline`): 24 high, radius 8, an `input` outline and a full-height `input` rule at rest, no fill; a 25 wide icon half (14px icon) and a 24 wide chevron half (16), 50 in all ([t3-tokens「按钮」](../t3-tokens.md)).
+- `split()` `xs` (`surface: "chrome"`), T3's OpenInPicker in a header (`outline`): 24 high, radius 8, an `input` outline and a full-height `input` rule at rest, no fill; a 25 wide icon half (14px icon) and a 24 wide chevron half (16), 50 in all ([t3-tokens "Buttons"](../t3-tokens.md)).
 - The half under the pointer takes the `chrome` hover fill alone; with its menu open the chevron's half is on. Disabled (remote), the whole control, outline too, fades to 0.64, nothing shifting. The chevron has only an aria-label.
 - Its menu is Details' (`shared/open-in.js` `targetsMenu`): 220 wide, 28px rows, right edge on the group's (`align="end"`), 4 below. No check mark: the main icon already says the target. App icons from `targetIcon`: coloured brand art, single-colour brand marks in `foreground`, others a `dim` generic window.
 - Choosing saves the target; the main half opens it.
@@ -38,7 +38,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 `shared/file-tree.js` `treeRow`, shared by Files and Review; slots never change its geometry.
 
 - Row 24, 12px text, radius 6, padding 6.4, margin 1.6, 16px icons, gap 4.8. Each level indents 16 + 4.8 = 20.8, so a child's icon sits under its parent's name.
-- No fold chevron: folders are Lucide `folder` / `folder-open` (`dim`), files Pierre's shapes coloured by theme ANSI or `dim` (t3-tokens「有意不同」).
+- No fold chevron: folders are Lucide `folder` / `folder-open` (`dim`), files Pierre's shapes coloured by theme ANSI or `dim` (t3-tokens "Deliberate differences").
 - Review's reviewed box is a fixed 16 slot (plus the gap) before the icon; tri-state boxes and status letters as before.
 - With the pointer over the tree, each level draws a 1px `foreground` 14% indent guide on the centre line of its folder row's first 16 slot: the icon in Files, the reviewed box in Review, so no line crosses a child's box.
 - Hover 7%, selected 12%, a row whose context menu is open 7%. The `accent` 1px keyboard ring appears only after a key moves the selection.
@@ -62,7 +62,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 ## Folders from the breadcrumbs
 
 - A folder crumb opens a folder tab beside the source file, keeping its trail; moving between folders then replaces that tab in place. Folders are never read as text.
-- `›` opens that folder's menu, one native popup, as T3's `FileBreadcrumbs`, not a cascade: folders show a folder icon and `›`, files their type icon. Click or Enter on a folder shows it in the same menu, read afresh; keys that moved it light its first row. Opened from the keys, its first row is lit ([t3-tokens「菜单行」](../t3-tokens.md)).
+- `›` opens that folder's menu, one native popup, as T3's `FileBreadcrumbs`, not a cascade: folders show a folder icon and `›`, files their type icon. Click or Enter on a folder shows it in the same menu, read afresh; keys that moved it light its first row. Opened from the keys, its first row is lit ([t3-tokens "Menu rows"](../t3-tokens.md)).
 - Below the crumb's own folder, the first row is `Back to <folder above>` (the root folder's name at the root, arrow-left icon), then a rule; both stay put while the entries scroll. Back or ← goes up one folder, never above the crumb that opened it; there ← does nothing. Esc closes; picking a file opens it and closes the menu.
 - The menu's left edge lines up with `›`, 4 below; it keeps its height (12 rows) while it moves, and the entries scroll past that.
 
@@ -121,7 +121,7 @@ Only a missing file returns `null`; an empty file returns `""`. Binary and inval
 
 ## Tree menu
 
-- A native popup at the pointer, 220 wide, 4 top and bottom, rows from t3-tokens「菜单行」.
+- A native popup at the pointer, 220 wide, 4 top and bottom, rows from t3-tokens "Menu rows".
 - Local: Open, Reveal (`open -R`), Open with (default app where supported); relative Copy path; Insert into the tab's last active terminal (disabled when there is none). Remote spaces get no local-app rows.
 - Arrows, Escape and typeahead work. `cmd-w` closes the menu before the tab.
 - Insert: save the text clipboard, write the path, `pane.focus` the terminal, `terminal.paste`, then restore the clipboard 150ms later (paste reads the clipboard late; restoring at once pastes the old text). Never presses Enter, never overwrites an image clipboard or something copied meanwhile. Paths with control characters are refused; Copy path still works.

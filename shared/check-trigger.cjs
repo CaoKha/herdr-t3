@@ -76,7 +76,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(hang(null, 220))), {});
 
 // A press that came to nothing (released off the button: no click), then the keyboard. The host clicks a focused stop on Enter's
 // release, after its key-down went to that stop; the press mustn't still count: no old box to hang from, no old close to
-// swallow the open (t3-tokens「菜单行」: opened by keys, its first row lights). Every handler an element gets runs, as GPUI's.
+// swallow the open (t3-tokens "Menu rows": opened by keys, its first row lights). Every handler an element gets runs, as GPUI's.
 {
   const all = (kind = "div") => {
     const node = { kind, items: [], handlers: {}, style: {} };

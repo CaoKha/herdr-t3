@@ -71,7 +71,7 @@ export function scrollList(view, id, { count, row, at = -1, height, draw, wheele
     .children(rows);
 }
 
-// A menu's lit row as it opens (docs/internals/t3-tokens.md「菜单行」): its first opened by keys, none by the pointer until an
+// A menu's lit row as it opens (docs/internals/t3-tokens.md "Menu rows"): its first opened by keys, none by the pointer until an
 // arrow key. A popup menu's opener puts `litProp(keys)` in its props, and the popup reads it back with `propsLit()`.
 export const openLit = (keys) => (keys ? 0 : -1);
 export const litProp = (keys) => (keys ? { lit: 0 } : {});

@@ -40,7 +40,7 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 
 - A `split()` row. The main half is the icon, the name, then in 12px `dim` the range the live Review tab shows: only `review.shown` written by a Review tab that still exists (matching `born`), otherwise nothing. Same words as Review's range button; a commit shows its title.
 - The main half shows Review on that range, else its default.
-- The chevron opens the range menu under the row: as wide as the row, 4 below, rows from t3-tokens「菜单行」. Review's ranges only: no base, no `‹ ›`. Only the shown range is checked; before Review has shown one, nothing is.
+- The chevron opens the range menu under the row: as wide as the row, 4 below, rows from t3-tokens "Menu rows". Review's ranges only: no base, no `‹ ›`. Only the shown range is checked; before Review has shown one, nothing is.
 - Commits opens beside it in its own popup, 320 wide (T3 `w-80`), list at most 320 high, placed with `submenu.js` `subPlace` next to the Commits row.
 - Choosing a range shows Review on it and closes Details.
 - Counts, commits and refs are read afresh on every opening, outside render; a late read applies only if its token, root, space and base haven't changed. No Git writes, no PR rows.
@@ -48,13 +48,13 @@ Sources: T3 `09a54f01` `chat/threadDetailsPanelStyles.ts`, `ThreadDetailsSection
 - The menu draws at once, never a "Reading…" note: the last read of the same repository root and base (`review-scope.js`, kept for the mod's run, [storage](../storage.md)), its numbers replaced as the fresh read lands; the root the space read last (`roots`) is used at once and checked behind it. With nothing read for that root and base: the rows' names, their counts' places blank and not greyed; past 150ms still reading, `…` there (the wallpaper's rule: nothing for waits under 150ms). ↑/↓, Home, End and typeahead work throughout.
 - A range picked before the fresh read lands (drawn from the last read, or not read yet) waits for it, then goes only if that row is still pickable in the fresh read (a count, or the range shown); otherwise nothing happens and the menu stays with the fresh counts. Commits opens at once (its commits are the last read's until the fresh one lands). The Review page's own range menu follows the same rules (shared `readScope`).
 - The cached repository is for drawing only until the open menu confirms the source's repository. A Commit or range from a different repository cannot open Review, even when both repositories belong to the same space. Only a range waits for that confirmation; a Commit picked before it does nothing and is picked again. A corrected repository replaces the menu's rows and invalidates its old Commits submenu. An invalid source or missing Review page leaves the request untouched; Details closes only after Review accepts the pick.
-- Review not installed, or a remote space: disabled with a reason. Outside a Git repository, the menu says so.
+- Review not installed, or no working directory: disabled with a reason. Outside a Git repository, the menu says so.
 
 ## Keyboard and lifecycle
 
 - Opened by keys (`cmd-shift-b`, Enter or Space on its button: `toggleDetails` with no press puts `litProp(true)` in its props), its first control has the keyboard with the focus ring; by the pointer, the card has it and nothing is ringed until the first arrow.
 - ↑/↓, Home, End and typing move between rows as a menu's (`list.js` `menuKeys` over `detailsGrid`), wrapping and keeping the half; ←/→ move between a split's halves and stop at its ends. The machine row isn't in the walk. Tab, Enter and Space work as on every stop: Enter and Space are the control's click.
-- A row's menu opened by keys hangs under that row (from `props.at` and the row's top: no press to measure) with its first row lit (t3-tokens「菜单行」). When it closes, the keyboard returns to the chevron that opened it (`popup-menu.js` `backTo`, run in its close, never in render), unless the focused terminal changed meanwhile, as when an action ran beside it.
+- A row's menu opened by keys hangs under that row (from `props.at` and the row's top: no press to measure) with its first row lit (t3-tokens "Menu rows"). When it closes, the keyboard returns to the chevron that opened it (`popup-menu.js` `backTo`, run in its close, never in render), unless the focused terminal changed meanwhile, as when an action ran beside it.
 - Escape closes one layer at a time; on the card, it closes Details and gives the keyboard back to the source terminal.
 - Opening an editor keeps the popup; running an action closes only its menu.
 - Opening captures the space, tab, terminal and cwd. An action's explicit cwd wins. When the source changes, the popup closes.

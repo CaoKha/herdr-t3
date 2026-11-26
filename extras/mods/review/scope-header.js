@@ -59,7 +59,7 @@ export function scopeKey(view, e, cx) {
 
 
 // As the toolbar's xs ghost buttons (docs/adr/0013), its words truncating, a chevron at 70%: no fill of its own over the
-// toolbar's, only hovered or while its menu is open. Its box at 12, under the panel head's first tab's (t3-tokens「规则」R1), with
+// toolbar's, only hovered or while its menu is open. Its box at 12, under the panel head's first tab's (t3-tokens "Rules" R1), with
 // a sm button's own padding both sides: its words 22 in, where Files' first crumb has its words.
 function scopeButton(view, t, s) {
   return opener(view, { closed: popupClosed("scope"), onOpen: (b, cx) => view.togglePopup("scope", cx, !b) })(drawButton(t, "review-scope", { variant: "plain", wide: true, label: `Diff scope: ${s.label}`, size: "sm", surface: "chrome", on: view.popup === "scope", hot: view.hot === "review-scope" }).min_w(0).flex_shrink(1)
@@ -73,7 +73,7 @@ export function scopeHeader(view, t, { trigger = true } = {}) {
   const s = scopeOf(view), list = diffCommits(view), at = s.sha ? list.findIndex(c => c.sha === s.sha) : -1;
   // A commit opened as its own diff, or no longer listed (as after an amend), has nowhere to step.
   const steps = s.sha && view.page !== view.base && at >= 0;
-  // The Review header's 40 bar: its buttons sm on chrome (t3-tokens「规则」R2, P7).
+  // The Review header's 40 bar: its buttons sm on chrome (t3-tokens "Rules" R2, P7).
   const go = (id, icon, label, c) => ghostButton(view, t, id, { icon, label, act: (cx) => openReviewPage(view, `/commit/${c.sha}`, cx), disabled: !c, size: "sm", iconSize: 14, surface: "chrome" });
   return h_flex().id("review-scope-row").min_w(0).gap(12).items_center()
     .when(trigger, el => el.child(scopeButton(view, t, s)))

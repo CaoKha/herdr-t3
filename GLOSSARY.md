@@ -1,110 +1,110 @@
 # Herdr T3
 
-Herdr App 的一套布局，让人同时开着很多 agent，只看需要他的那几个。
+A layout for the Herdr App that lets you keep many agents open at once and look only at the few that need you.
 
-## 来自 Herdr
+## From Herdr
 
-**Space**：
-在某一台机器上打开的一个 Project，里面有若干标签。
-_Avoid_: workspace、工作区；不要把 Space 叫成 project
+**Space**:
+A Project opened on one machine, holding some tabs.
+_Avoid_: workspace; don't call a Space a project
 
-**Project**（T3 Code 的概念）：
-某一台机器上的一个文件夹记录。Space 关掉后它还在，New 能在原机器、原文件夹上重开它。
-_Avoid_: 书签、bookmark
+**Project** (a T3 Code concept):
+A record of one folder on one machine. It outlives its Space; New can reopen it on the same machine and folder.
+_Avoid_: bookmark
 
-**Agent**：
-向 Herdr 报告状态（working、blocked、done、idle）的终端程序。
-_Avoid_: thread（T3 Code 的叫法）、session
+**Agent**:
+A terminal program that reports its state (working, blocked, done, idle) to Herdr.
+_Avoid_: thread (T3 Code's name), session
 
-**子 agent**：
-由另一个 agent 启动的 agent，列在父级下面。
-_Avoid_: child、worker
+**Sub-agent**:
+An agent started by another agent, listed under its parent.
+_Avoid_: child, worker
 
-**顶层 agent**：
-不是子 agent 的 agent。
+**Top-level agent**:
+An agent that is not a sub-agent.
 
-**程序**：
-不报告状态的终端程序，如 lazygit、vite。
-_Avoid_: tool、app
+**Program**:
+A terminal program that doesn't report a state, such as lazygit or vite.
+_Avoid_: tool, app
 
-**机器**：
-`hc machine` 管理的一台计算机，本机或通过 ssh 连接的远程机器。
-_Avoid_: host、server
+**Machine**:
+A computer managed by `hc machine`: this one, or a remote one reached over ssh.
+_Avoid_: host, server
 
-## 侧栏
+## Sidebar
 
-**Inbox**：
-按注意力组织的侧栏：需要你的 agent 是上方的卡片，其余收进底部的收纳区。
-_Avoid_: Focus（旧名）、通知
+**Inbox**:
+The sidebar organized by attention: agents that need you are cards at the top, the rest go into the shelf at the bottom.
+_Avoid_: Focus (old name), notifications
 
-**Lists**：
-按 Space 组织的侧栏，由 Spaces 和 Agents 两个列表组成。
-_Avoid_: 列表模式
+**Lists**:
+The sidebar organized by Space, made of two lists: Spaces and Agents.
+_Avoid_: list mode
 
-**卡片**：
-Inbox 上方代表一个 agent 的条目（或一个声明了 `inbox: true` 的 mod pane）。
+**Card**:
+An entry at the top of the Inbox that stands for one agent (or for a mod pane that declares `inbox: true`).
 
-**收纳区**：
-Inbox 底部可折叠的分组：Working、Snoozed、Settled。
-_Avoid_: drawer、文件夹
+**Shelf**:
+The foldable groups at the bottom of the Inbox: Working, Snoozed, Settled.
+_Avoid_: drawer, folder
 
-**Pinned**：
-被置顶的 agent 所在的分组，保留人排的顺序；Inbox 和 Agents 列表共用一份置顶。
+**Pinned**:
+The group of pinned agents, kept in the order you arranged; the Inbox and the Agents list share one set of pins.
 
-## 状态
+## State
 
-**当前查看的 agent**：
-焦点所在窗格里的 agent。
-_Avoid_: 当前 agent、选中的 agent
+**Viewed agent**:
+The agent in the focused pane.
+_Avoid_: current agent, selected agent
 
-**未读的 done**：
-已 done、但人还没看过的 agent，显示为圆点。
+**Unread done**:
+An agent that is done but you haven't looked at yet, shown as a dot.
 
-**Settle**：
-人把结束的 agent 收起；它一有新工作就自动回来。
-_Avoid_: archive、dismiss、完成
+**Settle**:
+You put away a finished agent; it comes back by itself as soon as it has new work.
+_Avoid_: archive, dismiss, complete
 
-**Snooze**：
-把不需要你的 agent 藏到人选的时间；到点回到原位，标为 Woke。
-_Avoid_: 稍后提醒、mute
+**Snooze**:
+Hide an agent that doesn't need you until a time you pick; when it's due it goes back to where it was, marked Woke.
+_Avoid_: remind me later, mute
 
-**Woke**：
-刚从 Snooze 醒来、人还没看过的标记。
+**Woke**:
+The mark on an agent that just woke from Snooze and that you haven't looked at yet.
 
-## 位置和入口
+## Places and entry points
 
-**Home**：
-收起当前查看的 agent 后的落脚点，一个不属于任何 Project 的隐形 space，里面只放一样东西（一个 mod 或一个 shell），不放 agent。
-_Avoid_: dashboard、首页
+**Home**:
+Where you land after putting away the viewed agent: a hidden space that belongs to no Project and holds just one thing (a mod or a shell), never an agent.
+_Avoid_: dashboard, start page
 
-**Settings**（布局设置）：
-布局自己的设置页，和 Herdr 的 Settings 分开；只收因人而异的偏好（见 ADR 0009）。
-_Avoid_: preferences、config、T3 settings
+**Settings** (layout settings):
+The layout's own settings page, separate from Herdr's Settings; it only holds preferences that differ from person to person (see ADR 0009).
+_Avoid_: preferences, config, T3 settings
 
-**Go to**：
-`cmd-p` 打开的跳转面板，每个窗格一行。
-_Avoid_: picker（mod 名）；Search 是 Inbox 的行内搜索
+**Go to**:
+The jump panel opened by `cmd-p`, one row per pane.
+_Avoid_: picker (the mod's name); Search is the Inbox's inline search
 
-**Clean up**：
-侧栏底栏垃圾桶图标和 `cmd-shift-r` 打开的回收对话框：当前标签之外已 Settle 的顶层 agent（**Settled**）和停在提示符的空 shell（**Idle shells**）分为两块独立折叠，可分组、逐行或一键关掉；所在 space 已没有在工作的 agent、却还在运行的程序（Left behind）各是一张卡片，可以跳过去或单独停掉；还有 agent 在工作的 space 里的程序算在用，不放进来。
-_Avoid_: Close idle、Clear、Running、Background（旧名）；回收站、Trash（关掉的终端不能恢复）
+**Clean up**:
+The clean-up dialog opened by the trash icon in the sidebar footer and by `cmd-shift-r`: settled top-level agents outside the current tab (**Settled**) and empty shells waiting at their prompt (**Idle shells**) sit in two separate folded blocks, closed by group, by row or all at once; each program still running in a space where no agent is at work any more (Left behind) is a card you can jump to or stop on its own; programs in a space where an agent is still working count as in use and stay out.
+_Avoid_: Close idle, Clear, Running, Background (old names); recycle bin, Trash (closed terminals can't be restored)
 
-**Action**：
-详情 Actions 行里的一条命令，在新标签或分屏里运行。
-_Avoid_: task、script
+**Action**:
+A command in the Actions row of the details, run in a new tab or split.
+_Avoid_: task, script
 
-**Review**：
-一个 space 的待评审内容，以及显示它的唯一可关闭 Review 标签；切换保留，关闭释放。
-_Avoid_: diff、changes、评审窗格
+**Review**:
+A space's content awaiting review, and the single closable Review tab that shows it; switching away keeps it, closing releases it.
+_Avoid_: diff, changes, review pane
 
-**space 面板**：
-窗口右侧唯一的面板，由文件标签、通用 Files 标签和可选的唯一 Review 标签组成。内容跨终端标签跟随 space；开关、放大、标签列表和当前项按 space 各记，宽度全窗口一份。隐藏保留，关闭释放。
-_Avoid_: 侧边面板、panel 栏
+**Space panel**:
+The single panel on the right of the window, made of file tabs, the generic Files tab and an optional single Review tab. Its content follows the space across terminal tabs; open state, maximize, tab list and current item are kept per space, the width once for the whole window. Hiding keeps it, closing releases it.
+_Avoid_: side panel, panel bar
 
-**导航列**：
-space 面板一个标签里内容右边的那一列：列头加文件树。Files 和 Review 各记自己的宽度和开关。
-_Avoid_: aside、侧栏、文件栏
+**Navigation column**:
+The column to the right of the content in a space panel tab: a column header plus the file tree. Files and Review each keep their own width and open state.
+_Avoid_: aside, sidebar, file bar
 
-**Files**：
-space 面板里共用的只读文件树与预览；每个文件一个标签，通用 Files 标签显示整宽树。
-_Avoid_: 文件浏览器、file explorer
+**Files**:
+The shared read-only file tree and preview in the space panel; each file gets a tab, and the generic Files tab shows the full-width tree.
+_Avoid_: file browser, file explorer

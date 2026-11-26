@@ -52,7 +52,7 @@ The most common defect is a change that works where you tried it and is missing 
 
 ## Finishing a change
 
-1. Both changelogs and, where they describe it, both READMEs and `docs/user/` say the new behaviour, in both languages. `RECIPE.md` and `RECIPE.zh-CN.md` change only when what a rebuild produces changes; a value or detail goes in `t3-tokens.md` or the surface's spec, or the briefs grow back.
+1. `CHANGELOG.md` and, where they describe it, `README.md` and `docs/user/` say the new behaviour, in English. `RECIPE.md` changes only when what a rebuild produces changes; a value or detail goes in `t3-tokens.md` or the surface's spec, or the brief grows back.
 2. Run `scripts/sync.sh`. It also writes outside this repo: the installed `~/.config/herdr-app` and the working trees of `herdr-t3-inbox`, `herdr-t3-actions` and `herdr-pulls-review`, which then need their own commits.
 3. `scripts/check.sh` prints `all checks passed`.
 4. Anything visible is seen whole in a screenshot of the demo window, at the default sidebar width. A check passing or one word showing doesn't show a layout fits.
@@ -73,7 +73,7 @@ Two audiences, two sets:
 
 Most changes need no `docs/internals/` change. Before adding a paragraph, ask what a maintainer would get wrong without it; if reading the code answers that, leave it out. No feature lists, field catalogues, control-flow narration or change summaries. When a documented rule or constraint changes, rewrite or remove the affected text instead of appending the new account.
 
-`RECIPE.md` and `RECIPE.zh-CN.md` are matching briefs for rebuilding the layout from an empty folder. Keep the official six-part structure, the visible geometry, behaviour, dependencies and observable acceptance criteria in each brief. Keep each file at most 60,000 UTF-8 bytes so Gallery can collect it. Sizes, constants and edge rules belong in `docs/internals/specs/`, function-level algorithms and host workarounds in `docs/internals/`; link them where the reader needs that detail. Use `t3-tokens.md` and `storage.md` as their subjects' single source instead of repeating their tables and rules.
+`RECIPE.md` is the brief for rebuilding the layout from an empty folder, in English only. Keep the official six-part structure, the visible geometry, behaviour, dependencies and observable acceptance criteria in it. Keep it at most 60,000 UTF-8 bytes so Gallery can collect it. Sizes, constants and edge rules belong in `docs/internals/specs/`, function-level algorithms and host workarounds in `docs/internals/`; link them where the reader needs that detail. Use `t3-tokens.md` and `storage.md` as their subjects' single source instead of repeating their tables and rules.
 
 `docs/internals/t3-tokens.md`: read before adding or changing any visible control: a button, menu, tooltip, hover or focus state.
 

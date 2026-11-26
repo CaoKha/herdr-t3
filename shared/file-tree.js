@@ -111,7 +111,7 @@ export function treeKey(key, rows, at) {
 export const revealRow = (view, id, path) => { view.treeReveal = { ...view.treeReveal, [id]: path }; };
 
 /** The rows in a list that draws only those in view; `draw(row, i)` makes one, handlers and all. A row's box sits 12 in,
- *  the column head's edge (t3-tokens「规则」R1), not Pierre's 16. */
+ *  the column head's edge (t3-tokens "Rules" R1), not Pierre's 16. */
 export function treeList(view, id, rows, draw) {
   const want = view.treeReveal?.[id], at = want == null ? -1 : rowAt(rows, want);
   if (at >= 0 && view.listHeight?.[id] !== undefined) view.treeReveal = { ...view.treeReveal, [id]: undefined };

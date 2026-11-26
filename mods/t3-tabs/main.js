@@ -389,7 +389,7 @@ export default class Tabs extends View {
         .when(Boolean(glyph), el => el.child(glyph)), radiusOf("sm")), { action: key, below: true });
     // The work header's end: Lists' terminal + before Details (t3-actions' block), so it never moves Details; after Details the panel's
     // toggle while no panel head owns it, then the window's buttons. tabs-end-inset keeps the toggle where the open panel's head puts
-    // it (t3-tokens「规则」P3, R1). At Home neither: its row folds (fitRow); ⌥⌘B still opens the panel there.
+    // it (t3-tokens "Rules" P3, R1). At Home neither: its row folds (fitRow); ⌥⌘B still opens the panel there.
     const windowButtons = () => h_flex().flex_none().ml(8).items_center()
       .child(button("minimize", w.platform === "windows" ? "mods/t3-tabs/icons/win-min.svg" : undefined, "Minimize", () => run("window.minimize"), undefined, w.platform === "windows" ? undefined : "−"))
       .child(button("maximize", w.platform === "windows" ? `mods/t3-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg` : undefined, w.maximized ? "Restore" : "Maximize", () => run("window.maximize"), undefined, w.platform === "windows" ? undefined : "□"))
@@ -399,7 +399,7 @@ export default class Tabs extends View {
       const newTabShown = !this.navigation.atHome && !inboxShown();
       return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
         .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
-          // One size with the panel toggle beside it (「规则」R2).
+          // One size with the panel toggle beside it ("Rules" R2).
           .when(newTabShown, el => el.child(this.newTabMenu(t)))));
     }
     if (part === "window") {

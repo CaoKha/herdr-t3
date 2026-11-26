@@ -1,21 +1,21 @@
-# Review 的组是整页一行的页签
+# Review's groups are a full-width row of page tabs
 
-修订 [0013](0013-space-panel-pages-share-one-frame.md) 里“Review 的组并入这一列，作为树的顶层节点”这一条，以及“没有分析结果时没有组这一层”。
+Revises the point in [0013](0013-space-panel-pages-share-one-frame.md) that "Review's groups merge into this column as the tree's top-level nodes", and "with no analysis result there is no group level".
 
-组并入树之后，所有组的文件摊在一棵树里，diff 却仍只显示一个组：“先挑一个组，再看这一组”的读法没了，组的增删数和已看进度也随环形图一起删了；没有 AI 分析时，守护进程按文件夹分的组被合成一个列表，连组都没有。用户要回 pulls.review 那种按组读的方式。
+Once groups merged into the tree, all groups' files were spread over one tree while the diff still showed only one group: the reading pattern "pick a group first, then read that group" was gone, and the groups' added/removed counts and viewed progress went away with the ring chart; without AI analysis, the groups the daemon makes by folder were merged into one list, with no groups at all. Users want back the pulls.review way of reading by group.
 
-导航列仍是一列，宽度、列头、文件树照 0013 不变。工具栏下方加回改版前窄宽时的组页签（`groups.js` 的 `groupTabs`），即 pulls.review 原生的 DiffGroupNav：横跨整页一行，在 diff 和导航列之上，每组一个页签，类别图标、名字、critical 标记、增删数、文件数、已看进度环。点一组，diff 和树都只显示这一组；树里只剩当前组的文件夹、文件和子组行。只有一个组时不显示。规则分组和分析结果一样列出。页签不再带展开子组的 caret：子组在树里。
+The navigation column is still one column, with width, column header and file tree unchanged from 0013. Below the toolbar, the group tabs that the old version used when narrow come back (`groupTabs` in `groups.js`), i.e. pulls.review's native DiffGroupNav: one row spanning the whole page, above the diff and the navigation column, one tab per group, with category icon, name, critical mark, added/removed counts, file count and viewed progress ring. Clicking a group makes both the diff and the tree show only that group; the tree keeps only the current group's folder, file and subgroup rows. Not shown when there is only one group. Rule-based groups are listed just like analysis results. Tabs no longer carry a caret for expanding subgroups: subgroups are in the tree.
 
-先试过把组列在导航列里、树的上方（40px 一行一组），用户看后要回原生的一行页签。
+Listing the groups in the navigation column above the tree (one 40px row per group) was tried first; after seeing it, users wanted the native single row of tabs back.
 
 ## Considered Options
 
-- **回到旧的组侧栏 + 文件列表两列、窄时组页签**：最像原来，但 0013 已说明默认宽度 681 放不下两列，且之后的工具栏、状态组件都建在一列的结构上。
-- **保留组作为树的顶层节点，改成手风琴（点一组只展开它）**：改动最小，但组仍和文件混在一棵树里，不是独立的筛选，也没有增删数和进度。
+- **Back to the old two columns (group sidebar + file list), with group tabs when narrow**: closest to the original, but 0013 already showed two columns don't fit at the default width of 681, and the later toolbar and state components are all built on the one-column structure.
+- **Keep groups as the tree's top-level nodes, as an accordion (clicking a group expands only it)**: smallest change, but groups are still mixed with files in one tree, not a separate filter, and have no added/removed counts or progress.
 
 ## Consequences
 
-- 组行离开文件树；子组仍是树里的行，点它滚到它的组头。
-- 树的路径：当前组的文件和文件夹不带前缀，子组里的带 `group:<key>/`。
-- `applyReview` 不再把规则分组合成 `plain` 组。
-- 组多时页签行横向滚动，不换行；它占去 diff 和导航列上方约 60px。
+- Group rows leave the file tree; subgroups are still rows in the tree, and clicking one scrolls to its group header.
+- Tree paths: the current group's files and folders have no prefix; those in subgroups carry `group:<key>/`.
+- `applyReview` no longer merges rule-based groups into a `plain` group.
+- With many groups the tab row scrolls horizontally without wrapping; it takes about 60px above the diff and the navigation column.

@@ -25,12 +25,12 @@ import { alpha } from "./color.js";
 // wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image. A page slot
 // not named here (another mod's) shows by its slot's id.
 const PAGES = { files: ["Files", "folder-tree", false, "f"], review: ["Review", "pulls-review", true, "r"], pulls: ["Pull requests", "git-pull-request", false, "p"], issues: ["Issues", "circle-dot", false, "i"] };
-// The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md「菜单行」).
+// The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md "Menu rows").
 const MENU_W = 220, menuHeight = (rows) => rows * MENU_ROW + 8;
 const zoomOf = () => Number(settings()?.zoom) || 1;
 const side = (n) => [].concat(n?.padding ?? 0).at(-1);
 // The layout's room each side of the panel head's mod: the panel's and the head's padding put its ends 12 in, as the
-// surfaces' own rows below it (t3-tokens「规则」R1).
+// surfaces' own rows below it (t3-tokens "Rules" R1).
 const headPad = (root) => side(layoutNode(root, "panel")) + side(layoutNode(root, "panel-head"));
 // Stamped as `+`'s menu closes: a press on `+` that closed it mustn't reopen it (trigger.js).
 const SURFACE_CLOSED = closedKey("t3-chrome", "surface");
@@ -167,7 +167,7 @@ export default class WorkspaceChrome extends View {
         .on_hover(glow(this, id))
         // Each opens over its button, before the pointer can report leaving it.
         .on_click((_e, cx) => { this.hot = null; action(); cx.notify(); }), radiusOf("default")), { action: key });
-      // T3's footer, whatever height the layout gives the block (docs/internals/t3-tokens.md「规则」P3).
+      // T3's footer, whatever height the layout gives the block (docs/internals/t3-tokens.md "Rules" P3).
       return focusRoot(this, div().size_full().bg(t.chrome).px(8).pt(4).child(h_flex().h(32).gap(8).items_center()
         .child(h_flex().id("footer-buttons").flex_none().gap(GROUP_GAP).items_center()
           .child(button("settings", "mods/t3-chrome/icons/settings.svg", "Settings", () => run("app.settings"), "app.settings"))
@@ -229,7 +229,7 @@ export default class WorkspaceChrome extends View {
   }
 
   // The space panel's head (docs/internals/specs/space-panel.md): T3's tabs, + after them in the same scrolled strip, T3's arrows
-  // while it overflows, then widen and put away; its ends over its pages' rows (「规则」P3, R1). The rest of the row drags the window.
+  // while it overflows, then widen and put away; its ends over its pages' rows ("Rules" P3, R1). The rest of the row drags the window.
   panelHead(t) {
     const s = panelState(), space = spaces().find(p => p.active), z = zoomOf(), w = window();
     // Review's run for this space, marked as a tab's agent is.

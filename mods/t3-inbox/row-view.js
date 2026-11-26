@@ -167,7 +167,7 @@ export function inboxRowView(view, t, model, actions, drag) {
         .child(svg("mods/t3-inbox/icons/check.svg").size(14).flex_none().text_color(lit(id, t.muted)))
         .child("Settle")
         .when(offer, (el) => stop(view, t, id, el, 6)), { action: on ? settleKey() : undefined, delay }))));
-    // T3's card row, 8 in, not T3's 10, so its words and icons end where the buttons' icons above do (t3-tokens「规则」R3).
+    // T3's card row, 8 in, not T3's 10, so its words and icons end where the buttons' icons above do (t3-tokens "Rules" R3).
     const base = v_flex().id(`${ghost ? "ghost-" : ""}card-${a.address}`).px(8).py(8).flex_none().rounded(6)
       // A working row recedes until it's hovered or in view, as T3's.
       .when(!ghost, (el) => el.opacity(running(a) && !woke(a) && !on && !over ? 0.7 : 1).transition("opacity", MOTION));

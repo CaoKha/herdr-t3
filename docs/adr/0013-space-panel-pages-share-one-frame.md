@@ -1,31 +1,31 @@
-# space 面板的两页共用一套框架
+# The space panel's two pages share one frame
 
-双向跨页操作和共用导航列宽度已由 [0015](0015-panel-pages-stay-independent.md) 取代；共用框架和视觉实现保留。
+Two-way cross-page actions and the shared navigation column width are superseded by [0015](0015-panel-pages-stay-independent.md); the shared frame and the visual implementation stay.
 
-修订 [0011](0011-one-space-panel.md) 里“窄时 Review 按原有规则改用页签和 unified diff”这一条，以及“Review 的组侧栏和文件列表也移到 diff 右边”的两列做法。
+Revises the point in [0011](0011-one-space-panel.md) that "when narrow, Review switches to page tabs and a unified diff by its existing rules", and the two-column approach of "Review's group sidebar and file list also move to the right of the diff".
 
-Files 和 Review 是同一个 space 面板的两页，但头部、导航列、树行、菜单、空态各写各的：Files 的头是两条各跟一列的列头，Review 是一条 chrome 底的整页头；Files 常驻一列树，Review 窄时没有导航列、宽时有组侧栏和文件列表两列；选中、行高、圆角、字体、控件样式都不同。切页时整页在跳。
+Files and Review are two pages of the same space panel, but their headers, navigation columns, tree rows, menus and empty states were each written separately: Files' header is two column headers, one per column, Review's a single full-page header on chrome; Files has a standing tree column, while Review has no navigation column when narrow and two columns (group sidebar and file list) when wide; selection, row height, radius, font and control styles all differ. The whole page jumps on switching pages.
 
-两页改为同一套框架，以 T3 Code `09a54f01` 右侧面板（`RightPanelTabs` 里的 Files 与 Diff surface）为唯一基准；pulls.review 只决定 diff 内容本身。T3 两个 surface 之间不一致的地方（树默认开关、默认宽度、树头高度），取 Files surface 的做法。
+The two pages now share one frame, with the T3 Code `09a54f01` right panel (the Files and Diff surfaces in `RightPanelTabs`) as the only reference; pulls.review only decides the diff content itself. Where T3's two surfaces disagree (tree open by default, default width, tree header height), take the Files surface's approach.
 
-- **框架**：面板头和 `panel-body` 同为一整面 `chrome`，靠分隔线和工作区分开；内容区（Files 的文件、Review 的 diff）在 `background` 上，导航列和工具栏留在 `chrome`，照 T3 右侧面板。面板头之下每页一条常驻全宽工具栏，左边是“在看什么”，右边是页面工具，最右是导航开关；其下内容在左、导航列在右。空态也保留工具栏。
-- **导航列**：每页只有一列，两页共用一个宽度、一样的边框和列头；没有按宽度变形的断点。Review 的组并入这一列，作为树的顶层节点。（已由 [0014](0014-review-groups-filter-the-tree.md) 修订：组是工具栏下方一行页签，树只列当前组。）
-- **树**：两页用 `shared/` 里同一个文件树行，规格照 T3 的 Pierre compact 树。选中只表示一个当前文件。Review 的已看勾选放在行首，chevron 之后、文件图标之前。
-- **菜单与跨页**：文件行两页同一份右键菜单，菜单项由 `shared/` 里同一个函数算出，尺寸照 `t3-menu`；面板自己画，不开 `t3-menu` 的 overlay，因为单独发布的 Review 所在的 Herdr 自带布局里没有 `t3-menu`。跨页跳转是菜单项，加上工具栏里一个对称的图标按钮。
-- **状态**：加载、空、错误用一套组件。
-- **字体**：面板里的界面文字跟随布局字体，等宽字体只给 diff 和代码，取自设置，不写死字体名。
+- **Frame**: the panel header and `panel-body` are one continuous `chrome` surface, separated from the work area by divider lines; the content area (Files' file, Review's diff) is on `background`, while the navigation column and toolbar stay on `chrome`, like T3's right panel. Below the panel header each page has a standing full-width toolbar: "what you're looking at" on the left, page tools on the right, the navigation toggle at the far right; below it, content on the left and the navigation column on the right. Empty states keep the toolbar too.
+- **Navigation column**: each page has only one column; the two pages share one width, the same border and column header; no breakpoint that changes shape with width. Review's groups merge into this column as the tree's top-level nodes. (Revised by [0014](0014-review-groups-filter-the-tree.md): groups are a row of page tabs below the toolbar, and the tree lists only the current group.)
+- **Tree**: both pages use the same file tree row from `shared/`, specced like T3's Pierre compact tree. Selection means a single current file. Review's viewed checkbox sits at the start of the row, after the chevron and before the file icon.
+- **Menus and cross-page**: file rows on both pages share one context menu, its items computed by the same function in `shared/`, sized like `t3-menu`; the panel draws it itself and doesn't open `t3-menu`'s overlay, because Herdr's built-in layout, where the separately published Review lives, has no `t3-menu`. Jumping across pages is a menu item, plus a symmetric icon button in the toolbar.
+- **States**: loading, empty and error use one set of components.
+- **Fonts**: UI text in the panel follows the layout font; the monospace font is only for diffs and code, taken from settings, with no hardcoded font name.
 
-现行规格见 [space-panel](../internals/specs/space-panel.md)、[files](../internals/specs/files.md) 和 [review](../internals/specs/review.md)。
+Current specs are in [space-panel](../internals/specs/space-panel.md), [files](../internals/specs/files.md) and [review](../internals/specs/review.md).
 
 ## Considered Options
 
-- **只统一 token（色、圆角、字号），保留两页各自的结构**：最省，但切页时头部高度、横线、导航列仍然在跳，不一致的根在结构。
-- **Review 保留组侧栏 + 文件列表两列，Files 也加一列**：两列在默认宽度 681 下放不下内容；T3 没有两列导航。
-- **以 pulls.review 网页为 Review 页基准**：两页就有两个基准，正是现在不一致的来源。
+- **Unify only tokens (colour, radius, font size), keeping each page's own structure**: cheapest, but header height, rules and navigation column still jump on switching pages; the root of the inconsistency is the structure.
+- **Review keeps two columns (group sidebar + file list), and Files gets a column too**: two columns can't fit the content at the default width of 681; T3 has no two-column navigation.
+- **The pulls.review website as the Review page's reference**: the two pages would then have two references, which is exactly where the current inconsistency comes from.
 
 ## Consequences
 
-- Review 窄宽时的组卡片行、宽时的组侧栏与 aside 删除；设置里的 Groups: Tabs / Sidebar（`groupNav`）和 Files: Tree / List（`fileList`）删除。
-- Review 的选中从“视野内的多行”改为单个当前文件，滚动时跟随视口顶部的文件。
-- 默认宽度下导航列占 256，Review 的 diff 比现在窄（约 425）；可以关掉导航列或放大面板。
-- 组的环形图删除，组 summary 移到 diff 区顶部，只显示当前组的。
+- Review's row of group cards when narrow, and its group sidebar and aside when wide, are removed; the settings Groups: Tabs / Sidebar (`groupNav`) and Files: Tree / List (`fileList`) are removed.
+- Review's selection changes from "the several rows in view" to a single current file, following the file at the top of the viewport while scrolling.
+- At the default width the navigation column takes 256, so Review's diff is narrower than now (about 425); the navigation column can be closed or the panel maximized.
+- The groups' ring chart is removed; the group summary moves to the top of the diff area, showing only the current group's.

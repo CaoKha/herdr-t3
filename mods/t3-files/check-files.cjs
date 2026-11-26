@@ -271,7 +271,7 @@ async function page() {
   shared["t3-files.menuClosed"] = Date.now();
   find(view.render(cx), "browse-").handlers.on_click({}, cx);
   assert.equal(w.overlays.length, made, "the press that closed it doesn't open it again");
-  // Opened from the keys (no press), its first row lit (t3-tokens「菜单行」).
+  // Opened from the keys (no press), its first row lit (t3-tokens "Menu rows").
   find(view.render(cx), "browse-").handlers.on_click({}, cx);
   assert.equal(w.overlays.at(-1).props.lit, 0, "keys light the first row");
   // A breadcrumb menu's file is the person's pick: it opens and the tree takes the keyboard.
