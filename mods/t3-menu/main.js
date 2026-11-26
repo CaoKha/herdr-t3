@@ -21,6 +21,7 @@ import { sidebarParts } from "./sidebar.js";
 import { closedKey } from "./store.js";
 import { keyLabel } from "./tip.js";
 import { ghostButton } from "./button.js";
+import { ui } from "./layout-settings.js";
 
 // What a submenu's close() stamps, for the menu it hangs off (popup-menu.js subGone).
 const SUB_CLOSED = closedKey("t3-menu", "submenu");
@@ -29,7 +30,7 @@ const SPACE_CLOSED = closedKey("t3-menu", "space");
 // A menu's measures, as T3's, a rule 4 above and below. The space switcher's 280 width and 10-row cap match the sub-agent list's, so names, durations and marks fit.
 const WIDTH = 220, PAD = 4, ROW = 28, RULE = 9, SPACE_SHOWN = 10;
 // Where row `i` starts below the menu's top, its rules included.
-const rowTop = (list, i) => PAD + i * ROW + list.slice(1, i + 1).filter((it, j) => it[4] !== list[j][4]).length * RULE;
+const rowTop = (list, i) => PAD + i * ui(ROW) + list.slice(1, i + 1).filter((it, j) => it[4] !== list[j][4]).length * RULE;
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s) {
@@ -495,7 +496,7 @@ export default class Menu extends View {
       .min_h(0)
       .p(4)
       .bg(t.popover)
-      .text_size(14)
+      .text_size(ui(14))
       .on_mouse_move((_e, cx) => { if (!this.pointer) { this.pointer = true; cx.notify(); } })
       .on_key_down((e, cx) => {
         this.pointer = false;
@@ -511,8 +512,8 @@ export default class Menu extends View {
         trail: menuHint(t, shortcut("t3-tabs.new")), pick: () => pick(0),
       }))
       .when(entries.length > 0, (el) => el.child(menuRule(t)).child(scrollList(this, "space-menu-list", {
-        count: entries.length, row: MENU_ROW, at: this.at - 1,
-        height: Math.min(entries.length, SPACE_SHOWN) * MENU_ROW,
+        count: entries.length, row: ui(MENU_ROW), at: this.at - 1,
+        height: Math.min(entries.length, SPACE_SHOWN) * ui(MENU_ROW),
         wheeled: (keep) => { if (keep >= 0) this.at = keep + 1; },
         draw: drawEntry,
       })));
@@ -558,7 +559,7 @@ export default class Menu extends View {
       .min_h(0)
       .p(4)
       .bg(t.popover)
-      .text_size(14)
+      .text_size(ui(14))
       // Off the menu, nothing pending opens; a submenu open stays.
       .on_hover((on) => { if (!on) subLeft(this.s); })
       // A submenu's ← goes back to its menu, as its Esc does.

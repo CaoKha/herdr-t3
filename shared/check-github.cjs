@@ -64,5 +64,8 @@ const json = (x) => JSON.parse(JSON.stringify(x));
   assert.deepEqual(srcs(md, `<img src="${signed(id2)}" alt="two"><img src="${signed(id1)}" alt="one">`), [null, null], "out of order: none is guessed");
   assert.deepEqual(srcs(md, `<img src="${signed(id1)}">`), [null, null], "a different count: none");
   assert.deepEqual(srcs("![x](https://a/x.png)", '<img src="https://camo/x" alt="y">'), [null], "no asset id: the alt has to agree");
+  const table = `![one](https://github.com/user-attachments/assets/${id1})\n\n| a | b |\n| - | - |\n| :tada: | ![two](https://github.com/user-attachments/assets/${id2}) |\n`;
+  const cells = g.pairImages(g.splitBody(table), html), inTable = cells[1].table.rows[0][1][0].image;
+  assert.deepEqual(json([cells[0].image.src, inTable.key, inTable.src]), [signed(id1), id2, signed(id2)].map((s) => s.replace("&amp;", "&")), "a table cell's picture is paired in its turn");
   console.log("ok: github: a folder's repository, gh's arguments and failures, and a body's signed picture addresses");
 })().catch((e) => { console.error(e); process.exit(1); });

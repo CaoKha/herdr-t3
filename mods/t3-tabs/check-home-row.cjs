@@ -14,6 +14,7 @@ let hidden = false, buttons = false, homeMod = "asciicn-wallpaper", split = fals
 const state = {};
 const shown = { path: "/cache/pic.png", w: 1600, h: 900, right: -20, top: -60, opacity: 1, home: "h" };
 const env = {
+  ui: (n) => n,
   View: class {}, div: element, svg: src => Object.assign(element(), { src }), image: src => Object.assign(element(), { kind: "image", src }), h_flex: element,
   Popup: { new: (_id, trigger) => element().child(trigger) },
   theme: () => t, props: () => ({ part: "home" }), settings: () => ({ zoom: 1 }), window: () => ({ platform: "linux", buttons, maximized: false }),

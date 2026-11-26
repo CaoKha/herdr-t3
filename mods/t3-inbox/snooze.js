@@ -10,6 +10,7 @@ import { MOTION } from "./motion.js";
 import { presets } from "./snooze-presets.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // A custom snooze can be far off; its timer needn't be.
 export const DAY = 86400000;
@@ -98,7 +99,7 @@ function calendar(view, t) {
   };
   const weeks = Array.from({ length: 6 }, (_, w) => h_flex().children(Array.from({ length: 7 }, (_, i) => day(new Date(y, m, 1 - lead + w * 7 + i)))));
   // One stop for the month's days, as T3's: the panel holds the keyboard and the arrows walk them, the month following.
-  return v_flex().id("custom-calendar").mt(4).p(8).rounded(12).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(14)
+  return v_flex().id("custom-calendar").mt(4).p(8).rounded(12).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(14))
     .track_focus(view.dayKeys).key_context("InboxCalendar")
     .on_action("t3_inbox_day_pick", (_e, cx) => {
       const by = { "month-back": -1, "month-on": 1 }[onStop(view)];
@@ -121,16 +122,16 @@ function calendar(view, t) {
       .child(turn("month-back", "left", "Previous month", -1))
       .child(div().flex_1().text_center().font_medium().text_color(t.foreground).child(`${MONTHS[m]} ${y}`))
       .child(turn("month-on", "right", "Next month", 1)))
-    .child(h_flex().children(["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((w) => h_flex().size(36).items_center().justify_center().text_size(12).font_medium().text_color(t.dim).child(w))))
+    .child(h_flex().children(["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((w) => h_flex().size(36).items_center().justify_center().text_size(ui(12)).font_medium().text_color(t.dim).child(w))))
     .children(weeks);
 }
 
 export function customView(view) {
   const t = theme(), done = () => closeOverlay(props().overlay);
-  const label = (text) => div().text_size(14).line_height("16px").font_medium().text_color(t.foreground).child(text);
+  const label = (text) => div().text_size(ui(14)).line_height(`${ui(16)}px`).font_medium().text_color(t.foreground).child(text);
   // 11 and T3's 1px border, as its controls count their padding.
   const input = (state) => h_flex().h(32).px(11).rounded(8).border(1).border_color(t.border).bg(t.input).items_center()
-    .child(Input.new(state).flex_1().h_full().text_size(14).text_color(t.foreground));
+    .child(Input.new(state).flex_1().h_full().text_size(ui(14)).text_color(t.foreground));
   const dialogButton = (id, text, primary, act) => stop(view, t, id, button(t, id, { text, variant: primary ? "primary" : "outline", size: "default", surface: "card" })
     .cursor_pointer().on_click(act), radiusOf("default"));
   // NumberInput replays these onto its own step buttons (their ids are its own); inside the frame's 1px, so 7 round.
@@ -175,7 +176,7 @@ export function customView(view) {
       cx.stop_propagation();
       cx.notify();
     })
-    .children(UNITS.map(([u, name], i) => h_flex().id(`unit-${u}`).h(28).px(8).flex_none().items_center().rounded(4).text_color(t.foreground)
+    .children(UNITS.map(([u, name], i) => h_flex().id(`unit-${u}`).h(ui(28)).px(8).flex_none().items_center().rounded(4).text_color(t.foreground)
       .when(view.unit === u, (row) => row.bg(t.selected)).when(view.unit !== u && view.unitAt === i, (row) => row.bg(t.hover))
       .when(view.unitAt === i, (row) => row.aria_active_descendant())
       .on_hover((on, cx) => { if (on && view.unitAt !== i) { view.unitAt = i; cx.notify(); } })
@@ -208,24 +209,24 @@ export function customView(view) {
     : h_flex().gap(12)
       // As T3's NumberField: − and + either side of the amount, in the frame the other fields have.
       .child(v_flex().flex_1().min_w(0).gap(8).child(label("Snooze for"))
-        .child(NumberInput.new(view.amount).h(32).rounded(8).border(1).border_color(t.border).bg(t.input).text_size(14).text_color(t.foreground)
+        .child(NumberInput.new(view.amount).h(32).rounded(8).border(1).border_color(t.border).bg(t.input).text_size(ui(14)).text_color(t.foreground)
           .decrement_button(stepper("minus", "Decrease duration", "l"))
           .increment_button(stepper("plus", "Increase duration", "r"))))
       .child(v_flex().flex_1().min_w(0).gap(8).child(label("Unit")).child(unit));
   // T3's dialog: its header, panel and footer, each with its own padding, in a frame drawn here for T3's 16px corners (Herdr's own is its size).
-  return focusRoot(view, v_flex().id("custom-snooze").w_full().rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_xl().text_size(14)
+  return focusRoot(view, v_flex().id("custom-snooze").w_full().rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_xl().text_size(ui(14))
     .child(v_flex().flex_none().p(24).pb(12).gap(8)
       .child(h_flex().items_center()
-        .child(div().flex_1().text_size(20).line_height(1.375).font_semibold().text_color(t.foreground).child("Custom snooze"))
-        .child(div().text_size(12).text_color(t.dim).child("Esc")))
-      .child(div().line_height("20px").text_color(t.muted).child("Choose when snoozed agents return to your inbox.")))
+        .child(div().flex_1().text_size(ui(20)).line_height(1.375).font_semibold().text_color(t.foreground).child("Custom snooze"))
+        .child(div().text_size(ui(12)).text_color(t.dim).child("Esc")))
+      .child(div().line_height(`${ui(20)}px`).text_color(t.muted).child("Choose when snoozed agents return to your inbox.")))
     .child(v_flex().flex_none().px(24).pt(4).pb(24).gap(16)
       .child(segmented(view, t, [
         { id: "mode-date", label: "Date and time", on: view.mode === "date", pick: () => { view.mode = "date"; view.time.focus(); view.error = null; } },
         { id: "mode-duration", label: "Duration", on: view.mode === "duration", pick: () => { view.mode = "duration"; view.amount.focus(); view.error = null; } },
       ], { fill: true }))
       .child(when)
-      .when(Boolean(view.error), (el) => el.child(div().id("custom-error").role("alert").line_height("20px").text_color(t.blocked).child(view.error))))
+      .when(Boolean(view.error), (el) => el.child(div().id("custom-error").role("alert").line_height(`${ui(20)}px`).text_color(t.blocked).child(view.error))))
     .child(h_flex().flex_none().px(24).py(16).gap(8).items_center().justify_end().border_t(1).border_color(t.border)
       .child(dialogButton("custom-cancel", "Cancel", false, done))
       .child(dialogButton("custom-submit", "Snooze", true, (_e, cx) => { submitCustom(view); cx.notify(); }))));
@@ -261,7 +262,7 @@ export function snoozeButton(view, t, a, { now, offer: napOffer, delay }, pick) 
     .when(menu, (el) => {
       const choices = [...presets(now), { label: "Custom…", custom: true }];
       // Sized as T3's menu: as wide as its rows. Nothing lit until the pointer or a key gets there.
-      return el.content(v_flex().id(`snooze-panel-${key}`).min_w(160).mt(4).p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(14)
+      return el.content(v_flex().id(`snooze-panel-${key}`).min_w(160).mt(4).p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(14))
         .opacity(view.napShown === false ? 0 : 1).transition("opacity", MOTION)
         .track_focus(view.napKeys).key_context("InboxSnoozeMenu")
         .on_action("t3_inbox_snooze_pick", (_e, cx) => {

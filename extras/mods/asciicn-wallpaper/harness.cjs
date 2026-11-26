@@ -28,7 +28,7 @@ const moved = () => { moves++; for (const go of wakers.splice(0)) go(); };
 const under = (work, started = true) => { busy.add(work); if (started) moved(); const end = () => { busy.delete(work); moved(); }; work.then(end, end); return work; };
 const idle = async () => { while (busy.size) await Promise.allSettled([...busy]); };
 
-const MODULES = ["ascii-art.js", "scenes.js", "library.js", "source.js", "framing.js", "tip.js", "focus.js", "color.js", "button.js", "list.js", "menu-row.js", "trigger.js", "store.js", "main.js"];
+const MODULES = ["ascii-art.js", "scenes.js", "library.js", "source.js", "framing.js", "tip.js", "focus.js", "color.js", "store.js", "layout-settings.js", "button.js", "list.js", "menu-row.js", "trigger.js", "main.js"];
 
 // A render tree: what a test can find by id, read the geometry of and press.
 function element(kind) {

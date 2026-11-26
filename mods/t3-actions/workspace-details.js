@@ -15,6 +15,7 @@ import { menuRow, menuRule, MENU_ROW } from "./menu-row.js";
 import { installedTargets, knownTargets, openTarget, targetIcon, targetsMenu, openInHeight } from "./open-in.js";
 import { glow, tip, tipMark } from "./tip.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
+import { ui } from "./layout-settings.js";
 
 const DETAILS_ITEMS = [["environment", "Machine and folder"], ["openIn", "Open in"], ["scripts", "Actions"], ["review", "Review"]];
 function detailsVisibility() {
@@ -26,9 +27,9 @@ function detailsVisibility() {
 // machine row: nothing on it acts.
 export function detailsGrid() {
   const v = detailsVisibility(), rows = [];
-  let top = 1 + 8 + (v.environment ? 32 : 0);
-  if (v.openIn) { rows.push({ ids: ["details-finder", "details-open-more"], label: "Open in", top }); top += 32; }
-  if (v.scripts) { rows.push({ ids: state().list.length ? ["action-run", "action-more"] : ["action-add"], label: "Actions", top }); top += 32; }
+  let top = 1 + 8 + (v.environment ? ui(32) : 0);
+  if (v.openIn) { rows.push({ ids: ["details-finder", "details-open-more"], label: "Open in", top }); top += ui(32); }
+  if (v.scripts) { rows.push({ ids: state().list.length ? ["action-run", "action-more"] : ["action-add"], label: "Actions", top }); top += ui(32); }
   // Workspace's 8 under its rows and the rule, then Review's own 8.
   if (v.review) rows.push({ ids: ["details-review", "details-review-more"], label: "Review", top: top > 9 ? top + 8 + 1 + 8 : top });
   if (!v.environment && !rows.length) rows.push({ ids: ["details-choose-items"], label: "Choose what to show", top });
@@ -84,8 +85,8 @@ export function initDetails(view, cx) {
 }
 
 // From its row: under it, as the other rows' menus; from a right-click on the card, where the pointer is.
-const ITEMS_H = 8 + 28 + DETAILS_ITEMS.length * MENU_ROW + 9 + MENU_ROW;
-function chooseDetailsItems(place = { width: 220, height: ITEMS_H }, keys = false) { return openLayer("details-items", place, {}, keys); }
+const itemsHeight = () => 8 + ui(28) + DETAILS_ITEMS.length * ui(MENU_ROW) + 9 + ui(MENU_ROW);
+function chooseDetailsItems(place = { width: 220, height: itemsHeight() }, keys = false) { return openLayer("details-items", place, {}, keys); }
 
 export function detailsItemsMenu(view) {
   const t = theme(), visible = detailsVisibility(), dirty = Object.values(visible).some(on => !on);
@@ -100,7 +101,7 @@ export function detailsItemsMenu(view) {
   const row = (id, at, label, o = {}) => menuRow(view, t, id, { at: [view, "at", at], label, pick: (cx) => choose(at, cx), ...o });
   return focusRoot(view, v_flex().id("details-items-menu").p(4).bg(t.popover).track_focus(view.keys)
     .on_key_down(menuKeys(view, [...DETAILS_ITEMS.map(([, label]) => label), ...(dirty ? ["Reset to default"] : [])], choose))
-    .child(h_flex().h(28).px(8).items_center().text_size(12).font_medium().text_color(t.dim).child("Show in Details"))
+    .child(h_flex().h(ui(28)).px(8).items_center().text_size(ui(12)).font_medium().text_color(t.dim).child("Show in Details"))
     .children(DETAILS_ITEMS.map(([id, label], at) => row(`details-item-${id}`, at, label,
       { lead: div().size(16).flex_none().when(visible[id], el => el.child(svg("mods/t3-actions/icons/check.svg").size(16))) }).role("check_box").checked(visible[id])))
     .child(menuRule(t))
@@ -131,7 +132,7 @@ export function directoryMenu(view) {
 
 function machineRow(view, t, s) {
   return cardRow(t, "details-context", { locked: true }).pr(0).accessibility_label(`Machine: ${view.machineName}`)
-    .when(Boolean(s.folder), el => el.on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openLayer("directory-menu", { width: 220, height: 8 + MENU_ROW }); cx.notify(); }))
+    .when(Boolean(s.folder), el => el.on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openLayer("directory-menu", { width: 220, height: 8 + ui(MENU_ROW) }); cx.notify(); }))
     .child(div().id("details-machine-icon").size(16).flex_none().child(svg("mods/t3-actions/icons/laptop.svg").size(16).text_color(t.dim)))
     .child(div().id("details-machine-slot").flex_1().min_w(0).child(measuredTooltip(view, t, "details-machine-name", view.machineName, nameText(view, "details-machine-name", view.machineName, { size: 13, weight: "medium" }).id("details-machine-name").w_full().whitespace_nowrap().on_hover(glow(view, "details-machine-name")), { below: true }).w_full().min_w(0)))
     .child(div().id("details-path-slot").w(32).h_full().flex_none().flex().justify_center().items_center().child(tipMark(view, t, "details-path", s.folder || "No working directory", svg("mods/t3-actions/icons/folder.svg").size(16).text_color(t.dim), { below: true })));
@@ -160,15 +161,15 @@ export function detailsView(view) {
     .when(visible.environment, el => el.child(machineRow(view, t, s)))
     .when(visible.openIn, el => el.child(openInRow(view, t, s)))
     .when(visible.scripts, el => el.child(detailsControl(view, t)));
-  // Before the first measure, what the rows will make: 8 round each section, 32 a row, a rule between.
-  const guess = !shown && !review ? 48 : (shown ? 16 + 32 * shown : 0) + (review ? 48 + (shown ? 1 : 0) : 0);
+  // Before the first measure, what the rows will make: 8 round each section, ui(32) a row, a rule between.
+  const guess = !shown && !review ? 16 + ui(32) : (shown ? 16 + ui(32) * shown : 0) + (review ? 16 + ui(32) + (shown ? 1 : 0) : 0);
   const content = v_flex().id("details-content").w_full().flex_none()
     .on_size_change((size, cx) => {
       const height = Math.ceil(size.height / (Number(settings().zoom) || 1));
       if (height > 0 && height !== view.detailsHeight) { view.detailsHeight = height; cx.notify(); }
     })
     .when(shown > 0, el => el.child(workspace)).when(Boolean(review), el => el.child(review))
-    .when(!shown && !review, el => el.child(div().p(8).child(stop(view, t, "details-choose-items", rowMenu(view, "details-choose-items", ITEMS_H, chooseDetailsItems)(cardRow(t, "details-choose-items", { on: hasOpen(props().overlay, "details-items") }).role("button").accessibility_label("Choose what to show").cursor_pointer())
+    .when(!shown && !review, el => el.child(div().p(8).child(stop(view, t, "details-choose-items", rowMenu(view, "details-choose-items", itemsHeight(), chooseDetailsItems)(cardRow(t, "details-choose-items", { on: hasOpen(props().overlay, "details-items") }).role("button").accessibility_label("Choose what to show").cursor_pointer())
       .child(svg("mods/t3-actions/icons/sliders-horizontal.svg").size(16).text_color(t.dim)).child("Choose what to show"), 8))));
   // No shadow: the native popup is the card's own size and would clip one into square corners.
   // A root scroller with only max-height measures to zero in a native popup (layout-implementation.md): its height is set.

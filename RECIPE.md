@@ -167,12 +167,13 @@ Putting away the viewed agent (Settle, Snooze, drag, sweep) goes Home by default
 
 Home is one local hidden space, in no Project, shared across machines, created on demand, found only by its remembered id or the exact name `Home\u200b`, and left out of every list. It holds one mod (`t3-home` by default) or a shell; if that shell starts an agent, the space becomes an ordinary one in place and the next Home is fresh.
 
-Layout Settings (footer sliders or `cmd-shift-,`) has two pages. Home has exactly two stored preferences; Sidebar has Sidebar shows, Inbox or Lists, which reads and switches the layout's own sidebar stack as `cmd-shift-l` does and stores nothing:
+Layout Settings (footer sliders or `cmd-shift-,`) has three pages. Home has exactly two stored preferences; Sidebar has Sidebar shows, Inbox or Lists, which reads and switches the layout's own sidebar stack as `cmd-shift-l` does and stores nothing; Text has Text size:
 
 | Preference | Choices and effect |
 | --- | --- |
 | After putting away | Home (default), Next card; applies to Settle/Snooze/drag/sweep, not closing |
 | Home shows | Default, Terminal, installed mods with `"home": true` in `mod.json`, sorted by title else folder name; include selected mod even if no longer self-offered |
+| Text size | Default (Herdr's `ui_font_size`, 13), 12–18 px; every T3 text size and the rows that fit text scale by it, terminals and the window's bars don't ([t3-tokens](docs/internals/t3-tokens.md#text-size)) |
 
 ### Optional asciicn wallpaper Home
 

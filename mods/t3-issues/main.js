@@ -14,14 +14,16 @@ import { alpha } from "./color.js";
 import { inlineMenu } from "./inline-menu.js";
 import { discoverRepo, ghProblem } from "./github.js";
 import { initPictures, dropPictures } from "./pictures.js";
+import { codeFont, dropCode } from "./code.js";
 import { initPage, refreshPage, freshness, pageFrame, pageShown, sectionOpen, section, control, textButton, note, line, rich, said, stateIcon,
-  openUrl, writeError, draftKey, since, codeFont } from "./page.js";
+  openUrl, writeError, draftKey, since } from "./page.js";
 import { initComposer, sent, commentBox, replyBox, replyButton } from "./composer.js";
 import { segmented } from "./segmented.js";
 import { compactField } from "./field.js";
 import { findKey, linearIssues } from "./linear.js";
 import { githubIssues } from "./ghissues.js";
 import { ISSUE_BINDING, linearState, PRIORITY, initials, commentThreads, workflowOrder, sectionSummary, KEY_ADD, keyProblem } from "./model.js";
+import { ui } from "./layout-settings.js";
 
 const MOD = "mods/t3-issues";
 const icon = (name) => `${MOD}/icons/${name}.svg`;
@@ -73,6 +75,7 @@ export default class Issues extends View {
 
   async close() {
     stopsEnd(this);
+    dropCode(this);
     await dropPictures(this);
   }
 
@@ -281,7 +284,7 @@ export default class Issues extends View {
   searchField(t) {
     return compactField(this, t, "t3-issues-search-field", { focused: Boolean(this.searchFocused), focus: () => this.search.focus(),
       escape: (cx) => { this.search.set_value(""); this.handle.focus(); this.searchNow(cx); },
-      child: Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search issues") });
+      child: Input.new(this.search).w_full().h_full().text_size(ui(12)).text_color(t.foreground).accessibility_label("Search issues") });
   }
 
   body(st, t, cx) {
@@ -302,7 +305,7 @@ export default class Issues extends View {
   keyPage(t) {
     const p = keyProblem(this.keyIssue);
     return emptyState(t, "t3-issues-key", icon("circle-dot"), p.title, p.detail)
-      .child(div().id("t3-issues-key-command").max_w(360).px(6).py(2).rounded(4).bg(alpha(t.foreground, "12")).text_size(12).font_family(codeFont())
+      .child(div().id("t3-issues-key-command").max_w(360).px(6).py(2).rounded(4).bg(alpha(t.foreground, "12")).text_size(ui(12)).font_family(codeFont())
         .text_color(t.foreground).child(KEY_ADD))
       .child(h_flex().pt(8).gap(8).justify_center()
         .child(textButton(this, t, "t3-issues-key-retry", "Try again", "outline", (cx) => this.retryKey(cx)))
@@ -325,7 +328,7 @@ export default class Issues extends View {
     const now = Date.now();
     return v_flex().id(`t3-issues-list-${st.tab}`).size_full().overflow_y_scrollbar().px(12).pb(8).gap(2)
       .children(items.map((issue) => this.row(st, issue, t, now)))
-      .when(more, (el) => el.child(div().px(8).py(8).text_size(12).text_color(t.dim).child("More than these: search to narrow them down.")));
+      .when(more, (el) => el.child(div().px(8).py(8).text_size(ui(12)).text_color(t.dim).child("More than these: search to narrow them down.")));
   }
 
   row(st, issue, t, now) {
@@ -340,8 +343,8 @@ export default class Issues extends View {
           .child(div().flex_1().min_w(0).truncate().child(issue.title))
           .when(Boolean(mark), (el) => el.child(svg(icon(mark.icon)).size(14).flex_none().text_color(t[mark.color])))
           .when(Boolean(issue.assignee), (el) => el.child(div().size(18).flex_none().rounded_full().bg(alpha(t.foreground, "12")).flex().items_center().justify_center()
-            .text_size(9).font_medium().text_color(t.muted).accessibility_label(`Assigned to ${issue.assignee}`).child(initials(issue.assignee)))))
-        .child(h_flex().min_w(0).gap(8).text_size(12).text_color(t.dim)
+            .text_size(ui(9)).font_medium().text_color(t.muted).accessibility_label(`Assigned to ${issue.assignee}`).child(initials(issue.assignee)))))
+        .child(h_flex().min_w(0).gap(8).text_size(ui(12)).text_color(t.dim)
           .child(div().flex_none().child(issue.ref))
           .child(div().flex_1().min_w(0).truncate().child(issue.assignee || "Unassigned"))
           .child(div().flex_none().child(since(issue.updatedAt, now))))), 6);
@@ -362,16 +365,16 @@ export default class Issues extends View {
       .when(Boolean(st.actionError), (el) => el.child(noticeBar(t, "t3-issues-action-error", st.actionError, t.ansi1, "dismiss", "Dismiss", (cx) => { st.actionError = null; cx.notify(); }, this)))
       .when(Boolean(d?.error) && full, (el) => el.child(errorBar(t, "t3-issues-detail-error", d.error, (cx) => this.readDetail(st, issue, cx), this)))
       .child(v_flex().id(`t3-issues-detail-${issue.id}`).flex_1().min_h(0).overflow_y_scrollbar().px(12).pb(16)
-        .child(h_flex().id("t3-issues-title").pt(4).gap(8).items_center().text_size(14)
+        .child(h_flex().id("t3-issues-title").pt(4).gap(8).items_center().text_size(ui(14))
           .child(stateIcon(this, t, issue.state, 16))
           .child(div().min_w(0).truncate().font_medium().child(issue.title))
           .child(div().flex_none().text_color(t.dim).child(issue.ref)))
-        .child(h_flex().id("t3-issues-facts").pt(4).gap(4).flex_wrap().text_size(12).text_color(t.dim)
+        .child(h_flex().id("t3-issues-facts").pt(4).gap(4).flex_wrap().text_size(ui(12)).text_color(t.dim)
           .children(facts.flatMap((f, i) => i ? [div().flex_none().child("·"), div().flex_none().child(f)] : [div().flex_none().child(f)])))
         .when(issue.labels.length > 0, (el) => el.child(h_flex().id("t3-issues-labels").pt(6).gap(6).flex_wrap()
           .children(issue.labels.map((l, i) => h_flex().id(`t3-issues-label-${i}`).h(20).px(6).gap(4).flex_none().items_center().rounded(4).bg(alpha(t.foreground, "0a"))
-            .text_size(11).text_color(t.muted).child(div().size(6).rounded_full().bg(l.color || t.dim)).child(l.name)))))
-        .when(!full, (el) => el.child(div().pt(8).text_size(12).text_color(t.dim).child(d?.error ? d.error : "Loading…")))
+            .text_size(ui(11)).text_color(t.muted).child(div().size(6).rounded_full().bg(l.color || t.dim)).child(l.name)))))
+        .when(!full, (el) => el.child(div().pt(8).text_size(ui(12)).text_color(t.dim).child(d?.error ? d.error : "Loading…")))
         .when(full, (el) => el
           .child(part("prs", "Linked PRs", () => this.prRows(st, issue, t), issue.prs.length))
           .child(part("description", "Description", () => [(issue.description ?? "").trim()

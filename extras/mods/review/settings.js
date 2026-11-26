@@ -7,6 +7,8 @@ import { hoverRow, subOpened, subLeft } from "./submenu.js";
 import { menuRow, menuHint } from "./menu-row.js";
 import { wrapLines, setWrapLines } from "./store.js";
 import { PANE, MODEL_ROW, SPLIT_MIN, BELOW, pref, setPref, pickMark, searchField, popover, toPane, subState, subAt } from "./controls.js";
+import { searchHeight } from "./review-menu.js";
+import { ui } from "./layout-settings.js";
 
 // Models the settings list before the search must narrow them.
 const LISTED = 200;
@@ -97,10 +99,10 @@ export function pageRows(view) {
   return rows.map(m => ({ id: m.key ?? `model-${m.id}`, name: m.name, detail: m.detail, on: m.id === model, pick: (cx) => saveLlm(view, { agentModel: m.id }, cx) }));
 }
 
-// The panel's rows at main.js's top (BELOW), right 40, past its border and padding: a label, two choices of 36, a rule, a
-// label and the switch, then Language, Agent and Model.
+// The panel's rows at main.js's top (BELOW), right 40, past its border and padding: a label, two choices, a rule, a label
+// and the switch, then Language, Agent and Model.
 // shortcut: assumes all three rows and no error note above them; a row the pointer is on gives its own bounds instead.
-const navRow = (view, id) => ({ x: view.width - 40 - 320 + 5, y: BELOW + 5 + 165 + MODEL_ROW * ["language", "agent", "model"].indexOf(id), width: 310, height: MODEL_ROW });
+const navRow = (view, id) => ({ x: view.width - 40 - 320 + 5, y: BELOW + 5 + 3 * ui(28) + 2 * ui(36) + 9 + ui(MODEL_ROW) * ["language", "agent", "model"].indexOf(id), width: 310, height: ui(MODEL_ROW) });
 
 // A setting's submenu, beside its row (`row`, in the pane), which stays lit. A press on the panel stops there, so the
 // keyboard is sent where the submenu wants it: the model search, else the pane's keys.
@@ -129,7 +131,7 @@ function settingsRest(view, key, e, cx) {
 
 // As T3's MenuGroupLabel and MenuSeparator, and its ComboboxStatus, its 12 in the panel's 4 and 8.
 const rule = (t) => div().h(1).my(4).mx(8).flex_none().bg(t.border);
-const note = (t, text, color = t.dim) => div().p(8).flex_none().text_size(12).font_medium().text_color(color).child(text);
+const note = (t, text, color = t.dim) => div().p(8).flex_none().text_size(ui(12)).font_medium().text_color(color).child(text);
 
 /** The settings, as the app's settings dialog in a panel: the view's choices, then the analysis's (analyzing when a count
  *  opens a review, and the language, agent and model, each a row naming its value). A row opens its list as a submenu left
@@ -137,13 +139,13 @@ const note = (t, text, color = t.dim) => div().p(8).flex_none().text_size(12).fo
 export function settingsPanel(view, t) {
   const page = view.settingsPage, locale = view.locale(), { agent, model, catalog } = view.models();
   const split = pref("split") === true, autoAnalyze = pref("autoAnalyze") === true;
-  const label = (text) => div().h(28).px(8).flex_none().flex().items_center().text_size(12).font_medium().text_color(t.dim).child(text);
+  const label = (text) => div().h(ui(28)).px(8).flex_none().flex().items_center().text_size(ui(12)).font_medium().text_color(t.dim).child(text);
   // A row without a submenu: resting on it closes the open one.
   const off = (e, cx) => settingsRest(view, null, e, cx);
   const link = (id, text, url) => div().id(id).text_color(t.muted).hover(s => s.text_color(t.foreground).underline()).role("link")
     .on_click((_e, cx) => { cx.stop_propagation(); openUrl(url); }).child(text);
   // A setting with a submenu, as T3's MenuSubTrigger: its name, its value and a chevron; lit while its submenu is open.
-  const nav = (id, text, value) => h_flex().id(`settings-${id}`).h(28).px(8).gap(8).flex_none().items_center().rounded(4).hover(s => s.bg(t.selected))
+  const nav = (id, text, value) => h_flex().id(`settings-${id}`).h(ui(28)).px(8).gap(8).flex_none().items_center().rounded(4).hover(s => s.bg(t.selected))
     .when(page === id, el => el.bg(t.selected))
     .on_mouse_move((e, cx) => settingsRest(view, id, e, cx))
     .role("button").accessibility_label(`${text}: ${value}`).on_click((_e, cx) => openPage(view, id, cx, view.navBox?.[id]))
@@ -164,7 +166,7 @@ export function settingsPanel(view, t) {
     Switch.new("auto-analyze").checked(autoAnalyze).accessibility_label("Analyze automatically")
       .on_change((on, cx) => { setPref("autoAnalyze", on); cx.notify(); })
       // As T3's MenuCheckboxItem, its switch variant.
-      .child(h_flex().on_mouse_move(off).h(28).pl(8).pr(6).gap(16).items_center().rounded(4).hover(s => s.bg(t.selected))
+      .child(h_flex().on_mouse_move(off).h(ui(28)).pl(8).pr(6).gap(16).items_center().rounded(4).hover(s => s.bg(t.selected))
         .child(div().flex_1().child("Analyze automatically"))
         .child(div().w(22).h(14).p(1).flex_none().flex().rounded_full().bg(autoAnalyze ? t.accent : t.input)
           .when(autoAnalyze, el => el.justify_end())
@@ -178,7 +180,7 @@ export function settingsPanel(view, t) {
     Boolean(current) && nav("model", "Model", !model ? "Default" : catalog.find(m => m.id === model)?.name ?? model),
     rule(t),
     // Credit, as the app's footer: pulls.review is antfu's; this pane draws from JinJieBeWater's fork of it.
-    h_flex().id("settings-credit").on_mouse_move(off).h(28).px(8).gap(4).flex_none().items_center().text_size(11).text_color(t.dim)
+    h_flex().id("settings-credit").on_mouse_move(off).h(ui(28)).px(8).gap(4).flex_none().items_center().text_size(ui(11)).text_color(t.dim)
       .child(image(`mods/${PANE}/icons/logo.svg`).w(12).h(12).flex_none())
       .child(link("credit-upstream", "pulls.review", "https://github.com/antfu/pulls.review")).child("by")
       .child(link("credit-antfu", "@antfu", "https://github.com/antfu")).child("·")
@@ -202,8 +204,8 @@ export function settingsSub(view, t) {
   const notes = [model && shown.length < matches.length && note(t, `${matches.length - LISTED} more: search to narrow`),
     model && Boolean(typed) && !matches.length && note(t, `Enter to use “${typed}”`)].filter(Boolean);
   // Its border and padding, the search and its margins, and a note's 32 each.
-  const chrome = 10 + (model ? 43 : 0) + notes.length * 32;
-  const listHeight = Math.min(options.length * MODEL_ROW, Math.max(MODEL_ROW * 3, Math.min(model ? 368 : Infinity, view.height - 16) - chrome));
+  const chrome = 10 + (model ? searchHeight() : 0) + notes.length * ui(32);
+  const listHeight = Math.min(options.length * ui(MODEL_ROW), Math.max(ui(MODEL_ROW) * 3, Math.min(model ? 368 : Infinity, view.height - 16) - chrome));
   // 320 where there's room beside the panel, else narrower, never over its row (subAt).
   const { at: box, w } = subAt(view, row, 320, chrome + listHeight);
   // The pointer on it: nothing pending on the panel's rows opens or closes it.
@@ -211,7 +213,7 @@ export function settingsSub(view, t) {
     .child(popover(view, t, "review-settings-sub", false).w(w).p(4).on_hover((on) => { if (on) subLeft(subState(view)); })
       // The search sits above the catalog, which runs to hundreds for some agents.
       .when(model, el => el.child(searchField(t, view.modelInput).mx(8).mt(5).mb(5)))
-      .child(scrollList(view, `${page}-list`, { count: options.length, row: MODEL_ROW, at: view.pageAt, draw: (i) => choice(options[i], i), height: listHeight, wheeled: (keep) => { view.pageAt = keep; } }))
+      .child(scrollList(view, `${page}-list`, { count: options.length, row: ui(MODEL_ROW), at: view.pageAt, draw: (i) => choice(options[i], i), height: listHeight, wheeled: (keep) => { view.pageAt = keep; } }))
       .children(notes));
 }
 
@@ -221,11 +223,11 @@ export function locale(view) { return view.shared?.locale ?? view.shared?.defaul
 // A setting's row: its name, then its options as one segmented control; `pick(id, cx)` on a press.
 function choiceRow(t, name, options, pick) {
   // A menu row's 4 either side of the 28 track.
-  return h_flex().h(36).px(8).gap(8).flex_none().items_center()
+  return h_flex().h(ui(36)).px(8).gap(8).flex_none().items_center()
     .child(div().flex_1().child(name))
     // As Custom snooze's segmented group (T3's ToggleGroup): an `input` track, the picked option `selected`; the others brighten on hover.
     .child(h_flex().flex_none().p(2).gap(2).rounded(8).bg(t.input)
-      .children(options.map(([id, text, on, faded]) => div().id(id).h(24).px(10).flex().items_center().rounded(6).text_size(12).font_medium()
+      .children(options.map(([id, text, on, faded]) => div().id(id).h(ui(24)).px(10).flex().items_center().rounded(6).text_size(ui(12)).font_medium()
         .text_color(on ? t.foreground : t.dim).when(on, el => el.bg(t.selected)).when(!on, el => el.hover(s => s.text_color(t.foreground)))
         .when(Boolean(faded), el => el.opacity(0.5))
         .role("radio_button").accessibility_label(`${name}: ${text}`)

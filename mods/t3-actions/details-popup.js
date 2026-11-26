@@ -9,6 +9,7 @@ import { terminalFor, workFolder } from "./terminal-context.js";
 import { closedKey } from "./store.js";
 import { panelState } from "./panel.js";
 import { detailsAnchor } from "./titlebar.js";
+import { ui } from "./layout-settings.js";
 
 export const MENU_CLOSED = closedKey("t3-actions", "menu"), DETAILS_CLOSED = closedKey("t3-actions", "details");
 export const CHEVRON = "mods/t3-actions/icons/chevron-down.svg";
@@ -50,7 +51,7 @@ export const rowMenu = (view, id, height, open) => opener(view, { closed: MENU_C
 // Row `id`'s bounds as a press would give them, zoomed px: inside the card's 1 border and 8 padding, as wide as a row.
 function keyRow(view, id) {
   const at = props().at, row = view.grid?.find(r => r.ids.includes(id)), z = Number(settings().zoom) || 1;
-  return at && row ? { x: at.x + 9 * z, y: at.y + row.top * z, width: ROW_W * z, height: 32 * z } : null;
+  return at && row ? { x: at.x + 9 * z, y: at.y + row.top * z, width: ROW_W * z, height: ui(32) * z } : null;
 }
 
 /** The keyboard back on the terminal Details opened on: Escape, an action run. */

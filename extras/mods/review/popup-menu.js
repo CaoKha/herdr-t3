@@ -4,6 +4,7 @@ import { openOverlay, closeOverlay, props, settings, shared } from "herdr";
 import { subPlace, subOpened } from "./submenu.js";
 import { MENU_ROW } from "./menu-row.js";
 import { litProp } from "./list.js";
+import { ui } from "./layout-settings.js";
 
 // id → { mod, parent, kind, back? }: the popup it hangs off (null: a top one), what it is, for a row's on state (hasOpen), and
 // for a submenu, how its menu takes the keyboard back when it closes.
@@ -58,7 +59,7 @@ export function openBeside(view, i, key, row, spec, kind = null, keys = false) {
   // shortcut: with no row seen yet (keys only), the row is placed from the pointer where the menu opened, as Herdr opens it
   // there; a menu Herdr pushed back into the window puts its submenu off by as much. Upgrade if Herdr reports where an element is.
   const o = view.origin ?? { x: 0, y: 0 };
-  const b = view.rowsAt[i] ?? { x: o.x + 4 * z, y: o.y + row.top * z, width: row.width * z, height: MENU_ROW * z };
+  const b = view.rowsAt[i] ?? { x: o.x + 4 * z, y: o.y + row.top * z, width: row.width * z, height: ui(MENU_ROW) * z };
   // Herdr keeps a popup in the window, but doesn't flip it: subPlace does, in the menu's own px, narrowed to the room it has.
   const at = subPlace({ x: b.x / z, y: b.y / z, width: b.width / z, height: b.height / z }, spec.width, 0, (/** @type {any} */ (globalThis).window?.viewport_size?.().width ?? 1e6) / z);
   const id = openPopup({ ...spec, width: at.width, at: { x: at.x * z, y: at.y * z }, props: { ...spec.props, parents: [...(p.parents ?? []), p.overlay] } }, p.overlay, kind, keys);

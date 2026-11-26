@@ -5,7 +5,9 @@ import { h_flex } from "gpui-base";
 import { litOnHover } from "./list.js";
 import { DISABLED } from "./button.js";
 import { glow, tip } from "./tip.js";
+import { ui } from "./layout-settings.js";
 
+// As written for 13px text: a row is ui(MENU_ROW) tall.
 export const MENU_ROW = 28;
 
 /**
@@ -18,7 +20,7 @@ export const MENU_ROW = 28;
  *   disabled?: boolean, hint?: string, pick?: (cx: any) => void, also?: (row: any) => any }} o
  */
 export function menuRow(view, t, id, { at: [state, key, i], label, open = false, icon, lead, trail, color, sub, disabled = false, hint, pick, also }) {
-  const row = h_flex().id(id).h(MENU_ROW).px(8).gap(8).flex_none().items_center().rounded(4).text_size(14).text_color(color ?? t.foreground)
+  const row = h_flex().id(id).h(ui(MENU_ROW)).px(8).gap(8).flex_none().items_center().rounded(4).text_size(ui(14)).text_color(color ?? t.foreground)
     // A label that isn't words (an element) names itself: the caller sets accessibility_label.
     .role("button").when(typeof label === "string", (el) => el.accessibility_label(label))
     .when(disabled, (el) => el.opacity(DISABLED))
@@ -35,7 +37,7 @@ export function menuRow(view, t, id, { at: [state, key, i], label, open = false,
 }
 
 /** A row's shortcut or note at its end, as T3's MenuShortcut. */
-export const menuHint = (t, text) => div().flex_none().text_size(12).font_medium().text_color(t.dim).child(text);
+export const menuHint = (t, text) => div().flex_none().text_size(ui(12)).font_medium().text_color(t.dim).child(text);
 
 /** T3's MenuSeparator. */
 export const menuRule = (t) => div().h(1).mx(8).my(4).flex_none().bg(t.border);

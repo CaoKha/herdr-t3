@@ -99,14 +99,6 @@ const IMAGES = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 const extOf = (name) => name.includes(".") ? name.split(".").pop().toLowerCase() : "";
 export const kindOf = (name) => IMAGES.has(extOf(name)) ? "image" : /^(md|markdown|mdx)$/.test(extOf(name)) ? "markdown" : "text";
 
-// The Editor's languages that color something (docs/internals/specs/files.md, Editor languages); the rest stay plain.
-const LANGUAGES = {
-  js: "js", mjs: "js", cjs: "js", jsx: "js", ts: "js", mts: "js", cts: "js", tsx: "js", json: "json", jsonc: "json", yaml: "yaml", yml: "yaml",
-  rs: "rust", go: "go", py: "python", sh: "sh", bash: "bash", zsh: "zsh", css: "css", c: "c", h: "c", cpp: "cpp", cc: "cpp", cxx: "cpp",
-  hpp: "cpp", java: "java", kt: "kotlin", kts: "kotlin", rb: "ruby", php: "php", sql: "sql", lua: "lua", graphql: "graphql", gql: "graphql",
-};
-export const languageOf = (name) => /^(gnu)?makefile$/i.test(name) ? "makefile" : LANGUAGES[extOf(name)];
-
 // readTextFile's errors, in a sentence each. Gone (null) is the caller's.
 export function readProblem(error) {
   const e = String(error);

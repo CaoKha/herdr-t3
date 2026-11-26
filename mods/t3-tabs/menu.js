@@ -1,5 +1,6 @@
 // A right-click opens the menu of what's under it (docs/internals/specs/menus.md).
 import { openOverlay } from "herdr";
+import { ui } from "./layout-settings.js";
 
 // At the pointer, as T3's. A popup's height is only its most: the menu is as tall as its rows.
 // `kind` and `target` are t3-menu's props: which thing, not what it offers; the menu reads that from the thing itself.
@@ -8,5 +9,5 @@ import { openOverlay } from "herdr";
 export function openMenu(view, kind, target, cx, mod = "t3-menu") {
   cx.stop_propagation();
   if (view) view.hot = null;
-  openOverlay({ mod, kind: "popup", width: 220, height: 260, props: { tab: kind, target } });
+  openOverlay({ mod, kind: "popup", width: 220, height: ui(260), props: { tab: kind, target } });
 }

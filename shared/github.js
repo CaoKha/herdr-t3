@@ -2,7 +2,7 @@
 // CLI on this computer, with its login, remote spaces included. Arguments go to gh as they are, never through a shell; exec
 // has no stdin, so a query goes as a raw `-f` field. After Branch PR's gh.js (munza/herdr-mods, Apache-2.0).
 import { exec } from "herdr";
-import { splitBody, imgAttributes, assetKey, size, UUID } from "./images.js";
+import { splitBody, imgAttributes, assetKey, size, UUID, mapImages, imagesOf } from "./images.js";
 
 const GH_TIMEOUT = 26000, DISCOVER_TIMEOUT = 20000;
 // Reads that leave the index and the filesystem monitor alone.
@@ -97,23 +97,22 @@ export const htmlImages = (html) => [...String(html ?? "").matchAll(/<img\b[^>]*
   .filter((a) => a.src && !/(^|\s)emoji(\s|$)/.test(a.class ?? ""));
 
 /**
- * Each image part of `parts` with the address to download (`src`, from bodyHTML) and its `key`, when the two say the same
+ * Each picture of `parts`, a table cell's too, with the address to download (`src`, from bodyHTML) and its `key`, when the two say the same
  * pictures in the same order: as many, and each pair the same asset where the Markdown names one, else the same alt where
  * both have one. Otherwise none gets a `src`, and each is drawn as its alt and a link. GitHub's Markdown image addresses
  * answer 404 without a browser session; bodyHTML's signed ones download.
  */
 export function pairImages(parts, html) {
-  const want = parts.filter((p) => p.image), got = htmlImages(html);
-  const same = want.length === got.length && want.every((p, i) => {
-    const id = UUID.exec(p.image.url)?.[0], src = got[i].src;
+  const want = imagesOf(parts), got = htmlImages(html);
+  const same = want.length === got.length && want.every((im, i) => {
+    const id = UUID.exec(im.url)?.[0], src = got[i].src;
     if (id) return src.toLowerCase().includes(id.toLowerCase());
-    return !p.image.alt || !got[i].alt || p.image.alt === got[i].alt;
+    return !im.alt || !got[i].alt || im.alt === got[i].alt;
   });
   let i = 0;
-  return parts.map((p) => {
-    if (!p.image) return p;
+  return mapImages(parts, (im) => {
     const h = same ? got[i++] : null;
-    return { image: { ...p.image, key: assetKey(p.image.url), src: h?.src ?? null, width: p.image.width ?? size(h?.width), height: p.image.height ?? size(h?.height) } };
+    return { ...im, key: assetKey(im.url), src: h?.src ?? null, width: im.width ?? size(h?.width), height: im.height ?? size(h?.height) };
   });
 }
 

@@ -8,6 +8,8 @@ import { checking, exec, appHome } from "herdr";
 import * as fs from "fs/promises";
 import { stop } from "./focus.js";
 import { imageExt, curlArgs, imageSize, drawnSize } from "./images.js";
+import { codeView, fenceLanguage, fenceDiff, diffView, diffRowsOf } from "./code.js";
+import { ui } from "./layout-settings.js";
 
 export const PICTURES_AT_ONCE = 3;
 
@@ -71,25 +73,50 @@ async function download(cache, key, src) {
 }
 
 /**
- * A body's `parts` ({ text } or { image: { alt, url, src, key, width } }) as TextView.markdown draws them, its pictures between
- * the text: downloaded, as wide as `column` at most, their shape kept; until then the alt text, quiet; failed or without an
- * address (`src` null), the alt and an Open image link. `open(url, cx)` opens the original in the browser.
+ * A body's `parts` ({ text }, { code: { text, info } }, { image: { alt, url, src, key, width } } or { table }) as TextView.markdown
+ * draws them, its code in code views (code.js; a diff in diff rows, made once per part), a table with pictures as a grid, and its pictures between the text: downloaded,
+ * as wide as `column` at most, their shape kept; until then the alt text, quiet; failed or without an address (`src` null), the
+ * alt and an Open image link. `open(url, cx)` opens the original in the browser.
  */
 export function pictureBody(view, t, id, parts, { column, open }) {
-  const p = view.pictures;
   return v_flex().id(id).px(6).pt(4).gap(8).children(parts.map((part, i) => {
-    if (!part.image) return TextView.markdown(`${id}-${i}`, part.text).selectable(true).scrollable(false).text_size(13);
-    const { alt, url, src, key, width } = part.image, got = p.images.get(key), pid = `${id}-image-${i}`, label = alt || "Image";
-    if (got?.status === "done") {
-      const shown = drawnSize(got.natural, column, width);
-      return stop(view, t, pid, div().id(pid).flex_none().cursor_pointer().role("button").accessibility_label(`Open ${label}`).on_click((_e, cx) => open(url, cx))
-        .child(shown ? image(got.path).w(shown.w).h(shown.h) : image(got.path).max_w_full()), 4);
-    }
-    if (src) p.wanted.set(key, src);
-    const failed = !src || got?.status === "failed" && got.src === src;
-    return h_flex().id(pid).min_w(0).gap(8).items_center().text_size(12).text_color(t.dim)
-      .child(div().min_w(0).truncate().child(label))
-      .when(failed, (el) => el.child(stop(view, t, `${pid}-open`, div().id(`${pid}-open`).flex_none().cursor_pointer().text_color(t.muted).role("button")
-        .accessibility_label(`Open ${label}`).hover((s) => s.text_color(t.foreground).underline()).on_click((_e, cx) => open(url, cx)).child("Open image"), 4)));
+    if (part.code) return fenceDiff(part.code.info) ? diffView(view, t, `${id}-${i}`, diffRowsOf(part.code, part.code.text))
+      : codeView(view, t, `${id}-${i}`, part.code.text, fenceLanguage(part.code.info), column);
+    if (part.table) return pictureTable(view, t, `${id}-table-${i}`, part.table, column, open);
+    if (!part.image) return TextView.markdown(`${id}-${i}`, part.text).selectable(true).scrollable(false).text_size(ui(13));
+    return picture(view, t, `${id}-image-${i}`, part.image, column, open);
   }));
+}
+
+// Downloaded, as wide as `column` at most; until then its alt, and failed its alt and Open image.
+function picture(view, t, pid, { alt, url, src, key, width }, column, open) {
+  const p = view.pictures, got = p.images.get(key), label = alt || "Image";
+  if (got?.status === "done") {
+    const shown = drawnSize(got.natural, column, width);
+    return stop(view, t, pid, div().id(pid).flex_none().cursor_pointer().role("button").accessibility_label(`Open ${label}`).on_click((_e, cx) => open(url, cx))
+      .child(shown ? image(got.path).w(shown.w).h(shown.h) : image(got.path).max_w_full()), 4);
+  }
+  if (src) p.wanted.set(key, src);
+  const failed = !src || got?.status === "failed" && got.src === src;
+  return h_flex().id(pid).min_w(0).gap(8).items_center().text_size(ui(12)).text_color(t.dim)
+    .child(div().min_w(0).truncate().child(label))
+    .when(failed, (el) => el.child(stop(view, t, `${pid}-open`, div().id(`${pid}-open`).flex_none().cursor_pointer().text_color(t.muted).role("button")
+      .accessibility_label(`Open ${label}`).hover((s) => s.text_color(t.foreground).underline()).on_click((_e, cx) => open(url, cx)).child("Open image"), 4)));
+}
+
+const CELL_PADDING = 6;
+
+/**
+ * A table with pictures as a grid `column` wide: its columns equal, 1px `border` lines, each cell 6 in, its text and pictures
+ * 4 apart; the header row semibold. A picture shrinks to its cell.
+ */
+function pictureTable(view, t, tid, { header, rows }, column, open) {
+  const cellWidth = Math.floor((column - 1) / header.length), inner = Math.max(1, cellWidth - 1 - 2 * CELL_PADDING);
+  const row = (cells, r) => div().id(`${tid}-${r}`).flex().children(cells.map((parts, c) => {
+    const cid = `${tid}-${r}-${c}`;
+    return v_flex().id(cid).w(cellWidth).flex_none().min_w(0).p(CELL_PADDING).gap(4).border_r_1().border_b_1().border_color(t.border)
+      .children(parts.map((part, k) => (part.image ? picture(view, t, `${cid}-image-${k}`, part.image, inner, open)
+        : TextView.markdown(`${cid}-${k}`, part.text).selectable(true).scrollable(false).text_size(ui(13)).when(r === "h", (el) => el.font_semibold()))));
+  }));
+  return v_flex().id(tid).flex_none().border_t_1().border_l_1().border_color(t.border).child(row(header, "h")).children(rows.map(row));
 }

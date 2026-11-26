@@ -27,8 +27,10 @@ const load = (file, env) => {
   return context;
 };
 const { plain } = kit;
-const rows = load("rows.js", {});
-const { pairRows, buildItems, noteHeight, pageLabel, groupFiles, contentWidth, codeInset, noteWidth, clipRows, rowsToAsk, LOOKAHEAD, wrapRow, wrapColumns, charWidth, lineCount } = vm.runInContext("({ pairRows, buildItems, noteHeight, pageLabel, groupFiles, contentWidth, codeInset, noteWidth, clipRows, rowsToAsk, LOOKAHEAD, wrapRow, wrapColumns, charWidth, lineCount })", rows);
+// The text size every bundle reads (layout-settings.js ui): 13, sizes as written.
+let textAt = 13;
+const rows = load("rows.js", { shared: () => null, settings: () => ({ ui_font_size: textAt }) });
+const { pairRows, buildItems, noteHeight, pageLabel, groupFiles, contentWidth, codeInset, noteWidth, clipRows, rowsToAsk, LOOKAHEAD, wrapRow, wrapColumns, charWidth, lineCount, codeChar } = vm.runInContext("({ pairRows, buildItems, noteHeight, pageLabel, groupFiles, contentWidth, codeInset, noteWidth, clipRows, rowsToAsk, LOOKAHEAD, wrapRow, wrapColumns, charWidth, lineCount, codeChar })", rows);
 
 const row = (kind, old, next) => ({ kind, old, new: next, tokens: [[`${kind}${old ?? ""}:${next ?? ""}`]] });
 // A run of deletions faces the additions after it; context faces itself.
@@ -205,6 +207,15 @@ assert.equal(contentWidth([long("测".repeat(60))], undefined, 7.25, 1.6), conte
   assert.deepEqual(plain(buildItems(r, g, { ...opts, wrap: { row: 10, pair: 5, solo: 10 } }).filter(i => i.lines).map(i => i.size)), [20 + 20 + 3 * 20]);
   assert.deepEqual(plain(buildItems(r, g, { ...opts, split: true, wrap: { row: 10, pair: 5, solo: 10 } }).filter(i => i.lines).map(i => i.size)), [20 + 5 * 20]);
   assert.deepEqual(plain(buildItems(r, g, opts).filter(i => i.lines).map(i => i.size)), [60], "unwrapped, a line a row");
+  // At 16px text a line is ui(20) = 25 tall, its file's header ui(32) = 39, and a part built at 13 is built again.
+  const parts = new Map();
+  buildItems(r, g, { ...opts, parts });
+  textAt = 16;
+  const at16 = plain(buildItems(r, g, { ...opts, parts, wrap: { row: 10, pair: 5, solo: 10 } }));
+  assert.deepEqual(at16.filter(i => i.lines || i.kind === "file").map(i => i.size), [39, 25 + 25 + 3 * 25]);
+  assert.deepEqual(plain(buildItems(r, g, { ...opts, parts })).filter(i => i.lines).map(i => i.size), [75], "unwrapped at 16");
+  assert.equal(codeChar(), 7.25 * 15 / 12, "a column of the code font at ui(12) = 15");
+  textAt = 13;
 }
 // A big group's rows run past the 8 MB a read carries: a read asks for the files in view and the 10 after them that have
 // none and aren't folded, while they fit in 3000 changed lines, the first one always.
@@ -269,7 +280,7 @@ const env = {
   agents: () => [], focused: () => null, panes: () => [],
   localStorage: { getItem: (k) => local.get(k) ?? null, setItem: (k, v) => local.set(k, String(v)), removeItem: (k) => local.delete(k) },
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, h_resizable: element, resizable_panel: element, Scrollbar: { vertical: element },
-  Switch: { new: element }, settings: () => ({ zoom: 1 }),
+  Switch: { new: element }, settings: () => ({ zoom: 1, ui_font_size: textAt }),
   // tip.js's own; its watch on the pointer is checked in t3-spaces/check-sidebar.cjs.
   hoverKept: (view, key, id, el) => el.on_hover((on) => { if (on) view[key] = id; else if (view[key] === id) view[key] = null; }),
   glow: (view, id) => (on, cx) => { if (on) view.hot = id; else if (view.hot === id) view.hot = null; cx?.notify?.(); },
@@ -288,7 +299,7 @@ const env = {
   // Shared values every mod sees.
   shared: (key) => sharedStore.get(key) ?? null, setShared: (key, value) => sharedStore.set(key, value),
   run: (name, args) => calls.push([name, args]), notify: (n) => notes.push(n), nextCommand: () => new Promise(done => waiting.push(done)), theme: () => ({ background: "#17191d", chrome: "#111315", selected: "#ffffff17", foreground: "#eeeeee", ansi1: "#ff0000", ansi2: "#00ff00", dim: "#888888", input: "#ffffff24" }),
-  FILE: 32, ROW: 20, CHAR: 7.25, groupFiles, buildItems, pageLabel, contentWidth, codeInset, noteWidth, clipRows, rowsToAsk, LOOKAHEAD, wrapRow, wrapColumns,
+  FILE: 32, ROW: 20, NUMBER_W: 40, codeChar, groupFiles, buildItems, pageLabel, contentWidth, codeInset, noteWidth, clipRows, rowsToAsk, LOOKAHEAD, wrapRow, wrapColumns,
   // The daemon: rows only for the files asked for, and the first group's with `firstRows`; no run going. A later batch's
   // rows come on their own.
   review: async (_root, route, body) => {
@@ -1055,6 +1066,15 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
     setPref("split", true);
     assert.equal(sizeAt(1000), 20 + Math.ceil(300 / wrapColumns(1000, 8).pair) * 20, "split, each half wraps on its own, a pair as its longer side");
     assert.ok(pane.sideMax(0) === 0 && pane.sideMax(1) === 0);
+    // At 16px text the code font's width is measured again (ui(12) = 15), and a line is ui(20) = 25 tall.
+    textAt = 16; setPref("split", false); drawn.clear(); pane.render(cx);
+    assert.ok(drawn.has("review-char"), "measured again at a new size");
+    handlers.get("review-char.on_size_change")({ width: 1000, height: 20 }, cx);
+    assert.equal(pane.charWidth, 10);
+    assert.equal(sizeAt(1000), 2 * 25 + Math.ceil(300 / wrapColumns(1000, 10).row) * 25);
+    textAt = 13; drawn.clear(); pane.render(cx);
+    handlers.get("review-char.on_size_change")({ width: 800, height: 16 }, cx);
+    setPref("split", true);
     // Dragged, a width that keeps changing keeps the lines as they were cut, and cuts them again once it has held (nav-column.js holdWidth).
     {
       setPref("split", false); timers.length = 0;

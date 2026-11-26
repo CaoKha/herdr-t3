@@ -3,13 +3,14 @@
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 /** T3's Kbd, one for the whole layout, on a faint wash of the text. */
-export const keycap = (t, label) => div().min_w(20).h(20).px(4).flex().flex_none().items_center().justify_center().rounded(4)
-  .bg(alpha(t.foreground, "12")).text_size(12).font_medium().text_color(alpha(t.foreground, "bf")).child(label);
+export const keycap = (t, label) => div().min_w(ui(20)).h(ui(20)).px(4).flex().flex_none().items_center().justify_center().rounded(4)
+  .bg(alpha(t.foreground, "12")).text_size(ui(12)).font_medium().text_color(alpha(t.foreground, "bf")).child(label);
 
 /** T3's CommandFooterAction: no fill of its own, its words brighten. The caller adds what it does and shows. */
-export const footAction = (t, id, label) => h_flex().id(id).gap(4).px(8).rounded(8).items_center().flex_none().text_size(12).line_height("16px")
+export const footAction = (t, id, label) => h_flex().id(id).gap(4).px(8).rounded(8).items_center().flex_none().text_size(ui(12)).line_height(`${ui(16)}px`)
   .role("button").accessibility_label(label).hover((s) => s.text_color(t.foreground));
 
 /** A palette's footer: `hints`, [keys, what] (keys split on spaces, a keycap each), then `end` (a footAction) on the right. */

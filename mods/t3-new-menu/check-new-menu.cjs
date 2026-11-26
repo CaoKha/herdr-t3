@@ -23,6 +23,7 @@ const cx = {
 };
 let platform = "macos";
 const context = vm.createContext({
+  ui: (n) => n,
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, Input: { new: element },
   InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, set_value(v) { value = v; }, type(v) { value = v; on.change({}, cx); }, submit() { on.submit({}, cx); } }; } },
   settings: () => ({ zoom: 1 }),

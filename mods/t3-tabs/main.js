@@ -27,6 +27,7 @@ import { stripAt, stripWheel, stripFades } from "./scroll-strip.js";
 import { button as drawButton, radiusOf, tint as ghostTint, GROUP_GAP } from "./button.js";
 import { nameText, named as namedLabel } from "./measured-text.js";
 import { tab } from "./tab.js";
+import { ui } from "./layout-settings.js";
 
 const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
@@ -555,7 +556,7 @@ export default class Tabs extends View {
   newTabMenu(t) {
     const sp = spaces().find(p => p.active), agents = agentsOn(sp?.machine), rows = 1 + (agents ? agents.length : 1);
     return trigger(this, t, "tab-new", { icon: "mods/t3-tabs/icons/plus.svg", label: "New tab", action: "t3-tabs.new", below: true,
-      closed: closedKey("t3-menu"), onOpen: (b) => sp && openOverlay({ mod: "t3-menu", kind: "popup", width: NEW_MENU_W, height: 8 + rows * 28 + (rows > 1 ? 9 : 0),
+      closed: closedKey("t3-menu"), onOpen: (b) => sp && openOverlay({ mod: "t3-menu", kind: "popup", width: NEW_MENU_W, height: 8 + rows * ui(28) + (rows > 1 ? 9 : 0),
         ...hang(b, NEW_MENU_W, { align: "end" }), props: { tab: "new-tab", target: { space: sp.id }, ...litProp(!b) } }) });
   }
 
@@ -604,7 +605,7 @@ export default class Tabs extends View {
     // or its pane. In view it opens its menu, as T3's title; held or away it's dim, and leads back.
     const title = (address) => {
       const lit = !dim && !ctx.sub, id = `peer-${address}`, label = nameOf(address);
-      const el = h_flex().h(24).gap(4).rounded(6).items_center().min_w(0).flex_shrink(1)
+      const el = h_flex().h(ui(24)).gap(4).rounded(6).items_center().min_w(0).flex_shrink(1)
         .text_color(lit || this.hot === id ? t.foreground : t.muted)
         .child(text(id, label))
         .when(lit, e => e.child(chevron(id)));
@@ -615,8 +616,8 @@ export default class Tabs extends View {
       .when(!dim, e => e.child(chevron(`peer-${ctx.sub}`))), dim ? () => focusAgent(ctx.sub) : null, { agent: ctx.sub });
     const spaceLit = this.hot === "crumb-space" || within(this, ["crumb-space"]) || menuOn("crumb-space");
     // Its own width and no less, as flex weighting alone lets the strip win; capped at the row, where its names shorten.
-    return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(14).font_medium()
-      .child(named("crumb-space", space.name, h_flex().h(24).gap(6).rounded(6).items_center().min_w(0).flex_shrink(1)
+    return h_flex().id("crumb").flex_grow(1).flex_shrink(0).min_w(0).when(this.area > 0, el => el.max_w(this.area)).h_full().gap(12).items_center().text_size(ui(14)).font_medium()
+      .child(named("crumb-space", space.name, h_flex().h(ui(24)).gap(6).rounded(6).items_center().min_w(0).flex_shrink(1)
         .text_color(spaceLit ? t.foreground : t.muted)
         .child(projectMark("mods/t3-tabs", space, 14, t, ps))
         .child(text("crumb-space", space.name)), null, {
@@ -638,7 +639,7 @@ export default class Tabs extends View {
       const on = p.pane === z.pane, id = `seg-${p.pane}`, label = name(p);
       const glyph = programIcon(programOf(p), 12, t.muted) ?? svg("mods/t3-tabs/icons/terminal.svg").size(12).text_color(t.muted);
       return stop(this, t, id, h_flex().id(id).relative().h_full().pl(6).pr(8).gap(2).rounded(6).items_center().min_w(0).flex_shrink(1)
-        .max_w(on ? TAB_ACTIVE : TAB_FLOOR).text_size(12).text_color(on || this.hot === id ? t.foreground : t.muted)
+        .max_w(on ? TAB_ACTIVE : TAB_FLOOR).text_size(ui(12)).text_color(on || this.hot === id ? t.foreground : t.muted)
         .when(on, el => el.bg(ghostTint(t, "chrome", true))).when(!on, el => el.hover(s => s.bg(ghostTint(t, "chrome", false)))).on_hover(glow(this, id))
         .role("button").accessibility_label(label)
         .on_mouse_down("left", stopPress).on_click(() => focusPane(p.pane))
@@ -646,7 +647,7 @@ export default class Tabs extends View {
         .child(div().size(16).flex_none().flex().items_center().justify_center().child(glyph))
         .child(nameText(this, id, label).flex_1()), 6);
     };
-    return h_flex().id(`group-${e.id}`).w(width).h(24).flex_none().rounded(6).border(1).border_dashed().border_color(t.border).items_center().overflow_hidden()
+    return h_flex().id(`group-${e.id}`).w(width).h(ui(24)).flex_none().rounded(6).border(1).border_dashed().border_color(t.border).items_center().overflow_hidden()
       .children(list.map(segment))
       .when(Boolean(status), el => el.child(div().w(16).flex_none().flex().items_center().justify_center().child(statusMark("mods/t3-tabs", t, status, 14))));
   }
@@ -658,7 +659,7 @@ export default class Tabs extends View {
     const button = h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
       .when(live, el => stop(this, t, "undo-notice-undo", el.hover(s => s.underline()).on_hover(glow(this, "undo-notice-undo"))
         .role("button").accessibility_label(`Undo: ${n.action} ${n.count} agent${n.count === 1 ? "" : "s"}`).on_click(() => run("t3-tabs.undo")), 4)).child(undoLabel("t3-tabs.undo"));
-    return h_flex().id(`undo-notice-${n.gen}`).flex_none().h(24).gap(4).items_center().text_size(11).text_color(t.dim)
+    return h_flex().id(`undo-notice-${n.gen}`).flex_none().h(24).gap(4).items_center().text_size(ui(11)).text_color(t.dim)
       .opacity(n.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
       .child(`${n.action}${n.count === 1 ? "" : ` ${n.count}`},`)
       .child(button);

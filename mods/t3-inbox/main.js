@@ -22,6 +22,7 @@ import { KEY, readLocal } from "./store.js";
 import { rememberNotice, forgetNotice, undoNotice } from "./notice.js";
 import { prunePins } from "./pins.js";
 import { writeLabel } from "./labels.js";
+import { ui } from "./layout-settings.js";
 
 // A label write render keeps asking for waits this long (ms) after failing.
 const RETRY = 60000;
@@ -377,7 +378,7 @@ export default class Inbox extends View {
     if (props()?.customSnooze) return customView(this);
     const t = theme(), zoom = Number(settings()?.zoom) || 1;
     const model = this.compute(cx, false), { pinned, out, busyRows, napRows, inView, inboxMode, work, nap, put } = model;
-    const tree = v_flex().id("t3-inbox-root").relative().size_full().min_h(0).bg(t.chrome).text_size(14)
+    const tree = v_flex().id("t3-inbox-root").relative().size_full().min_h(0).bg(t.chrome).text_size(ui(14))
       .on_size_change((size) => { this.height = size.height / zoom; this.width = size.width / zoom; });
     const cards = [...pinned, ...out, ...busyRows], ordered = [...pinned, ...out, ...work, ...nap, ...put];
     let drawn = new Set();

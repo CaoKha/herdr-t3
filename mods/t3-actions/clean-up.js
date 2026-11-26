@@ -12,6 +12,7 @@ import { ownStatus, stillSettled, subAgents } from "./tree.js";
 import { alpha } from "./color.js";
 import { projectMark } from "./project.js";
 import { dialog, dialogTitle, dialogButton } from "./dialog.js";
+import { ui } from "./layout-settings.js";
 
 const cleanUpAnd = (list) => list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
 
@@ -61,7 +62,7 @@ function closeRow(view, t, prefix, r, done, mark, closePane) {
   const icon = prefix === "clean-up-settled"
     ? (programIcon(r.program, 14, t.muted) ?? svg("mods/t3-actions/icons/terminal.svg").size(14).flex_none().text_color(t.muted))
     : svg("mods/t3-actions/icons/terminal.svg").size(14).flex_none().text_color(t.muted);
-  const meta = h_flex().flex_none().max_w(180).gap(6).items_center().text_size(12).text_color(t.dim)
+  const meta = h_flex().flex_none().max_w(180).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
     .child(div().min_w(0).truncate().child(r.space))
     .when(Boolean(r.machine), (el) => el
       .child(svg("mods/t3-actions/icons/server.svg").size(12).flex_none().text_color(t.dim))
@@ -69,7 +70,7 @@ function closeRow(view, t, prefix, r, done, mark, closePane) {
   const closeBtn = closePane
     ? actionButton(view, t, closeId, { text: "Close", label: `Close ${r.name}`, act: () => closePane(r.pane) })
     : null;
-  return stop(view, t, id, h_flex().id(id).h(32).px(8).gap(8).items_center().rounded(6).cursor_pointer()
+  return stop(view, t, id, h_flex().id(id).h(ui(32)).px(8).gap(8).items_center().rounded(6).cursor_pointer()
     .when(lit, (el) => el.bg(tint(t, "card", false)))
     .on_hover(hoverCleanRow(view, id)).on_click(() => { done(); run(`t3-tabs.go-pane:${r.pane}`, {}); })
     .role("button").accessibility_label(`Go to ${r.name}`)
@@ -93,13 +94,13 @@ function card(view, t, c, done, mark) {
     .bg(lit ? tint(t, "card", false) : alpha(t.foreground, "0a"))
     .on_hover(hoverCard(view, id)).on_click(() => { done(); run(`t3-tabs.go-pane:${c.pane}`, {}); })
     .role("button").accessibility_label(`Go to ${c.name}`)
-    .child(h_flex().h(20).gap(6).items_center().text_size(12).text_color(t.dim)
+    .child(h_flex().h(ui(20)).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
       .child(mark(c))
       .child(div().flex_1().min_w(0).truncate().child(c.space))
       .when(Boolean(c.machine), (el) => el.child(svg("mods/t3-actions/icons/server.svg").size(12).flex_none().text_color(t.dim)).child(div().flex_none().child(c.machine)))
       .when(Boolean(proc), (el) => el.child(div().flex_none().font_family("monospace").child(proc)))
       .child(stopBtn))
-    .child(h_flex().h(20).mt(4).gap(6).items_center()
+    .child(h_flex().h(ui(20)).mt(4).gap(6).items_center()
       .child(div().flex_1().min_w(0).truncate().text_color(lit ? t.foreground : t.muted).child(c.name))
       .child(div().flex_none().opacity(0.6).child(programIcon(c.program, 14, t.muted) ?? svg("mods/t3-actions/icons/terminal.svg").size(14).flex_none().text_color(t.muted))));
   return stop(view, t, id, row, 6);
@@ -208,7 +209,7 @@ export function cleanUpView(view, cx = undefined) {
         .child(shelfHead(view, t, "t3-actions", "clean-up-left", "Left behind", { count: cards.length, side: "no agent at work" }))
         .child(v_flex().gap(5).children(cards.map((c) => card(view, t, c, done, mark)))))))
     // The reason last (P9), on a line of its own level with the title, clear of the buttons.
-    .child(div().id("clean-up-note").px(24).pt(12).text_size(12).line_height("16px").text_color(t.dim)
+    .child(div().id("clean-up-note").px(24).pt(12).text_size(ui(12)).line_height(`${ui(16)}px`).text_color(t.dim)
       .child(noteText))
     .child(h_flex().id("clean-up-footer").mt_auto().px(24).pt(20).pb(24).gap(8).items_center().justify_end()
       .child(dialogButton(view, t, "clean-up-no", total ? "Cancel" : "Done", "outline", done))

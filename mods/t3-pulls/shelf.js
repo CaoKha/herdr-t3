@@ -5,6 +5,7 @@ import { h_flex } from "gpui-base";
 import { stop, within } from "./focus.js";
 import { glow } from "./tip.js";
 import { foldArrow } from "./motion.js";
+import { ui } from "./layout-settings.js";
 
 /**
  * `mod` holds the arrow's icons. With `toggle`, a click, Enter or Space folds or opens it. `h` and `px` its row: 32 and 8 in a
@@ -14,7 +15,7 @@ import { foldArrow } from "./motion.js";
  */
 export function shelfHead(view, t, mod, id, label, { count = null, open = false, side = null, sideColor = null, trail = null, toggle = undefined, h = 32, px = 8 } = {}) {
   const lit = view.hot === id || within(view, [id]);
-  const head = h_flex().id(id).h(h).px(px).gap(6).items_center().rounded(6).text_size(12)
+  const head = h_flex().id(id).h(ui(h)).px(px).gap(6).items_center().rounded(6).text_size(ui(12))
     .child(div().flex_none().text_color(lit ? t.muted : t.dim).child(label))
     .when(count != null, (el) => el.child(div().flex_none().text_color(t.muted).child(String(count))))
     .when(Boolean(toggle), (el) => el.child(foldArrow(mod, null, open, 12, t.dim)))

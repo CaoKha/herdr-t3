@@ -40,10 +40,11 @@ let now = Date.now();
 const tipScope = vm.createContext({ window: () => ({ platform: "macos" }), keys: () => keyList });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "tip.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.keyLabel = keyLabel;", tipScope);
 // button.js in a scope of its own: its tint() and project.js's share a name in one bundle.
-const buttonScope = vm.createContext({ div: el, h_flex: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, glow: () => () => {}, alpha: (c) => c });
+const buttonScope = vm.createContext({ ui: (n) => n, div: el, h_flex: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, glow: () => () => {}, alpha: (c) => c });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "button.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.ghostButton = ghostButton; globalThis.DISABLED = DISABLED;", buttonScope);
 // closeOverlay runs what a closed t3-menu's close() does with the registry (popup-menu.js menuClosed), as Herdr calls close().
 const context = vm.createContext({
+  ui: (n) => n,
   Date: class extends Date { static now() { return now; } },
   checking: () => false,
   // menu-row.js's: button.js's and tip.js's (no row here is disabled).

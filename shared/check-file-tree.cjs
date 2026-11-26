@@ -10,7 +10,7 @@ const src = ["color.js", "file-tree.js", "file-listing.js"].map((f) => fs.readFi
 // The row as drawn: each element a tag and what it holds, in order.
 const el = (tag) => { const node = { tag, kids: [], calls: {} }; const p = new Proxy(node, { get: (t, k) => k in t ? t[k] : k === "child" ? (c) => (t.kids.push(c), p)
   : k === "when" ? (c, f) => (c ? f(p) : p) : (...args) => (t.calls[k] = args, p) }); return p; };
-const context = vm.createContext({ div: () => el("div"), svg: (src) => Object.assign(el("svg"), { src }), h_flex: () => el("row"), pierreFileIcon: () => el("svg") });
+const context = vm.createContext({ ui: (n) => n, div: () => el("div"), svg: (src) => Object.assign(el("svg"), { src }), h_flex: () => el("row"), pierreFileIcon: () => el("svg") });
 vm.runInContext(src.replace("globalThis.tree = { treeRows,", "globalThis.tree = { treeRow, treeRows,"), context);
 const { treeRows, pathEntries, rowAt, treeKey, treeRow, naturalCompare, sortEntries, parseListing, join } = context.tree;
 const plain = (v) => JSON.parse(JSON.stringify(v));

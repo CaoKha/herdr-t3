@@ -7,6 +7,7 @@ import { tip } from "./tip.js";
 import { popupClosed } from "./review-menu.js";
 import { scopeHeader } from "./scope-header.js";
 import { navToggle, setNavOpen, NAV_NARROW } from "./nav-column.js";
+import { ui } from "./layout-settings.js";
 
 // As the app's describeProgress, but the file's name only: the agent's paths run long, often through its own scratch folder.
 function progressText(progress) {
@@ -27,8 +28,8 @@ export function analysisStatus(view) {
 // or why it failed, and once it's done a Re-run.
 export function statusPanel(view, t) {
   const { running, error } = analysisStatus(view);
-  return popover(view, t, "review-status-panel").w(320).p(16).gap(8).text_size(12)
-    .child(div().font_medium().text_size(14).child("AI analysis"))
+  return popover(view, t, "review-status-panel").w(320).p(16).gap(8).text_size(ui(12))
+    .child(div().font_medium().text_size(ui(14)).child("AI analysis"))
     .when(running, el => el.child(h_flex().gap(8).items_center().opacity(0.4)
       .child(svg("mods/review/icons/circle-dashed.svg").size(14).flex_none().text_color(t.working))
       .child(div().min_w(0).child(progressText(view.review.analysis.progress)))))
@@ -72,7 +73,7 @@ export function header(view, t, head) {
   return h_flex().id("review-header").h(HEADER).flex_none().px(12).gap(8).items_center().overflow_hidden()
     .child(scopeHeader(view, t))
     // The counts hold, as T3's stats beside its tools: a long commit subject truncates instead.
-    .when(head.parts.length > 0, el => el.child(h_flex().id("review-counts").flex_none().gap(4).items_center().text_size(11)
+    .when(head.parts.length > 0, el => el.child(h_flex().id("review-counts").flex_none().gap(4).items_center().text_size(ui(11))
       .children(head.parts.map(p => div().text_color(t[p.color] ?? t.dim).child(p.text)))))
     .child(div().flex_1())
     .children(words.map(b => button(view, t, b.id, b.text, b.pops ? (cx, keys) => view.togglePopup(b.pops, cx, keys) : b.run,

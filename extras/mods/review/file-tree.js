@@ -4,6 +4,7 @@ import { h_flex } from "gpui-base";
 import { scrollList } from "./list.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // Pierre's compact density (factor 0.8); a level is one icon and its gap, so a folder's rows start under its name.
 const TREE_ROW = 24;
@@ -116,7 +117,7 @@ export function treeList(view, id, rows, draw) {
   const want = view.treeReveal?.[id], at = want == null ? -1 : rowAt(rows, want);
   if (at >= 0 && view.listHeight?.[id] !== undefined) view.treeReveal = { ...view.treeReveal, [id]: undefined };
   return div().id(`${id}-viewport`).size_full().px(10.4)
-    .child(scrollList(view, id, { count: rows.length, row: TREE_ROW, at, draw: (i) => draw(rows[i], i), wheeled: () => {} }).size_full());
+    .child(scrollList(view, id, { count: rows.length, row: ui(TREE_ROW), at, draw: (i) => draw(rows[i], i), wheeled: () => {} }).size_full());
 }
 
 /**
@@ -127,7 +128,7 @@ export function treeList(view, id, rows, draw) {
  */
 /** @param {any} t @param {string} mod @param {any} row @param {string} id @param {{ selected?: boolean, focused?: boolean, context?: boolean, guides?: boolean, status?: string, dim?: boolean, struck?: boolean, leading?: any, trailing?: any, icon?: any, drag?: { path: string, on: string } }} options */
 export function treeRow(t, mod, row, id, { selected = false, focused = false, context = false, guides = false, status, dim = false, struck = false, leading, trailing, icon, drag } = {}) {
-  return h_flex().id(id).relative().h(TREE_ROW).mx(1.6).pl(PAD + row.depth * LEVEL).pr(PAD).gap(GAP).items_center().rounded(6).text_size(12).cursor_pointer()
+  return h_flex().id(id).relative().h(ui(TREE_ROW)).mx(1.6).pl(PAD + row.depth * LEVEL).pr(PAD).gap(GAP).items_center().rounded(6).text_size(ui(12)).cursor_pointer()
     .when(Boolean(drag), el => el.drag_paths([drag.path], { on: drag.on }))
     .when(selected, (el) => el.bg(alpha(t.foreground, "1f"))).when(!selected, (el) => el.hover((s) => s.bg(alpha(t.foreground, "12"))))
     .when(context && !selected, el => el.bg(alpha(t.foreground, "12")))
@@ -143,5 +144,5 @@ export function treeRow(t, mod, row, id, { selected = false, focused = false, co
 // The letter in its status's color, on a tenth of it; T3's sm Badge.
 export function statusBadge(letter) {
   const color = STATUS[letter] ?? STATUS.M;
-  return div().h(16).min_w(16).px(3).flex_none().flex().items_center().justify_center().rounded(4).font_medium().text_size(10).text_color(color).bg(alpha(color, "1a")).child(letter);
+  return div().h(ui(16)).min_w(ui(16)).px(3).flex_none().flex().items_center().justify_center().rounded(4).font_medium().text_size(ui(10)).text_color(color).bg(alpha(color, "1a")).child(letter);
 }

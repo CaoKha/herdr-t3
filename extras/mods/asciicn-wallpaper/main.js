@@ -17,6 +17,7 @@ import { popupOpen, trigger } from "./trigger.js";
 import { MENU_ROW, menuRow } from "./menu-row.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
 import { KEY as LAYOUT, closedKey } from "./store.js";
+import { ui } from "./layout-settings.js";
 
 const STYLES = [['dots', 'Dots'], ['braille', 'Braille'], ['blocks', 'Blocks'], ['quadrants', 'Quadrants']];
 const styleName = (style) => STYLES.find(([id]) => id === style)?.[1] ?? style;
@@ -35,7 +36,7 @@ const menuItems = (windows) => [
   ...(windows ? [] : [{ id: "image", label: "Choose image…", icon: "image" }]),
   { id: "folder", label: "Open wallpaper folder", icon: "folder" },
 ];
-const menuHeight = (items) => 8 + items.length * MENU_ROW;
+const menuHeight = (items) => 8 + items.length * ui(MENU_ROW);
 // Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so
 // nothing flashes. FILL: the progress bar's last stretch, while Home loads the first picture.
 const SHOW = 150, KEEP = 300, FILL = 400;
@@ -535,7 +536,7 @@ export default class Wallpaper extends View {
     const shown = this.over || this.opening || menuUp || Date.now() < (this.shownUntil ?? 0) || /** @type {any} */ (this).fs.keyboard;
     const loader = (size) => svg(icon("loader-circle")).size(size).flex_none().text_color(t.dim);
     const switcher = h_flex().id("wallpaper-switcher").absolute().right(12).bottom(12).p(4).gap(4).items_center()
-      .rounded(8).bg(t.chrome).text_size(12).text_color(t.dim)
+      .rounded(8).bg(t.chrome).text_size(ui(12)).text_color(t.dim)
       .opacity(shown ? 1 : 0).transition("opacity", FADE)
       .child(button("wallpaper-back", "chevron-left", "Previous wallpaper", go(-1), all.length < 2))
       // A picture still loading puts the loader inside the name's fixed slot, so no button moves.
@@ -671,17 +672,17 @@ export default class Wallpaper extends View {
     const open = !!d.scene && !!d.shown && !waits.load;
     const loader = (size) => svg(icon("loader-circle")).size(size).flex_none().text_color(t.dim);
     const drawing = `Drawing ${d.image ? styleName(d.style) : "picture"}…`;
-    let rows = [div().id("wallpaper-card-name").h(20).flex_none().truncate().text_size(13).font_semibold().text_color(t.foreground).child(d.name)];
+    let rows = [div().id("wallpaper-card-name").h(ui(20)).flex_none().truncate().text_size(ui(13)).font_semibold().text_color(t.foreground).child(d.name)];
     if (!open) {
       rows.push(broken
-        ? div().id("wallpaper-card-error").flex_none().max_h(48).overflow_hidden().text_size(12).text_color(t.ansi1).child(d.message ?? "")
+        ? div().id("wallpaper-card-error").flex_none().max_h(48).overflow_hidden().text_size(ui(12)).text_color(t.ansi1).child(d.message ?? "")
         : waits.load ? this.progress(t, d, d.phase === 'loading' ? "Reading image…" : drawing, loader)
-        : div().h(26).flex_none());
+        : div().h(ui(16) + 10).flex_none());
     } else {
       if (d.pixels) rows.push(this.modes(t, d, loader, waits.draw));
       const reset = this.resetOf(d), atRest = p.zoom === reset.zoom && p.x === reset.x && p.y === reset.y;
-      rows.push(h_flex().h(28).flex_none().gap(8).items_center()
-        .child(h_flex().h(28).flex_1().min_w(0).p(2).gap(2).rounded(8).bg(t.raised).children([['cover', 'Fill'], ['contain', 'Fit']].map(([mode, text]) =>
+      rows.push(h_flex().h(ui(28)).flex_none().gap(8).items_center()
+        .child(h_flex().h(ui(28)).flex_1().min_w(0).p(2).gap(2).rounded(8).bg(t.raised).children([['cover', 'Fill'], ['contain', 'Fit']].map(([mode, text]) =>
           stop(this, t, `wallpaper-${mode}`, this.toggle(t, `wallpaper-${mode}`, { text, on: p.mode === mode, disabled: busy,
             label: `${mode === 'cover' ? 'Fill: crop to fill' : 'Fit: show the whole picture'}${p.mode === mode ? ', selected' : ''}`,
           }, cx => this.setPlacement(d, { mode }, cx)).rounded(6).flex_1().min_w(0), radiusOf("compact")))))
@@ -694,15 +695,15 @@ export default class Wallpaper extends View {
       : open && (waits.draw || waits.larger) ? h_flex().gap(6).items_center().child(loader(12)).child(d.phase === 'converting' ? drawing : "Loading picture…")
       : open && d.saved?.id.startsWith("file:") && !busy ? this.action(t, "wallpaper-delete", "Delete", () => this.askRemove(d.saved), { variant: "danger" })
       : null;
-    const footer = h_flex().id("wallpaper-card-footer").h(28).flex_none().gap(8).items_center()
-      .child(h_flex().id("wallpaper-card-status").flex_1().min_w(0).items_center().text_size(12).text_color(t.dim).when(Boolean(status), (el) => el.child(status)))
+    const footer = h_flex().id("wallpaper-card-footer").h(ui(28)).flex_none().gap(8).items_center()
+      .child(h_flex().id("wallpaper-card-status").flex_1().min_w(0).items_center().text_size(ui(12)).text_color(t.dim).when(Boolean(status), (el) => el.child(status)))
       .child(broken ? this.action(t, "wallpaper-close", "Close", cx => cx.spawn(cx => this.cancelPreview(cx)))
         : this.action(t, "wallpaper-cancel", "Cancel", cx => { if (!busy) cx.spawn(cx => this.cancelPreview(cx)); }, { disabled: busy }))
       .child((broken ? this.action(t, "wallpaper-choose-another", "Choose another…", cx => cx.spawn(cx => this.choose(cx)), { variant: "primary", disabled: window()?.platform === "windows" })
         : this.action(t, "wallpaper-apply", waits.apply || (d.applyQueued && waits.draw) ? "Applying…" : "Apply", cx => cx.spawn(cx => this.applyPreview(cx, d)),
           { variant: "primary", disabled: !open || busy || (!!d.applyQueued && waits.draw) })).min_w(72));
     return v_flex().id("wallpaper-card").absolute().right(12).bottom(12).w(this.cardWidth()).p(16).gap(12)
-      .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(12).text_color(t.muted)
+      .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(12)).text_color(t.muted)
       // The canvas lies under it: a press or scroll here is the card's.
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_scroll_wheel((_e, cx) => cx.stop_propagation())
@@ -716,10 +717,10 @@ export default class Wallpaper extends View {
   // loader stands by the step and there is no bar, which would claim an amount.
   progress(t, d, label, loader) {
     const w = this.cardWidth() - 32, f = d.progress == null ? null : d.phase === 'ready' ? 1 : d.progress;
-    const step = div().h(16).min_w(0).truncate().text_size(12).text_color(t.dim).child(label);
-    return v_flex().id("wallpaper-progress").h(26).flex_none().gap(6).role("progress_indicator")
+    const step = div().h(ui(16)).min_w(0).truncate().text_size(ui(12)).text_color(t.dim).child(label);
+    return v_flex().id("wallpaper-progress").h(ui(16) + 10).flex_none().gap(6).role("progress_indicator")
       .accessibility_label(f == null ? label : `${label} ${Math.round(f * 100)}%`)
-      .child(f == null ? h_flex().h(16).gap(6).items_center().child(loader(12)).child(step) : step)
+      .child(f == null ? h_flex().h(ui(16)).gap(6).items_center().child(loader(12)).child(step) : step)
       .when(f != null, (el) => el.child(div().relative().h(4).w_full().rounded(4).bg(t.border).overflow_hidden()
         .child(div().id("wallpaper-progress-bar").absolute().top(0).left(0).h_full().w(w * f).rounded(4).bg(t.foreground)
           .transition("width", { duration: d.phase === 'ready' ? FILL : 300, easing: d.phase === 'ready' ? "linear" : "ease-out" }))));
@@ -728,7 +729,7 @@ export default class Wallpaper extends View {
   // T3's segmented ToggleGroup; the mode being drawn carries the loader.
   modes(t, d, loader, drawing) {
     const off = d.phase === 'applying';
-    const styles = h_flex().id('wallpaper-styles').h(28).w_full().p(2).gap(2).rounded(8).bg(t.raised).role('group').accessibility_label('Image processing')
+    const styles = h_flex().id('wallpaper-styles').h(ui(28)).w_full().p(2).gap(2).rounded(8).bg(t.raised).role('group').accessibility_label('Image processing')
       .children(STYLES.map(([style, text], index) => stop(this, t, `wallpaper-style-${style}`,
         this.toggle(t, `wallpaper-style-${style}`, { text: style === 'quadrants' && (this.width ?? 324) < 324 ? 'Quads' : text,
           label: `${text}${d.style === style ? ', selected' : ''}`, on: d.style === style, disabled: off },
@@ -741,7 +742,7 @@ export default class Wallpaper extends View {
             cx.spawn(cx => this.setStyle(next, cx));
             cx.stop_propagation();
           }), 6)));
-    return tip(this, t, 'wallpaper-styles', 'Dots, Braille, Blocks or Quadrants', styles, { below: true }).h(28).flex_none().w_full();
+    return tip(this, t, 'wallpaper-styles', 'Dots, Braille, Blocks or Quadrants', styles, { below: true }).h(ui(28)).flex_none().w_full();
   }
 
   // − slider + and the zoom in percent. A slider (T3 has none: its 16px control icon and 4px spacing make the thumb and
@@ -767,7 +768,7 @@ export default class Wallpaper extends View {
       .child(this.tool(t, "wallpaper-zoom-out", "minus", "Zoom out", step(-1), off || z <= 1))
       .child(div().flex_1().min_w(0).mx(8).child(slider))
       .child(this.tool(t, "wallpaper-zoom-in", "plus", "Zoom in", step(1), off || z >= 4))
-      .child(div().id("wallpaper-zoom-value").w(40).ml(4).flex_none().text_right().text_size(12).text_color(t.dim).child(`${Math.round(z * 100)}%`));
+      .child(div().id("wallpaper-zoom-value").w(40).ml(4).flex_none().text_right().text_size(ui(12)).text_color(t.dim).child(`${Math.round(z * 100)}%`));
     return tip(this, t, "wallpaper-zoom-row", "Scroll to zoom at the pointer", row, { hint: "⌘-scroll on a trackpad" }).h(24).flex_none().w_full();
   }
 }

@@ -15,6 +15,7 @@ import { ago } from "./ago.js";
 import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
 import { worktreeLabel } from "./worktree.js";
+import { ui } from "./layout-settings.js";
 
 // The settle key: the layout's tab bar holds it; a standalone Inbox, its own command.
 const settleKey = () => keyOf("t3-tabs.settle") ? "t3-tabs.settle" : "t3-inbox.settle";
@@ -154,7 +155,7 @@ export function inboxRowView(view, t, model, actions, drag) {
         .child(h_flex().id(`controls-${a.address}`).h(20).flex_none().items_center().when(!acting, (el) => el.absolute().top(0).right(0))
         .when(Boolean(clock), (el) => el.child(clock))
         .child(div().when(!offer, (el) => el.absolute().top(0).right(0)).child(tip(view, t, id, a.mod ? "Settle and close" : "Settle agent", h_flex().id(id).h(20).px(6).mr(-4).gap(4).flex_none().items_center().rounded(6)
-        .text_size(12).text_color(lit(id, t.muted)).opacity(offer ? 1 : 0).transition("opacity", MOTION)
+        .text_size(ui(12)).text_color(lit(id, t.muted)).opacity(offer ? 1 : 0).transition("opacity", MOTION)
         // Faded out it's no button: a click there is the card's. As T3's row controls, hover only lights it: no ground.
         .when(offer, (el) => el.on_hover(glow(view, id)).role("button").accessibility_label(a.mod ? "Settle and close" : "Settle").when(!a.mod, (b) => b.on_mouse_down("left", sweepFrom("settle", a))).on_click((_e, cx) => {
           cx.stop_propagation();
@@ -175,18 +176,18 @@ export function inboxRowView(view, t, model, actions, drag) {
       .on_click(open(a)).on_size_change((size) => { view.cardH = size.height / zoom; }))
       .when(on, (el) => el.bg(t.selected))
       .when(!on && !ghost && !dragging && !view.sweep?.moved, (el) => el.when(menu, (m) => m.bg(t.hover)).hover((s) => s.bg(t.hover)).active((s) => s.bg(t.selected)))
-      .child(h_flex().h(20).gap(6).items_center().text_size(12).text_color(t.dim)
+      .child(h_flex().h(ui(20)).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
         .child(avatar(a.space, a.space_name, 16))
         // Lifted, a pin keeps its glyph only while it stays among the pins.
         .when(pins.includes(a.address) && (!ghost || plan?.section === "pinned" || !plan), (el) => el.child(pin(a, ghost)))
         .child(div().flex_1().min_w(0).truncate().child(a.space_name ?? ""))
         .child(corner))
-      .child(h_flex().h(20).mt(4).gap(6).items_center()
-        .child(div().flex_1().min_w(0).truncate().text_size(14).when(leads, (el) => el.font_medium())
+      .child(h_flex().h(ui(20)).mt(4).gap(6).items_center()
+        .child(div().flex_1().min_w(0).truncate().text_size(ui(14)).when(leads, (el) => el.font_medium())
           .text_color(leads || over || swept(a) ? t.foreground : t.muted).child(title(a)))
         // Marks go on the third line when there is one, as in T3, so the title keeps its whole line.
         .when(Boolean(marks) && !branch, (el) => el.child(marks)))
-      .when(Boolean(branch), (el) => el.child(h_flex().h(16).mt(2).gap(6).items_center().text_size(12).text_color(t.dim)
+      .when(Boolean(branch), (el) => el.child(h_flex().h(ui(16)).mt(2).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
         .when(Boolean(linked), (m) => m.child(worktreeMark(a, linked, branch, ghost)))
         // T3's MiddleTruncate: a branch's start and end tell it apart.
         .child(div().flex_1().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_middle().child(branch))
@@ -218,7 +219,7 @@ export function inboxRowView(view, t, model, actions, drag) {
     const time = napping
       ? h_flex().gap(4).items_center().text_color(t.accent).child(svg("mods/t3-inbox/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(napUntil(a), now))
       : !ghost && ago(settledAt(a)[0], now);
-    const base = h_flex().id(`${ghost ? "ghost-" : ""}slim-${a.address}`).h(SLIM).px(8).gap(10).flex_none().items_center().rounded(6);
+    const base = h_flex().id(`${ghost ? "ghost-" : ""}slim-${a.address}`).h(ui(SLIM)).px(8).gap(10).flex_none().items_center().rounded(6);
     return (ghost ? base : row(base, a, details).role("button").accessibility_label(title(a)).on_hover(hover(a)).when(Boolean(menuMod), context(a)).on_click(open(a)))
       .when(on, (el) => el.bg(t.selected))
       .when(!on && !ghost && !dragging && !view.sweep?.moved, (el) => el.hover((s) => s.bg(t.hover)).active((s) => s.bg(t.selected)))
@@ -227,7 +228,7 @@ export function inboxRowView(view, t, model, actions, drag) {
       .child(ghost ? (verb ? badge(verb) : div()) : swept(a) ? badge(view.sweep.action === "unsnooze" ? "wake" : "unsettle")
         // T3's corner: the time fades out on hover as the undo arrow fades in over it.
         : h_flex().id(`slim-corner-${a.address}`).relative().h(24).min_w(32).flex_none().items_center().justify_end()
-          .child(div().flex_none().text_size(12).text_color(t.dim).opacity(over ? 0 : 1).transition("opacity", MOTION).child(time))
+          .child(div().flex_none().text_size(ui(12)).text_color(t.dim).opacity(over ? 0 : 1).transition("opacity", MOTION).child(time))
           .child(div().absolute().top(0).right(-4).child(tip(view, t, undoId, undoLabel, undo, { action: on && !napping ? settleKey() : undefined, delay }))))
       .when(!ghost, (el) => stop(view, t, `slim-${a.address}`, el));
   };

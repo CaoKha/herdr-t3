@@ -13,6 +13,7 @@ import { keyOf } from "./tip.js";
 const SECTIONS = [
   { id: "home", title: "Home", icon: "mods/t3-chrome/icons/house.svg" },
   { id: "sidebar", title: "Sidebar", icon: "mods/t3-chrome/icons/panel-left.svg" },
+  { id: "text", title: "Text", icon: "mods/t3-chrome/icons/type.svg" },
 ];
 // A row's value is t3.settings' `key`, unless it has `get` and `set`: what the sidebar shows is the layout's own stack, which
 // its key (`also`, named in the hint as keys.json binds it) switches too, so it's read from there each time and never copied into t3.settings.
@@ -21,6 +22,8 @@ const ROWS = [
   { section: "home", key: "homeMod", title: "Home shows", about: "A terminal, or a mod that offers itself with \"home\": true in its mod.json.", options: (view) => view.homeMods },
   { section: "sidebar", key: "sidebarShows", title: "Sidebar shows", about: "The Inbox, or the Spaces and Agents lists.", also: "t3-tabs.sidebar", options: () => [["inbox", "Inbox"], ["lists", "Lists"]],
     get: () => sidebarParts(layout()).stack?.active ?? "lists", set: (child) => run("layout.select", { stack: "sidebar-lists", child }) },
+  { section: "text", key: "textSize", title: "Text size", about: "The layout's panels, lists and menus; the terminals keep their own. Default is Herdr's interface size.",
+    options: () => [[null, "Default"], ...[12, 13, 14, 15, 16, 18].map((n) => [n, `${n} px`])] },
 ];
 // Home as a shell, not a mod (homeMod null): an agent started there turns that space into an ordinary one (t3-tabs/navigation.js).
 const TERMINAL = [null, "Terminal"];

@@ -6,6 +6,7 @@ import { checking, exec, theme } from "herdr";
 import { focusRoot } from "./focus.js";
 import { menuKeys, scrollList } from "./list.js";
 import { menuRow, MENU_ROW } from "./menu-row.js";
+import { ui } from "./layout-settings.js";
 
 // T3 contracts/editor.ts; LaunchServices also finds bundles absent from this GUI process's PATH.
 const EDITORS = ["Cursor", "Trae", "Kiro", "Visual Studio Code", "Visual Studio Code - Insiders", "VSCodium", "Zed", "Antigravity",
@@ -52,7 +53,7 @@ export function targetIcon(mod, name, t, size = 16) {
 // At most this tall, so twenty editors scroll and the keys' row stays in view (list.js scrollList).
 const OPEN_IN_MAX = 420;
 /** The popup's height for `names` (a row saying why when there are none). */
-export const openInHeight = (names) => Math.min(OPEN_IN_MAX, 8 + Math.max(1, names.length) * MENU_ROW);
+export const openInHeight = (names) => Math.min(OPEN_IN_MAX, 8 + Math.max(1, names.length) * ui(MENU_ROW));
 
 /** An Open in menu opened before the probe has finished: redrawn once it has, so it lists what it found (targetsMenu). */
 export function awaitTargets(cx) {
@@ -67,8 +68,8 @@ export function targetsMenu(view, mod, names, reason, choose) {
   const t = theme(), pick = (at, cx) => choose(names[at], cx);
   return focusRoot(view, v_flex().id("open-in-menu").size_full().p(4).bg(t.popover).track_focus(view.keys)
     .on_key_down(menuKeys(view, names, pick))
-    .when(!names.length, el => el.child(h_flex().id("open-in-unavailable").min_h(28).px(8).items_center().text_size(14).text_color(t.dim).child(reason ?? "No installed editors found")))
-    .when(names.length > 0, el => el.child(scrollList(view, "open-in-list", { count: names.length, row: MENU_ROW, at: view.at, height: Math.min(names.length * MENU_ROW, OPEN_IN_MAX - 8),
+    .when(!names.length, el => el.child(h_flex().id("open-in-unavailable").min_h(ui(MENU_ROW)).px(8).items_center().text_size(ui(14)).text_color(t.dim).child(reason ?? "No installed editors found")))
+    .when(names.length > 0, el => el.child(scrollList(view, "open-in-list", { count: names.length, row: ui(MENU_ROW), at: view.at, height: Math.min(names.length * ui(MENU_ROW), OPEN_IN_MAX - 8),
       wheeled: (keep) => { if (keep >= 0) view.at = keep; },
       draw: (i) => menuRow(view, t, `open-in-${i}`, { at: [view, "at", i], label: names[i], icon: targetIcon(mod, names[i], t), pick: (cx) => pick(i, cx) })
         .accessibility_label(`Open in ${names[i]}`) }))));

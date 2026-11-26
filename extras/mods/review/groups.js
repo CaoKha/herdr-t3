@@ -4,6 +4,7 @@ import { groupFiles } from "./rows.js";
 import { LU, zoom, isLight, diffStats, FADED } from "./controls.js";
 import { hoverKept } from "./tip.js";
 import { tint } from "./button.js";
+import { ui } from "./layout-settings.js";
 
 // The app's category icons (Lucide here, for one icon set across the layout; the app's are Phosphor duotone, in its own shapes) and hues (Tailwind's 300 on dark, 800 on light), by category.
 const CATEGORY = {
@@ -66,7 +67,7 @@ export function groupTabs(view, t, pick) {
       const id = `group-tab-${g.key}`, active = g.key === view.groupKey;
       const stats = view.tabStats.stats.get(g.key), critical = g.critical || g.children.some(c => c.critical);
       return hoverKept(view, "hovered", id, h_flex().id(id)).flex_none().px(8).py(2).gap(8).items_center().rounded(8)
-        .text_size(12).font_medium().text_color(t.foreground)
+        .text_size(ui(12)).font_medium().text_color(t.foreground)
         .when(active, el => el.bg(tint(t, "chrome", true))).when(!active, el => el.opacity(FADED).hover(s => s.opacity(1).bg(tint(t, "chrome", false))))
         .role("tab").accessibility_label(g.label).on_click((_e, cx) => pick(g.key, cx))
         .child(v_flex().items_start()
@@ -74,7 +75,7 @@ export function groupTabs(view, t, pick) {
             .child(categoryIcon(t, g.category, active || view.hovered === id).size(14))
             .child(g.label)
             .when(critical, el => el.child(criticalMark(t, 14))))
-          .child(h_flex().items_center().text_size(11).font_normal()
+          .child(h_flex().items_center().text_size(ui(11)).font_normal()
             .child(diffStats(t, stats.added, stats.deleted))
             .child(div().id(`${id}-count`).text_color(t.dim).child(`${stats.added || stats.deleted ? "・" : ""}${stats.count} ${stats.count === 1 ? "file" : "files"}`))))
         .when(stats.progress !== 0, el => el.child(donut(t, stats.progress)));

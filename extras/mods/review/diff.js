@@ -2,19 +2,20 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, v_virtual_list, TextView } from "gpui-base";
 import { notify } from "herdr";
 import { review } from "./daemon.js";
-import { codeInset, FILE, noteWidth, ROW, wrapRow } from "./rows.js";
+import { codeInset, FILE, noteWidth, NUMBER_W, ROW, wrapRow } from "./rows.js";
 import { canFull } from "./review-load.js";
 import { LU, mono, zoom, isLight, checkMark, diffStats, popover } from "./controls.js";
 import { fileStatus } from "./files.js";
 import { emptyState } from "./panel-states.js";
 import { holdWidth } from "./nav-column.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // The runs measured for a character's width, and a wide one's: long enough that rounding the whole to a pixel doesn't matter.
 const MEASURED = "0".repeat(100), MEASURED_WIDE = "中".repeat(100);
 // A run of the code font, drawn unseen under the list until its width is known, for where wrapped lines break (rows.js
 // wrapColumns); again when the font is changed in the settings.
-const measureRun = (id, text, set) => div().id(id).absolute().top(0).left(0).opacity(0).font_family(mono()).text_size(12).whitespace_nowrap()
+const measureRun = (id, text, set) => div().id(id).absolute().top(0).left(0).opacity(0).font_family(mono()).text_size(ui(12)).whitespace_nowrap()
   .on_size_change((size, cx) => { if (size.width > 0) { set(size.width / zoom() / text.length); cx.notify(); } })
   .child(text);
 // How long a sideways scroll's bars stay after it stops (ms).
@@ -59,7 +60,7 @@ export function foldAll(view, { collapse, applies }, cx) {
 
 export function foldMenu(view, t) {
   return popover(view, t, "review-fold-menu").min_w(160).p(4)
-    .children(FOLDS.map((fold, i) => h_flex().id(`fold-${fold.id}`).h(28).px(8).gap(8).items_center().rounded(4)
+    .children(FOLDS.map((fold, i) => h_flex().id(`fold-${fold.id}`).h(ui(28)).px(8).gap(8).items_center().rounded(4)
       .when(i === view.foldAt, el => el.bg(t.selected)).on_hover((on, cx) => { if (on && view.foldAt !== i) { view.foldAt = i; cx.notify(); } })
       .role("button").accessibility_label(fold.label).on_click((_e, cx) => foldAll(view, fold, cx))
       .child(svg(`${LU}/${fold.icon}.svg`).size(16).mx(-2).flex_none().text_color(t.dim))
@@ -108,7 +109,7 @@ export function diffView(view, t) {
   const items = view.items(), sticky = view.stickyFile();
   view.stuck = Boolean(sticky);
   return v_flex().size_full().min_w(0).overflow_hidden()
-    .child(div().id("review-diff-area").flex_1().min_h(0).overflow_hidden().relative().text_size(12)
+    .child(div().id("review-diff-area").flex_1().min_h(0).overflow_hidden().relative().text_size(ui(12))
       .on_size_change((size, cx) => {
         view.diffHeight = size.height / zoom();
         // Wrapped lines are cut again only once the width holds (view.wrapHold): a panel dragged changes it every frame.
@@ -132,8 +133,8 @@ export function diffView(view, t) {
       // A row reports only its key: where the press landed says which part of a file's header it was for.
       .on_mouse_down("left", (event) => { view.pressX = (event.local_position?.x ?? 0) / zoom(); view.pressY = (event.local_position?.y ?? 0) / zoom(); })
       // A wide character's own: a code font seldom has CJK, and the one drawn in its place makes it about 1em, not 2 columns.
-      .when(!view.charWidth || view.charFont !== mono(), el => el.child(measureRun("review-char", MEASURED, (w) => { view.panel.charWidth = w; view.panel.charFont = mono(); })))
-      .when(!view.wideWidth || view.wideFont !== mono(), el => el.child(measureRun("review-wide", MEASURED_WIDE, (w) => { view.panel.wideWidth = w; view.panel.wideFont = mono(); })))
+      .when(!view.charWidth || view.charFont !== mono() || view.charSize !== ui(12), el => el.child(measureRun("review-char", MEASURED, (w) => { view.panel.charWidth = w; view.panel.charFont = mono(); view.panel.charSize = ui(12); })))
+      .when(!view.wideWidth || view.wideFont !== mono() || view.wideSize !== ui(12), el => el.child(measureRun("review-wide", MEASURED_WIDE, (w) => { view.panel.wideWidth = w; view.panel.wideFont = mono(); view.panel.wideSize = ui(12); })))
       // A blank after the items (trailing) lets the last header reach the top.
       .child(v_virtual_list("review-diff", items.length + 1, view.listSizes(), (i) => items[i]?.key ?? "end",
         // The range drawn is the only word on where the list is scrolled, and its frames on when a scroll has landed.
@@ -144,7 +145,7 @@ export function diffView(view, t) {
         .track_scroll(view.scroll).size_full()
         .on_item_click((key, cx) => {
           // A press on the stuck header lands on the row under it too: the header has it.
-          if (view.stuck && view.pressY < FILE) return;
+          if (view.stuck && view.pressY < ui(FILE)) return;
           const path = view.itemList.find(item => item.key === key)?.path, file = view.review.files.find(f => f.path === path);
           if (!file) return;
           if (key.startsWith("f:")) view.headerPress(file, view.pressX ?? 0, cx);
@@ -160,7 +161,7 @@ export function diffView(view, t) {
           const at = view.items().findIndex(item => item.key === `f:${sticky.path}`);
           if (open && view.collapsed.has(sticky.path) && at >= 0) view.scroll.scroll_to_item(at);
         })
-        .child(diffItem(view, t, { key: `f:${sticky.path}`, kind: "file", file: sticky, size: FILE }))))
+        .child(diffItem(view, t, { key: `f:${sticky.path}`, kind: "file", file: sticky, size: ui(FILE) }))))
       .child(Scrollbar.vertical("review-diff").absolute().inset_0())
       .children(view.hbars(t))
       // As T3's DiffPanel with nothing to show: a diff with no files has no group either.
@@ -193,12 +194,12 @@ function drawCode(t, row, numbers, shift = 0, wrapped = null) {
   // Herdr ships JetBrains Mono; Geist Mono, a common terminal font here, draws `=>` over the space before it.
   return h_flex().flex_1().min_w(0).h_full().overflow_hidden().font_family(mono()).when(Boolean(tint), el => el.bg(tint))
     .when(!wrapped, el => el.items_center()).when(Boolean(wrapped), el => el.items_start())
-    .children(numbers.map(number => div().w(40).flex_none().pr(6).text_right().text_color(t.dim)
-      .when(Boolean(wrapped), el => el.h(ROW).flex().items_center().justify_end()).child(number === undefined ? "" : String(number))))
+    .children(numbers.map(number => div().w(ui(NUMBER_W)).flex_none().pr(6).text_right().text_color(t.dim)
+      .when(Boolean(wrapped), el => el.h(ui(ROW)).flex().items_center().justify_end()).child(number === undefined ? "" : String(number))))
     .child(div().w(12).flex_none().text_color(row.kind === "+" ? t.ansi2 : row.kind === "-" ? t.ansi1 : t.dim)
-      .when(Boolean(wrapped), el => el.h(ROW).flex().items_center()).child(row.kind === " " ? "" : row.kind))
+      .when(Boolean(wrapped), el => el.h(ui(ROW)).flex().items_center()).child(row.kind === " " ? "" : row.kind))
     .child(wrapped
-      ? v_flex().flex_1().min_w(0).overflow_hidden().children(wrapped.map(tokens => h_flex().h(ROW).flex_none().items_center().whitespace_nowrap().children(code(tokens))))
+      ? v_flex().flex_1().min_w(0).overflow_hidden().children(wrapped.map(tokens => h_flex().h(ui(ROW)).flex_none().items_center().whitespace_nowrap().children(code(tokens))))
       : h_flex().flex_1().min_w(0).overflow_hidden().whitespace_nowrap().child(h_flex().flex_none().relative().left(-shift).children(code(row.tokens))));
 }
 
@@ -215,11 +216,11 @@ function diffItem(view, t, item) {
         .child(checkMark(t, f.changed ? "changed" : f.reviewed ? "all" : "none"))
         .child(div().min_w(0).flex_shrink_1().truncate().when(f.reviewed, el => el.text_color(t.dim)).child(f.previousPath ? `${f.previousPath} → ${f.path}` : f.path))
         .when(f.test, el => el.child(svg(`${LU}/flask-conical.svg`).size(14).flex_none().text_color(isLight(t.background) ? "#15803d" : "#4ade80")))
-        .when(f.noisy, el => el.child(div().flex_none().text_size(11).text_color(t.dim).child("generated")))
-        .when(f.changed, el => el.child(div().flex_none().text_size(11).text_color(t.ansi3).child("changed since reviewed")))
+        .when(f.noisy, el => el.child(div().flex_none().text_size(ui(11)).text_color(t.dim).child("generated")))
+        .when(f.changed, el => el.child(div().flex_none().text_size(ui(11)).text_color(t.ansi3).child("changed since reviewed")))
         .child(div().flex_1())
-        .when(!f.isBinary, el => el.child(div().flex_none().text_size(11).child(diffStats(t, f.additions, f.deletions))))
-        .when(f.isBinary, el => el.child(div().flex_none().text_size(11).text_color(t.dim).child("binary")))
+        .when(!f.isBinary, el => el.child(div().flex_none().text_size(ui(11)).child(diffStats(t, f.additions, f.deletions))))
+        .when(f.isBinary, el => el.child(div().flex_none().text_size(ui(11)).text_color(t.dim).child("binary")))
         .child(fileStatus(f.status))
         .child(h_flex().flex_none().gap(4)
           .child(slot().when(canFull(f), el => el.child(svg(loading ? "mods/review/icons/loader-circle.svg" : "mods/review/icons/file-text.svg").size(12).text_color(loading ? t.working : full ? t.accent : t.dim))))
@@ -232,7 +233,7 @@ function diffItem(view, t, item) {
     case "hunk":
       // Hunk headers on the text color at 5%, as Pierre's separator (the code's ground 95%, its text 5%), 11px; `@@` is code, so mono.
       // Cut inside the 12 on the right too: truncate on the padded row would clip the text at its border.
-      return div().w_full().h(item.size).px(12).flex().items_center().bg(alpha(t.foreground, "0d")).font_family(mono()).text_size(11).text_color(t.dim)
+      return div().w_full().h(item.size).px(12).flex().items_center().bg(alpha(t.foreground, "0d")).font_family(mono()).text_size(ui(11)).text_color(t.dim)
         .child(div().min_w(0).truncate().child(item.text));
     case "note": {
       // As the app's AnalysisNoteCard: a sparkle, or a critical note's mark, then its Markdown in the UI font.
@@ -244,7 +245,7 @@ function diffItem(view, t, item) {
           : svg(`${LU}/sparkles.svg`).size(12).mt(3).flex_none().text_color(t.dim))
         // Markdown in a row wraps at the row's width, past the mark and padding: a column of the measured width holds it.
         .child(v_flex().w(noteWidth(view.view, item.anchored)).flex_none()
-          .child(TextView.markdown(`note-${item.key}`, note.text).selectable(true).scrollable(false).text_size(12).text_color(t.foreground)));
+          .child(TextView.markdown(`note-${item.key}`, note.text).selectable(true).scrollable(false).text_size(ui(12)).text_color(t.foreground)));
       return item.anchored
         ? div().w_full().h(item.size).px(12).py(3)
           .child(body.w_full().max_w(800).h_full().px(10).py(4).rounded(8).bg(critical ? alpha(t.blocked, "1a") : alpha(t.foreground, "0a")))
@@ -263,12 +264,12 @@ function diffLine(view, t, kind, line) {
   const cols = view.wrapCols?.[kind], cut = (row) => cols && row ? wrapRow(row, cols, view.wrapCols.wide) : null;
   if (kind === "pair") {
     const left = cut(line.left), right = cut(line.right);
-    return h_flex().w_full().h(cols ? Math.max(left?.length ?? 1, right?.length ?? 1) * ROW : ROW)
+    return h_flex().w_full().h(cols ? Math.max(left?.length ?? 1, right?.length ?? 1) * ui(ROW) : ui(ROW))
       .child(drawCode(t, line.left, [line.left?.old], Math.min(view.shift[0], view.sideMax(0)), left))
       // A 1px gap of the panel's chrome between the halves on background, as Pierre's sides, no rule.
       .child(div().w(1).h_full().flex_none().bg(t.chrome))
       .child(drawCode(t, line.right, [line.right?.new], Math.min(view.shift[1], view.sideMax(1)), right));
   }
   const numbers = kind === "solo" ? [line.kind === "-" ? line.old : line.new] : [line.old, line.new], lines = cut(line);
-  return h_flex().w_full().h(lines ? lines.length * ROW : ROW).child(drawCode(t, line, numbers, Math.min(view.shift[2], view.sideMax(2)), lines));
+  return h_flex().w_full().h(lines ? lines.length * ui(ROW) : ui(ROW)).child(drawCode(t, line, numbers, Math.min(view.shift[2], view.sideMax(2)), lines));
 }

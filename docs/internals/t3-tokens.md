@@ -13,6 +13,10 @@ This file holds only the rules and tokens shared by the whole layout. Sizes and 
 
 Conversion: T3 `1rem = 16px`, `spacing(1) = 4px`, and Herdr's logical px map one to one. Where there is an `sm:` value, take it: that is the desktop size.
 
+### Text size
+
+Every size here is written for 13px text and drawn through `ui(n)` (`shared/layout-settings.js`): n × size / 13, whole px, n itself at 13. The size is `t3.settings.textSize`, else Herdr's `ui_font_size` (which `settings.json` can't set today, so 13). Wrap with `ui()` every text size and every height that exists to fit text: list, menu, tree, tab and code rows, the popup heights and offsets summed from them, line heights and character-width guesses. Keep fixed what isn't about text: the window's and the layout's bars (40px top bars, the tab row, panel heads on the pane header's centre, traffic lights), gaps, padding, radii, widths, icons and icon-only buttons, and badges drawn in an icon's box. Keep a base constant as written and wrap it at each use, so what's drawn and what's summed agree. The layout's Settings dialog stays at Herdr's own sizes, as Herdr's Settings does.
+
 ### Design principles
 
 Check every rewritten block against these nine:

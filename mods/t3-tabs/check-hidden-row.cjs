@@ -16,6 +16,7 @@ const list = [pi("t1", "c1", "blocked", "Fix login"), pi("t2", "c2", "idle", "La
 // Away from Home with the Inbox: the breadcrumb's (navigation.js context), here with t2 in view.
 const ctx = { space: { id: "s", name: "proj", tabs: [] }, tab: "c2", parent: null, heads: ["t2"], head: "t2", sub: null, held: false, away: false, kin: [], programs: [] };
 const env = {
+  ui: (n) => n,
   View: class {}, div: element, svg: src => Object.assign(element(), { src }), image: src => Object.assign(element(), { kind: "image", src }), h_flex: element,
   Popup: { new: (_id, trigger) => element().child(trigger) },
   theme: () => t, props: () => ({}), settings: () => ({ zoom: 1 }), window: () => ({ platform: "macos", buttons: false }),

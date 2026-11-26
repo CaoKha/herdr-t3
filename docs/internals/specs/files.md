@@ -97,7 +97,7 @@ Sources: T3 `09a54f01` `files/fileSurfaceChrome.tsx`, `FileBrowserPanel.tsx`, `F
 
 ### Editor languages
 
-`EditorState.language` accepts any string, but only some names have a grammar. Mapped by extension (`model.js` `LANGUAGES`); the rest stay plain:
+`EditorState.language` accepts any string, but only some names have a grammar. Mapped by extension (`shared/code.js` `LANGUAGES`, which Pull requests and Issues use too); the rest stay plain:
 
 | Extensions | Language |
 | --- | --- |

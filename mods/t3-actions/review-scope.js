@@ -9,6 +9,7 @@ import { git, readReview, readPicks, readRefs, argPage } from "./review-git.js";
 import { PANE, LU, MODEL_ROW, pickMark, searchField } from "./review-menu.js";
 import { menuRow, menuRule } from "./menu-row.js";
 import { ago } from "./ago.js";
+import { ui } from "./layout-settings.js";
 
 // A conventional commit's type and scope (`fix(t3-tabs): `), dimmed so the words after it lead.
 const PREFIX = /^[a-z]+(\([^)]*\))?!?: /;
@@ -166,7 +167,7 @@ export function commitsBody(view, t, { height, icons = LU }) {
   const items = scopeList(view);
   return [searchField(t, view.scopeSearch, icons).mx(8).mt(5).mb(5),
     v_flex().flex_none()
-      .child(scrollList(view, "scope-list", { count: items.length, row: MODEL_ROW, at: view.scopeListAt, draw: (i) => commitRow(view, t, items, i, icons), height: Math.min(items.length * MODEL_ROW, height),
+      .child(scrollList(view, "scope-list", { count: items.length, row: ui(MODEL_ROW), at: view.scopeListAt, draw: (i) => commitRow(view, t, items, i, icons), height: Math.min(items.length * ui(MODEL_ROW), height),
         wheeled: (keep) => { if (keep >= 0) view.scopeListAt = keep; } }))
       .when(!items.length, el => el.child(div().id("scope-none").p(8).flex_none().text_center().text_color(t.dim).child(view.picks ? "No matches" : "Reading…")))];
 }
@@ -183,7 +184,7 @@ export function openScope(view, cx, lit = -1) {
 export function scopeRow(view, t, r, i, { icons = LU, open = false, also = undefined } = {}) {
   return menuRow(view, t, r.id, { at: [view, "scopeAt", i], label: r.label, open, lead: pickMark(Boolean(r.on), icons), sub: Boolean(r.sub) && icons,
     disabled: r.known && !r.count && !r.on, pick: (cx) => pickScopeRow(view, r, cx),
-    trail: r.detail ? div().id(`${r.id}-detail`).flex_none().ml(16).text_size(12).text_color(t.dim).child(r.detail) : null, also })
+    trail: r.detail ? div().id(`${r.id}-detail`).flex_none().ml(16).text_size(ui(12)).text_color(t.dim).child(r.detail) : null, also })
     .role(r.sub ? "button" : "radio_button").accessibility_label(`${r.label}${r.detail ? `, ${r.detail}` : ""}${r.on ? ", shown" : ""}`);
 }
 
@@ -201,8 +202,8 @@ export function commitRow(view, t, items, i, icons = LU) {
     .when(Boolean(prefix), el => el.child(div().flex_none().text_color(t.dim).child(prefix.trim())))
     .child(div().flex_1().min_w(0).truncate().child(c.subject.slice(prefix.length)));
   const trail = (out || c.time) ? h_flex().flex_none().gap(8).items_center()
-    .when(out, el => el.child(div().flex_none().text_size(12).text_color(t.ansi2).child("↑")))
-    .when(Boolean(c.time), el => el.child(div().id(`${item.id}-time`).flex_none().text_size(12).text_color(t.dim).child(ago(c.time, now)))) : null;
+    .when(out, el => el.child(div().flex_none().text_size(ui(12)).text_color(t.ansi2).child("↑")))
+    .when(Boolean(c.time), el => el.child(div().id(`${item.id}-time`).flex_none().text_size(ui(12)).text_color(t.dim).child(ago(c.time, now)))) : null;
   return menuRow(view, t, item.id, { at: [view, "scopeListAt", i], label, lead: pickMark(on, icons), trail, pick: (cx) => pickListed(view, item, cx) })
     .accessibility_label(`Review commit ${c.subject}${on ? ", shown" : ""}${out ? ", not pushed" : ""}`);
 }

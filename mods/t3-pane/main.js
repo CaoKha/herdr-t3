@@ -17,6 +17,7 @@ import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
 import { openMenu } from "./menu.js";
 import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
+import { ui } from "./layout-settings.js";
 
 // The list as the layout's other menus (the sort menu, the right-click menu): 4 around 28px rows.
 const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = closedKey("t3-pane", "kids");
@@ -103,7 +104,7 @@ export default class Pane extends View {
         }
         cx.stop_propagation(); cx.notify();
       })
-      .child(scrollList(this, "pane-kids-list", { count: rows.length, row: MENU_ROW, height: Math.min(rows.length, KIDS_SHOWN) * MENU_ROW, at: cursor.at,
+      .child(scrollList(this, "pane-kids-list", { count: rows.length, row: ui(MENU_ROW), height: Math.min(rows.length, KIDS_SHOWN) * ui(MENU_ROW), at: cursor.at,
         wheeled: (keep) => { if (keep >= 0) cursor.at = keep; },
         draw: (i) => {
           const { k, depth } = rows[i];
@@ -188,7 +189,7 @@ export default class Pane extends View {
       .pr(2)
       .gap(6)
       .items_center()
-      .text_size(14)
+      .text_size(ui(14))
       .on_hover((on, cx) => this.headHover(on, cx))
       .on_mouse_move((e) => { pointerMoved(e.position); this.box = e.bounds; })
       .on_click(() => run("pane.focus", { pane }))

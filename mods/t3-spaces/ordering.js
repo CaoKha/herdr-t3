@@ -119,14 +119,15 @@ export function spaceOrdering({ spaces, panes, machines, run, home, facts, shown
   }
 
   function preview(rows, key, y, drawn) {
+    const rowH = row(), pitchH = pitch();
     const at = rows.findIndex(e => e.key === key), lead = rows[at];
     let end = at + 1;
     const sibling = parent(lead.r);
     if (!sibling) while (rows[end]?.r?.tree) end++;
     const block = rows.slice(at, end), rest = [...rows.slice(0, at), ...rows.slice(end)];
-    y = Math.max(0, Math.min(y, rest.length * pitch));
+    y = Math.max(0, Math.min(y, rest.length * pitchH));
     let slot = at, edge = null;
-    const under = rest[Math.min(rest.length - 1, Math.floor((y - row / 2) / pitch))];
+    const under = rest[Math.min(rest.length - 1, Math.floor((y - rowH / 2) / pitchH))];
     if (drawn && (!under || under.m === lead.m)) {
       const inScope = e => e?.r && e.m === lead.m && parent(e.r) === sibling;
       for (let j = 0; j <= rest.length; j++) {
@@ -136,7 +137,7 @@ export function spaceOrdering({ spaces, panes, machines, run, home, facts, shown
         let k = j - 1;
         if (!sibling) while (rest[k]?.r?.tree) k--;
         const previous = rest[k], anchor = inScope(next) ? next : inScope(previous) ? previous : null;
-        if (anchor && Math.abs(j * pitch - y) < Math.abs(slot * pitch - y)) {
+        if (anchor && Math.abs(j * pitchH - y) < Math.abs(slot * pitchH - y)) {
           slot = j;
           edge = { machine: lead.m, parent: sibling, anchor: groupKey(anchor.r), after: anchor !== next };
         }

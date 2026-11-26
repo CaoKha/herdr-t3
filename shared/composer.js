@@ -5,6 +5,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, TextareaState, Textarea } from "gpui-base";
 import { alpha } from "./color.js";
 import { textButton } from "./page.js";
+import { ui } from "./layout-settings.js";
 
 export function initComposer(view) {
   /** @type {Map<string, string>} */
@@ -41,8 +42,8 @@ export function sent(view, key) {
  * at its right, Cancel before the action. `state` null draws the empty box while it takes its draft.
  */
 export function editor(view, t, id, state, focused, label, { send, cancel = null }) {
-  const box = state ? Textarea.new(state).w_full().px(11).py(7).rounded(8).text_size(13).text_color(t.foreground).accessibility_label(label)
-    : div().w_full().h(76).px(11).py(7).text_size(13).text_color(t.dim).child(label);
+  const box = state ? Textarea.new(state).w_full().px(11).py(7).rounded(8).text_size(ui(13)).text_color(t.foreground).accessibility_label(label)
+    : div().w_full().h(ui(76)).px(11).py(7).text_size(ui(13)).text_color(t.dim).child(label);
   return v_flex().id(id).px(6).pt(4).gap(8)
     .child(div().id(`${id}-frame`).relative().rounded(8).border_1().border_color(focused ? t.accent : t.input).when(focused, (el) => el.bg(t.background))
       .child(box)

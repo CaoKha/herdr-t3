@@ -3,6 +3,7 @@
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { stop } from "./focus.js";
+import { ui } from "./layout-settings.js";
 
 /**
  * `options`: `{ id, label, on, pick(cx), count?, name? }`, `name` what assistive tech reads (else the label and count). `fill`:
@@ -12,8 +13,8 @@ import { stop } from "./focus.js";
  */
 export function segmented(view, t, options, { fill = false, role = "button" } = {}) {
   return h_flex().p(2).gap(2).rounded(8).bg(t.input).when(!fill, (el) => el.flex_none())
-    .children(options.map(({ id, label, on, pick, count = null, name }) => stop(view, t, id, h_flex().id(id).h(24).px(10).gap(6).items_center().rounded(6)
-      .text_size(12).font_medium().when(fill, (el) => el.flex_1().justify_center()).when(!fill, (el) => el.flex_none())
+    .children(options.map(({ id, label, on, pick, count = null, name }) => stop(view, t, id, h_flex().id(id).h(ui(24)).px(10).gap(6).items_center().rounded(6)
+      .text_size(ui(12)).font_medium().when(fill, (el) => el.flex_1().justify_center()).when(!fill, (el) => el.flex_none())
       .when(on, (el) => el.bg(t.selected)).text_color(on ? t.foreground : t.dim).hover((s) => s.text_color(t.foreground))
       .role(role).accessibility_label(name ?? `${label}${count == null ? "" : `, ${count}`}${on ? ", shown" : ""}`)
       .on_click((_e, cx) => { pick(cx); cx.notify(); })

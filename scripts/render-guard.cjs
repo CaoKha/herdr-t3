@@ -42,7 +42,7 @@ function guardView(ctx, Mod) {
     const refuse = (what) => () => { throw new Error(`${what} is not allowed during the 'render' phase`); };
     const saved = {};
     for (const k of ["notify", "new", "focus_handle"]) if (typeof cx[k] === "function") { saved[k] = cx[k]; cx[k] = refuse(`cx.${k}()`); }
-    const made = ["InputState", "VirtualListScrollHandle"].map(k => [k, ctx[k], ctx[k]?.new]).filter(([, , make]) => make);
+    const made = ["InputState", "EditorState", "VirtualListScrollHandle"].map(k => [k, ctx[k], ctx[k]?.new]).filter(([, , make]) => make);
     for (const [k, owner] of made) owner.new = refuse(`${k}.new()`);
     drawing++;
     try { return render.call(this, cx, ...rest); } finally { drawing--; Object.assign(cx, saved); for (const [, owner, make] of made) owner.new = make; }

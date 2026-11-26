@@ -9,7 +9,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find } = kit;
 const srcs = (n) => !n || typeof n !== "object" ? [] : [...(typeof n.src === "string" ? [n.src] : []), ...n.items.flatMap(srcs)];
 const tips = [];
-const scope = vm.createContext({
+const scope = vm.createContext({ ui: (n) => n, 
   div: element, h_flex: element, svg: src => Object.assign(element(), { src }), Popup: { new: (_id, el) => element().child(el) },
   settings: () => ({ zoom: 1 }), pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, POINTER_WATCH: 100, FADE: {},
   tip: (_v, _t, id, label, el, options) => { tips.push([id, label, options]); return el; }, tipCard: element,

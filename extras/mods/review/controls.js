@@ -7,6 +7,7 @@ import { PANE, LU, COMPACT, MODEL_ROW, zoom, pickMark, searchField, popupClosed 
 import { subPlace } from "./submenu.js";
 import { opener } from "./trigger.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 export { PANE, LU, COMPACT, MODEL_ROW, zoom, pickMark, searchField };
 
 // The toolbar, 32 high, not T3's 40: its row's centre falls on the work column's pane header's (40 of tabs, 2 of border, half
@@ -16,7 +17,7 @@ export const HEADER = 32, BELOW = HEADER / 2 + 28 / 2 + 4;
 // The page's popovers (settings, status, the scope menu and its submenu): drawn inside the pane, not popups. A press outside
 // one closes it, unless it's on its submenu (`subRect`, subAt).
 export function popover(view, t, id, closes = true) {
-  return v_flex().id(id).rounded(8).bg(t.popover).border_1().border_color(t.border).text_size(14).shadow_lg()
+  return v_flex().id(id).rounded(8).bg(t.popover).border_1().border_color(t.border).text_size(ui(14)).shadow_lg()
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_scroll_wheel((_e, cx) => cx.stop_propagation())
     .when(closes, el => el.on_mouse_down_out((e, cx) => { if (!inSub(view, e)) view.closePopup(cx, true); }));

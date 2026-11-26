@@ -3,6 +3,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // As T3's tooltip group: while a card is up, or was a moment ago, the next opens at once.
 export const detailsLive = (view) => Boolean(view.details) || Date.now() - (view.detailsClosed ?? 0) < 400;
@@ -85,7 +86,7 @@ export function detailsCard(view, t, key, title, lines, { wrap, hide, from = -4 
   const shown = view.details === key && view.detailsIn && !hide;
   return v_flex().id(`details-card-${key}`).max_w(320).p(12).gap(8).rounded(6).border(1).border_color(t.border)
     // Solid: T3's glass blurs what's behind it, which a mod can't, and a terminal's text would show through.
-    .bg(t.chrome).shadow_xl().text_size(12).line_height("16px").opacity(shown ? 1 : 0).left(shown ? 0 : from).transition("opacity", detailsFade).transition("left", detailsFade)
+    .bg(t.chrome).shadow_xl().text_size(ui(12)).line_height(`${ui(16)}px`).opacity(shown ? 1 : 0).left(shown ? 0 : from).transition("opacity", detailsFade).transition("left", detailsFade)
     .child(div().min_w(0).when(!wrap, el => el.truncate()).line_height(1.25).font_medium().text_color(t.foreground).child(title))
     .child(v_flex().pl(2).gap(6).children(lines.filter(Boolean)));
 }

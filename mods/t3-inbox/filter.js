@@ -12,6 +12,7 @@ import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
 import { trigger } from "./trigger.js";
 import { namer } from "./name.js";
+import { ui } from "./layout-settings.js";
 
 // The space filter's rows, flush as T3's, and how many show before the list scrolls: the whole rows T3's 23rem holds.
 const SCOPE_ROW = 32, SCOPE_SHOWN = 9;
@@ -82,7 +83,7 @@ export function inboxTop(view, t, model) {
   const choice = (s, i) => {
     const on = s.id ? scope.includes(s.id) : scope.length === 0;
     // Selection is a check badge on the icon, as in T3.
-    return h_flex().id(`scope-${s.id ?? "all"}`).h(SCOPE_ROW).px(8).gap(8).flex_none().items_center().rounded(4)
+    return h_flex().id(`scope-${s.id ?? "all"}`).h(ui(SCOPE_ROW)).px(8).gap(8).flex_none().items_center().rounded(4)
       .when(i === view.scopeAt, (el) => el.bg(t.selected))
       .on_hover((over, cx) => { if (over && view.scopeAt !== i) { view.scopeAt = i; cx.notify(); } })
       .role("button").accessibility_label(s.name)
@@ -117,7 +118,7 @@ export function inboxTop(view, t, model) {
           : h_flex().flex_none().ml(-6).rounded(6).border(2).border_color(t.chrome).child(avatar(s.id, s.name, 14))))
         : avatar(scoped[0].id, scoped[0].name, 16))), radiusOf("sm")))
     .content(v_flex().id("inbox-scope-panel").w(288).mt(4).p(4).rounded(8)
-      .bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(14)
+      .bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(14))
       .on_key_down((e, cx) => {
         const to = step(e, view.scopeAt, view.matches(cx).length);
         if (to < 0) return;
@@ -128,13 +129,13 @@ export function inboxTop(view, t, model) {
       // As T3's ComboboxSearchInput. Its text starts 20 from the icon, 4 before the names, inside the button's left edge as the panel hangs from it.
       .child(h_flex().mx(8).mt(5).h(33).pb(6).gap(4).flex_none().items_center().border_b_1().border_color(t.border)
         .child(svg("mods/t3-inbox/icons/search.svg").size(16).flex_none().text_color(t.dim))
-        .child(Input.new(view.search).flex_1().h_full().text_size(14).text_color(t.foreground)))
+        .child(Input.new(view.search).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)))
       .child(div().pt(5).flex_none()
-        .when(found.length > 0, (el) => el.child(scrollList(view, "inbox-scope-list", { count: found.length, row: SCOPE_ROW, at: view.scopeAt, height: Math.min(found.length, SCOPE_SHOWN) * SCOPE_ROW,
+        .when(found.length > 0, (el) => el.child(scrollList(view, "inbox-scope-list", { count: found.length, row: ui(SCOPE_ROW), at: view.scopeAt, height: Math.min(found.length, SCOPE_SHOWN) * ui(SCOPE_ROW),
           draw: (i) => choice(found[i], i), wheeled: (keep) => { view.scopeAt = keep; } })))
-        .when(found.length === 0, (el) => el.child(div().p(8).text_center().line_height("20px").text_color(t.dim).child("No matching spaces.")))));
+        .when(found.length === 0, (el) => el.child(div().p(8).text_center().line_height(`${ui(20)}px`).text_color(t.dim).child("No matching spaces.")))));
   const search = stop(view, t, "inbox-search", h_flex().id("inbox-search-field").flex_1().min_w(0).h(32).px(8).gap(8)
-    .items_center().rounded(6).text_size(14).font_medium().hover((s) => s.bg(t.hover))
+    .items_center().rounded(6).text_size(ui(14)).font_medium().hover((s) => s.bg(t.hover))
     .when(view.inlineFocused, (el) => el.bg(t.hover))
     .on_mouse_down("left", (_e, cx) => { view.inlineInput.focus(); cx.stop_propagation(); })
     .when(Boolean(view.inline.query), (el) => el.key_context("InboxSearch")
@@ -142,7 +143,7 @@ export function inboxTop(view, t, model) {
       .on_action(SEARCH_KEYS[1].action, (_e, cx) => view.inlineStep("down", cx))
       .on_action(SEARCH_KEYS[2].action, (_e, cx) => view.clearInline(cx, true)))
     .child(svg("mods/t3-inbox/icons/search.svg").size(16).flex_none().text_color(t.dim))
-    .child(Input.new(view.inlineInput).id("inbox-search-input").flex_1().min_w(0).h_full().text_size(14)
+    .child(Input.new(view.inlineInput).id("inbox-search-input").flex_1().min_w(0).h_full().text_size(ui(14))
       .text_color(t.foreground).accessibility_label("Search Inbox"))
     .when(Boolean(view.inline.query), (el) => el.child(stop(view, t, "inbox-search-clear", button(t, "inbox-search-clear", { size: "micro", icon: "mods/t3-inbox/icons/x.svg", label: "Clear search",
       hot: view.hot === "inbox-search-clear" }).mr(-4).on_hover(glow(view, "inbox-search-clear"))

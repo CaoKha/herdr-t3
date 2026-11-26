@@ -13,6 +13,7 @@ const cx = { notify() {}, stop_propagation() {} };
 // Host reads a draw makes: each copies what it returns.
 const reads = { layout: 0, panel: 0, home: 0 };
 const env = {
+  ui: (n) => n,
   View: class {}, div: element, svg: src => { const e = element(); e.src = src; return e; }, image: element, h_flex: element,
   Popup: { new: (_id, trigger) => element().child(trigger) },
   theme: () => t, props: () => part, settings: () => ({ zoom: 1 }), window: () => ({ platform, buttons: true }),

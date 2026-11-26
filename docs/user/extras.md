@@ -40,9 +40,19 @@ Install: copy `extras/mods/asciicn-wallpaper` into `~/.config/herdr-app/mods/`, 
 
 ## Theme and settings
 
-The layout sets no theme: yours stays. `extras/themes/` holds two light and dark pairs, plus a second Catppuccin dark, if you want them:
+The layout sets no theme: yours stays. `extras/themes/` holds these, if you want them. Terminal colors come from each theme's own terminal port, and the panels from its documented palette: its darkest background behind, the editor background for cards, the next tier up for selection and borders, its comment color for dim text, and its blue (or main accent) as the accent:
 
-- `catppuccin-mocha`, `catppuccin-macchiato` and `catppuccin-latte`: [Catppuccin](https://catppuccin.com)'s official palette, terminal colors as its spec gives them and the panels in Catppuccin's own surfaces (mantle behind, base for cards, surface0 for selection and borders), with blue as the accent.
+- `catppuccin-mocha`, `catppuccin-macchiato`, `catppuccin-frappe` and `catppuccin-latte`: [Catppuccin](https://github.com/catppuccin/ghostty) (mantle behind, base for cards, surface0 for selection and borders).
+- `tokyo-night`, `tokyo-night-storm` and `tokyo-night-day`: [Tokyo Night](https://github.com/folke/tokyonight.nvim) (its `extras/ghostty` and `extras/lua` palettes).
+- `dracula`: [Dracula](https://github.com/dracula/ghostty), panels in the tiers of [its VS Code theme](https://github.com/dracula/visual-studio-code), purple as the accent; secondary text, which Dracula doesn't define, is halfway between its foreground and comment.
+- `nord`: [Nord](https://github.com/nordtheme/alacritty), panels as [its VS Code theme](https://github.com/nordtheme/visual-studio-code) draws them (nord0 throughout, nord1 above), frost `#88c0d0` as the accent.
+- `gruvbox-dark` and `gruvbox-light`: [gruvbox](https://github.com/morhetz/gruvbox-contrib)'s terminal colors and [gruvbox](https://github.com/morhetz/gruvbox)'s palette (hard contrast behind dark, soft behind light).
+- `rose-pine`, `rose-pine-moon` and `rose-pine-dawn`: [Rosé Pine](https://github.com/rose-pine/ghostty), panels in [its roles](https://github.com/rose-pine/rose-pine-palette): base behind, surface for cards, overlay above, foam as the accent.
+- `solarized-dark` and `solarized-light`: [Solarized](https://github.com/altercation/solarized)'s palette and terminal colors. Its light text is softer than the others' on purpose.
+- `kanagawa-wave`: [Kanagawa](https://github.com/rebelot/kanagawa.nvim)'s Wave (its `extras/ghostty` and palette).
+- `everforest-dark` and `everforest-light`: [Everforest](https://github.com/sainnhe/everforest)'s medium contrast, terminal colors as its Vim theme sets them, blue as the accent.
+- `github-dark` and `github-light`: [GitHub's VS Code theme](https://github.com/primer/github-vscode-theme), from the Primer colors it's built on.
+- `one-dark`: [Atom](https://github.com/atom/atom)'s One Dark syntax and UI colors. Atom had no terminal, so its terminal colors are One Dark's syntax hues.
 - `t3-code-dark` and `t3-code-light`: the colors T3 Code's web app draws by default, a true black canvas with accent `#346bf1` and a `#fcfcfc` canvas with accent `#1b4ed8`, with the VS Code terminal palette T3 Code uses. Terminal text takes the chat's 90% foreground, so an agent's replies read like T3 Code's.
 
 Copy the files you want into `~/.config/herdr-app/themes/` and pick one in Settings, or set a pair in `settings.json` so it follows the system's light and dark mode, for example `"theme": { "light": "catppuccin-latte", "dark": "catppuccin-mocha" }`. The preview's other settings:

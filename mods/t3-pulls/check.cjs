@@ -100,7 +100,7 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
     detail: (n) => ({ ...card(n, n === 8 ? "feat-2" : "feat", n === 8 ? "feat" : "main"), body: "Fixes **this**.", headRefOid: `h${n}`, baseRefOid: "b0", mergeable: "MERGEABLE",
       mergeStateStatus: "CLEAN", reviewDecision: null, latestOpinionatedReviews: { nodes: [] }, ...rollup([]) }),
     // What's been said on every PR, paged `pageSize` at a time and a thread's replies `replyPage` at a time, as GitHub would.
-    talk: TALK(), pageSize: 100, replyPage: 100, boxes: [], drawing: false };
+    talk: TALK(), pageSize: 100, replyPage: 100, boxes: [], editors: [], drawing: false };
   const sh = { "t3.panels": { s1: { tabs: [{ id: "pulls", born: 1 }], active: "pulls", open: true }, s2: { tabs: [{ id: "pulls", born: 2 }], active: "pulls", open: true } } };
   const answer = (cmd, args, o) => {
     const line = args.join(" ");
@@ -193,7 +193,15 @@ function makePage({ spaces, panes = [], slots = ["files", "panel-empty", "pulls"
       return box;
     } },
     Textarea: { new: (state) => element("textarea", state) },
-    checking: () => false, spaces: () => w.spaces, panes: () => w.panes, focused: () => null, exec, theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", input: "#222222", ansi1: "#ff0000" }),
+    // Each code view's editor, counted: made outside the draw (render-guard.cjs refuses it there), released once.
+    EditorState: { new: (o) => {
+      const e = { ...o, released: false, release() { assert.ok(!e.released, "an editor is released once"); e.released = true; return true; } };
+      w.editors.push(e);
+      return e;
+    } },
+    Editor: { new: (state) => element("editor", state) },
+    ScrollHandle: { new: () => ({ release: () => true, offset: () => ({ x: 0, y: 0 }), viewport_size: () => ({ width: 0, height: 0 }), content_size: () => ({ width: 0, height: 0 }) }) },
+    checking: () => false, spaces: () => w.spaces, panes: () => w.panes, focused: () => null, exec, theme: () => ({ foreground: "#ffffff", dim: "#888888", accent: "#0000ff", input: "#222222", ansi1: "#ff0000", ansi2: "#00ff00" }),
     window: () => ({ active: true, platform: "macos" }), nextCommand: () => queue.length ? Promise.resolve(queue.shift()) : new Promise((r) => { wake = r; }), keys: () => [], settings: () => ({ zoom: 1, font_family: "Mono" }), layout,
     run: (name, args) => w.commands.push([name, args]), shared: (k) => sh[k], setShared: (k, v) => { sh[k] = v; },
     localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)) }, Date: Clock, Uint8Array,
@@ -419,7 +427,7 @@ function sections() {
   same(entries.map((e) => e.id), ["r1", "c1", "T2", "T1"], "comments and reviews by time (a wordless comment review says nothing), then threads");
   same(entries.map((e) => e.kind ?? null), ["Approved", "Comment", null, null]);
   same([m.threadPlace(TALK().threads[0]), m.threadPlace(TALK().threads[1]), m.threadPlace({ path: "x" })], ["src/a.js:12", "src/b.js:3", "x"], "an outdated thread keeps its old line");
-  same(m.hunkTail(TALK().threads[0].comments[0].diffHunk).split("\n"), ["+line 4", "+line 5", "+line 6", "+line 7", "+line 8", "+line 9"], "the hunk's last six lines");
+  same(m.hunkTail(TALK().threads[0].comments[0].diffHunk.split("\n")), ["+line 4", "+line 5", "+line 6", "+line 7", "+line 8", "+line 9"], "the hunk's last six lines");
   same([m.threadShut({ isResolved: true }), m.threadShut({ isOutdated: true }), m.threadShut({})], [true, true, false]);
 }
 
@@ -654,6 +662,102 @@ async function picturesOnPage() {
   same(fs.readdirSync(cache), [], "the copy's files go when it stops");
 }
 
+// #3780's Screenshots: tables of pictures drawn as grids, their columns kept, each picture shrunk to its cell and fetched once.
+async function pictureTablesOnPage() {
+  const ids = ["en", "es", "pt", "a", "b"].map((s, i) => `c523b8b3-e7f2-4520-bb42-8a68ab28c0${i}${s.length}`);
+  const asset = (i) => `https://github.com/user-attachments/assets/${ids[i]}`, signed = (i) => `https://private-user-images.githubusercontent.com/1/9-${ids[i]}.png?jwt=A`;
+  const body = "## Screenshots\n\n| With code, en | With code, es | With code, pt |\n| --- | --- | --- |\n"
+    + `| ![Invite, en](${asset(0)}) | ![Invite, es](${asset(1)}) | ![Invite, pt](${asset(2)}) |\n\n| Desktop | Mobile |\n| --- | --- |\n| ![a](${asset(3)}) | ![b](${asset(4)}) |\n`;
+  const cellHtml = (tag, i) => `<${tag}><a href="#"><img src="${signed(i)}" alt="x"></a></${tag}>`;
+  const p = makePage({ spaces: [space("s1", "/r", true)] });
+  p.w.detail = (n) => ({ ...card(n, "feat", "main"), body, headRefOid: "h", baseRefOid: "b", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null,
+    latestOpinionatedReviews: { nodes: [] }, ...rollup([]),
+    bodyHTML: `<h2>Screenshots</h2><table><thead><tr><th>With code, en</th><th>With code, es</th><th>With code, pt</th></tr></thead><tbody><tr>${[0, 1, 2].map((i) => cellHtml("td", i)).join("")}</tr></tbody></table>`
+      + `<table><thead><tr><th>Desktop</th><th>Mobile</th></tr></thead><tbody><tr>${cellHtml("td", 3)}${cellHtml("td", 4)}</tr></tbody></table>` });
+  p.w.web = Object.fromEntries(ids.map((_, i) => [signed(i), { type: "image/png", bytes: png(1600, 900) }]));
+  await p.tick(); await p.settle();
+  for (let i = 0; i < 4; i++) { await p.draw(); await p.settle(); }
+  const curls = p.w.ran.filter((r) => r.cmd === "curl").map((r) => r.args.at(-1));
+  same(curls.slice().sort(), ids.map((_, i) => signed(i)).sort(), "each picture fetched once, from its own signed address");
+  const root = (await p.draw()).root, body1 = find(root, "t3-pulls-body-s1-7");
+  const tables = kit.walk(body1).filter((x) => /^t3-pulls-body-s1-7-table-\d+$/.test(x.key ?? ""));
+  same(tables.map((x) => x.items.length), [2, 2], "two grids: a header row and one row each");
+  const cellsOf = (tid, r) => kit.walk(find(root, `${tid}-${r}`)).filter((x) => new RegExp(`^${tid}-${r}-\\d+$`).test(x.key ?? ""));
+  same(tables.map((x) => cellsOf(x.key, "h").length), [3, 2], "the tables' columns kept");
+  const texts = (node) => kit.walk(node).filter((x) => x.kind === "markdown");
+  same(cellsOf(tables[0].key, "h").map((x) => texts(x).map((m) => [m.source, "font_semibold" in m.style])), [0, 1, 2].map((i) => [[`With code, ${["en", "es", "pt"][i]}`, true]]),
+    "the header's text, semibold");
+  same(cellsOf(tables[0].key, "h").map((x) => x.style.w), [[127], [127], [127]], "equal columns");
+  const drawn = (tid, c) => kit.walk(find(root, `${tid}-0-${c}`)).find((x) => x.kind === "image");
+  same([0, 1, 2].map((c) => [drawn(tables[0].key, c).source, drawn(tables[0].key, c).style.w, drawn(tables[0].key, c).style.h]),
+    [0, 1, 2].map((i) => [`cache/t3-pulls/${ids[i]}.png`, [114], [64]]), "each in its column, as wide as the cell allows, its shape kept");
+  same([drawn(tables[1].key, 1).style.w, drawn(tables[1].key, 1).style.h], [[178], [100]]);
+  same(texts(body1).map((m) => m.source), ["## Screenshots\n\n", "With code, en", "With code, es", "With code, pt", "Desktop", "Mobile"], "no pipes left as text");
+  find(root, `${tables[1].key}-0-1-image-0`).handlers.on_click({}, p.cx); await p.settle();
+  same(p.w.ran.at(-1).args, [asset(4)], "a click opens the original");
+  await p.view.close();
+}
+
+// Fenced code in code views: an editor each, made after a draw of the shown page that has it, kept while the same text is drawn,
+// released once it isn't (a section shut, another PR), the page hidden or the copy closed. A ```diff block and a thread's hunk
+// are a selectable code block, never an editor: an added line on a green wash, a removed one on red.
+async function codeOnPage() {
+  const p = makePage({ spaces: [space("s1", "/r", true)] });
+  const long = `// ${"x".repeat(117)}`, many = Array.from({ length: 40 }, (_, i) => `echo ${i}`).join("\n");
+  const bodies = { 7: `Intro\n\n\`\`\`ts\nconst a = 1;\n${long}\n\`\`\`\n\nThen\n~~~diff\n-a\n+b\n~~~\n- step\n  \`\`\`sh\n${many.replace(/^/gm, "  ")}\n  \`\`\`\n`, 5: "```py\nx = 1\n```\n" };
+  p.w.detail = (n) => ({ ...card(n, "feat", "main"), body: bodies[n] ?? "", headRefOid: "h", baseRefOid: "b", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN",
+    reviewDecision: null, latestOpinionatedReviews: { nodes: [] }, ...rollup([]) });
+  const live = () => p.w.editors.filter((e) => !e.released).map((e) => [e.language ?? null, e.value]).sort((a, b) => (a[1] < b[1] ? -1 : 1));
+  const both = [["js", `const a = 1;\n${long}`], ["sh", many]];
+  await p.tick(); await p.settle();
+  p.w.open = false;
+  await p.draw(); await p.draw();
+  assert.equal(p.w.editors.length, 0, "none made while the page is hidden");
+
+  p.w.open = true;
+  let root = (await p.draw()).root;
+  const editorIn = (id) => kit.walk(find(root, id)).some((x) => x.kind === "editor");
+  assert.ok(!editorIn("t3-pulls-body-s1-7-1") && strings(find(root, "t3-pulls-body-s1-7-1")).some((s) => s.startsWith("const a = 1;")), "plain until its editor is made");
+  same(live(), both, "one editor a block, its language from the info string; none for the diff or the hunk");
+  const e = p.w.editors[0];
+  same([e.readonly, e.soft_wrap, e.line_numbers, e.folding, e.font_family, e.font_size], [true, true, false, false, "Mono", 12]);
+  root = (await p.draw()).root;
+  assert.ok(editorIn("t3-pulls-body-s1-7-1") && !editorIn("t3-pulls-body-s1-7-3") && !editorIn("t3-pulls-thread-T1-hunk"));
+  // A diff is one selectable code block, each changed line washed by kind behind its text.
+  const block = (id) => kit.walk(find(root, id)).find((x) => x.kind === "markdown");
+  const washed = (id) => { const b = block(id), [from, to, color] = b.style.highlight_range; return [b.style.selectable, b.source.slice(from, to), color]; };
+  same([washed("t3-pulls-body-s1-7-3"), washed("t3-pulls-thread-T1-hunk")], [[[true], "+b", "#00ff001c"], [[true], "+line 9", "#00ff001c"]], "the last range painted: an added line");
+  assert.ok(block("t3-pulls-body-s1-7-3").source.includes("-a\n+b"));
+  same(block("t3-pulls-thread-T1-hunk").source.split("\n").slice(1, -1), ["+line 4", "+line 5", "+line 6", "+line 7", "+line 8", "+line 9"], "the hunk's last rows");
+  same(["t3-pulls-body-s1-7-1", "t3-pulls-body-s1-7-5"].map((id) => find(root, id).style.h), [[96], [316]],
+    "a code view as high as its rows, a long line wrapped at the column, at most 15 rows");
+  same(["t3-pulls-body-s1-7-3", "t3-pulls-thread-T1-hunk"].map((id) => [find(root, id).style.h, find(root, id).style.max_h]), [[undefined, [316]], [undefined, [316]]],
+    "a diff as high as it draws, at most 15 rows");
+  assert.ok(find(root, "t3-pulls-body-s1-7-5").handlers.on_scroll_wheel, "a drawn box has its handle, and with it the wheel");
+  p.refresh(); await p.settle();
+  await p.draw(); await p.draw();
+  same([p.w.editors.length, live().length], [2, 2], "a re-read with the same text keeps its editors");
+
+  p.view.sections = { ...p.view.sections, description: false };
+  await p.draw();
+  same(live(), [], "a shut section's go");
+  p.view.sections = { ...p.view.sections, description: true };
+  await p.draw();
+  same(live(), both, "open again, made again");
+
+  p.view.pick(p.st(), 5, p.cx); await p.settle();
+  await p.draw(); await p.draw();
+  same(live(), [["python", "x = 1"]], "another PR: the last one's go");
+  p.w.open = false;
+  await p.tick();
+  same(live(), [], "hidden, none kept");
+  p.w.open = true;
+  await p.draw();
+  assert.equal(live().length, 1);
+  await p.view.close();
+  same(live(), [], "the copy closing releases them all");
+}
+
 // Every empty list says why in one line; none is blank.
 async function emptyStates() {
   const said = async (p, id) => { await p.tick(); await p.settle(); const root = (await p.draw()).root; return strings(find(root, id)).join(" "); };
@@ -686,5 +790,7 @@ async function emptyStates() {
   await conversation();
   await sectionsKept();
   await picturesOnPage();
+  await pictureTablesOnPage();
+  await codeOnPage();
   console.log("t3-pulls checks passed");
 })().catch((e) => { console.error(e); process.exit(1); });

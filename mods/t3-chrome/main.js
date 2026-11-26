@@ -20,13 +20,14 @@ import { statusMark } from "./status-mark.js";
 import { tab as closableTab } from "./tab.js";
 import { keycap } from "./palette.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file, in the order + lists them: their names, icons and + keys. Review
 // wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image. A page slot
 // not named here (another mod's) shows by its slot's id.
 const PAGES = { files: ["Files", "folder-tree", false, "f"], review: ["Review", "pulls-review", true, "r"], pulls: ["Pull requests", "git-pull-request", false, "p"], issues: ["Issues", "circle-dot", false, "i"] };
 // The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md "Menu rows").
-const MENU_W = 220, menuHeight = (rows) => rows * MENU_ROW + 8;
+const MENU_W = 220, menuHeight = (rows) => rows * ui(MENU_ROW) + 8;
 const zoomOf = () => Number(settings()?.zoom) || 1;
 const side = (n) => [].concat(n?.padding ?? 0).at(-1);
 // The layout's room each side of the panel head's mod: the panel's and the head's padding put its ends 12 in, as the
@@ -153,13 +154,13 @@ export default class WorkspaceChrome extends View {
         .when(undoLive, (el) => stop(this, t, "undo-notice-undo", el, 4));
       // Match T3's SidebarThreadUndoNotice: the summary fits whole beside Undo or is omitted, never truncated to "…".
       const notice = noticeActive && h_flex().id(`undo-notice-${undo.gen}`).flex_1().min_w(0).h(24).justify_end().gap(4).items_center()
-        .text_size(11).text_color(t.dim).opacity(undo.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
+        .text_size(ui(11)).text_color(t.dim).opacity(undo.shown ? 1 : 0).transition("opacity", { duration: 200, easing: "ease-out" })
         .when(showSummary, (el) => el.child(div().id("undo-notice-summary").flex_none().whitespace_nowrap().child(summary)))
         // As T3's InlineButton: medium, foreground, underlined on hover.
         // T3's names its key in the button (threadUndoLabel), so it has no tooltip.
         .child(undoButton);
       const measureSummary = noticeActive && div().id(`undo-summary-measure-${summary}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap()
-        .text_size(11).font_normal().child(summary).on_size_change(noteW("noticeSummaryW", summary));
+        .text_size(ui(11)).font_normal().child(summary).on_size_change(noteW("noticeSummaryW", summary));
       const noticeSlot = h_flex().id("footer-notice-slot").relative().flex_1().min_w(0).h(24).items_center()
         .on_size_change(noteW("noticeW"))
         .when(Boolean(notice), (el) => el.child(notice).child(measureSummary));
@@ -176,7 +177,7 @@ export default class WorkspaceChrome extends View {
           .child(button("clean-up", "mods/t3-chrome/icons/trash-2.svg", "Clean up", () => run("t3-tabs.cleanup"), "t3-tabs.cleanup")))
         .child(noticeSlot)
         .when(Boolean(ready), el => el.child(tip(this, t, "app-update", `Update ${ready} downloaded. Click to restart`, stop(this, t, "app-update", div().id("app-update").h(32).px(12).flex_none().flex().items_center()
-          .rounded_full().bg(alpha(t.accent, "26")).text_size(12).text_color(t.accent).hover(s => s.bg(alpha(t.accent, "40"))).on_hover(glow(this, "app-update"))
+          .rounded_full().bg(alpha(t.accent, "26")).text_size(ui(12)).text_color(t.accent).hover(s => s.bg(alpha(t.accent, "40"))).on_hover(glow(this, "app-update"))
           .role("button").accessibility_label(`Restart into Herdr ${ready}`)
           .on_click(() => run("app.update")).child("Update"), 16))))));
     }
@@ -316,7 +317,7 @@ export default class WorkspaceChrome extends View {
     const list = v_flex().id("surface-list").w_full().max_w(empty ? 320 : MENU_W).p(4).gap(0).children(items.map((it, i) => menuRow(this, t, `surface-option-${i}`, {
       at: [this, "surfaceAt", i], label: it.label, icon: it.icon, disabled: it.disabled, hint: it.reason ?? "Not available",
       trail: it.key ? (empty ? keycap(t, it.key.toUpperCase()) : menuHint(t, it.key.toUpperCase())) : null, pick: (cx) => choose(i, cx),
-      also: (el) => el.when(empty, (el) => el.h(32).px(10).gap(10).rounded(8)) })));
+      also: (el) => el.when(empty, (el) => el.h(ui(32)).px(10).gap(10).rounded(8)) })));
     return v_flex().id(empty ? "surface-empty" : "surface-menu").size_full().min_h(0).items_center()
       // Centred in the column, as T3's: 40 (the top bar) lifted off its bottom.
       .when(empty, el => el.justify_center().gap(12).px(24).pb(40)).when(!empty, el => el.bg(t.popover))
@@ -326,7 +327,7 @@ export default class WorkspaceChrome extends View {
         if (e.keystroke === e.key && items.some(it => it.key === e.key)) { choose(items.findIndex(it => it.key === e.key), cx); cx.stop_propagation(); cx.notify(); }
         else if (!(empty && e.key === "escape")) menuKeys(this, items.map(it => it.label), choose, { at: "surfaceAt", close: finish, disabled: (i) => Boolean(items[i].disabled) })(e, cx);
       })
-      .when(empty, el => el.child(div().text_size(14).font_medium().text_color(t.foreground).child("Open a surface")))
+      .when(empty, el => el.child(div().text_size(ui(14)).font_medium().text_color(t.foreground).child("Open a surface")))
       .child(list);
   }
 }

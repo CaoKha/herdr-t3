@@ -8,7 +8,9 @@ const kit = require("./check-kit.js");
 const element = kit.elements();
 const strip = (f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const tips = [];
+let scale = 1;
 const context = vm.createContext({ div: () => element(), h_flex: () => element(), svg: () => element("svg"), settings: () => ({ zoom: 1 }), Date,
+  ui: (n) => (scale === 1 ? n : Math.round(n * scale)),
   DISABLED: 0.64, glow: (view, id) => (on) => { view.hot = on ? id : null; },
   tip: (_view, _t, id, label, trigger) => { tips.push([id, label]); const p = element("tip"); p.items.push(trigger); return p; } });
 vm.runInContext(strip("list.js") + strip("menu-row.js") + "\nglobalThis.m = { menuRow, litOnHover };", context);
@@ -44,4 +46,9 @@ assert.equal(inner.style.opacity, 0.64);
 assert.ok(!lit(inner), "a disabled row isn't lit");
 assert.equal(inner.handlers.on_click, undefined, "a disabled row isn't picked");
 assert.equal(draw(5, { disabled: true }).kind, "div", "no reason, no tooltip");
-console.log("ok: menu rows light under the pointer only, pick on click, and a disabled one says why");
+// A row fits its text: as written at 13px, and grown with the text size.
+assert.deepEqual([draw(0).style.h, draw(0).style.text_size], [28, 14]);
+scale = 16 / 13;
+assert.deepEqual([draw(0).style.h, draw(0).style.text_size], [34, 17], "the row grows with its text");
+scale = 1;
+console.log("ok: menu rows light under the pointer only, pick on click, a disabled one says why, and grow with the text");

@@ -6,7 +6,7 @@ const calls = [], tips = [], commands = [];
 let props = { part: 'surface-empty' }, s = { pages: ['files', 'review', 'panel-empty'], tabs: [], active: null, open: true }, problem = '', folder = '/space';
 const win = () => ({ platform: 'macos' }); win.viewport_size = () => ({ width: 1800, height: 1000 });
 const glyph = src => { const el = element(); el.src = src; return el; };
-const c = vm.createContext({ checking: () => false, View: class {}, div: element, h_flex: element, v_flex: element, svg: glyph, image: glyph,
+const c = vm.createContext({ ui: (n) => n, checking: () => false, View: class {}, div: element, h_flex: element, v_flex: element, svg: glyph, image: glyph,
   props: () => props, panelState: () => s, spaces: () => [{ id: 's', active: true, folder: '/space' }], panes: () => [], settings: () => ({ zoom: 2 }), window: win, shared: () => null,
   layout: () => ({ id: 'root', children: [{ id: 'panel', children: [{ id: 'panel-head', size: { px: 40 }, padding: [0, 12] }] }] }),
   showPage: id => calls.push(['add', id]), closeSurface: (id, mode) => calls.push(['close', id, mode]), activateSurface: id => calls.push(['select', id]),

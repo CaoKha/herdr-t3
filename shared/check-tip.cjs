@@ -8,7 +8,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find, fire, strings } = kit;
 
 let pointer = { x: 10, y: 110 }, bound = [], keyReads = 0;
-const context = vm.createContext({
+const context = vm.createContext({ ui: (n) => n, 
   div: () => element(), v_flex: () => element(),
   Popup: { new: (id, child) => element("popup").id(id).child(child) },
   keys: () => { keyReads++; return bound; },

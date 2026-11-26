@@ -13,6 +13,7 @@ import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
 import { sidebarParts } from "./sidebar.js";
 import { KEY, closedKey, readLocal } from "./store.js";
 import { prunePins, setPinned } from "./pins.js";
+import { ui } from "./layout-settings.js";
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
@@ -156,13 +157,13 @@ export default class Agents extends View {
       .w_full()
       .p(4)
       .bg(t.popover)
-      .text_size(14)
+      .text_size(ui(14))
       .opacity(this.shown ? 1 : 0).transition("opacity", MOTION)
       .track_focus(this.keys).on_key_down(menuKeys(this, SORTS.map((s) => s.label), (at) => choose(SORTS[at])))
-      .child(div().px(8).py(6).text_size(12).line_height("16px").font_medium().text_color(t.muted).child("Sort agents"))
+      .child(div().px(8).py(6).text_size(ui(12)).line_height(`${ui(16)}px`).font_medium().text_color(t.muted).child("Sort agents"))
       .children(SORTS.map((s, i) => h_flex()
         .id(`sort-${s.id}`)
-        .h(28)
+        .h(ui(28))
         .px(8)
         .gap(8)
         .rounded(4)
@@ -296,7 +297,7 @@ export default class Agents extends View {
       if (rowAt >= 0 && this.listScroll) this.listScroll.scroll_to_item(exits.length + rowAt);
     }
     const rows = windowed
-      ? entries.filter((e) => at.get(e.key).y + e.h > top - OVERDRAW && at.get(e.key).y < top + seen + OVERDRAW)
+      ? entries.filter((e) => at.get(e.key).y + e.h > top - ui(OVERDRAW) && at.get(e.key).y < top + seen + ui(OVERDRAW))
         .map((e) => div().absolute().left(0).right(0).top(at.get(e.key).y - top).child(flying(this, e.key, e.el())))
       : entries.map((e) => flying(this, e.key, e.el()));
 
@@ -307,7 +308,7 @@ export default class Agents extends View {
       .bg(t.chrome)
       .border_t(1)
       .border_color(t.border)
-      .text_size(14)
+      .text_size(ui(14))
       .child(
           h_flex()
             .id("agents-heading")
@@ -316,7 +317,7 @@ export default class Agents extends View {
             .flex_none()
             .items_center()
             .justify_between()
-            .child(div().text_size(12).font_medium().text_color(t.muted).child("Agents"))
+            .child(div().text_size(ui(12)).font_medium().text_color(t.muted).child("Agents"))
             .child(
               // Hung from the button, right edges together, as T3's menus. No press (the keyboard), the app's default.
               trigger(this, t, "ag-sort", { icon: `mods/t3-agents/icons/${sort.icon}.svg`, label: `Sort agents: ${sort.label}`, closed: closedKey("t3-agents", "sort"),
@@ -324,7 +325,7 @@ export default class Agents extends View {
             ),
       )
       .when(list.length === 0, (el) =>
-        el.child(div().px(16).py(24).text_center().text_size(12).line_height("16px").text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
+        el.child(div().px(16).py(24).text_center().text_size(ui(12)).line_height(`${ui(16)}px`).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
       .when(!windowed, (el) => el.child(v_flex().id("ag-list").flex_1().min_h(0).px(8).pb(8)
         // The rows in one box that scrolls, so the leaving ones placed in it scroll with them.

@@ -14,12 +14,14 @@ import { GIT, discoverRepo, ghProblem, githubParts } from "./github.js";
 import { ownBranchPRs, prState, rollupKind, CHECK_LOOK, checksOf, reviewersOf, REVIEW_LOOK, verdict, tallies, TONE_COLOR, stackOf, matches,
   fetchArgs, fetchHeadShas, comparePage, conversationEntries, threadPlace, hunkTail, threadShut, checksOpenByDefault, sectionSummary } from "./model.js";
 import { initPictures, dropPictures } from "./pictures.js";
+import { codeFont, diffRowsOf, dropCode } from "./code.js";
 import { inlineMenu } from "./inline-menu.js";
 import { initPage, stateFor, refreshPage, freshness, pageFrame, sectionOpen, toggleSection, section, control, textButton, note, line, rich, said,
-  stateIcon, openUrl, writeError, draftKey, since, codeFont } from "./page.js";
+  stateIcon, openUrl, writeError, draftKey, since, diffBlock } from "./page.js";
 import { initComposer, sent, commentBox, replyBox, replyButton, BUSY } from "./composer.js";
 import { segmented } from "./segmented.js";
 import { compactField } from "./field.js";
+import { ui } from "./layout-settings.js";
 
 const MOD = "mods/t3-pulls";
 const JIN_TIMEOUT = 20000, FETCH_TIMEOUT = 120000;
@@ -63,6 +65,7 @@ export default class Pulls extends View {
 
   async close() {
     stopsEnd(this);
+    dropCode(this);
     await dropPictures(this);
   }
 
@@ -268,7 +271,7 @@ export default class Pulls extends View {
   searchField(t) {
     return compactField(this, t, "t3-pulls-search-field", { focused: Boolean(this.searchFocused), focus: () => this.search.focus(),
       escape: () => { this.search.set_value(""); this.handle.focus(); },
-      child: Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search pull requests") });
+      child: Input.new(this.search).w_full().h_full().text_size(ui(12)).text_color(t.foreground).accessibility_label("Search pull requests") });
   }
 
   body(st, sp, pages, t, cx) {
@@ -298,7 +301,7 @@ export default class Pulls extends View {
     const now = Date.now(), more = st.tab === "repo" && st.openTotal > st.open.length;
     return v_flex().id(`t3-pulls-list-${st.tab}`).size_full().overflow_y_scrollbar().px(12).pb(8).gap(2)
       .children(prs.map((pr) => this.row(st, pr, t, now)))
-      .when(more, (el) => el.child(div().px(8).py(8).text_size(12).text_color(t.dim).child(`The ${OPEN_PAGE} most recently updated of ${st.openTotal}.`)));
+      .when(more, (el) => el.child(div().px(8).py(8).text_size(ui(12)).text_color(t.dim).child(`The ${OPEN_PAGE} most recently updated of ${st.openTotal}.`)));
   }
 
   row(st, pr, t, now) {
@@ -312,7 +315,7 @@ export default class Pulls extends View {
         .child(h_flex().gap(8).items_center()
           .child(div().flex_1().min_w(0).truncate().child(pr.title))
           .when(Boolean(kind), (el) => el.child(stateIcon(this, t, CHECK_LOOK[kind], 14))))
-        .child(h_flex().min_w(0).gap(8).text_size(12).text_color(t.dim)
+        .child(h_flex().min_w(0).gap(8).text_size(ui(12)).text_color(t.dim)
           .child(div().flex_none().child(`#${pr.number}`))
           .child(div().flex_1().min_w(0).truncate().child(`${pr.headRefName} → ${pr.baseRefName}`))
           .child(div().flex_none().child(since(pr.updatedAt, now))))), 6);
@@ -334,15 +337,15 @@ export default class Pulls extends View {
       .when(Boolean(st.actionError), (el) => el.child(noticeBar(t, "t3-pulls-action-error", st.actionError, t.ansi1, "dismiss", "Dismiss", (cx) => { st.actionError = null; cx.notify(); }, this)))
       .when(Boolean(d?.error) && full, (el) => el.child(errorBar(t, "t3-pulls-detail-error", d.error, (cx) => this.readDetail(st, n, cx), this)))
       .child(v_flex().id(`t3-pulls-detail-${n}`).flex_1().min_h(0).overflow_y_scrollbar().px(12).pb(16)
-        .child(h_flex().id("t3-pulls-title").pt(4).gap(8).items_center().text_size(14)
+        .child(h_flex().id("t3-pulls-title").pt(4).gap(8).items_center().text_size(ui(14))
           .child(stateIcon(this, t, s, 16))
           .child(div().min_w(0).truncate().font_medium().child(pr.title))
           .child(div().flex_none().text_color(t.dim).child(`#${n}`)))
-        .child(h_flex().pt(4).min_w(0).gap(4).text_size(12).text_color(t.dim)
+        .child(h_flex().pt(4).min_w(0).gap(4).text_size(ui(12)).text_color(t.dim)
           .child(div().flex_none().child(`${pr.author?.login ?? "ghost"} ·`))
           .child(div().min_w(0).truncate().child(`${pr.headRefName} → ${pr.baseRefName}`))
           .child(div().flex_none().child(`· ${s.label}, ${since(pr.updatedAt, now)}`)))
-        .child(full ? this.status(pr, t) : div().pt(8).text_size(12).text_color(t.dim).child(d?.error ? "" : "Loading…"))
+        .child(full ? this.status(pr, t) : div().pt(8).text_size(ui(12)).text_color(t.dim).child(d?.error ? "" : "Loading…"))
         .when(Boolean(stack), (el) => el.child(part("stack", "Stack", () => this.stackRows(st, stack, n, t))))
         .when(full, (el) => el.child(part("checks", "Checks", () => this.checkRows(st, pr, t), { fallback: checksOpenByDefault(pr) }))
           .child(part("reviewers", "Reviewers", () => this.reviewerRows(pr, t)))
@@ -359,7 +362,7 @@ export default class Pulls extends View {
       return key ? stop(this, t, id, el.cursor_pointer().role("button").accessibility_label(`${text}: show ${key === "checks" ? "Checks" : "Reviewers"}`)
         .hover((h) => h.underline()).on_click((_e, cx) => toggleSection(this, key, true, cx)), 4) : el;
     };
-    return h_flex().id("t3-pulls-status").pt(8).gap(4).flex_wrap().items_center().text_size(12)
+    return h_flex().id("t3-pulls-status").pt(8).gap(4).flex_wrap().items_center().text_size(ui(12))
       .child(part("t3-pulls-verdict", v.text, t[TONE_COLOR[v.tone]], v.section).font_medium())
       .child(div().flex_none().text_color(t.dim).child("·"))
       .child(part("t3-pulls-tally-checks", n.checks, t.dim, "checks"))
@@ -446,7 +449,8 @@ export default class Pulls extends View {
     const flip = (kind, text) => textButton(this, t, `${id}-${kind}`, text, "plain", (cx) => this.write(st, pr, { kind, thread }, cx),
       { disabled: Boolean(writing), reason: BUSY });
     return block
-      .when(Boolean(hunk), (el) => el.child(div().mx(6).mt(4).p(8).rounded(6).bg(t.background).text_size(12).font_family(codeFont()).text_color(t.muted).child(hunkTail(hunk))))
+      // The whole hunk read once, so its @@ counts tell a removed "-- …" from a header; the end drawn.
+      .when(Boolean(hunk), (el) => el.child(diffBlock(this, t, `${id}-hunk`, hunkTail(diffRowsOf(comments[0], hunk))).mt(4)))
       .children(comments.map((c) => this.said(st, t, `${id}-${c.id}`, c, now)))
       .child(h_flex().id(`${id}-actions`).pt(4).px(6).gap(GROUP_GAP).items_center()
         .when(!thread.isResolved && thread.viewerCanReply && this.replyTo !== key, (el) => el.child(replyButton(this, t, id, key, writing)))

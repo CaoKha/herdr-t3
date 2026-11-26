@@ -17,7 +17,7 @@ const element = (calls = []) => new Proxy({ calls }, { get: (target, key) => key
 } });
 // tip.js's glow.
 const glow = (view, id) => (on) => { view.hot = on ? id : null; };
-const context = vm.createContext({ h_flex: () => element(), div: () => element(), svg: (p) => element([["svg", p]]), glow });
+const context = vm.createContext({ ui: (n) => n, h_flex: () => element(), div: () => element(), svg: (p) => element([["svg", p]]), glow });
 vm.runInContext(src, context);
 const { button, split, ghostButton, DISABLED } = context.b;
 const t = { solid: "SOLID", solid_foreground: "INK", raised: "RAISED", input: "INPUT", foreground: "#ffffff", dim: "DIM",

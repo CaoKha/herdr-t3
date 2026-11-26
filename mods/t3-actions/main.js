@@ -15,6 +15,7 @@ import { MOD, ICONS, icon, lit, state, barControl, openBarMenu, initMenu, action
 import { awaitTargets } from "./open-in.js";
 import { dialog, dialogTitle, dialogButton } from "./dialog.js";
 import { initCleanUp, cleanUpView } from "./clean-up.js";
+import { ui } from "./layout-settings.js";
 
 const ACTION_PLACES = [["tab", "Tab"], ["right", "Right"], ["down", "Down"]];
 const BAR_MENU = "bar-menu:";
@@ -55,12 +56,12 @@ function editorView(view) {
   const t = theme(), done = () => closeOverlay(props().overlay);
   const [name, command] = view.inputs.map(([, input]) => input.value().trim());
   const ok = Boolean(name && command);
-  const label = (text) => div().line_height("16px").font_medium().text_color(t.foreground).child(text);
+  const label = (text) => div().line_height(`${ui(16)}px`).font_medium().text_color(t.foreground).child(text);
   const field = ([k, input]) => v_flex().gap(6).child(label({ name: "Name", command: "Command", cwd: "Folder (optional)" }[k]))
-    .child(h_flex().h(32).px(11).rounded(8).border(1).border_color(t.border).bg(t.input).items_center()
-      .child(Input.new(input).flex_1().h_full().text_size(14).text_color(t.foreground)));
+    .child(h_flex().h(ui(32)).px(11).rounded(8).border(1).border_color(t.border).bg(t.input).items_center()
+      .child(Input.new(input).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)));
   // T3's sm toggle.
-  const choice = (id, on, pick, name, child) => stop(view, t, id, h_flex().id(id).h(28).min_w(28).px(6).rounded(8).items_center().justify_center().font_medium()
+  const choice = (id, on, pick, name, child) => stop(view, t, id, h_flex().id(id).h(typeof child === "string" ? ui(28) : 28).min_w(28).px(6).rounded(8).items_center().justify_center().font_medium()
     .bg(on ? t.selected : t.input).text_color(lit(view, id, on ? t.foreground : t.dim)).on_hover(glow(view, id))
     .role("button").accessibility_label(name)
     .on_click((_e, cx) => { pick(); cx.notify(); }).child(child), 8);

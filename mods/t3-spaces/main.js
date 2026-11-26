@@ -18,9 +18,11 @@ import { KEY, closedKey, readLocal } from "./store.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
 import { prepareSpace } from "./space-arrival.js";
+import { ui } from "./layout-settings.js";
 
 // T3's project row, and its list's 1px between items (gap-px). A drag's math goes by the pitch.
-const ROW = 32, STACK = 1, PITCH = ROW + STACK;
+const ROW = 32, STACK = 1;
+const pitch = () => ui(ROW) + STACK;
 // Docked alone there's no Inbox to be behind.
 const listInView = (root = layout()) => {
   const { rail, stack } = sidebarParts(root);
@@ -56,7 +58,7 @@ export default class Spaces extends View {
     this.folded = new Set(readLocal("machines.folded", []));
     this.foldedRepos = new Set(readLocal("repos.folded", []));
     this.order = spaceOrdering({ spaces, panes, machines, run, home: () => shared(KEY.home), facts: (w, ps) => this.repos.forSpace(w, ps),
-      shown: this.shown, foldedRepos: this.foldedRepos, row: ROW, pitch: PITCH });
+      shown: this.shown, foldedRepos: this.foldedRepos, row: () => ui(ROW), pitch });
     this.machinesSeen = this.machinesNow();
     this.machinesDirty = false;
     this.machinesRefreshedAt = -Infinity;
@@ -181,8 +183,8 @@ export default class Spaces extends View {
   grouped(t, sp, ps) {
     const rows = this.order.rows(sp, ps), lifting = Boolean(this.drag?.moved), here = sp.find(s => s.active)?.machine ?? null;
     const draw = (r, ghost) => r.head ? this.repoHead(r, t, ps, ghost) : this.row(r, t, ps, ghost);
-    const entry = (r) => ({ key: r.head ? r.w.id : `space-${r.w.id}`, h: PITCH, m: r.w.machine ?? null, r, el: draw(r), ghost: () => draw(r, true) });
-    const plain = (key, m, draw) => ({ key, h: PITCH, m, el: draw(false), ghost: () => draw(true) });
+    const entry = (r) => ({ key: r.head ? r.w.id : `space-${r.w.id}`, h: pitch(), m: r.w.machine ?? null, r, el: draw(r), ghost: () => draw(r, true) });
+    const plain = (key, m, draw) => ({ key, h: pitch(), m, el: draw(false), ghost: () => draw(true) });
     const remote = [...new Set([...rows.map(r => r.w.machine).filter(Boolean), ...this.machines.filter(m => !m.temporary).map(m => m.name), ...Object.keys(this.reconnecting)])].sort();
     let known;
     const loading = m => {
@@ -191,7 +193,7 @@ export default class Spaces extends View {
         || sp.some(s => (s.machine ?? null) === m && !this.shown.has(s.id));
     };
     const loadingRow = m => plain(`machine-loading-${m ?? "local"}`, m, ghost => div().when(!ghost, el => el.id(`machine-loading-${m ?? "local"}`))
-      .h(ROW).flex_none().px(8).flex().items_center().text_color(t.dim).child("Loading…"));
+      .h(ui(ROW)).flex_none().px(8).flex().items_center().text_color(t.dim).child("Loading…"));
     if (!remote.length) return loading(null) && !rows.length ? [loadingRow(null)] : rows.map(entry);
     const machineNames = [null, ...remote];
     return machineNames.flatMap((m) => {
@@ -204,8 +206,8 @@ export default class Spaces extends View {
       const id = m ?? "local";
       // Drawn as the agents list's shelves, T3's: the chevron at the row's end and its + as T3's folder has it.
       // By the row's id: this computer's m is null, which a cleared field would equal. Kept as Agents' headings are, as a leave can go missing.
-      const head = hoverKept(this, "overMachine", `machine-${id}`, h_flex().id(`machine-${id}`).h(ROW).flex_none().mx(2).px(8).gap(8).items_center()
-        .text_size(12).font_medium().text_color(t.dim)
+      const head = hoverKept(this, "overMachine", `machine-${id}`, h_flex().id(`machine-${id}`).h(ui(ROW)).flex_none().mx(2).px(8).gap(8).items_center()
+        .text_size(ui(12)).font_medium().text_color(t.dim)
         .role("button").accessibility_label(`${folded ? "Expand" : "Collapse"} ${m ?? "This computer"}`))
         // Its + and its Connect in a menu; asleep, with neither, it has none.
         .when(connected || (rebuilt && !repair?.busy), el => el.on_mouse_down("right", (_e, cx) => openMenu(this, "machine", { machine: m, connected, connect: rebuilt && !repair?.busy }, cx)))
@@ -245,7 +247,7 @@ export default class Spaces extends View {
             .text_color(this.overMachine === `machine-${id}` ? t.foreground : t.dim)
             .child(foldArrow("t3-spaces", `machine-fold-${id}`, !folded, 12, this.overMachine === `machine-${id}` ? t.foreground : t.dim))));
       const empty = plain(`machine-new-${id}`, m, ghost => {
-        const el = h_flex().h(ROW).flex_none().px(8).gap(10).items_center().rounded(8)
+        const el = h_flex().h(ui(ROW)).flex_none().px(8).gap(10).items_center().rounded(8)
           .text_color(this.hot === `machine-new-${id}` ? t.foreground : t.dim)
           // Laid out as a space's row: the + in the mark's 16px, the words where a name starts.
           .child(div().size(16).flex_none().flex().items_center().justify_center().child(svg("mods/t3-spaces/icons/plus.svg").size(12))).child("New space here");
@@ -255,7 +257,7 @@ export default class Spaces extends View {
           .on_click(() => run("space.new", { machine: m ?? "" })), 8);
       });
       // A machine rarely goes, and when it does its heading just goes: no ghost.
-      const heading = { key: `machine-${id}`, h: PITCH, m, el: stop(this, t, `machine-${id}`, head) };
+      const heading = { key: `machine-${id}`, h: pitch(), m, el: stop(this, t, `machine-${id}`, head) };
       if (rebuilt) return [heading];
       return [heading, ...(folded ? [] : mine.length ? mine.map(entry) : [loading(m) ? loadingRow(m) : empty])];
     });
@@ -278,7 +280,7 @@ export default class Spaces extends View {
       .gap(6)
       .justify_end()
       .items_center()
-      .text_size(12)
+      .text_size(ui(12))
       .text_color(t.dim)
       .when(Boolean(where), (el) => el.child(div().min_w(0).truncate().child(where)))
       .when(g.ahead > 0, (el) => el.child(mark(`ahead-${id}`, n(g.ahead, "push"), div().text_color(t.ansi2).child(`\u2191${g.ahead}`))))
@@ -306,7 +308,7 @@ export default class Spaces extends View {
   // so a click opens it, and it becomes the checkout's own row. A bare repo has nothing to open: there the click folds.
   repoHead(r, t, ps, ghost) {
     const { w, g, hiding = 0 } = r, rowId = w.id, foldId = `${rowId}-fold`;
-    const el = h_flex().h(ROW).flex_none().px(8).gap(10).items_center().rounded(8)
+    const el = h_flex().h(ui(ROW)).flex_none().px(8).gap(10).items_center().rounded(8)
       .child(div().flex_none().opacity(0.5).child(projectMark("mods/t3-spaces", w, 16, t, ps)))
       .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.dim).child(w.name))
       .child(this.foldButton(t, foldId, g.repo, hiding, ghost));
@@ -327,14 +329,14 @@ export default class Spaces extends View {
     const el = v_flex()
       .relative()
       .px(8)
-      .h(ROW)
+      .h(ui(ROW))
       .flex_none()
       .justify_center()
       .rounded(8)
       .when(on, (el) => el.bg(t.selected))
       // The same tree lines as sub-agents: from the checkout's avatar center, turning into the branch icon.
       .when(tree === "├─", el => el.child(div().absolute().left(15.25).top(0).bottom(-STACK).w(1.5).bg(t.input)))
-      .when(Boolean(tree), el => el.child(div().absolute().left(15.25).top(-4).h(20).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input)))
+      .when(Boolean(tree), el => el.child(div().absolute().left(15.25).top(-4).h(ui(ROW) / 2 + 4).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input)))
       .child(
         h_flex()
           .w_full().min_w(0)
@@ -429,7 +431,7 @@ export default class Spaces extends View {
     if (d && !rows.some((e) => e.key === d.key)) d = this.drag = null;
     if (d?.moved) {
       // The first frame lifted keeps the gap where the row was, so a quick first move still slides the rows it passes.
-      const { block, rest, slot, y, edge } = this.order.preview(rows, d.key, d.top + d.dy, d.drawn), h = block.length * PITCH;
+      const { block, rest, slot, y, edge } = this.order.preview(rows, d.key, d.top + d.dy, d.drawn), h = block.length * pitch();
       d.y = y; d.edge = edge;
       shown = [...rest.slice(0, slot), { key: "space-gap", h, el: div().h(h - STACK), ghost: () => div().h(h - STACK) }, ...rest.slice(slot)];
       lifted = v_flex().id("space-lifted").absolute().left(0).right(0).top(d.y).gap(STACK).rounded(8).bg(t.selected).shadow_lg()
@@ -440,14 +442,14 @@ export default class Spaces extends View {
     if (d?.moved) d.drawn = true;
     this.landed = null;
     const tool = (id, label, icon, options) => trigger(this, t, id, { icon: `mods/t3-spaces/icons/${icon}.svg`, label, ...options });
-    return focusRoot(this, v_flex().size_full().min_h(0).bg(t.chrome).text_size(14)
+    return focusRoot(this, v_flex().size_full().min_h(0).bg(t.chrome).text_size(ui(14))
       .when(this.dragFocus, el => el.track_focus(this.dragKeys).on_key_down((e, cx) => {
         if (e.keystroke !== "escape" || !this.dragFocus) return;
         cx.stop_propagation();
         this.letGo(cx, true);
       }))
       // As tall as Inbox's top row, T3's.
-      .child(h_flex().id("spaces-heading").h(32).flex_none().pl(18).pr(8).items_center().justify_between().text_size(12).font_medium().text_color(t.dim)
+      .child(h_flex().id("spaces-heading").h(32).flex_none().pl(18).pr(8).items_center().justify_between().text_size(ui(12)).font_medium().text_color(t.dim)
         .child(div().text_color(t.muted).child("Spaces"))
         // The same two as Inbox's top row, so switching modes moves nothing.
         .child(h_flex().flex_none().items_center()

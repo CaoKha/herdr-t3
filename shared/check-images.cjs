@@ -1,5 +1,5 @@
-// The pictures in a Markdown body (images.js): where they are, what each is kept under, what a download may be, how big it
-// is and how big it's drawn.
+// The pictures in a Markdown body (images.js): where they are and its fenced code, what each is kept under, what a download may
+// be, how big it is and how big it's drawn.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -7,7 +7,7 @@ const vm = require("node:vm");
 
 const c = vm.createContext({ Uint8Array, WeakMap });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "images.js"), "utf8").replace(/^export /gm, "")
-  + "\nglobalThis.img = { splitBody, ownParts, assetKey, imageExt, curlArgs, imageSize, drawnSize, IMAGE_MAX };", c);
+  + "\nglobalThis.img = { splitBody, ownParts, mapImages, imagesOf, assetKey, imageExt, curlArgs, imageSize, drawnSize, IMAGE_MAX };", c);
 const { img } = c;
 const json = (x) => JSON.parse(JSON.stringify(x));
 const same = (a, b, message) => assert.deepEqual(json(a), json(b), message);
@@ -17,11 +17,46 @@ const ascii = (s) => [...s].map((ch) => ch.charCodeAt(0));
 
 const parts = img.splitBody("Intro ![a](https://x/1.png \"t\") then <img width=\"300\" height=\"80\" alt='B &amp; C' src=\"https://x/2.png\" /> end\n"
   + "```md\n![not](https://x/3.png)\n```\nkept `![inline](https://x/4.png)` too\n~~~\n<img src=\"https://x/5.png\">\n~~~\n");
-same(parts.map((p) => p.image ? ["image", p.image.alt, p.image.url, p.image.width ?? null, p.image.height ?? null] : ["text", p.text.trim().slice(0, 12)]),
-  [["text", "Intro"], ["image", "a", "https://x/1.png", null, null], ["text", "then"], ["image", "B & C", "https://x/2.png", 300, 80], ["text", "end\n```md\n!["]],
-  "Markdown and HTML pictures among the text; none inside code, fenced or inline");
-assert.ok(parts.at(-1).text.includes("`![inline](https://x/4.png)`") && parts.at(-1).text.includes('<img src="https://x/5.png">'));
+const kinds = (ps) => ps.map((p) => p.image ? ["image", p.image.alt, p.image.url, p.image.width ?? null, p.image.height ?? null]
+  : p.code ? ["code", p.code.info, p.code.text] : ["text", p.text]);
+same(kinds(parts), [["text", "Intro "], ["image", "a", "https://x/1.png", null, null], ["text", " then "], ["image", "B & C", "https://x/2.png", 300, 80],
+  ["text", " end\n"], ["code", "md", "![not](https://x/3.png)"], ["text", "kept `![inline](https://x/4.png)` too\n"], ["code", "", '<img src="https://x/5.png">']],
+"Markdown and HTML pictures among the text, fenced code apart; no picture inside code, fenced or inline");
 same(img.splitBody("   \n"), [], "nothing to draw");
+
+// Fenced code: in a list (its indent off), a longer fence holding a shorter, one fence kind holding the other, unclosed, CRLF.
+same(kinds(img.splitBody("1. Install:\n   ```sh\n   npm i\n     --save\n   ```\n2. Run\n")),
+  [["text", "1. Install:\n"], ["code", "sh", "npm i\n  --save"], ["text", "2. Run\n"]], "a fence inside a list");
+same(kinds(img.splitBody("````md\n```ts\nx\n```\n````\n~~~rust,ignore\nlet s = \"```\";\n```\n~~~\n")),
+  [["code", "md", "```ts\nx\n```"], ["code", "rust,ignore", "let s = \"```\";\n```"]], "closed only by its own kind, at least as long");
+same(kinds(img.splitBody("```js const x``` is inline, and so is `` ``` ``\n![a](u)\n")),
+  [["text", "```js const x``` is inline, and so is `` ``` ``\n"], ["image", "a", "u", null, null]], "backticks in the text open no fence");
+same(kinds(img.splitBody("Run\r\n```ts\r\nlet a\r\n```\r\nthen\n```py\nprint(1)\n")), [["text", "Run\r\n"], ["code", "ts", "let a"], ["text", "then\n"], ["code", "py", "print(1)"]],
+  "CRLF lines, and an unclosed fence runs to the end");
+same(img.splitBody("```\n  \n```\n"), [], "a blank block draws nothing");
+
+// GFM tables: one with a picture is a grid of cells, each its own parts; one without stays in the text.
+const cell = (ps) => kinds(ps);
+const grid = (p) => p.table && { header: p.table.header.map(cell), align: p.table.align, rows: p.table.rows.map((r) => r.map(cell)) };
+const shots = "## Screenshots\n\n| With code, en | With code, es | With code, pt |\n| --- | --- | --- |\n"
+  + "| ![en](https://x/1.png) | ![es](https://x/2.png) | ![pt](https://x/3.png) |\n\n| Without | Mobile |\n|:--|--:|\n| ![a](https://x/4.png) | <img width=\"200\" alt=\"b\" src=\"https://x/5.png\"> |\n\nAfter\n";
+const twice = img.splitBody(shots);
+same(twice.map((p) => (p.table ? "table" : kinds([p])[0][0])), ["text", "table", "table", "text"], "two tables, the text between and around them apart");
+same(grid(twice[1]), { header: [[["text", "With code, en"]], [["text", "With code, es"]], [["text", "With code, pt"]]], align: [null, null, null],
+  rows: [[[["image", "en", "https://x/1.png", null, null]], [["image", "es", "https://x/2.png", null, null]], [["image", "pt", "https://x/3.png", null, null]]]] }, "#3780's table");
+same(grid(twice[2]), { header: [[["text", "Without"]], [["text", "Mobile"]]], align: ["left", "right"],
+  rows: [[[["image", "a", "https://x/4.png", null, null]], [["image", "b", "https://x/5.png", 200, null]]]] }, "an alignment row, an HTML picture in a cell");
+same(kinds(twice).filter((k) => k[0] === "image"), [], "a table's pictures are only in its cells");
+same(img.imagesOf(twice).map((i) => i.alt), ["en", "es", "pt", "a", "b"], "pictures in document order, row by row, for pairing with bodyHTML");
+same(img.imagesOf(img.mapImages(twice, (i) => ({ ...i, alt: i.alt.toUpperCase() }))).map((i) => i.alt), ["EN", "ES", "PT", "A", "B"], "each picture made once, in its cell");
+
+const pipes = grid(img.splitBody("a \\| b | `x | y` | c\n-|:-:|-\n![p](u) text | `q|r` \\| s | ![t](v) | extra\nshort\n")[0]);
+same(pipes, { header: [[["text", "a \\| b"]], [["text", "`x | y`"]], [["text", "c"]]], align: [null, "center", null],
+  rows: [[[["image", "p", "u", null, null], ["text", " text"]], [["text", "`q|r` \\| s"]], [["image", "t", "v", null, null]]], [[["text", "short"]], [], []]] },
+"no outer pipes; an escaped pipe and one in code don't split; extra cells go, missing ones are empty");
+same(kinds(img.splitBody("| a | b |\n| - | - |\n| `![x](y)` | 1 |\n")), [["text", "| a | b |\n| - | - |\n| `![x](y)` | 1 |\n"]], "a table without a picture stays text");
+same(kinds(img.splitBody("| a | b |\n| - |\n| ![x](y) | 1 |\n")).map((k) => k[0]), ["text", "image", "text"], "a delimiter row of another width isn't a table");
+same(kinds(img.splitBody("```\n| a | b |\n| - | - |\n| ![x](y) | 1 |\n```\n")).map((k) => k[0]), ["code"], "a table in fenced code stays code");
 
 const id1 = "c523b8b3-e7f2-4520-bb42-8a68ab28c022";
 const signed = (id, jwt = "A") => `https://private-user-images.githubusercontent.com/1/9-${id}.png?jwt=${jwt}&x=1`;

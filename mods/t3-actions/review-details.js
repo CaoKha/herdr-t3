@@ -10,16 +10,18 @@ import { split } from "./button.js";
 import { panelState, showPage, reviewRepo, openReview, reviewShown } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { MENU_ROW } from "./menu-row.js";
+import { searchHeight } from "./review-menu.js";
 import { propsLit } from "./list.js";
 import { hoverRow, subLeft } from "./submenu.js";
 import { openBeside, closeSub, subGone, closeChain, hasOpen } from "./popup-menu.js";
 import { scopeOf, openScope, readScope, scopeRows, scopeRow, scopeItems, scopeList, pickListed, menuKey, commitsKey, commitsBody, releaseScope } from "./review-scope.js";
 import { sourceOkay, openLayer, underRow, rowMenu, splitHot, CHEVRON, MENU_CLOSED } from "./details-popup.js";
+import { ui } from "./layout-settings.js";
 
 const ICON_DIR = "mods/t3-actions/icons";
 // The range menu at its tallest: four ranges, the rule, Commits, its padding. The app fits a popup to what it draws.
-const RANGE_H = 8 + 4 * MENU_ROW + 9 + MENU_ROW;
-// The Commits submenu: T3's w-80, and its list's tallest under its search (43) and padding.
+const rangeHeight = () => 8 + 4 * ui(MENU_ROW) + 9 + ui(MENU_ROW);
+// The Commits submenu: T3's w-80, and its list's tallest under its search and padding.
 const COMMITS_W = 320, COMMITS_LIST = 320;
 // Where each space's Review read last (panel.js reviewRepo), for this mod's run: the menu reads there at once and checks it after.
 const roots = new Map();
@@ -45,7 +47,7 @@ export function reviewDetailsView(view, t, visible, rule) {
       .child(div().flex_1().min_w(0).truncate().child("Review"))
       .when(Boolean(label), el => el.child(div().id("details-review-scope-slot").flex_none().max_w(120).min_w(0).font_normal()
         .child(nameText(view, "details-review", label, { size: 12 }).text_color(t.dim).whitespace_nowrap()))), 8), { below: true }),
-    more => stop(view, t, "details-review-more", reason ? more : rowMenu(view, "details-review-more", RANGE_H,
+    more => stop(view, t, "details-review-more", reason ? more : rowMenu(view, "details-review-more", rangeHeight(),
       (place, keys) => sourceOkay(source) && openLayer("review-scope", place, { at: place.at ?? null }, keys))(more.on_hover(glow(view, "details-review-more"))), 8));
   return v_flex().id("details-review-section").p(8).when(rule, el => el.border_t(1).border_color(t.border))
     .child(reason ? tip(view, t, "details-review-row", reason, row, { below: true }) : row);
@@ -127,8 +129,8 @@ export function closeRangeMenu(view) {
 // Commits beside its row, as t3-menu's Snooze: the row where the pointer last found it, else from where the menu opened.
 function openCommits(view, scope, lit, cx) {
   const p = props(), i = scopeRows(scope).findIndex(r => r.sub);
-  const count = scopeList(scope).length, h = 8 + 43 + (count ? Math.min(count * MENU_ROW, COMMITS_LIST) : 36);
-  openBeside(view, i, "commits", { top: 4 + i * MENU_ROW + 9, width: underRow(null, 0).width - 8 },
+  const count = scopeList(scope).length, h = 8 + searchHeight() + (count ? Math.min(count * ui(MENU_ROW), COMMITS_LIST) : ui(36));
+  openBeside(view, i, "commits", { top: 4 + i * ui(MENU_ROW) + 9, width: underRow(null, 0).width - 8 },
     { mod: "t3-actions", width: COMMITS_W, height: h, props: { actions: "review-commits", source: p.source, details: p.details } }, "review-commits", lit >= 0);
   cx.notify();
 }
@@ -147,7 +149,7 @@ export function rangeMenu(view) {
         if (key) scope.openCommits(cx, -1); else closeSub(view);
       });
     }) });
-  return focusRoot(view, v_flex().id("details-range-menu").w_full().p(4).bg(t.popover).text_size(14).track_focus(view.keys)
+  return focusRoot(view, v_flex().id("details-range-menu").w_full().p(4).bg(t.popover).text_size(ui(14)).track_focus(view.keys)
     .on_hover((on) => { if (!on) subLeft(view.s); })
     .on_key_down((e, cx) => { if (scope && view.scope === scope) menuKey(scope, e, cx); else if (e.key === "escape") closeOverlay(props().overlay); })
     .when(Boolean(view.scopeError), el => el.child(div().id("details-range-note").min_h(28).px(8).flex().items_center().text_color(t.dim).child(view.scopeError)))
@@ -170,7 +172,7 @@ export function initCommits(view) {
 export function commitsMenu(view) {
   if (!view.scopeSearch) return div(); // Its parent closed or changed repositories before the overlay mounted.
   const t = theme();
-  return focusRoot(view, v_flex().id("details-commits").w_full().p(4).bg(t.popover).text_size(14)
+  return focusRoot(view, v_flex().id("details-commits").w_full().p(4).bg(t.popover).text_size(ui(14))
     .on_key_down((e, cx) => commitsKey(view, e, cx, () => closeOverlay(props().overlay)))
     .children(commitsBody(view, t, { height: COMMITS_LIST, icons: ICON_DIR })));
 }

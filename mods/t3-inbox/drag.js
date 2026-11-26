@@ -9,6 +9,7 @@ import { SLIM, CARD_GAP, LIST_TOP } from "./list-view.js";
 import { byCard } from "./row-model.js";
 import { setPinned } from "./pins.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 export function inboxDrag(view, t, model, actions) {
   const { list, pins, pinned, put, out, busy, hidden, settledAt, working, since, state, viewing, napUntil, wake, napRows } = model;
@@ -58,7 +59,7 @@ export function inboxDrag(view, t, model, actions) {
   const BADGE = { pin: ["mods/t3-inbox/icons/pin.svg", "Pin"], unpin: ["mods/t3-inbox/icons/pin-off.svg", "Unpin"],
     settle: ["mods/t3-inbox/icons/circle-check.svg", "Settle"], unsettle: ["mods/t3-inbox/icons/undo.svg", "Un-settle"], wake: ["mods/t3-inbox/icons/alarm-clock-off.svg", "Wake"] };
   const badge = (v) => h_flex().id(`badge-${v}`).h(20).px(6).gap(4).flex_none().items_center().rounded(4)
-    .border(1).border_color(alpha(t.accent, "66")).bg(alpha(t.accent, "1a")).text_size(11).font_medium().text_color(t.accent)
+    .border(1).border_color(alpha(t.accent, "66")).bg(alpha(t.accent, "1a")).text_size(ui(11)).font_medium().text_color(t.accent)
     .child(svg(BADGE[v][0]).size(12).flex_none().text_color(t.accent)).child(BADGE[v][1]);
 
   // Settled shows one page; while a drag moves a row out of it the next row fills in, and one settled into
@@ -79,8 +80,8 @@ export function inboxDrag(view, t, model, actions) {
     return pinTo(xs.slice(upper && a.address !== d?.from ? i : i + 1).find((x) => x !== d?.from));
   };
   // The gap: a card and the list's spacing in Pinned and Active, a slim row in Settled.
-  const cardH = lifted && !fromShelf ? d.height : view.cardH ?? 78;
-  const gap = (key) => div().id(`gap-${key}`).flex_none().h(plan?.gap !== key ? 0 : plan.section === "settled" ? SLIM : cardH + CARD_GAP)
+  const cardH = lifted && !fromShelf ? d.height : view.cardH ?? ui(78);
+  const gap = (key) => div().id(`gap-${key}`).flex_none().h(plan?.gap !== key ? 0 : plan.section === "settled" ? ui(SLIM) : cardH + CARD_GAP)
     .when(dragging, (el) => el.transition("height", MOTION));
   // Each droppable row sits in a lane: the gap that opens above it, the row (folding away once the lifted one is
   // headed elsewhere, holding its place until then) with the list's spacing, and after the last, the end gap.
@@ -91,14 +92,14 @@ export function inboxDrag(view, t, model, actions) {
       .child(fly(a.address, section === "settled" || section === "snoozed" ? "slim" : "card", draw(a))).when(spacing > 0, (el) => el.child(div().h(spacing).flex_none())))
     .when(i === xs.length - 1, (el) => el.child(gap(`end-${section}`))));
   // T3's boundaries: Pinned and Active labels, shown only while dragging; the list opens room for them.
-  const boundary = (id, text, section, to) => h_flex().id(id).flex_none().overflow_hidden().h(dragging ? 24 : 0)
-    .transition("height", MOTION).px(8).gap(8).items_center().text_size(12).font_medium()
+  const boundary = (id, text, section, to) => h_flex().id(id).flex_none().overflow_hidden().h(dragging ? ui(24) : 0)
+    .transition("height", MOTION).px(8).gap(8).items_center().text_size(ui(12)).font_medium()
     .on_mouse_move((_e, cx) => aim(to, cx))
     .when(dragging, (el) => el.child(div().text_color(hot(section) ? t.accent : t.muted).child(text))
       .child(div().flex_1().h(1).bg(hot(section) ? alpha(t.accent, "80") : t.border)));
   // An empty section still takes a drop: T3's dashed placeholder, accent while it's the target.
-  const placeholder = (section, text) => div().id(`${section}-placeholder`).h(36).mx(2).mb(CARD_GAP).flex_none().flex().items_center().justify_center()
-    .rounded(6).border(1).border_dashed().text_size(12)
+  const placeholder = (section, text) => div().id(`${section}-placeholder`).h(ui(36)).mx(2).mb(CARD_GAP).flex_none().flex().items_center().justify_center()
+    .rounded(6).border(1).border_dashed().text_size(ui(12))
     .border_color(hot(section) ? alpha(t.accent, "66") : t.border).text_color(hot(section) ? t.accent : t.muted)
     .when(hot(section), (el) => el.bg(alpha(t.accent, "0d")))
     .on_mouse_move((_e, cx) => aim({ section }, cx))
@@ -175,7 +176,7 @@ export function inboxDrag(view, t, model, actions) {
   };
 
   const TOP = 32; // The top row above the list.
-  const ghostTop = () => Math.max(TOP + LIST_TOP + 24, Math.min(d.y - d.grab, (view.height ?? Infinity) - d.height - 8));
+  const ghostTop = () => Math.max(TOP + LIST_TOP + ui(24), Math.min(d.y - d.grab, (view.height ?? Infinity) - d.height - 8));
   // Ends a drag or sweep, and hands the keyboard back to the pane that had it, unless the drop moved on to
   // another agent. Not FocusHandle.release(): that frees the handle, and the next drag would throw.
   // `view.back` is set only once something lifted.

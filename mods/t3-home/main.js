@@ -9,6 +9,7 @@ import { agentStep } from "./agent-step.js";
 import { closedKey } from "./store.js";
 import { keycap } from "./palette.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 const ACTIONS = [
   { id: "next", word: "Next agent", action: "t3-tabs.next", go: () => run("t3-tabs.next"), ready: () => agentStep(layout(), shared, spaces(), 1) !== null },
@@ -31,7 +32,7 @@ export default class Home extends View {
     const t = theme();
     const row = (a) => {
       const id = `home-${a.id}`, off = a.ready && !a.ready(), key = keyOf(a.action);
-      const el = h_flex().id(id).h(32).px(10).gap(10).flex_none().rounded(8).items_center().justify_between().text_color(t.muted)
+      const el = h_flex().id(id).h(ui(32)).px(10).gap(10).flex_none().rounded(8).items_center().justify_between().text_color(t.muted)
         .child(a.word)
         .when(Boolean(key), (r) => r.child(h_flex().flex_none().gap(4).children(caps(key).map((cap) => keycap(t, cap)))));
       // Nowhere to go: dimmed, as the key does nothing either. The theme's hover can be the pane's own color, so a tint of the text, as Go to's rows.
@@ -40,6 +41,6 @@ export default class Home extends View {
     };
     // As T3's launcher: pb its top bar's height, so the list centers on the whole panel.
     return focusRoot(this, v_flex().size_full().px(24).pb(40).items_center().justify_center()
-      .child(v_flex().w_full().max_w(320).gap(2).text_size(14).children(ACTIONS.map(row))));
+      .child(v_flex().w_full().max_w(320).gap(2).text_size(ui(14)).children(ACTIONS.map(row))));
   }
 }

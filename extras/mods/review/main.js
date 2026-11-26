@@ -6,7 +6,7 @@ import { v_flex, h_flex, VirtualListScrollHandle, InputState, TextView } from "g
 import { checking, exec, nextCommand, setShared, shared, spaces, theme, props, window as appWindow } from "herdr";
 import { panelState, surfacesFor, closeSurface, reviewRepo, surfaceBorn, reviewRequest, reviewShown, REVIEW_SHOWN, REVIEW_STATUS } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
-import { buildItems, contentWidth, groupFiles, rowsToAsk, wrapColumns, CHAR, LOOKAHEAD } from "./rows.js";
+import { buildItems, codeChar, contentWidth, groupFiles, rowsToAsk, wrapColumns, LOOKAHEAD } from "./rows.js";
 import { PANE, LU, SPLIT_MIN, DISABLED, HEADER, BELOW, pref, setPref, zoom, subState } from "./controls.js";
 import { GROUP_GAP } from "./button.js";
 import { popupClosed } from "./review-menu.js";
@@ -27,6 +27,7 @@ import { reviewKey } from "./keys.js";
 import { wrapLines } from "./store.js";
 import { initMenu, closeMenu, menuView, closeMenus } from "./menus.js";
 import { installedTargets } from "./open-in.js";
+import { textSize, ui } from "./layout-settings.js";
 
 // A request this young when its space's review starts is the click that opened the panel; an older one was already shown.
 const FRESH = 10000;
@@ -342,10 +343,10 @@ export default class ReviewPanel extends View {
   // items changed are built again (`parts`); the rest of a group of thousands is joined as it was.
   items() {
     // Wrapped, lines break at the columns the diff's width holds, of the characters' measured widths (diff.js), once known.
-    const char = this.charWidth ?? CHAR, wideChar = this.wideWidth ?? 2 * char, wide = wideChar / char;
+    const char = this.charWidth ?? codeChar(), wideChar = this.wideWidth ?? 2 * char, wide = wideChar / char;
     // At the width it last held (diff.js), so a drag doesn't cut every row in view at each step.
     const wrap = wrapLines() ? wrapColumns(this.wrapHold.at ?? this.view, char, wideChar) : null;
-    const split = this.splitShown(), group = this.group(), id = `${this.version}:${this.groupKey}:${split}:${Math.round(this.view / 40)}:${wrap ? `${wrap.row}:${wrap.pair}` : ""}:${char}:${wide}`;
+    const split = this.splitShown(), group = this.group(), id = `${this.version}:${this.groupKey}:${split}:${Math.round(this.view / 40)}:${wrap ? `${wrap.row}:${wrap.pair}` : ""}:${char}:${wide}:${textSize()}`;
     if (id !== this.itemsId) {
       // Kept only once all of it is built: a throw part way would leave the list and its lookups out of step, never rebuilt.
       // A width's change counts each row's lines again (rows.js lineCount) and cuts only those drawn (diff.js).
@@ -452,7 +453,7 @@ export default class ReviewPanel extends View {
       this.panel.front.deferRead();
     }
     // With no review to show, the toolbar names the page alone and keeps the column's switch, greyed.
-    const note = (body) => v_flex().id("review-pane").size_full().text_color(t.foreground).text_size(12)
+    const note = (body) => v_flex().id("review-pane").size_full().text_color(t.foreground).text_size(ui(12))
       .child(h_flex().id("review-header").h(HEADER).flex_none().px(12).gap(8).items_center()
         .child(div().id("review-title").flex_1().pl(8).font_medium().child("Review"))
         .child(navToggle(this, t, "mods/review", "review-nav-toggle", this.navOpen, () => {}, true)))
@@ -523,7 +524,7 @@ export default class ReviewPanel extends View {
     // settings' right edge past the 12 inset, the tree's switch and the group's gap (header.js), the fold's a button and a gap on.
     // Keys open them too, with no press to place them by.
     const right = 12 + 28 + GROUP_GAP, below = BELOW;
-    return v_flex().id("review-pane").relative().size_full().min_h(0).text_color(t.foreground).text_size(12)
+    return v_flex().id("review-pane").relative().size_full().min_h(0).text_color(t.foreground).text_size(ui(12))
       // cmd-w and cmd-t are keys.json's (mod:review): review.close, t3-chrome.surface-menu.
       .track_focus(this.handle).on_key_down((e, cx) => this.key(e, cx))
       .on_mouse_down("left", () => this.handle.focus())
@@ -546,8 +547,8 @@ export default class ReviewPanel extends View {
           content: v_flex().size_full().min_w(0)
             // A rule-based group's summary is the daemon's boilerplate for its folder rule.
             .when(Boolean(group?.summary) && this.review.source !== "rule-based", el => el.child(v_flex().id("group-summary").flex_none().max_h(160).overflow_hidden().px(12).py(10).gap(4)
-              .child(div().text_size(13).font_medium().child(group.label))
-              .child(TextView.markdown(`summary-${group.key}`, group.summary).selectable(true).scrollable(false).text_size(12).text_color(t.muted))))
+              .child(div().text_size(ui(13)).font_medium().child(group.label))
+              .child(TextView.markdown(`summary-${group.key}`, group.summary).selectable(true).scrollable(false).text_size(ui(12)).text_color(t.muted))))
             .child(div().flex_1().min_h(0).child(diffView(this, t))) }))).when(Boolean(this.switching), el => el.opacity(DISABLED)))
       // Built only while open: render runs on every live change, and a catalog runs to hundreds of rows.
       // Each 4 under its button (T3's sideOffset) in the header.

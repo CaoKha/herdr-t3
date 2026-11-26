@@ -13,11 +13,12 @@ import { targetsMenu, awaitTargets, openTarget, targetIcon } from "./open-in.js"
 import { pierreFileIcon } from "./pierre-icons.js";
 import { KEY, closedKey } from "./store.js";
 import { LIST, join, parseListing } from "./file-listing.js";
+import { ui } from "./layout-settings.js";
 
 const menuMod = () => props()?.menuMod ?? "t3-files";
 const menuIcons = () => `mods/${menuMod()}`; // each mod draws only its own icons/
 // As t3-menu's.
-export const MENU_W = 220, FOLDER_H = 8 + 12 * MENU_ROW;
+export const MENU_W = 220, folderHeight = () => 8 + 12 * ui(MENU_ROW);
 // Stamped as a top menu closes, for the control that opened it (trigger.js); a submenu's, for the menu it hangs off.
 export const MENU_CLOSED = closedKey("t3-files", "menu");
 
@@ -154,7 +155,7 @@ function items(view) {
 // Row `i`'s submenu beside it, Open with's editors (the one row with one). `lit`: keys opened it, so its first row is lit, as Base UI's.
 function openSub(view, i, lit) {
   const p = props(), it = items(view)[i];
-  openBeside(view, i, it.id, { top: 4 + i * MENU_ROW, width: MENU_W - 8 }, { mod: menuMod(), width: MENU_W, height: 8 + p.editors.length * MENU_ROW,
+  openBeside(view, i, it.id, { top: 4 + i * ui(MENU_ROW), width: MENU_W - 8 }, { mod: menuMod(), width: MENU_W, height: 8 + p.editors.length * ui(MENU_ROW),
     props: { menuMod: menuMod(), files: it.sub, source: p.source, path: p.path, editors: p.editors } }, null, lit);
 }
 
@@ -182,7 +183,7 @@ export function menuView(view) {
       view.rowsAt[i] = e.bounds;
       hoverRow(view.s, it.sub ? it.id : null, e, cx, (key, _row, cx) => { if (key) openSub(view, i, false); else closeSub(view); cx.notify(); });
     }) }); };
-  return focusRoot(view, v_flex().id("files-menu").size_full().p(4).bg(t.popover).text_size(14).track_focus(view.keys)
+  return focusRoot(view, v_flex().id("files-menu").size_full().p(4).bg(t.popover).text_size(ui(14)).track_focus(view.keys)
     // Off the menu, nothing pending opens; a submenu open stays.
     .on_hover((on) => { if (!on) subLeft(view.s); })
     // A submenu's ← goes back to its menu, as its Esc does. Moving off the row whose submenu is open closes it, as Base UI's.
@@ -194,7 +195,7 @@ export function menuView(view) {
     })
     // Back, then a rule, stay put over the folder's entries.
     .when(o > 0, (el) => el.child(row(0)).child(menuRule(t)))
-    .child(scrollList(view, "files-menu-list", { count: list.length - o, row: MENU_ROW, at: view.at - o, height: Math.min((list.length - o) * MENU_ROW, FOLDER_H - 8 - o * (MENU_ROW + 9)),
+    .child(scrollList(view, "files-menu-list", { count: list.length - o, row: ui(MENU_ROW), at: view.at - o, height: Math.min((list.length - o) * ui(MENU_ROW), folderHeight() - 8 - o * (ui(MENU_ROW) + 9)),
       wheeled: (keep) => { if (keep >= 0) view.at = keep + o; },
       draw: (i) => row(i + o) })));
 }

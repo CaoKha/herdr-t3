@@ -32,6 +32,7 @@ The space panel's Issues page (`t3-issues`, the `issues` slot of `panel-body`, a
 - Linked PRs: Linear's attachments that are GitHub PRs (any repository; other links aren't), GitHub's `closedByPullRequestsReferences`. A PR of the tab's own repository opens in Pull requests: `showPage("pulls")` then the `t3-pulls.open:<n>` command, which picks it there as a row would; any other opens in the browser.
 - Comments: threads, each top-level comment with its replies 16 in, in Linear's order. On Linear, Reply under each thread and a new-comment box at the end, Pull requests' boxes and drafts (by issue id, and issue id and thread). GitHub's comments are read only here.
 - Pictures as Pull requests' (`pictures.js`, `cache/t3-issues/`). A GitHub issue's are paired with `bodyHTML`. Linear's `uploads.linear.app` addresses need the key; fetch has no binary body in this runtime (`text()` and `json()` only) and the key must stay out of curl's arguments, so every Linear request carries `public-file-urls-expire-in: 600` and Linear answers with signed upload addresses that curl downloads as it does GitHub's.
+- Fenced code in a description or comment, GitHub's or Linear's, as Pull requests' Code (`shared/code.js`): a coloured read-only code view each, made only while the page shows it and released once not drawn, hidden or closed; a `diff` or `patch` fence as Pull requests' diff rows, no editor.
 - Comments past 100 are read 100 a page, 10 pages at most, then a `dim` note says the rest is in the browser.
 
 ## Writes (Linear only)

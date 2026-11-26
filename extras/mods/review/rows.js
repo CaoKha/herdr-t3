@@ -1,18 +1,23 @@
 // What the pane's diff list shows, as plain data: no gpui here, so check-pane.cjs runs it under node.
 // The daemon sends each hunk's rows already highlighted (plans/fork/04 in the jin.review fork).
 import { STARTS, WIDTHS } from "./vendor/char-width.js";
+import { textSize, ui } from "./layout-settings.js";
 
-// Heights on one scale: 20 a code line, 24 a hunk, 28 a group, 32 a file.
+// Heights on one scale at 13px text, each drawn and summed as ui(…): 20 a code line, 24 a hunk, 28 a group, 32 a file.
 export const ROW = 20, HUNK = 24, GROUP = 28, FILE = 32, NOTE_LINE = 18;
 // One column of 12px code font; past MAX_COLUMNS characters a line is cut, not scrolled to.
 export const CHAR = 7.25, MAX_COLUMNS = 1000;
+/** A column of the code font as drawn, ui(12), until diff.js measures it. */
+export const codeChar = () => CHAR * ui(12) / 12;
 // Code lines go to the list in runs of up to this many, one item each: Herdr's v_virtual_list takes at most 10000 items,
 // which a group of a few thousand changed lines passes when each line is one.
 // shortcut: a group past about 5000 hunks still passes it; fold its files there if one ever does.
 const RUN = 32;
 
 /** Where code starts in a row, past the line numbers and sign: notes and placeholders line up with it. */
-export const codeInset = (split) => split ? 52 : 92;
+// A line number's column (40 at 13px text) each side, then 12.
+export const NUMBER_W = 40;
+export const codeInset = (split) => (split ? 1 : 2) * ui(NUMBER_W) + 12;
 
 /** A code point's columns, as wcwidth counts them from Unicode's tables (vendor/char-width.js): East Asian Wide or Fullwidth
  * 2, a combining mark or a default-ignorable (a zero-width joiner, a variation selector) 0, else 1, a lone surrogate too. */
@@ -172,7 +177,7 @@ export function clipRows(rows) {
  * How wide the code must be to show its longest line, gutters included: unified rows, one `side` ("left", "right")
  * of split pairs, or the "solo" rows a split view gives an added or removed file, which take the whole width.
  */
-export function contentWidth(items, side, char = CHAR, wide = 2) {
+export function contentWidth(items, side, char = codeChar(), wide = 2) {
   let most = 0;
   for (const item of items) {
     if (item.kind !== (!side ? "row" : side === "solo" ? "solo" : "pair")) continue;
@@ -215,9 +220,9 @@ export const noteWidth = (width, anchored) => (anchored ? Math.min(width - 24, 8
  *  (12px in, 6px padding), a line's is a card under the line (12px in, at most 800 wide, 10 by 4 padding,
  *  3px apart). Either has a 12px mark and an 8px gap before its text. Characters take charWidth's columns. */
 export function noteHeight(text, width, anchored) {
-  const columns = Math.max(20, Math.floor(noteWidth(width, anchored) / 7));
+  const columns = Math.max(20, Math.floor(noteWidth(width, anchored) / ui(7)));
   const lines = text.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(textColumns(line) / columns)), 0);
-  return lines * NOTE_LINE + (anchored ? 16 : 12);
+  return lines * ui(NOTE_LINE) + (anchored ? 16 : 12);
 }
 
 /** Every file a group shows: its own, then its children's. */
@@ -233,20 +238,20 @@ export function buildItems(review, group, { collapsed, full, split, width, wrap 
   const addFile = (path) => {
     const file = byPath.get(path);
     if (!file) return;
-    items.push({ key: `f:${path}`, kind: "file", file, size: FILE, path });
+    items.push({ key: `f:${path}`, kind: "file", file, size: ui(FILE), path });
     if (collapsed.has(path)) return;
     const notes = notesOf(group, path), whole = full.get(path), hunks = file.hunks;
     // What its items show: rows arriving, a page more (a hunk added, or the last one's rows), a whole file, its notes (and
     // the width they wrap at), the mode. A read's new file objects carry the rows already shown.
     const stamp = [hunks, hunks?.length, hunks?.at(-1)?.rows, file.clipped, file.stuck, file.status, file.isBinary, file.truncated,
-      whole, whole?.rows, whole?.truncated, whole?.stuck, split, notes.length ? `${width}:${JSON.stringify(notes)}` : "", wrap && `${wrap.row}:${wrap.pair}:${wrap.solo}:${wrap.wide}`];
+      whole, whole?.rows, whole?.truncated, whole?.stuck, split, textSize(), notes.length ? `${width}:${JSON.stringify(notes)}` : "", wrap && `${wrap.row}:${wrap.pair}:${wrap.solo}:${wrap.wide}`];
     let part = parts.get(path);
     if (!part || stamp.some((value, i) => value !== part.stamp[i])) parts.set(path, part = { stamp, items: fileItems(path, file, notes, whole, split, width, wrap) });
     for (const item of part.items) items.push(item);
   };
   for (const path of group.files) addFile(path);
   for (const child of group.children) {
-    items.push({ key: `g:${child.key}`, kind: "group", group: child, size: GROUP });
+    items.push({ key: `g:${child.key}`, kind: "group", group: child, size: ui(GROUP) });
     for (const path of child.files) addFile(path);
   }
   return items;
@@ -264,11 +269,11 @@ function fileItems(path, file, notes, whole, split, width, wrap) {
   if (file.isBinary) return items;
   const hunks = whole ? [{ header: null, rows: whole.rows }] : file.hunks;
   if (!hunks) {
-    push({ key: `e:${path}`, kind: "empty", text: "Loading…", loading: true }, ROW);
+    push({ key: `e:${path}`, kind: "empty", text: "Loading…", loading: true }, ui(ROW));
     return items;
   }
   if (!hunks.length) {
-    push({ key: `e:${path}`, kind: "empty", text: file.isBinary ? "Binary file" : file.truncated ? "Too large to show" : "No text changes" }, ROW);
+    push({ key: `e:${path}`, kind: "empty", text: file.isBinary ? "Binary file" : file.truncated ? "Too large to show" : "No text changes" }, ui(ROW));
     return items;
   }
   // Split, an added or removed file has one side only: it takes the whole width rather than half.
@@ -276,7 +281,7 @@ function fileItems(path, file, notes, whole, split, width, wrap) {
   const kind = !split ? "row" : solo ? "solo" : "pair";
   // Wrapped, a line is as many ROWs as it runs to; a pair, as its longer side.
   const count = (row) => lineCount(row, wrap[kind], wrap.wide);
-  const height = (line) => !wrap ? ROW : (kind === "pair" ? Math.max(count(line.left), count(line.right)) : count(line)) * ROW;
+  const height = (line) => (!wrap ? 1 : kind === "pair" ? Math.max(count(line.left), count(line.right)) : count(line)) * ui(ROW);
   // The anchored notes by the line they're on: each row looks up its own, not every note of the file.
   const anchored = new Map();
   for (const [i, note] of notes.entries()) {
@@ -284,7 +289,7 @@ function fileItems(path, file, notes, whole, split, width, wrap) {
     if (at) anchored.set(at, [...anchored.get(at) ?? [], i]);
   }
   for (const [h, hunk] of hunks.entries()) {
-    if (hunk.header) push({ key: `h:${path}:${h}`, kind: "hunk", text: hunk.header }, HUNK);
+    if (hunk.header) push({ key: `h:${path}:${h}`, kind: "hunk", text: hunk.header }, ui(HUNK));
     const lines = split && !solo ? pairRows(hunk.rows) : hunk.rows;
     let run = /** @type {any} */ (null);
     for (const [r, line] of lines.entries()) {
@@ -302,6 +307,6 @@ function fileItems(path, file, notes, whole, split, width, wrap) {
   }
   // Past the bytes one read carries, the daemon sends the rows only so far: the next page comes as this row nears the view.
   const stuck = (whole ?? file).stuck;
-  if (whole ? whole.truncated : file.clipped) push({ key: `e:${path}:cut`, kind: "empty", text: stuck ? "The rest of this file is too large to show" : "Loading…", loading: !stuck, more: !stuck }, ROW);
+  if (whole ? whole.truncated : file.clipped) push({ key: `e:${path}:cut`, kind: "empty", text: stuck ? "The rest of this file is too large to show" : "Loading…", loading: !stuck, more: !stuck }, ui(ROW));
   return items;
 }

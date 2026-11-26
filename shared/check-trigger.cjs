@@ -14,7 +14,7 @@ let now = 1000, zoom = 1;
 const src = ["store.js", "focus.js", "tip.js", "color.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import [^;]*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
   + "\nglobalThis.tr = { trigger, hang };";
-const context = vm.createContext({
+const context = vm.createContext({ ui: (n) => n, 
   div: () => element(), h_flex: () => element(), v_flex: () => element(), svg: () => element("svg"),
   Popup: { new: (id, child) => { const p = element("popup"); p.key = id; p.items.push(child); return p; } },
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, keys: () => [], window: { mouse_position: () => null, viewport_size: () => null },
@@ -99,7 +99,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(hang(null, 220))), {});
   const fire = (el, name, event) => (el.handlers[name] ?? []).forEach((h) => h(event, cx));
   const kstate = {};
   let know = 1000;
-  const kc = vm.createContext({
+  const kc = vm.createContext({ ui: (n) => n, 
     div: () => all(), h_flex: () => all(), v_flex: () => all(), svg: () => all("svg"),
     Popup: { new: (id, child) => { const p = all("popup"); p.key = id; p.items.push(child); return p; } },
     shared: (k) => kstate[k], setShared: (k, v) => { kstate[k] = v; }, props: () => ({}), closeOverlay: () => {},

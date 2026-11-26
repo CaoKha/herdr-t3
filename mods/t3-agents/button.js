@@ -4,6 +4,7 @@ import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { glow } from "./tip.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // An outlined button's 1px border is inside its padding, as T3's `px-[calc(--spacing(3)-1px)]`.
 const SIZES = {
@@ -44,7 +45,8 @@ export function button(t, id, { variant = "ghost", size = "xs", surface = "chrom
   const s = SIZES[size], filled = variant !== "ghost" && variant !== "plain", lit = variant === "plain" || (!disabled && (hot || on));
   // primary's border is its fill: drawn, a disabled one's faded edge shows lighter than its faded fill.
   const ruled = filled && variant !== "primary";
-  const el = h_flex().id(id).h(s.h).flex_none().items_center().justify_center().rounded(s.radius).text_size(s.text).font_medium()
+  // A button with words grows with the text; an icon-only one keeps its square.
+  const el = h_flex().id(id).h(text || wide ? ui(s.h) : s.h).flex_none().items_center().justify_center().rounded(s.radius).text_size(ui(s.text)).font_medium()
     .when(Boolean(text) || wide, (b) => b.px(ruled ? s.px - 1 : s.px).gap(s.gap)).when(!text && !wide, (b) => b.w(s.h))
     .when(ruled, (b) => b.border_1().border_color(t.input))
     .when(filled, (b) => b.bg(variant === "primary" ? t.solid : t.raised)
@@ -73,7 +75,7 @@ export function ghostButton(view, t, id, { icon, label, act, press, on = false, 
 
 /** A details row that isn't a split, as T3's threadDetailsPanelStyles: `on` while its menu is open; `locked` never lights. */
 export function cardRow(t, id, { locked = false, on = false } = {}) {
-  return h_flex().id(id).h(32).min_w(0).gap(10).px(10).items_center().rounded(8).text_size(13).font_medium().text_color(t.foreground)
+  return h_flex().id(id).h(ui(32)).min_w(0).gap(10).px(10).items_center().rounded(8).text_size(ui(13)).font_medium().text_color(t.foreground)
     .when(on, (el) => el.bg(tint(t, "card", true)))
     .when(!locked && !on, (el) => el.hover((st) => st.bg(tint(t, "card", false))));
 }
@@ -91,20 +93,20 @@ const SPLIT = { xs: { h: 24, main: 24, more: 23 }, row: { h: 32, more: 32 } };
  * @param {(el: any) => any} main @param {(el: any) => any} more
  */
 export function split(t, { id, mainId, moreId, chevron, size = "xs", surface = "card", wide = false, hot = null, on = false, disabled = false, locked = false, label, moreLabel }, main, more) {
-  const s = SPLIT[size], row = size === "row", lit = !disabled && (on || hot === "more" || (hot === "main" && !locked));
+  const s = SPLIT[size], row = size === "row", tall = row || wide ? ui(s.h) : s.h, lit = !disabled && (on || hot === "more" || (hot === "main" && !locked));
   // The halves' height and corners inside the outline.
-  const h = row ? s.h : s.h - 2, r = row ? 8 : 7;
+  const h = row ? tall : tall - 2, r = row ? 8 : 7;
   // A details row's hovered half adds its fill on the group's, as T3's primary/secondary.
   const half = (hid, off, name, key) => h_flex().id(hid).h(h).items_center().role("button").accessibility_label(name)
     .when(off && !disabled, (el) => el.opacity(DISABLED)).when(!off, (el) => el.cursor_pointer())
     .when(!off && (hot === key || (!row && on && key === "more")), (el) => el.bg(row ? tint(t, "card", false) : tint(t, surface, on && key === "more")));
-  return h_flex().id(id).h(s.h).min_w(0).items_center().rounded(8).cursor_default()
+  return h_flex().id(id).h(tall).min_w(0).items_center().rounded(8).cursor_default()
     .when(row, (g) => g.w_full().when(lit, (l) => l.bg(tint(t, surface, on))))
     .when(!row, (g) => g.flex_none().border_1().border_color(t.input))
     .when(disabled, (g) => g.opacity(DISABLED))
     // In a row the main half takes what the chevron leaves, even wrapped (in tip()'s Popup) by the caller.
     .child(main(half(mainId, disabled || locked, label, "main").rounded_l(r)
-      .when(row, (el) => el.flex_1().min_w(0).px(10).gap(10).text_size(13).font_medium().text_color(t.foreground))
+      .when(row, (el) => el.flex_1().min_w(0).px(10).gap(10).text_size(ui(13)).font_medium().text_color(t.foreground))
       .when(!row && wide, (el) => el.flex_none().pl(5).pr(7).gap(4))
       .when(!row && !wide, (el) => el.w(s.main).flex_none().justify_center())).when(row, (m) => m.flex_1().min_w(0)))
     .child(div().id(`${id}-rule`).w(1).h(row ? 16 : h).flex_none().when(!row || lit, (el) => el.bg(row ? t.border : t.input)))

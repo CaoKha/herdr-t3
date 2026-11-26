@@ -6,13 +6,14 @@ import { v_flex, h_flex } from "gpui-base";
 import { shared, setShared, spaces } from "herdr";
 import { scrollList, step } from "./list.js";
 import { hoverRow, subOpened, subLeft } from "./submenu.js";
-import { LU, COMPACT, MODEL_ROW, pickMark, searchField, popupClosed } from "./review-menu.js";
+import { LU, COMPACT, MODEL_ROW, pickMark, searchField, searchHeight, popupClosed } from "./review-menu.js";
 import { popover, toPane, subState, subAt, HEADER, BELOW } from "./controls.js";
 import { BASES, chosenBase, changesPage, diffCommits, repo, scopeOf, scopeRows, scopeList, scopeRow, scopeItems, readScope, releaseScope, openReviewPage, menuKey, commitsKey, commitsBody } from "./review-scope.js";
 import { opener } from "./trigger.js";
 import { button as drawButton, ghostButton, GROUP_GAP } from "./button.js";
 import { glow } from "./tip.js";
 import { menuRow } from "./menu-row.js";
+import { ui } from "./layout-settings.js";
 
 /** Opens the submenu `page` ("commits") beside its row, which stays lit; the keyboard is its search's. */
 export function openScopePage(view, page, cx, lit = -1) {
@@ -78,13 +79,13 @@ export function scopeHeader(view, t, { trigger = true } = {}) {
   return h_flex().id("review-scope-row").min_w(0).gap(12).items_center()
     .when(trigger, el => el.child(scopeButton(view, t, s)))
     .when(Boolean(s.sha), el => el.child(h_flex().flex_none().gap(GROUP_GAP).items_center()
-      .child(div().id("review-sha").mr(4).text_size(12).text_color(t.dim).child(s.sha.slice(0, 7)))
+      .child(div().id("review-sha").mr(4).text_size(ui(12)).text_color(t.dim).child(s.sha.slice(0, 7)))
       .when(steps, el => el
         .child(go("commit-older", `${LU}/chevron-left.svg`, "Older commit", list[at - 1]))
         .child(go("commit-newer", `${LU}/chevron-right.svg`, "Newer commit", list[at + 1])))))
     // As T3's refs, which drop the head below 20rem: here below COMPACT, where the header's buttons turn to icons. On Changes
     // the base is T3's comparison-target picker.
-    .when(Boolean(s.head && s.base), el => el.child(h_flex().id("review-refs").min_w(0).gap(8).items_center().overflow_hidden().text_size(12).text_color(t.dim)
+    .when(Boolean(s.head && s.base), el => el.child(h_flex().id("review-refs").min_w(0).gap(8).items_center().overflow_hidden().text_size(ui(12)).text_color(t.dim)
       .when(view.width >= COMPACT, el => el
         .child(div().id("review-ref-head").min_w(0).max_w(192).truncate().child(s.head))
         .child(svg(`${LU}/arrow-right.svg`).size(14).flex_none().opacity(0.7)))
@@ -156,7 +157,7 @@ const BASE_W = 288; // T3's w-72
 /** The base picker, as T3's ComboboxPopup: under its button, 288 wide; a search, a BRANCH / REMOTE heading, then the rows,
  *  256 tall at most. A row with a local and a remote ref has T3's switch to take the remote one; a remote-only row, a check. */
 export function baseMenu(view, t) {
-  const items = baseList(view), picked = chosenBase(view), height = Math.min(items.length * MODEL_ROW, 256);
+  const items = baseList(view), picked = chosenBase(view), height = Math.min(items.length * ui(MODEL_ROW), 256);
   const draw = (i) => {
     const item = items[i], on = item.value === picked, remote = Boolean(item.remote) && item.value === item.remote;
     return menuRow(view, t, item.id, { at: [view, "baseAt", i], label: item.label, lead: pickMark(on), pick: (cx) => pickBase(view, item.value, cx),
@@ -175,10 +176,10 @@ export function baseMenu(view, t) {
   return div().absolute().top(HEADER / 2 + 24 / 2 + 4).left(x).child(popover(view, t, "review-base-menu").w(Math.min(BASE_W, view.width - 16)).p(4)
     .child(searchField(t, view.refSearch).mx(8).mt(5))
     // As T3's: 10px, uppercase, the check's column kept.
-    .child(h_flex().h(24).pl(30).pr(8).flex_none().items_center().border_b_1().border_color(t.border).text_size(10).font_medium().text_color(t.dim)
+    .child(h_flex().h(ui(24)).pl(30).pr(8).flex_none().items_center().border_b_1().border_color(t.border).text_size(ui(10)).font_medium().text_color(t.dim)
       .child(div().flex_1().child("BRANCH")).child(div().child("REMOTE")))
     .child(v_flex().flex_none().mt(4)
-      .child(scrollList(view, "base-list", { count: items.length, row: MODEL_ROW, at: view.baseAt, draw, height,
+      .child(scrollList(view, "base-list", { count: items.length, row: ui(MODEL_ROW), at: view.baseAt, draw, height,
         wheeled: (keep) => { if (keep >= 0) view.baseAt = keep; } }))
       .when(!items.length, el => el.child(div().id("base-none").p(8).flex_none().text_center().text_color(t.dim).child(view.refs ? "No matching refs." : "Reading…")))));
 }
@@ -192,14 +193,14 @@ export function scopeMenu(view, t) {
 }
 
 /** The open submenu of commits in the Review page, as T3's: its search on top, its list at most 320 tall, beside its row
- *  in the menu (main.js draws the menu at top BELOW, left 12; its rows start past its border and padding: rows of 28, a rule of 9). */
+ *  in the menu (main.js draws the menu at top BELOW, left 12; its rows start past its border and padding: menu rows, a rule of 9). */
 export function scopeSub(view, t) {
   const page = view.scopePage, rows = scopeRows(view), radios = rows.filter(r => !r.sub).length;
   const at = rows.findIndex(r => r.sub === page);
-  const items = scopeList(view), most = Math.max(MODEL_ROW * 3, Math.min(320, view.height - 180));
+  const items = scopeList(view), most = Math.max(ui(MODEL_ROW) * 3, Math.min(320, view.height - 180));
   // Its border and padding, the search and its margins, then the list or its 36 note.
-  const h = 10 + 43 + (items.length ? Math.min(items.length * MODEL_ROW, most) : 36);
-  const anchor = { x: 17, y: BELOW + 5 + at * MODEL_ROW + (at >= radios ? 9 : 0), width: menuWidth(view) - 10, height: MODEL_ROW };
+  const h = 10 + searchHeight() + (items.length ? Math.min(items.length * ui(MODEL_ROW), most) : ui(36));
+  const anchor = { x: 17, y: BELOW + 5 + at * ui(MODEL_ROW) + (at >= radios ? 9 : 0), width: menuWidth(view) - 10, height: ui(MODEL_ROW) };
   // 384 where there's room beside the menu, else narrower (its subjects truncate), never over its row (subAt).
   const { at: box, w } = subAt(view, anchor, 384, h);
   // The pointer on it: nothing pending on the menu's rows opens or closes it.

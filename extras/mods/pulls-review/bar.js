@@ -18,6 +18,7 @@ import { statusMark } from "./status-mark.js";
 import { hang, trigger } from "./trigger.js";
 import { reviewShown, REVIEW_STATUS } from "./panel.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 const MOD = "pulls-review";
 // A conventional commit's type and scope (`fix(t3-tabs): `), dimmed so the words after it lead.
@@ -27,7 +28,7 @@ const MENU_CLOSED = closedKey(MOD, "menu");
 export const menuClosed = () => setShared(MENU_CLOSED, Date.now());
 
 // The menu's rows (T3's MenuItem), and what sits above them: its padding, search field and either the pages' switch or a title.
-const MENU_W = 368, menuChrome = (tabs) => 8 + 43 + (tabs ? 32 : 28);
+const MENU_W = 368, menuChrome = (tabs) => 8 + ui(33) + 10 + ui(28) + (tabs ? 4 : 0);
 
 // The shipped `changes` mod's lookup, except for a mod pane (below).
 export function reviewLocation() {
@@ -196,10 +197,10 @@ export function reviewMenu(view) {
     cx.notify();
   };
   // As T3's MenuGroupLabel.
-  const title = (text) => div().h(28).px(8).flex_none().flex().items_center().text_size(12).font_medium().text_color(t.dim).child(text);
+  const title = (text) => div().h(ui(28)).px(8).flex_none().flex().items_center().text_size(ui(12)).font_medium().text_color(t.dim).child(text);
   const tabs = menuTabs(), tab = view.tab, scope = tab === "branches" ? `vs ${base}` : branch === "(detached)" ? "" : `on ${branch}`;
   // As T3's segmented ToggleGroup; the page shown on a popover's on fill (button.js tint), as a pressed button on a card.
-  const segment = (id, label, n) => h_flex().id(`review-tab-${id}`).h(24).px(10).gap(8).flex_none().items_center().rounded(6).text_size(12).font_medium()
+  const segment = (id, label, n) => h_flex().id(`review-tab-${id}`).h(ui(24)).px(10).gap(8).flex_none().items_center().rounded(6).text_size(ui(12)).font_medium()
     .when(id === tab, el => el.bg(tint(t, "card", true)).text_color(t.foreground)).when(id !== tab, el => el.text_color(t.dim).hover(s => s.bg(alpha(t.foreground, "0a"))))
     .role("button").accessibility_label(`${label}, ${n}${id === tab ? ", shown" : ""}`).on_click((_e, cx) => setTab(view, id, cx))
     .child(label).child(div().text_color(t.dim).child(String(n)));
@@ -213,13 +214,13 @@ export function reviewMenu(view) {
       .on_mouse_move((e) => detailsAt(view, id, e)) });
   // Rows keep their handlers, as a virtual list's can't: a hovered commit opens its card. Only the rows in view are built.
   // The list shown is the picks, row for row. The wheel takes the highlight along, and a card moves off.
-  const list = (id, count, draw) => scrollList(view, id, { count, row: MENU_ROW, at: view.at, draw, wheeled: (keep, cx) => {
+  const list = (id, count, draw) => scrollList(view, id, { count, row: ui(MENU_ROW), at: view.at, draw, wheeled: (keep, cx) => {
     if (keep >= 0) view.at = keep;
     view.hovered = null;
     detailsFor(view, null, cx);
   } }).flex_1().min_h(0);
   // A popup's height is only a maximum: this one sets its own, for the list to scroll inside and to hold still while searching.
-  return v_flex().id("review-menu").w_full().h(height).p(4).bg(t.popover).text_size(14)
+  return v_flex().id("review-menu").w_full().h(height).p(4).bg(t.popover).text_size(ui(14))
     .on_key_down((e, cx) => {
       if (e.key === "tab" && tabs) { setTab(view, tab === "commits" ? "branches" : "commits", cx); cx.stop_propagation(); return; }
       const to = step(e, view.at, picks.length);
@@ -229,14 +230,14 @@ export function reviewMenu(view) {
       cx.stop_propagation();
     })
     // As T3's MenuSearchInput: 8 in and 6 down less the 1 it shifts up, a 26 field, 6 to the rule, 4 and that 1 below it.
-    .child(h_flex().mx(8).mt(5).mb(5).h(33).pb(6).gap(4).flex_none().items_center().border_b_1().border_color(t.border)
+    .child(h_flex().mx(8).mt(5).mb(5).h(ui(33)).pb(6).gap(4).flex_none().items_center().border_b_1().border_color(t.border)
       .child(svg(`mods/${MOD}/icons/search.svg`).size(16).flex_none().text_color(t.dim))
-      .child(Input.new(view.search).flex_1().h_full().text_size(14).text_color(t.foreground)))
+      .child(Input.new(view.search).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)))
     // Outside the list, so the pages' switch stays put.
-    .when(tabs, el => el.child(h_flex().h(28).mx(8).mb(4).gap(8).flex_none().items_center()
+    .when(tabs, el => el.child(h_flex().h(ui(28)).mx(8).mb(4).gap(8).flex_none().items_center()
       .child(h_flex().p(2).gap(2).flex_none().rounded(8).bg(alpha(t.foreground, "0f"))
         .child(segment("commits", "Commits", commits.length)).child(segment("branches", "Branches", branches.length)))
-      .child(div().flex_1()).child(div().min_w(0).truncate().text_size(12).text_color(t.dim).child(scope))))
+      .child(div().flex_1()).child(div().min_w(0).truncate().text_size(ui(12)).text_color(t.dim).child(scope))))
     .when(!tabs, el => el.child(title(tab === "branches" ? `Branches vs ${base}` : branch === "(detached)" ? "Commits" : `Commits on ${branch}`)))
     .when(tab === "branches", el => el.child(list("review-branches", branches.length, (i) => {
       const b = branches[i], id = `review-branch-${b.name}`;
@@ -245,7 +246,7 @@ export function reviewMenu(view) {
         label: h_flex().min_w(0).gap(8)
           .child(div().flex_none().max_w(160).truncate().child(b.name))
           .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(b.subject ?? "")),
-        trail: h_flex().flex_none().ml(4).gap(8).items_center().text_size(12).text_color(t.dim)
+        trail: h_flex().flex_none().ml(4).gap(8).items_center().text_size(ui(12)).text_color(t.dim)
           .when(b.count !== undefined, el => el.child(`${b.count} ahead`))
           .child(b.time ? ago(b.time, now) : ""),
         card: branchCard(view, t, id, b, base, now) });
@@ -255,7 +256,7 @@ export function reviewMenu(view) {
         return row(i, id, `Review commit ${c.subject}` + (out ? ", not pushed" : ""), (_e, cx) => openPick([c.sha], cx), {
           label: h_flex().min_w(0).gap(4).when(Boolean(prefix), el => el.child(div().flex_none().text_color(t.dim).child(prefix.trim())))
             .child(div().flex_1().min_w(0).truncate().child(c.subject.slice(prefix.length))),
-          trail: h_flex().flex_none().ml(4).gap(8).items_center().text_size(12).text_color(t.dim)
+          trail: h_flex().flex_none().ml(4).gap(8).items_center().text_size(ui(12)).text_color(t.dim)
             .when(out, el => el.child(div().text_color(t.ansi2).child("↑")))
             .child(c.time ? ago(c.time, now) : ""),
           card: commitCard(view, t, id, c, upstream, out, now) });
@@ -266,7 +267,7 @@ export function reviewMenu(view) {
 // As an Inbox row's details, but on the row's left: the menu hangs at the window's right. A 1px anchor just outside the
 // row's top left corner, the card's top right pinned to it. The whole subject, which the row truncates, then its lines.
 const initial = (t, name) => div().size(12).flex_none().rounded_full().bg(t.border).flex().items_center().justify_center()
-  .text_size(8).font_medium().text_color(t.muted).child(name.slice(0, 1).toUpperCase());
+  .text_size(ui(8)).font_medium().text_color(t.muted).child(name.slice(0, 1).toUpperCase());
 
 function commitCard(view, t, id, c, upstream, out, now) {
   const up = view.details === id || view.detailsOut === id;
@@ -307,7 +308,7 @@ function openPicks(view, r, at, source) {
     if (view.reviewClosed || !sameSource(source, reviewLocation()) || !commits.length && !branches.length) { view.opened = null; return; }
     // Tall enough for the longer page, so turning pages doesn't resize it; one page alone has a title instead of the switch.
     const tabs = branches.length > 0 && commits.length > 0;
-    const height = Math.min(368, menuChrome(tabs) + (tabs ? Math.max(commits.length, branches.length) : commits.length + branches.length) * MENU_ROW);
+    const height = Math.min(368, menuChrome(tabs) + (tabs ? Math.max(commits.length, branches.length) : commits.length + branches.length) * ui(MENU_ROW));
     openOverlay({ mod: MOD, kind: "popup", at, width: MENU_W, height, props: { menu: "review", source, root: r.root, branch: r.branch, base: r.base, baseRef: r.baseRef, upstream: r.gone ? null : r.upstream, commits, branches, unpushed, height } });
   } finally { view.readingPicks = false; } })();
 }
@@ -355,7 +356,7 @@ export function reviewBar(view, t, stopPress) {
     cx.spawn(() => reading);
   };
   // No outline: ghost buttons in a row, as the tab bar's own. The last button ends where the bar does, so it stays put as the counts come and go.
-  return h_flex().id("pulls-review").h(24).flex_none().items_center().gap(4).on_mouse_down("left", stopPress)
+  return h_flex().id("pulls-review").h(ui(24)).flex_none().items_center().gap(4).on_mouse_down("left", stopPress)
     .children(segments.map(s => item(/** @type {any} */ (s))))
     // Stays with no counts: on a clean default branch it's the only way in.
     // With the analysis's mark after the logo, it grows to hold both.

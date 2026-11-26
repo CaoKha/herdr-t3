@@ -16,6 +16,7 @@ import { pin } from "./pins.js";
 import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
+import { ui } from "./layout-settings.js";
 
 // T3's one-line row and shelf or folder header, and its list's 1px between items (gap-px).
 const ROW = 36, HEAD = 32, HEAD_GAP = 8;
@@ -48,16 +49,16 @@ function agentSubRow(view, t, s, st, shown, card, ghost) {
     .pl(28 + s.depth * 20)
     .pr(8)
     .rounded(6)
-    .h(ROW)
+    .h(ui(ROW))
     .flex_none()
     .items_center()
     .gap(10)
-    .text_size(14)
+    .text_size(ui(14))
     .when(on, (el) => el.bg(t.selected))
     // Upstream's 9px turn, hung from each ancestor's icon center (16px, then every 20px), ending 4px short of this icon.
     .children(s.lines.flatMap((l, j) => [
       l === "│" || l === "├" ? div().absolute().left(15.25 + 20 * j).top(0).bottom(-STACK).w(1.5).bg(t.input) : null,
-      l === "├" || l === "└" ? div().absolute().left(15.25 + 20 * j).top(-4).h(22).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input) : null,
+      l === "├" || l === "└" ? div().absolute().left(15.25 + 20 * j).top(-4).h(ui(ROW) / 2 + 4).w(9.75).border_l(1.5).border_b(1.5).rounded_bl(6).border_color(t.input) : null,
     ].filter(Boolean)))
     .child(h_flex().size(16).flex_none().items_center().justify_center()
       .when(Boolean(pic), el => el.child(pic)))
@@ -100,11 +101,11 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
   const viewing = (a) => facts.get(a.address).viewed;
   const withKids = (a) => {
     const subs = kidTree(all, a.address);
-    const r = { key: a.address, h: ROW + STACK, el: () => row(a, subs), ghost: () => row(a, subs, true) };
+    const r = { key: a.address, h: ui(ROW) + STACK, el: () => row(a, subs), ghost: () => row(a, subs, true) };
     // A sub-agent with no pane of its own isn't in agents(): it's placed by the agent it hangs from, and has no branch to name, as its folder may be another worktree.
     const sub = (s) => {
       const st = kidStatus(s.k, listed);
-      return { key: `sub-${s.k.address}`, h: ROW + STACK,
+      return { key: `sub-${s.k.address}`, h: ui(ROW) + STACK,
         el: () => agentSubRow(view, t, s, st, shown, (name, key) => details(list.find((x) => x.address === s.k.address) ?? { ...s.k, space: a.space, space_name: a.space_name }, name, key)),
         ghost: () => agentSubRow(view, t, s, st, shown, null, true) };
     };
@@ -190,12 +191,12 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
     const fromKid = st !== "idle" && st !== own;
     const lead = (subs.length ? button(t, ghost ? undefined : iconId, { size: "tiny", surface: "row", label: view.isFolded(a.address) ? "Expand sub-agents" : "Collapse sub-agents", hot: !ghost && view.hot === iconId })
       : h_flex().size(16).flex_none().items_center().justify_center()).when(Boolean(pic), el => el.child(pic));
-    const time = div().flex_none().text_size(12).text_color(t.dim).opacity(offer ? 0 : 1).transition("opacity", MOTION).when(Boolean(since), el => el.child(duration(now - since)));
+    const time = div().flex_none().text_size(ui(12)).text_color(t.dim).opacity(offer ? 0 : 1).transition("opacity", MOTION).when(Boolean(since), el => el.child(duration(now - since)));
     const base = h_flex()
       .relative()
       .w_full().min_w(0)
       .px(8)
-      .h(ROW)
+      .h(ui(ROW))
       .flex_none()
       .rounded(6)
       .items_center()
@@ -209,9 +210,9 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
         })))
       // Short of room the space wraps under the name, where the row's one line clips it, and the name has the width: never a stub.
       // The name's line is as tall as the row, so a wrapped line starts outside it.
-      .child(h_flex().flex_1().min_w(0).h(ROW).flex_wrap().overflow_hidden().gap(10).items_center()
-        .child(div().min_w(0).truncate().line_height(`${ROW}px`).when(on || st === "blocked" || st === "done", (el) => el.font_medium()).text_color(leads ? t.foreground : t.muted).child(name))
-        .when(Boolean(where), el => el.child(div().flex_none().whitespace_nowrap().text_size(12).text_color(t.dim).child(where))))
+      .child(h_flex().flex_1().min_w(0).h(ui(ROW)).flex_wrap().overflow_hidden().gap(10).items_center()
+        .child(div().min_w(0).truncate().line_height(`${ui(ROW)}px`).when(on || st === "blocked" || st === "done", (el) => el.font_medium()).text_color(leads ? t.foreground : t.muted).child(name))
+        .when(Boolean(where), el => el.child(div().flex_none().whitespace_nowrap().text_size(ui(12)).text_color(t.dim).child(where))))
       .child(h_flex().when(!ghost, el => el.id(`controls-${a.address}`)).flex_none().items_center().gap(4)
         .when(subs.length > 0, el => el.child(fold(a, subs, ghost)))
         // The time and the pin share one slot, T3's corner, so hovering moves nothing else.
@@ -254,11 +255,11 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
   const shelf = (g, open, ghost) => {
     const base = h_flex()
       .mx(2).px(8)
-      .h(HEAD)
+      .h(ui(HEAD))
       .flex_none()
       .gap(8)
       .items_center()
-      .text_size(12)
+      .text_size(ui(12))
       .font_medium()
       .text_color(t.dim)
       .child(div().flex_1().min_w(0).truncate().child(g.label))
@@ -279,7 +280,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
     const space = sp.find((s) => s.id === g.space) ?? { name: g.label };
     const base = h_flex()
       .px(8)
-      .h(HEAD)
+      .h(ui(HEAD))
       .flex_none()
       .gap(10)
       .items_center()
@@ -287,7 +288,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
       .child(projectMark("mods/t3-agents", space, 16, t, ps, true))
       .child(div().flex_1().min_w(0).truncate().font_medium().text_color(alpha(t.foreground, "e6")).child(g.label))
       .when(Boolean(dot), (el) => el.child(div().size(6).flex_none().rounded_full().bg(t[top]).role("status").accessibility_label(SECTION[RANK[top]])))
-      .when(hiding.length > 0, (el) => el.child(div().flex_none().text_size(12).text_color(t.dim).child(String(hiding.length))))
+      .when(hiding.length > 0, (el) => el.child(div().flex_none().text_size(ui(12)).text_color(t.dim).child(String(hiding.length))))
       .child(chevron(g, open, ghost));
     if (ghost) return base;
     return stop(view, t, g.id, hoverKept(view, "overGroup", g.id, base
@@ -302,7 +303,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
   const entries = groups.flatMap((g, i) => {
     const open = !view.isFolded(g.id, g.id === "sec-1");
     const head = (ghost) => g.space ? div().flex_none().when(i > 0, (el) => el.pt(HEAD_GAP)).child(folder(g, open, ghost)) : shelf(g, open, ghost);
-    return [{ key: `m:${g.id}`, h: HEAD + STACK + (g.space && i ? HEAD_GAP : 0), el: () => head(false), ghost: () => head(true) },
+    return [{ key: `m:${g.id}`, h: ui(HEAD) + STACK + (g.space && i ? HEAD_GAP : 0), el: () => head(false), ghost: () => head(true) },
       ...(open ? g.members : g.members.filter(viewing)).flatMap(withKids)];
   });
 

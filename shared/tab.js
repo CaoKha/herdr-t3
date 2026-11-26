@@ -6,6 +6,7 @@ import { tip, glow, keptHover } from "./tip.js";
 import { stop, within } from "./focus.js";
 import { button, tint as ghostTint } from "./button.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
+import { ui } from "./layout-settings.js";
 
 /**
  * The tab shown on `chrome`'s on fill, another hovered on its hover fill (t3-tokens "Buttons"). Hovered or keyboard-focused, ×
@@ -28,8 +29,8 @@ export function tab(view, t, id, { mod, label, icon, active = false, width, maxW
     .on_hover(glow(view, closeId))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); close(); })
     .when(over, (el) => stop(view, t, closeId, el, 4)), { action: closeAction, below: true, delay: 500 });
-  const el = h_flex().id(id).relative().h(24).when(width != null, (e) => e.w(width)).when(maxW != null, (e) => e.max_w(maxW)).pl(6).pr(8).gap(2)
-    .flex_none().items_center().rounded(6).text_size(12)
+  const el = h_flex().id(id).relative().h(ui(24)).when(width != null, (e) => e.w(width)).when(maxW != null, (e) => e.max_w(maxW)).pl(6).pr(8).gap(2)
+    .flex_none().items_center().rounded(6).text_size(ui(12))
     .bg(active ? ghostTint(t, "chrome", true) : t.chrome).text_color(active || over ? t.foreground : t.muted)
     .when(!active, (e) => e.hover((s) => s.bg(ghostTint(t, "chrome", false))))
     .role("tab").accessibility_label(label)

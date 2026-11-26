@@ -13,6 +13,7 @@ import { step, scrollList } from "./list.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
 import { footAction, paletteFooter } from "./palette.js";
+import { ui } from "./layout-settings.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
 const ROW = 48;
@@ -75,16 +76,16 @@ export default class Picker extends View {
   row(item, selection, ps, byAddress) {
     const pane = item.p.pane, t = theme(), on = selection.pane === pane, s = item.s, st = item.status;
     const mark = st === "done" && notNews(byAddress.get(item.p.terminal), item.p.status, item.under) ? null : statusMark("mods/t3-picker", t, st, 14);
-    return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
+    return h_flex().id(item.key).w_full().h(ui(ROW)).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(item.label)
       .when(on, (el) => el.bg(t.selected))
       .on_hover((over, cx) => { if (over && this.selection === selection && selection.pane !== pane) { selection.pane = pane; cx.notify(); } })
       .on_click((_e, cx) => this.choose(selection, pane, cx))
       // As T3's CommandPaletteTitleIcon: level with the title, not the row.
-      .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center().child(projectMark("mods/t3-picker", s, 16, t, ps, true)))
+      .child(h_flex().w(16).h(ui(20)).pt(2).self_start().flex_none().items_center().justify_center().child(projectMark("mods/t3-picker", s, 16, t, ps, true)))
       .child(v_flex().flex_1().min_w(0)
         .child(div().truncate().text_color(t.foreground).when(Boolean(item.here), (d) => d.font_medium()).child(item.label))
-        .child(h_flex().min_w(0).gap(4).items_center().text_size(12).line_height("16px").text_color(t.dim)
+        .child(h_flex().min_w(0).gap(4).items_center().text_size(ui(12)).line_height(`${ui(16)}px`).text_color(t.dim)
           .child(programIcon(item.program, 12, t.muted) ?? svg("mods/t3-picker/icons/terminal.svg").size(12).flex_none().text_color(t.muted))
           .child(div().flex_none().text_color(t.muted).child(item.program?.name ?? "Terminal"))
           .child(div().flex_none().child("·"))
@@ -105,7 +106,7 @@ export default class Picker extends View {
     const index = () => items.findIndex(item => item.p.pane === selection.pane);
     const at = index();
     if (at < 0 && selection.pane !== undefined) selection.pane = null;
-    return focusRoot(this, v_flex().id("picker").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")
+    return focusRoot(this, v_flex().id("picker").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(ui(14)).line_height(`${ui(20)}px`)
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
         if (this.selection !== selection) return;
@@ -118,10 +119,10 @@ export default class Picker extends View {
       })
       .child(h_flex().h(36).my(6).flex_none().pl(18).pr(20).gap(7).items_center()
         .child(svg("mods/t3-picker/icons/search.svg").size(16).flex_none().text_color(t.dim))
-        .child(Input.new(this.input).flex_1().h_full().text_size(14).text_color(t.foreground)))
+        .child(Input.new(this.input).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)))
       // No heading: there is one kind of row, and the room goes to the list.
       .child(div().flex_none().mt(8).mb(8).px(8)
-        .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ROW, at, height: Math.min(items.length * ROW, LIST_MAX),
+        .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ui(ROW), at, height: Math.min(items.length * ui(ROW), LIST_MAX),
           draw: (i) => this.row(items[i], selection, ps, byAddress), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
         .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
       // New work goes through New, which picks the space (and for a new space, the machine).

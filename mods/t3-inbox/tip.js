@@ -3,6 +3,7 @@
 import { div } from "gpui-kit";
 import { v_flex, Popup } from "gpui-base";
 import { keys, window } from "herdr";
+import { ui } from "./layout-settings.js";
 
 // An action's key as the new menu writes it: ⇧⌘O. Read from the bindings, so a rebound key says so.
 export function keyOf(action) {
@@ -63,7 +64,7 @@ const tips = new Map();
 export const FADE = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
 /** The label's card, as T3's TooltipPopup: docs/internals/t3-tokens.md "Tooltip". measured-text.js's named() draws it too. */
 export const tipCard = (t, id) => v_flex().id(id).max_w(320).px(8).py(4).gap(2).rounded(6).border(1).border_color(t.border).bg(t.chrome).shadow_md()
-  .text_size(12).font_normal().line_height(1.375).text_color(t.foreground);
+  .text_size(ui(12)).font_normal().line_height(1.375).text_color(t.foreground);
 let opened = 0;
 
 function dropTip(id, s) {

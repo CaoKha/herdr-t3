@@ -1,7 +1,7 @@
 // The space panel's Files view (docs/adr/0017): the active space's folder, read-only, the picked file beside its tree.
 // One copy serves every space, here or on another machine, each one's state kept by its id.
 import { View, div, svg, image } from "gpui-kit";
-import { v_flex, h_flex, InputState, Input, Editor, EditorState, TextView } from "gpui-base";
+import { v_flex, h_flex, InputState, Input, Editor, TextView } from "gpui-base";
 import { checking, spaces, panes, home, nextCommand, exec, readTextFile, theme, settings, shared, setShared, appHome, window, props } from "herdr";
 import * as fs from "fs/promises";
 import { Buffer } from "buffer";
@@ -9,7 +9,7 @@ import { panelState, surfacesFor, closeSurface, openFile, navigateFolder, resetF
 import { terminalFor, spaceFolder } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
 import { withNav, treeHead, navOpen, setNavOpen, holdWidth, NAV_NARROW, navShown } from "./nav-column.js";
-import { MENU_W, FOLDER_H, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
+import { MENU_W, folderHeight, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
 import { KEY, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
 import { split, ghostButton, tint, GROUP_GAP } from "./button.js";
@@ -20,8 +20,10 @@ import { tip, hoverKept, glow } from "./tip.js";
 import { MENU_ROW } from "./menu-row.js";
 import { LIST, join, parseListing } from "./file-listing.js";
 import { IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, parentOf, nameOf, ancestors, filesRoot, parseIgnored, markIgnored, folderEntries, terms, narrows,
-  filterPaths, rankPaths, kindOf, languageOf, readProblem, failedRead, ticket } from "./model.js";
+  filterPaths, rankPaths, kindOf, readProblem, failedRead, ticket } from "./model.js";
+import { languageOf, codeStyle, codeEditor } from "./code.js";
 import { compactField } from "./field.js";
+import { ui } from "./layout-settings.js";
 
 const MOD = "mods/t3-files";
 const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
@@ -55,8 +57,7 @@ let lastImage = 0; // The host caches decoded images by path, even after the cop
 const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads from updating the index or filesystem-monitor state
 
 const zoom = () => Number(settings()?.zoom) || 1;
-const editorStyle = (t = theme(), font = settings().font_family) =>
-  JSON.stringify([t.ansi5, t.ansi2, t.dim, t.ansi4, t.ansi3, t.ansi1, t.ansi6, font]);
+const editorStyle = (t = theme(), font = settings().font_family) => codeStyle(t, font);
 
 const rootOkay = (s, sp) => (sp.machine ?? null) === (s.on ?? null) && filesRoot(sp, s.root, spaceFolder(sp, panes()), home()) === s.root;
 
@@ -529,8 +530,7 @@ export default class Files extends View {
     view.wrap = wrapLines(); view.lang = languageOf(nameOf(rel));
     view.colored = Boolean(view.lang) && color;
     view.style = editorStyle(t, font);
-    view.code = EditorState.new({ language: view.colored ? view.lang : undefined, value: view.text, readonly: true, soft_wrap: view.wrap, font_family: font, font_size: 12,
-      syntax: { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi1, constant: t.ansi6 } });
+    view.code = codeEditor(t, font, { language: view.colored ? view.lang : undefined, value: view.text, wrap: view.wrap });
     old?.release();
   }
 
@@ -630,7 +630,7 @@ export default class Files extends View {
   rowMenu(st, path, keys = false) {
     const agent = terminalFor(st.id), editors = (knownTargets() ?? this.targets).filter(name => name !== "Finder");
     const n = rowItems({ remote: Boolean(st.on), platform: window()?.platform, agent, editors }).length;
-    openMenu("row", { height: 8 + n * MENU_ROW }, { source: this.source(st), path, agent: agent ? { terminal: agent.terminal } : null, editors }, keys);
+    openMenu("row", { height: 8 + n * ui(MENU_ROW) }, { source: this.source(st), path, agent: agent ? { terminal: agent.terminal } : null, editors }, keys);
     this.opened = { id: `row:${path}`, at: Date.now() };
   }
 
@@ -699,7 +699,7 @@ export default class Files extends View {
     else if (!v?.waiting && this.wantsColor(v) && this.shown()) this.colorLater(st, v, IDLE, cx);
     this.syncSearch(st, cx);
     const width = this.size?.width ?? 800, nav = navShown(width, this.navOpen, this.narrowNav);
-    return focusRoot(this, v_flex().id("t3-files").relative().size_full().min_h(0).text_color(t.foreground).text_size(13)
+    return focusRoot(this, v_flex().id("t3-files").relative().size_full().min_h(0).text_color(t.foreground).text_size(ui(13))
       .track_focus(this.handle).on_mouse_down("left", () => this.handle.focus())
       .on_size_change((size, cx) => { this.size = { width: size.width / zoom(), height: size.height / zoom() }; cx.notify(); })
       .when(Boolean(st.file) || st.folder !== null, el => el.child(this.toolbar(st, t)))
@@ -723,12 +723,12 @@ export default class Files extends View {
     // A folder's menu (menus.js), under its ›, its left edge with it; on while it's open, a second press closes it (trigger.js).
     const separator = path => { const id = `browse-${path}`, on = popupOpen(this, id, MENU_CLOSED);
       return stop(this, t, id, opener(this, { id, closed: MENU_CLOSED, onOpen: (b) => {
-        openMenu("folder", { height: FOLDER_H, ...hang(b, MENU_W, { align: "start" }) }, { source: this.source(st), dir: path, file: st.file }, !b);
+        openMenu("folder", { height: folderHeight(), ...hang(b, MENU_W, { align: "start" }) }, { source: this.source(st), dir: path, file: st.file }, !b);
       } })(div().id(id).w(16).h(20).mx(2).rounded(4).flex_none().flex().items_center().justify_center().cursor_pointer()
         .when(on, s => s.bg(tint(t, "chrome", true))).when(!on, el => el.hover(s => s.bg(tint(t, "chrome", false)))))
       .child(svg(`${MOD}/icons/chevron-right.svg`).size(14).text_color(on ? t.foreground : t.dim)).role("button").accessibility_label(`Browse ${path || nameOf(st.root)}`), 4); };
     return h_flex().id("t3-files-toolbar").h(32).flex_none().px(12).gap(8).items_center()
-        .child(h_flex().id("t3-files-breadcrumbs").flex_1().min_w(0).overflow_x_scroll().bg("#00000000").items_center().text_size(12)
+        .child(h_flex().id("t3-files-breadcrumbs").flex_1().min_w(0).overflow_x_scroll().bg("#00000000").items_center().text_size(ui(12))
           .when(Boolean(st.root), (el) => el.child(crumb(nameOf(st.root.replace(/\/$/, "")) || st.root, "", current === "")))
           .children(parts.flatMap((part, i) => [separator(parts.slice(0, i).join("/")), crumb(part, parts.slice(0, i + 1).join("/"), parts.slice(0, i + 1).join("/") === current)])))
         .child(this.openControl(st, t))
@@ -772,7 +772,7 @@ export default class Files extends View {
     return div().id("t3-files-content").size_full().min_h(0).min_w(0).on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .child(!v || v.loading ? loadingState(MOD, t, "t3-files-loading", "Loading the file…")
           // A file there's nothing to show of says why, as an empty page, with T3's Try again and a way to it in the tree.
-          : v.problem ? v_flex().id("t3-files-problem").size_full().p(24).gap(12).items_center().justify_center().text_center().text_size(12).role("alert")
+          : v.problem ? v_flex().id("t3-files-problem").size_full().p(24).gap(12).items_center().justify_center().text_center().text_size(ui(12)).role("alert")
             .child(div().text_color(t.ansi1).child(v.problem))
             .child(div().max_w_full().whitespace_normal().child(st.file)).child(div().max_w_full().whitespace_normal().text_color(t.dim).child(st.root))
             .child(h_flex().gap(4)
@@ -784,7 +784,7 @@ export default class Files extends View {
               })))
           : v.image ? div().size_full().p(16).flex().items_center().justify_center().child(image(v.image).max_w_full().max_h_full())
           // The page's edge (t3-tokens "Rules" R1), not T3's px-6.
-          : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(14))
+          : md && !code ? div().id("t3-files-md").size_full().overflow_y_scrollbar().px(12).py(16).child(TextView.markdown(`t3-files-md-${st.id}-${st.file}`, v.text).selectable(true).scrollable(false).text_size(ui(14)))
           // Laid out at the width its room last held (nav-column.js holdWidth), cut off or short of it while the room moves.
           : v.code && v.lang && !v.colored && !this.fits(v) ? v_flex().size_full().min_h(0)
             .child(noticeBar(t, "t3-files-highlight", `Syntax highlighting is off for files over ${AUTO_MAX / 1024} KB.`, t.ansi3, "anyway", "Highlight anyway", (cx) => { v.force = true; this.editor(v, st.file, true); cx.notify(); }, this))
@@ -823,8 +823,8 @@ export default class Files extends View {
       .child(this.control(t, "t3-files-refresh", "refresh-cw", "Refresh files", cx => this.recheck(st, cx)))
       // A tab stop as every control is; Enter or Space on it goes into the field.
       .child(compactField(this, t, "t3-files-search-field", { focused: Boolean(this.searchFocused), focus: () => this.search.focus(),
-        child: this.search.value() === st.query ? Input.new(this.search).w_full().h_full().text_size(12).text_color(t.foreground).accessibility_label("Search files")
-          : div().h_full().flex().items_center().truncate().text_size(12).text_color(st.query ? t.foreground : t.dim).child(st.query || "Search files") }))
+        child: this.search.value() === st.query ? Input.new(this.search).w_full().h_full().text_size(ui(12)).text_color(t.foreground).accessibility_label("Search files")
+          : div().h_full().flex().items_center().truncate().text_size(ui(12)).text_color(st.query ? t.foreground : t.dim).child(st.query || "Search files") }))
       .when(folders > 0, el => el.child(this.control(t, "t3-files-fold-all", this.allExpanded(st) ? "chevrons-down-up" : "chevrons-up-down", this.allExpanded(st) ? "Collapse all" : "Expand all", cx => this.foldAll(st, cx))));
   }
 
@@ -865,7 +865,7 @@ export default class Files extends View {
   // on hover; a click reads it again, and doesn't open or close it.
   retryMark(st, t, path, retry) {
     const id = `t3-files-retry-${path}`;
-    return tip(this, t, id, st.errors.get(path), div().id(id).flex_none().text_size(12).text_color(t.ansi1).cursor_pointer().role("button")
+    return tip(this, t, id, st.errors.get(path), div().id(id).flex_none().text_size(ui(12)).text_color(t.ansi1).cursor_pointer().role("button")
       .accessibility_label("Can't list this folder. Retry").child("Can't list · Retry").on_hover(glow(this, id))
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); retry(path, cx); }), { below: true });
   }
@@ -873,17 +873,17 @@ export default class Files extends View {
   // The folder's tree, as T3's: a click opens a file or a folder; the keys move a ring, ↵ opens what it's on. The ring shows
   // only once the keys move in it (focus-visible), not for a click.
   tree(st, t) {
-    if (!st.root) return div().p(8).text_size(12).text_color(t.dim).child("This space has no folder.");
+    if (!st.root) return div().p(8).text_size(ui(12)).text_color(t.dim).child("This space has no folder.");
     const retry = (path, cx) => cx.spawn(async (cx) => { await this.list(st, path); cx.notify(); });
     // The top folder unread: nothing else to draw, so its error is the page's. Any other says so on its own row (draw).
-    if (st.errors.has("") && !st.entries.has("")) return div().id("t3-files-retry-").p(16).text_size(12).text_color(t.ansi1).cursor_pointer()
+    if (st.errors.has("") && !st.entries.has("")) return div().id("t3-files-retry-").p(16).text_size(ui(12)).text_color(t.ansi1).cursor_pointer()
       .child("This folder can't be listed. Click to retry.").on_click((_e, cx) => retry("", cx));
     const found = this.found(st);
-    if (found?.error) return div().p(16).text_size(12).text_color(t.ansi1).cursor_pointer().on_click((_e, cx) => this.find(st, st.query, cx)).child(found.error);
-    if (st.query.trim() && !found || !st.entries.has("") && st.treeWaiting) return div().id("t3-files-tree-loading").px(12).py(4).text_size(12).text_color(t.dim).child("Loading files…");
+    if (found?.error) return div().p(16).text_size(ui(12)).text_color(t.ansi1).cursor_pointer().on_click((_e, cx) => this.find(st, st.query, cx)).child(found.error);
+    if (st.query.trim() && !found || !st.entries.has("") && st.treeWaiting) return div().id("t3-files-tree-loading").px(12).py(4).text_size(ui(12)).text_color(t.dim).child("Loading files…");
     if (!st.entries.has("")) return div();
     const rows = this.rows(st);
-    if (!rows.length) return st.query.trim() ? div().id("t3-files-no-matches").px(12).py(16).text_size(12).text_color(t.dim).child("No matching files.") : div();
+    if (!rows.length) return st.query.trim() ? div().id("t3-files-no-matches").px(12).py(16).text_size(ui(12)).text_color(t.dim).child("No matching files.") : div();
     const ringed = this.treeHandle.is_focused() && this.treeKeys ? st.index.at.get(st.focus ?? st.file) ?? -1 : -1, selected = st.index.at.get(st.selected) ?? -1;
     const draw = (r, i) => {
       let label;
@@ -918,7 +918,7 @@ export default class Files extends View {
         cx.notify();
       })
       .child(v_flex().size_full().min_h(0)
-        .when(Boolean(found && (found.more || found.total > found.results.length)), el => el.child(div().px(12).py(4).text_size(12).text_color(t.dim).child("More matches available. Refine your search.")))
+        .when(Boolean(found && (found.more || found.total > found.results.length)), el => el.child(div().px(12).py(4).text_size(ui(12)).text_color(t.dim).child("More matches available. Refine your search.")))
         .child(div().flex_1().min_h(0).child(treeList(this, `t3-files-tree-${st.id}`, rows, draw)))));
   }
 

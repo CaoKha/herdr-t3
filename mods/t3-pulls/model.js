@@ -175,9 +175,9 @@ export const threadPlace = (thread) => {
   return line == null ? thread.path : `${thread.path}:${line}`;
 };
 
-// A comment is about the end of its hunk, which can run to hundreds of lines.
+// A comment is about the end of its hunk, which can run to hundreds of lines: its last rows.
 const HUNK_LINES = 6;
-export const hunkTail = (hunk) => String(hunk ?? "").split("\n").slice(-HUNK_LINES).join("\n");
+export const hunkTail = (rows) => rows.slice(-HUNK_LINES);
 
 /** A thread starts shut when it needs nothing now: resolved, or about code that has since changed. */
 export const threadShut = (thread) => Boolean(thread.isResolved || thread.isOutdated);

@@ -13,6 +13,7 @@ import { button, radiusOf, split, cardRow, tint } from "./button.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { closeChain, hasOpen } from "./popup-menu.js";
 import { sourceOkay, openLayer, rowMenu, focusSource, splitHot, dismissDetails, openedDetails, CHEVRON, MENU_CLOSED } from "./details-popup.js";
+import { ui } from "./layout-settings.js";
 
 export const MOD = "t3-actions";
 export const ICONS = ["play", "test", "lint", "configure", "build", "debug"];
@@ -23,10 +24,11 @@ export const lit = (view, id, color = theme().dim) => (view.hot === id ? theme()
 // { list: [{ id, name, command, icon, place, cwd }], last: id }
 export const state = () => shared(KEY.actions) ?? { list: [] };
 const primary = ({ list, last }) => list.find(a => a.id === last) ?? list[0];
-// The menu: a popup's height is only a maximum, so its list sets its own. REST: its padding and Add action.
+// The menu: a popup's height is only a maximum, so its list sets its own. menuRest: its padding and Add action.
 // The menu as wide as the layout's other menus (t3-menu's, T3's); a longer name is cut short.
-const MENU_MAX = 420, MENU_REST = 36, MENU_W = 220;
-const menuHeight = (count) => Math.min(MENU_MAX, MENU_REST + count * MENU_ROW);
+const MENU_MAX = 420, MENU_W = 220;
+const menuRest = () => 8 + ui(MENU_ROW);
+const menuHeight = (count) => Math.min(MENU_MAX, menuRest() + count * ui(MENU_ROW));
 export const editor = (id) => { const p = props() ?? {}; return openOverlay({ mod: MOD, kind: "dialog", frame: "none", width: 512, props: { actions: "edit", id, source: p.source, details: p.actions === "details" ? p.overlay : p.details } }); };
 
 // Hung 4 under the control, right edges together (its outline 1 past ▾, and 1 under it), as T3's (align end) and the layout's
@@ -62,7 +64,7 @@ export function barControl(view, t, stopPress = (_e, cx) => cx.stop_propagation(
   // T3's xs outline button: its svg hangs 2px into each side, its label sits 4 on, and with the icon alone it's 24 square. The
   // split's outline (`input`) and, hovered, the bar's 4% (button.js tint), as the split's halves.
   const ends = (el, wide) => wide ? el.pl(5).pr(7).gap(4) : el.justify_center();
-  const box = (id) => h_flex().id(id).h(24).flex_none().items_center().rounded(8).border(1).border_color(t.input).text_size(12).on_mouse_down("left", stopPress);
+  const box = (id) => h_flex().id(id).h(compact ? 24 : ui(24)).flex_none().items_center().rounded(8).border(1).border_color(t.input).text_size(ui(12)).on_mouse_down("left", stopPress);
   if (!main) return measuredTooltip(view, t, "action-add", "Add action", stop(view, t, "action-add", ends(box("action-add"), !compact).when(Boolean(compact), el => el.w(24)).text_color(lit(view, "action-add")).hover(st => st.bg(tint(t, "chrome", false))).on_hover(glow(view, "action-add"))
     // The dialog covers it, before the pointer can report leaving it.
     .role("button").accessibility_label("Add action").on_click((_e, cx) => { view.hot = null; editor(null); cx.notify(); })
@@ -74,7 +76,7 @@ export function barControl(view, t, stopPress = (_e, cx) => cx.stop_propagation(
       .child(icon(main.icon).size(14)).when(!compact, el => el.child(nameText(view, "action-run", main.name).max_w(140))), 8), { shown: !compact, below: true }),
     more => stop(view, t, "action-more", opener(view, { id: "action-more", closed: MENU_CLOSED, onOpen: openBarMenu })(
       more.on_hover(glow(view, "action-more"))), 8))
-    .text_size(12).text_color(t.dim).on_mouse_down("left", stopPress);
+    .text_size(ui(12)).text_color(t.dim).on_mouse_down("left", stopPress);
 }
 
 /** Details' Actions row: a split, ▶ the action and ⌄ its menu, hung under the row. */
@@ -105,11 +107,11 @@ export function actionsMenu(view) {
   const picks = [...list.map(a => () => runAction(a)), () => editor(null)];
   const labels = [...list.map(a => a.name), "Add action"];
   const row = (id, at, icon, label, trail = null) => menuRow(view, t, id, { at: [view, "at", at], label, icon, trail, pick: () => { done(); picks[at](); } });
-  return focusRoot(view, v_flex().id("actions-menu").size_full().min_h(0).p(4).bg(t.popover).text_size(14)
+  return focusRoot(view, v_flex().id("actions-menu").size_full().min_h(0).p(4).bg(t.popover).text_size(ui(14))
     // On a row's Edit, Enter is Edit's.
     .track_focus(view.keys).on_key_down(menuKeys(view, labels, (at) => { done(); picks[at](); }, { enter: () => !onStop(view) }))
     // Add action stays outside the list, always in view: with it lit, nothing here is.
-    .child(scrollList(view, "actions-list", { count: list.length, row: MENU_ROW, height: menuHeight(list.length) - MENU_REST, at: view.at < list.length ? view.at : -1, wheeled: (keep) => { if (keep >= 0) view.at = keep; }, draw: (at) => { const a = list[at]; return row(`action-${a.id}`, at, icon(a.icon).size(16).text_color(t.muted), a.name,
+    .child(scrollList(view, "actions-list", { count: list.length, row: ui(MENU_ROW), height: menuHeight(list.length) - menuRest(), at: view.at < list.length ? view.at : -1, wheeled: (keep) => { if (keep >= 0) view.at = keep; }, draw: (at) => { const a = list[at]; return row(`action-${a.id}`, at, icon(a.icon).size(16).text_color(t.muted), a.name,
         div().size(24).flex_none().when(view.at === at || onStop(view) === `edit-${a.id}`, el => el.child(tip(view, t, `edit-${a.id}`, `Edit ${a.name}`, stop(view, t, `edit-${a.id}`, button(t, `edit-${a.id}`, { icon: "mods/t3-actions/icons/settings.svg", label: `Edit ${a.name}`, surface: "card", hot: view.hot === `edit-${a.id}` })
           .on_hover(glow(view, `edit-${a.id}`)).on_click((_e, cx) => { cx.stop_propagation(); done(); editor(a.id); }), radiusOf()), { below: true })))); } }))
     .child(row("action-new", list.length, "mods/t3-actions/icons/plus.svg", "Add action")));

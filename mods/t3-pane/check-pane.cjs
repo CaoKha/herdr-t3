@@ -28,6 +28,7 @@ let bound = [];
 // Host reads a header's draw makes: each copies every pane or agent, and every pane has a header.
 const reads = { panes: 0, agents: 0, terminals: 0, spaces: 0 };
 const env = {
+  ui: (n) => n,
   View: class {}, div: element, svg: (src) => { const el = element(); el.svg = src; return el; }, image: (src) => { images.push(src); return element(); }, h_flex: element, v_flex: element, Popup: { new: (id, trigger) => element().id(id).child(trigger) }, keys: () => bound,
   theme: () => ({ selected: "#123456" }), props: () => props, panes: () => { reads.panes++; return [pane, shell, review]; }, shared: (k) => sharedValues[k] ?? null, home: () => "/home/me",
   // A new list each call, as Herdr gives (tree.js indexes each list once).

@@ -14,6 +14,7 @@ import { join } from "./file-listing.js";
 import { closedKey } from "./store.js";
 import { popupOpen } from "./trigger.js";
 import { MENU_ROW } from "./menu-row.js";
+import { ui } from "./layout-settings.js";
 
 export const TREE = "review-files";
 
@@ -25,8 +26,8 @@ export function navHead(view, t) {
   const dirs = view.treeOf.dirs, folded = dirs.some(path => !isOpen(view, path));
   return h_flex().flex_1().min_w(0).gap(4).items_center()
     // 8 in, where Files' search icon and the rows' chevrons start.
-    .child(div().text_size(12).font_medium().child("Files"))
-    .child(div().id("review-nav-count").flex_1().min_w(0).text_size(11).text_color(t.dim).child(String(count)))
+    .child(div().text_size(ui(12)).font_medium().child("Files"))
+    .child(div().id("review-nav-count").flex_1().min_w(0).text_size(ui(11)).text_color(t.dim).child(String(count)))
     .when(dirs.length > 0, el => el.child(foldAllButton(view, t, `mods/${PANE}`, "review-fold-all", folded, (cx) => {
       for (const path of dirs) setOpen(view, path, folded);
       cx.notify();
@@ -47,7 +48,7 @@ export function fileTree(view, t) {
       cx.stop_propagation();
       const agent = terminalFor(view.space), editors = (knownTargets() ?? []).filter(name => name !== "Finder");
       const count = rowItems({ remote: Boolean(on), platform: appWindow()?.platform, agent, editors, deleted }).length;
-      openMenu("row", { height: 8 + count * MENU_ROW }, { menuMod: PANE,
+      openMenu("row", { height: 8 + count * ui(MENU_ROW) }, { menuMod: PANE,
         source: { space: view.space, tab: space?.tabs.find(tab => tab.active)?.id, root: view.root, on },
         path: row.real ?? row.path, deleted, agent: agent ? { terminal: agent.terminal } : null, editors });
       // The open row is remembered only for this run, as Files' context highlight is.
@@ -71,7 +72,7 @@ export function fileTree(view, t) {
         leading: checkbox(`tree-gcheck-${g.key}`, files, g.label),
         trailing: h_flex().flex_none().gap(6).items_center()
           .when(critical, el => el.child(criticalMark(t, 14)))
-          .child(div().text_size(11).text_color(t.dim).child(String(files.length))) })
+          .child(div().text_size(ui(11)).text_color(t.dim).child(String(files.length))) })
         .on_click((_e, cx) => { view.focusPath = null; pickGroup(view, row, cx); });
     }
     if (row.dir) {

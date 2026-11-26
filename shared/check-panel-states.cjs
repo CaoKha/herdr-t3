@@ -7,7 +7,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find, fire, strings } = kit;
 
 const state = {};
-const context = vm.createContext({
+const context = vm.createContext({ ui: (n) => n, 
   div: () => element(), svg: (src) => element("svg", src), h_flex: () => element(), v_flex: () => element(),
   Popup: { new: (id, child) => element("popup").id(id).child(child) },
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, keys: () => [], window: () => ({}),

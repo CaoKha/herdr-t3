@@ -11,6 +11,7 @@ import { ghostButton } from "./button.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
 import { keycap, footAction, paletteFooter } from "./palette.js";
+import { ui } from "./layout-settings.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
 const ROW = 48;
@@ -192,25 +193,25 @@ export default class NewMenu extends View {
     const missing = Boolean(entry && !entry.machine && folder && this.missing.has(folder));
     // Another machine's folder is said whole: `~` here is this computer's home. An empty one on a live remote space is its home.
     const sub = entry ? (entry.machine ? folder || "~" : shortFolder(folder)) : item.sub;
-    return h_flex().id(item.key).w_full().h(ROW).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
+    return h_flex().id(item.key).w_full().h(ui(ROW)).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
       .role("button").accessibility_label(entry?.name ?? item.name)
       .when(on, el => el.bg(t.selected))
       .when(Boolean(item.off) || missing, el => el.opacity(0.64))
       .on_hover((over, cx) => { if (over && this.at !== i) { this.at = i; cx.notify(); } })
       .on_click((_e, cx) => this.choose(item, cx))
       // As T3's CommandPaletteTitleIcon: level with the title, not the row.
-      .child(h_flex().w(16).h(20).pt(2).self_start().flex_none().items_center().justify_center()
+      .child(h_flex().w(16).h(ui(20)).pt(2).self_start().flex_none().items_center().justify_center()
         .child(entry ? projectMark("mods/t3-new-menu", entry, 16, t, ps) : svg(`mods/t3-new-menu/icons/${item.machine ? "server" : "monitor"}.svg`).size(16).text_color(t.muted)))
       .child(v_flex().flex_1().min_w(0)
         .child(div().truncate().text_color(t.foreground).child(entry?.name ?? item.name))
-        .child(h_flex().min_w(0).gap(4).items_center().text_size(12).line_height("16px").text_color(t.dim)
+        .child(h_flex().min_w(0).gap(4).items_center().text_size(ui(12)).line_height(`${ui(16)}px`).text_color(t.dim)
           // As T3 marks a remote thread: a server icon, then the name.
           .when(Boolean(entry?.machine), el => el
             .child(svg("mods/t3-new-menu/icons/server.svg").size(12).flex_none().text_color(t.muted))
             .child(div().flex_none().text_color(t.muted).child(`${entry.machine} ·`)))
           .child(div().min_w(0).truncate().child(sub))
           .when(missing, el => el.child(div().flex_none().text_color(t.ansi1).child("· Folder not found")))))
-      .when(Boolean(entry) && i < 9, el => el.child(div().flex_none().text_size(12).font_medium().text_color(t.muted).child(keyLabel(`cmd-${i + 1}`))))
+      .when(Boolean(entry) && i < 9, el => el.child(div().flex_none().text_size(ui(12)).font_medium().text_color(t.muted).child(keyLabel(`cmd-${i + 1}`))))
       .when(Boolean(space) && hasProjects, el => el.child(div().w(20).flex_none()))
       .when(Boolean(project), el => {
         const removeId = `remove-${item.key}`;
@@ -225,10 +226,11 @@ export default class NewMenu extends View {
     const id = "new-rows";
     const hasProjects = !this.picking && dormantCount > 0;
     const hasProjectsHead = !this.picking && liveCount > 0 && dormantCount > 0;
-    const headTop = liveCount * ROW;
-    const rowTop = (i) => i * ROW + (hasProjectsHead && i >= liveCount ? HEAD : 0);
+    const row = ui(ROW), head = ui(HEAD);
+    const headTop = liveCount * row;
+    const rowTop = (i) => i * row + (hasProjectsHead && i >= liveCount ? head : 0);
     const needTop = (i) => hasProjectsHead && i === liveCount ? headTop : rowTop(i);
-    const totalH = items.length * ROW + (hasProjectsHead ? HEAD : 0);
+    const totalH = items.length * row + (hasProjectsHead ? head : 0);
     const seen = Math.min(totalH, LIST_MAX);
     const max = Math.max(0, totalH - seen);
     let top = Math.max(0, Math.min(this.scrollTop?.[id] ?? 0, max));
@@ -237,23 +239,23 @@ export default class NewMenu extends View {
     if (py !== undefined) {
       const y = py + top;
       if (y >= 0 && y < totalH) {
-        if (!hasProjectsHead || y < headTop) pointed = Math.floor(y / ROW);
-        else if (y >= headTop + HEAD) pointed = Math.floor((y - HEAD) / ROW);
+        if (!hasProjectsHead || y < headTop) pointed = Math.floor(y / row);
+        else if (y >= headTop + head) pointed = Math.floor((y - head) / row);
       }
     }
     if (this.at >= 0 && this.at < items.length && this.at !== pointed) {
-      top = Math.max(0, Math.min(top, needTop(this.at), max), rowTop(this.at) + ROW - seen);
+      top = Math.max(0, Math.min(top, needTop(this.at), max), rowTop(this.at) + row - seen);
     }
     this.scrollTop = { ...this.scrollTop, [id]: top };
     const rows = [];
     for (let i = 0; i < items.length; i++) {
-      if (hasProjectsHead && i === liveCount && headTop + HEAD > top && headTop < top + seen) {
-        rows.push(div().id("new-projects-heading").h(HEAD).px(8).pt(8).pb(4)
-          .text_size(12).line_height("16px").font_medium().text_color(t.muted).child("Projects")
+      if (hasProjectsHead && i === liveCount && headTop + head > top && headTop < top + seen) {
+        rows.push(div().id("new-projects-heading").h(head).px(8).pt(8).pb(4)
+          .text_size(ui(12)).line_height(`${ui(16)}px`).font_medium().text_color(t.muted).child("Projects")
           .absolute().left(0).right(0).top(headTop - top));
       }
       const y = rowTop(i);
-      if (y + ROW > top && y < top + seen) {
+      if (y + row > top && y < top + seen) {
         rows.push(this.row(items[i], i, ps, hasProjects).absolute().left(0).right(0).top(y - top));
       }
     }
@@ -268,7 +270,7 @@ export default class NewMenu extends View {
         this.scrollTop = { ...this.scrollTop, [id]: next };
         let firstFull = -1, lastFull = -1;
         for (let i = 0; i < items.length; i++) {
-          if (needTop(i) >= next && rowTop(i) + ROW <= next + seen) {
+          if (needTop(i) >= next && rowTop(i) + row <= next + seen) {
             if (firstFull < 0) firstFull = i;
             lastFull = i;
           }
@@ -293,7 +295,7 @@ export default class NewMenu extends View {
       ...(hasProjects ? [[window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Remove"]] : []),
       ["Esc", "Close"],
     ];
-    return focusRoot(this, v_flex().id("new-menu").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(14).line_height("20px")
+    return focusRoot(this, v_flex().id("new-menu").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(ui(14)).line_height(`${ui(20)}px`)
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
         const to = step(e, this.at, items.length);
@@ -310,8 +312,8 @@ export default class NewMenu extends View {
       })
       .child(h_flex().h(36).my(6).flex_none().pl(18).pr(20).gap(7).items_center()
         .child(svg("mods/t3-new-menu/icons/search.svg").size(16).flex_none().text_color(t.dim))
-        .child(Input.new(this.picking ? this.machineInput : this.spaceInput).flex_1().h_full().text_size(14).text_color(t.foreground)))
-      .child(div().mt(8).px(16).py(6).flex_none().text_size(12).line_height("16px").font_medium().text_color(t.muted).child(heading))
+        .child(Input.new(this.picking ? this.machineInput : this.spaceInput).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)))
+      .child(div().mt(8).px(16).py(6).flex_none().text_size(ui(12)).line_height(`${ui(16)}px`).font_medium().text_color(t.muted).child(heading))
       .child(div().flex_none().mb(8).px(8)
         .when(items.length > 0, el => el.child(this.rowsView(t, items, ps, liveCount, dormantCount)))
         .when(items.length === 0, el => el.child(div().py(40).text_center().text_color(t.dim).child(this.picking ? "No matching machines." : "No matching spaces."))))
