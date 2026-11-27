@@ -14,10 +14,10 @@ share name mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker
 share program mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu mods/t3-actions
 share tree mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-menu mods/t3-actions
 share status-mark mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review
-share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-actions
+share project mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-actions mods/t3-menu
 share projects mods/t3-tabs mods/t3-new-menu
 share new-space mods/t3-inbox mods/t3-spaces mods/t3-new-menu
-share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper mods/t3-pulls mods/t3-issues
+share tip mods/t3-menu mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-picker mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper mods/t3-pulls mods/t3-issues
 share details mods/t3-inbox mods/t3-agents mods/t3-tabs extras/mods/pulls-review
 share measured-text mods/t3-actions mods/t3-chrome mods/t3-tabs
 share tab mods/t3-tabs mods/t3-chrome
@@ -33,13 +33,14 @@ share snooze-presets mods/t3-inbox mods/t3-menu
 share store mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-spaces mods/t3-actions mods/t3-home mods/t3-new-menu mods/t3-picker mods/t3-menu mods/t3-files extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper mods/t3-pulls mods/t3-issues
 share labels mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-menu
 share pins mods/t3-inbox mods/t3-agents mods/t3-tabs mods/t3-menu
-share notice mods/t3-tabs mods/t3-inbox
+share notice mods/t3-tabs mods/t3-inbox mods/t3-chrome
 share menu mods/t3-inbox mods/t3-agents mods/t3-spaces mods/t3-tabs mods/t3-pane
 share panel mods/t3-chrome mods/t3-tabs mods/t3-actions mods/t3-files extras/mods/pulls-review extras/mods/review mods/t3-pulls mods/t3-issues
 share terminal-context mods/t3-tabs mods/t3-actions mods/t3-files mods/t3-chrome extras/mods/pulls-review extras/mods/review mods/t3-pulls mods/t3-issues
 share surfaces mods/t3-chrome mods/t3-tabs mods/t3-actions mods/t3-files extras/mods/pulls-review extras/mods/review mods/t3-pulls mods/t3-issues
 share scroll-strip mods/t3-tabs mods/t3-chrome
 share submenu mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review
+share git mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-actions mods/t3-chrome mods/t3-files mods/t3-menu mods/t3-pulls mods/t3-issues extras/mods/pulls-review extras/mods/review
 share review-git mods/t3-actions extras/mods/pulls-review extras/mods/review
 share review-menu mods/t3-actions extras/mods/review
 share review-scope mods/t3-actions extras/mods/review
@@ -49,7 +50,7 @@ share file-tree mods/t3-files extras/mods/review
 share file-listing mods/t3-files extras/mods/review
 share menus mods/t3-files extras/mods/review
 share nav-column mods/t3-files extras/mods/review mods/t3-pulls mods/t3-issues
-share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox extras/mods/review extras/mods/asciicn-wallpaper extras/mods/pulls-review mods/t3-issues mods/t3-pulls
+share menu-row mods/t3-pane mods/t3-files mods/t3-actions mods/t3-chrome mods/t3-menu mods/t3-inbox mods/t3-tabs extras/mods/review extras/mods/asciicn-wallpaper extras/mods/pulls-review mods/t3-issues mods/t3-pulls
 share open-in mods/t3-files mods/t3-actions extras/mods/review
 share panel-states mods/t3-files extras/mods/review mods/t3-pulls mods/t3-issues
 share color mods/t3-menu mods/t3-actions mods/t3-agents mods/t3-spaces mods/t3-inbox mods/t3-tabs mods/t3-pane mods/t3-chrome mods/t3-files mods/t3-home mods/t3-new-menu mods/t3-picker extras/mods/pulls-review extras/mods/review extras/mods/asciicn-wallpaper mods/t3-pulls mods/t3-issues
@@ -70,6 +71,7 @@ share field mods/t3-files mods/t3-pulls mods/t3-issues
 share known-agents mods/t3-tabs mods/t3-menu
 share paging mods/t3-pulls mods/t3-issues
 share page mods/t3-pulls mods/t3-issues
+share open-url mods/t3-pulls mods/t3-issues extras/mods/pulls-review extras/mods/review
 share composer mods/t3-pulls mods/t3-issues
 # The checks' fake elements and loader, beside each mod's checks: a standalone repo has no shared/.
 share check-kit mods/t3-actions mods/t3-chrome mods/t3-files mods/t3-inbox mods/t3-new-menu mods/t3-pane mods/t3-picker mods/t3-spaces mods/t3-tabs extras/mods/pulls-review extras/mods/review mods/t3-pulls mods/t3-issues
@@ -79,10 +81,11 @@ for d in mods/t3-files extras/mods/review; do rsync -a --delete "$src/shared/ico
 # What shared modules draw from the mod's own icons/ (they name `${mod}/icons/…`), for the mods that pass them: menu-row.js's
 # submenu chevron, project.js's plain folder, status-mark.js's working circle, panel-states.js's loader. The last two also go
 # to the mods that draw them themselves. Herdr's own are drawn at 2, not the layout's 1.75 (check.sh).
-for d in mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/chevron-right.svg" "$src/$d/icons/"; done
-for d in mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/folder.svg" "$src/$d/icons/"; done
-for d in mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review extras/mods/review mods/t3-pulls mods/t3-issues; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/circle-dashed.svg" "$src/$d/icons/"; done
-for d in mods/t3-files extras/mods/review extras/mods/asciicn-wallpaper mods/t3-pulls mods/t3-issues; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/loader-circle.svg" "$src/$d/icons/"; done
+share_icon() { f=$1; shift; for d; do mkdir -p "$src/$d/icons"; cp "$src/shared/icons/ui/$f.svg" "$src/$d/icons/"; done; }
+share_icon chevron-right mods/t3-menu mods/t3-files mods/t3-actions extras/mods/review
+share_icon folder mods/t3-inbox mods/t3-agents mods/t3-picker mods/t3-spaces mods/t3-new-menu mods/t3-tabs mods/t3-menu
+share_icon circle-dashed mods/t3-pane mods/t3-agents mods/t3-tabs mods/t3-picker mods/t3-chrome mods/t3-inbox mods/t3-menu extras/mods/pulls-review extras/mods/review mods/t3-pulls mods/t3-issues
+share_icon loader-circle mods/t3-files extras/mods/review extras/mods/asciicn-wallpaper mods/t3-pulls mods/t3-issues
 # Open in's app artwork, the ones Details uses, copied into Files' own folder.
 for icon in finder vscode vscodium cursor zed app-window; do cp "$src/mods/t3-actions/icons/$icon.svg" "$src/mods/t3-files/icons/$icon.svg"; done
 # Review's shared path menu draws the same artwork from its own folder, including the standalone extra.

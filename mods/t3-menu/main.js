@@ -3,9 +3,9 @@
 
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { checking, run, props, openOverlay, closeOverlay, theme, keys, terminals, agents, spaces, panes, focused, exec, setShared, layout, settings } from "herdr";
+import { checking, run, props, openOverlay, closeOverlay, theme, keys, terminals, agents, spaces, panes, focused, setShared } from "herdr";
 import { menuKeys, scrollList, propsLit } from "./list.js";
-import { menuRow, menuRule, menuHint, MENU_ROW } from "./menu-row.js";
+import { menuRow, menuRule, menuHint, MENU_ROW, MENU_W } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
 import { openBeside, closeSub, subGone, closeChain, menuClosed } from "./popup-menu.js";
 import { presets } from "./snooze-presets.js";
@@ -17,30 +17,26 @@ import { statusMark, took } from "./status-mark.js";
 import { alpha } from "./color.js";
 import { focusAgent, focusPane } from "./zoom.js";
 import { pinList } from "./pins.js";
-import { sidebarParts } from "./sidebar.js";
+import { sidebarPage } from "./sidebar.js";
 import { closedKey } from "./store.js";
 import { keyLabel } from "./tip.js";
 import { ghostButton } from "./button.js";
-import { ui } from "./layout-settings.js";
+import { ui, monoFont } from "./layout-settings.js";
+import { git } from "./git.js";
+import { placeOf } from "./project.js";
 
 // What a submenu's close() stamps, for the menu it hangs off (popup-menu.js subGone).
 const SUB_CLOSED = closedKey("t3-menu", "submenu");
 const SPACE_CLOSED = closedKey("t3-menu", "space");
 
 // A menu's measures, as T3's, a rule 4 above and below. The space switcher's 280 width and 10-row cap match the sub-agent list's, so names, durations and marks fit.
-const WIDTH = 220, PAD = 4, ROW = 28, RULE = 9, SPACE_SHOWN = 10;
+const PAD = 4, RULE = 9, SPACE_SHOWN = 10;
 // Where row `i` starts below the menu's top, its rules included.
-const rowTop = (list, i) => PAD + i * ui(ROW) + list.slice(1, i + 1).filter((it, j) => it[4] !== list[j][4]).length * RULE;
-
-// Where a space is now: its first terminal's live folder, else where it was made.
-function place(s) {
-  const tabs = new Set((s.tabs ?? []).map((c) => c.id));
-  return panes().find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
-}
+const rowTop = (list, i) => PAD + i * ui(MENU_ROW) + list.slice(1, i + 1).filter((it, j) => it[4] !== list[j][4]).length * RULE;
 
 // A space's checkout: "main" (a repo's own), "linked" (a worktree), or null.
 async function checkout(folder, on) {
-  const rev = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd: folder, on });
+  const rev = await git(folder, ["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], on);
   const lines = (rev.stdout ?? "").trim().split(/\r?\n/).map((s) => s.trim());
   if (rev.code !== 0 || lines.length !== 2 || !lines[0] || !lines[1]) return null;
   const [top, common] = lines;
@@ -79,7 +75,7 @@ function agentItems(address) {
   const k = byAddress.get(address), a = byAgent.get(address), above = paneAncestors(byAddress, byAgent);
   if (!k) return [];
   const pane = terminalPane(address);
-  const inbox = sidebarParts(layout()).stack?.active !== "lists";
+  const inbox = sidebarPage() !== "lists";
   const kids = subAgents(every, all)(address), own = ownStatus(a?.status, address, all);
   const busy = [own, ...kids].some((s) => s === "working" || s === "blocked");
   const parent = k.parent && byAddress.get(k.parent);
@@ -176,7 +172,7 @@ function items(p, git, agents = null) {
     case "space": {
       const s = spaces().find((s) => s.id === tg.id);
       if (!s) return [];
-      const folder = place(s);
+      const folder = placeOf(s, panes());
       return grouped(
         [["New tab", "tab.new", { space: tg.id }, newTabKey(s)]],
         [["Rename", "space.rename", { id: tg.id }], ...(folder ? [["Copy path", "copy", { text: folder }]] : [])],
@@ -251,7 +247,7 @@ function spaceSwitchEntries(spaceId, now) {
   const agentsByTab = groupByTab(byAgent.values()), panesByTab = groupByTab(ps);
   const localTabs = new Set(tabs.map((c) => c.id));
   const above = paneAncestors(byAddress, byAgent);
-  const inbox = sidebarParts(layout()).stack?.active !== "lists";
+  const inbox = sidebarPage() !== "lists";
   const entries = [], seen = new Set(), children = new Map(), busyByAddress = new Map();
   const childrenOf = (address) => {
     if (!children.has(address)) children.set(address, agentKids(all, address));
@@ -337,7 +333,7 @@ export default class Menu extends View {
     this.keys = cx.focus_handle();
     this.keys.focus();
     const space = p?.tab === "space" && spaces().find((s) => s.id === p.target?.id);
-    const folder = space && place(space);
+    const folder = space && placeOf(space, panes());
     if (!checking() && folder)
       cx.spawn(async (cx) => {
         const kind = await checkout(folder, space.machine).catch(() => null);
@@ -350,7 +346,7 @@ export default class Menu extends View {
     let git = null;
     if (this.git && p.tab === "space") {
       const space = spaces().find((s) => s.id === p.target?.id);
-      if (space && space.machine === this.git.machine && place(space) === this.git.folder) git = this.git.kind;
+      if (space && space.machine === this.git.machine && placeOf(space, panes()) === this.git.folder) git = this.git.kind;
     }
     return items(p, git, this.agents);
   }
@@ -371,8 +367,8 @@ export default class Menu extends View {
   openSub(id, it, lit) {
     if (id !== this.snoozeRow?.id) return;
     const times = items({ tab: "snooze", target: it[2] }, null), h = rowTop(times, times.length) + PAD + 2;
-    openBeside(this, id, id, { top: this.snoozeRow.top, width: WIDTH - 2 * PAD },
-      { mod: "t3-menu", width: WIDTH, height: h, props: { tab: "snooze", target: it[2] } }, null, lit);
+    openBeside(this, id, id, { top: this.snoozeRow.top, width: MENU_W - 2 * PAD },
+      { mod: "t3-menu", width: MENU_W, height: h, props: { tab: "snooze", target: it[2] } }, null, lit);
   }
 
   choose(id, cx, lit = false) {
@@ -406,7 +402,7 @@ export default class Menu extends View {
     // A closed last row takes the highlight back to the row now last.
     if (this.at > entries.length) this.at = entries.length;
     let clockAt = Infinity;
-    const mono = settings()?.font_family ?? "JetBrains Mono";
+    const mono = monoFont();
     const labels = ["New tab", ...entries.map((e) => e.label)];
     const pick = (i) => {
       closeChain();
@@ -440,7 +436,7 @@ export default class Menu extends View {
       const spec = entry.kind === "agent"
         ? { tab: "agent", target: { address: entry.address } }
         : { tab: "pane", target: { pane: entry.pane, terminal: entry.address } };
-      openOverlay({ mod: "t3-menu", kind: "popup", width: WIDTH, height: 260, props: spec });
+      openOverlay({ mod: "t3-menu", kind: "popup", width: MENU_W, height: 260, props: spec });
     };
     const trailOf = (entry) => {
       let mark = null;
@@ -475,7 +471,7 @@ export default class Menu extends View {
         label: entry.here ? div().min_w(0).truncate().font_medium().child(entry.label) : entry.label,
         color,
         lead: entry.depth > 0 ? div().w(entry.depth * 16 - 8).flex_none() : undefined,
-        icon: programIcon(entry.program, 16, color) ?? svg("mods/t3-menu/icons/terminal.svg").size(16).flex_none().text_color(color),
+        icon: programIcon(entry.program, 16, color, "mods/t3-menu/icons/terminal.svg"),
         trail: closing
           ? h_flex().flex_none().pl(10).items_center().child(ghostButton(this, t, closeId, {
             size: "micro", surface: "card", icon: "mods/t3-menu/icons/x.svg", label: `Close ${entry.label}`, act: () => closeEntry(entry),

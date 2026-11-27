@@ -2,13 +2,15 @@
 // one, else a monogram tinted with a color its name picks.
 import { image, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { checking, exec, readTextFile, appHome, settings, shared, setShared, spaces, panes, run } from "herdr";
+import { checking, exec, readTextFile, appHome, shared, setShared, spaces, panes, run } from "herdr";
 import { Buffer } from "buffer";
 import { createHash } from "crypto";
 import * as fs from "fs/promises";
 import { KEY } from "./store.js";
 import { alpha } from "./color.js";
 import { prepareSpace } from "./space-arrival.js";
+import { repoTop } from "./git.js";
+import { monoFont } from "./layout-settings.js";
 
 // T3's project colors in its order, each as Tailwind's 400 (dark themes) and 600 (light).
 const PALETTE = [
@@ -98,15 +100,18 @@ function linkedIcon(source) {
 // folder (images show only from there); null if it has none. All through exec and readTextFile, so another
 // machine's space works the same.
 async function lookUp(on, dir) {
-  const top = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"], { cwd: dir, on });
-  const root = (top.code === 0 && top.stdout.trim()) || dir;
+  const root = (await repoTop(dir, on)) || dir;
   const first = async (paths) => (await exec("sh", ["-c", 'for f; do [ -f "$f" ] && { printf %s "$f"; exit; }; done', "sh", ...paths], { cwd: root, on })).stdout || null;
   let hit = await first(PLACES);
-  for (const page of PAGES) {
-    if (hit) break;
-    const href = linkedIcon((await readTextFile(`${root}/${page}`, { on })) ?? "")?.replace(/^\//, "");
-    // Inside the folder only, as T3 keeps it.
-    if (href && !href.split("/").includes("..")) hit = await first([`public/${href}`, href]);
+  if (!hit) {
+    // A page's failed read fails the look only where a sequential look would have reached it.
+    const reads = await Promise.all(PAGES.map((page) => readTextFile(`${root}/${page}`, { on }).then((text) => () => text, (e) => () => { throw e; })));
+    for (const read of reads) {
+      const href = linkedIcon(read() ?? "")?.replace(/^\//, "");
+      // Inside the folder only, as T3 keeps it.
+      if (href && !href.split("/").includes("..")) hit = await first([`public/${href}`, href]);
+      if (hit) break;
+    }
   }
   if (!hit) return null;
   const dot = hit.lastIndexOf(".");
@@ -146,7 +151,7 @@ const looked = () => (globalThis.t3ProjectLooked ??= new Map()); // [machine, fo
 const lastIcon = new Map(); // space -> its icon where it last had an answer
 const iconKey = (s, ps) => JSON.stringify([s.machine ?? null, placeOf(s, ps)]);
 const iconsOf = (ps) => (ps ? drawOf(ps).icons ??= shared(KEY.spaceIcons) ?? {} : shared(KEY.spaceIcons) ?? {});
-const fontOf = (ps) => (ps ? drawOf(ps).font ??= settings().font_family ?? "JetBrains Mono" : settings().font_family ?? "JetBrains Mono");
+const fontOf = (ps) => (ps ? drawOf(ps).font ??= monoFont() : monoFont());
 function projectIcon(s, ps, follow) {
   const folder = placeOf(s, ps);
   if (!folder) return null;

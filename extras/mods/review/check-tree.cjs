@@ -13,7 +13,7 @@ const overlays = [], closed = [], shared = new Map(), calls = [];
 let menuProps = null, machine = null, clipboard = "before";
 const cx = { notify() {}, stop_propagation() {}, focus_handle: () => ({ focus() {}, is_focused: () => false }), on_blur() {},
   timer: { every() {}, after() {} }, spawn() {}, read_from_clipboard: () => clipboard, write_to_clipboard: v => { clipboard = v; } };
-const env = { checking: () => false, div: element, svg: p => element("svg", p), image: p => element("image", p), h_flex: element, v_flex: element,
+const env = { checking: () => false, keepPress: (_e, cx) => cx.stop_propagation(), div: element, svg: p => element("svg", p), image: p => element("image", p), h_flex: element, v_flex: element,
   props: () => menuProps, settings: () => ({ zoom: 1 }), theme: () => ({ foreground: "#ffffff", dim: "#888888", popover: "#111111", accent: "#00ff00" }),
   spaces: () => [{ id: "s", active: true, machine, tabs: [{ id: "tab", active: true }] }],
   agents: () => [], panes: () => [], focused: () => null, appWindow: () => ({ platform: "macos" }), window: () => ({ platform: "macos" }), DISABLED: 0.64,

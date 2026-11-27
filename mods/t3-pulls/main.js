@@ -7,21 +7,22 @@ import { checking, spaces, exec, theme, nextCommand } from "herdr";
 import { panelState, closeSurface, openReview, REVIEW_PROBLEMS } from "./panel.js";
 import { tint, GROUP_GAP } from "./button.js";
 import { loadingState, emptyState, errorBar, noticeBar } from "./panel-states.js";
-import { stopsInit, stopsEnd, enter, stop } from "./focus.js";
+import { stopsInit, enter, stop } from "./focus.js";
 import { keycap } from "./palette.js";
 import { listPRs, prDetail, writePR, OPEN_PAGE } from "./gh.js";
-import { GIT, discoverRepo, ghProblem, githubParts } from "./github.js";
+import { discoverRepo, ghProblem, githubParts } from "./github.js";
 import { ownBranchPRs, prState, rollupKind, CHECK_LOOK, checksOf, reviewersOf, REVIEW_LOOK, verdict, tallies, TONE_COLOR, stackOf, matches,
   fetchArgs, fetchHeadShas, comparePage, conversationEntries, threadPlace, hunkTail, threadShut, checksOpenByDefault, sectionSummary } from "./model.js";
-import { initPictures, dropPictures } from "./pictures.js";
-import { codeFont, diffRowsOf, dropCode } from "./code.js";
+import { initPictures } from "./pictures.js";
+import { codeFont, diffRowsOf } from "./code.js";
 import { inlineMenu } from "./inline-menu.js";
 import { initPage, stateFor, refreshPage, freshness, pageFrame, sectionOpen, toggleSection, section, control, textButton, note, line, rich, said,
-  stateIcon, openUrl, writeError, draftKey, since, diffBlock } from "./page.js";
+  stateIcon, browse, writeError, draftKey, since, diffBlock, closePage, ghFailed } from "./page.js";
 import { initComposer, sent, commentBox, replyBox, replyButton, BUSY } from "./composer.js";
 import { segmented } from "./segmented.js";
 import { compactField } from "./field.js";
 import { ui } from "./layout-settings.js";
+import { GIT } from "./git.js";
 
 const MOD = "mods/t3-pulls";
 const JIN_TIMEOUT = 20000, FETCH_TIMEOUT = 120000;
@@ -64,9 +65,7 @@ export default class Pulls extends View {
   }
 
   async close() {
-    stopsEnd(this);
-    dropCode(this);
-    await dropPictures(this);
+    await closePage(this);
   }
 
   // What a space shows: what was read for its tab's folder on its machine, and what the person picked. `token` and `detailToken`
@@ -103,8 +102,7 @@ export default class Pulls extends View {
         if (n != null && n !== early) this.readDetail(st, n, cx);
       } catch (e) {
         if (!fresh()) return;
-        const message = e?.message ?? String(e), problem = ghProblem(message);
-        if (problem) st.gh = problem; else Object.assign(st, { gh: null, error: message });
+        ghFailed(st, e);
       } finally {
         if (fresh()) { st.reading = false; cx.notify(); }
       }
@@ -194,7 +192,7 @@ export default class Pulls extends View {
 
   // One fetch brings the PR's head and its base branch into the space's clone, then Review shows what GitHub does: head since
   // it forked from base. FETCH_HEAD lists the two in the order asked.
-  review(st, sp, pr, pages, cx) {
+  review(st, pr, pages, cx) {
     if (st.busy || this.reviewReason(st, pages)) return;
     const { root, remote } = st.info, o = { cwd: root, on: st.on, timeout: FETCH_TIMEOUT };
     st.busy = "review"; st.actionError = null; cx.notify();
@@ -225,18 +223,12 @@ export default class Pulls extends View {
     });
   }
 
-  browse(st, url, cx) {
-    cx.spawn(async (cx) => {
-      try { await openUrl(url); } catch (e) { st.actionError = e.message; cx.notify(); }
-    });
-  }
-
   render(cx) {
     const t = theme(), sp = spaces().find((s) => s.active), panel = panelState(), st = sp ? this.states.get(sp.id) : null;
     if (!sp) return div().id("t3-pulls").size_full();
     return pageFrame(this, t, cx, { panel, head: st ? this.head(st, sp, panel.pages, t) : div().flex_1(),
       bars: st?.error && !st.gh && !st.problem ? [errorBar(t, "t3-pulls-error", st.error, (cx) => refreshPage(this, cx), this)] : [],
-      body: st ? this.body(st, sp, panel.pages, t, cx) : loadingState(MOD, t, "t3-pulls-loading", "Loading pull requests…") });
+      body: st ? this.body(st, t, cx) : loadingState(MOD, t, "t3-pulls-loading", "Loading pull requests…") });
   }
 
   // One row, as Files' header: Branch and Repo, or Back to them from a PR picked off a list; Repo's search; then Refresh and,
@@ -254,7 +246,7 @@ export default class Pulls extends View {
       .child(searching ? this.searchField(t) : div().flex_1())
       .child(control(this, t, "t3-pulls-refresh", "refresh-cw", "Refresh pull requests", (cx) => refreshPage(this, cx)))
       .when(Boolean(pr), (el) => el
-        .child(textButton(this, t, "t3-pulls-review", busy ? "Fetching…" : "Review", "primary", (cx) => this.review(st, sp, pr, pages, cx),
+        .child(textButton(this, t, "t3-pulls-review", busy ? "Fetching…" : "Review", "primary", (cx) => this.review(st, pr, pages, cx),
           { disabled: Boolean(reason) || busy, reason: reason || "Fetching the pull request…" }))
         .child(this.moreMenu(st, sp, pr, pages, t)));
   }
@@ -264,7 +256,7 @@ export default class Pulls extends View {
     const pullsReason = this.pullsReason(st, sp, pages);
     return inlineMenu(this, t, "t3-pulls-more", { label: "More", icon: icon("ellipsis"), items: [
       { label: "Open in pulls.review", icon: image(`${MOD}/icons/pulls-review.svg`).size(16), disabled: Boolean(pullsReason), hint: pullsReason, pick: (cx) => this.pullsReview(st, sp, pr, pages, cx) },
-      { label: "Open on GitHub", icon: icon("external-link"), pick: (cx) => this.browse(st, pr.url, cx) },
+      { label: "Open on GitHub", icon: icon("external-link"), pick: (cx) => browse(st, pr.url, cx) },
       { label: "Copy link", icon: icon("link"), pick: (cx) => cx.write_to_clipboard(pr.url) }] });
   }
 
@@ -274,7 +266,7 @@ export default class Pulls extends View {
       child: Input.new(this.search).w_full().h_full().text_size(ui(12)).text_color(t.foreground).accessibility_label("Search pull requests") });
   }
 
-  body(st, sp, pages, t, cx) {
+  body(st, t, cx) {
     if (st.gh) {
       return emptyState(t, "t3-pulls-gh", icon("git-pull-request"), st.gh.title, st.gh.detail)
         .child(keycap(t, st.gh.command))
@@ -283,7 +275,7 @@ export default class Pulls extends View {
     if (st.problem) return emptyState(t, "t3-pulls-problem", null, null, st.problem);
     if (!st.info || !st.open) return st.error ? div() : loadingState(MOD, t, "t3-pulls-loading", "Loading pull requests…");
     const n = this.shownNumber(st);
-    return n != null ? this.detail(st, sp, n, t, cx) : this.list(st, t);
+    return n != null ? this.detail(st, n, t, cx) : this.list(st, t);
   }
 
   list(st, t) {
@@ -324,7 +316,7 @@ export default class Pulls extends View {
   // A list row's PR, the detail's until its own read lands.
   card(st, n) { return st.branch?.find((p) => p.number === n) ?? st.open?.find((p) => p.number === n) ?? null; }
 
-  detail(st, sp, n, t, cx) {
+  detail(st, n, t, cx) {
     const d = st.details.get(n), pr = d?.pr ?? this.card(st, n);
     if (!pr) return d?.error ? emptyState(t, "t3-pulls-detail-error", icon("git-pull-request"), `#${n} couldn't be read`, d.error) : loadingState(MOD, t, "t3-pulls-loading", `Loading #${n}…`);
     const full = Boolean(d?.pr), s = prState(pr), now = Date.now();
@@ -350,7 +342,7 @@ export default class Pulls extends View {
         .when(full, (el) => el.child(part("checks", "Checks", () => this.checkRows(st, pr, t), { fallback: checksOpenByDefault(pr) }))
           .child(part("reviewers", "Reviewers", () => this.reviewerRows(pr, t)))
           .child(part("description", "Description", () => [(pr.body ?? "").trim()
-            ? rich(this, t, `t3-pulls-body-${st.id}-${n}`, githubParts(pr, pr.body, pr.bodyHTML), (url, cx) => this.browse(st, url, cx)) : note(t, "No description.")]))
+            ? rich(this, t, `t3-pulls-body-${st.id}-${n}`, githubParts(pr, pr.body, pr.bodyHTML), (url, cx) => browse(st, url, cx)) : note(t, "No description.")]))
           .child(part("comments", "Comments", () => this.commentRows(st, pr, t, now, cx), { count: conversationEntries(pr).length }))));
   }
 
@@ -385,7 +377,7 @@ export default class Pulls extends View {
   checkRows(st, pr, t) {
     const checks = checksOf(pr);
     if (!checks.length) return [note(t, "No checks reported.")];
-    const row = (c, i) => line(this, t, `t3-pulls-check-${i}`, `Open ${c.name}'s details`, c.url ? (cx) => this.browse(st, c.url, cx) : null, [
+    const row = (c, i) => line(this, t, `t3-pulls-check-${i}`, `Open ${c.name}'s details`, c.url ? (cx) => browse(st, c.url, cx) : null, [
       stateIcon(this, t, CHECK_LOOK[c.kind], 14),
       div().flex_1().min_w(0).truncate().when(c.kind === "failure", (el) => el.text_color(t.ansi1)).child(c.name)]);
     const open = checks.map((c, i) => [c, i]).filter(([c]) => c.kind === "failure" || c.kind === "pending");
@@ -429,7 +421,7 @@ export default class Pulls extends View {
   said(st, t, id, c, now, word = null) {
     return said(this, t, id, { author: c.author?.login ?? "ghost", at: c.createdAt ?? c.submittedAt, url: c.url }, { now, word,
       wordColor: word === "Approved" ? t.ansi2 : word === "Changes requested" ? t.ansi1 : t.dim,
-      parts: c.body?.trim() ? githubParts(c, c.body, c.bodyHTML) : [], open: (url, cx) => this.browse(st, url, cx) });
+      parts: c.body?.trim() ? githubParts(c, c.body, c.bodyHTML) : [], open: (url, cx) => browse(st, url, cx) });
   }
 
   // A review thread: its place, shut when resolved or outdated (a click opens it); open, the end of its hunk, its comments,

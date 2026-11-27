@@ -6,7 +6,7 @@ import { textSize, ui } from "./layout-settings.js";
 // Heights on one scale at 13px text, each drawn and summed as ui(…): 20 a code line, 24 a hunk, 28 a group, 32 a file.
 export const ROW = 20, HUNK = 24, GROUP = 28, FILE = 32, NOTE_LINE = 18;
 // One column of 12px code font; past MAX_COLUMNS characters a line is cut, not scrolled to.
-export const CHAR = 7.25, MAX_COLUMNS = 1000;
+const CHAR = 7.25, MAX_COLUMNS = 1000;
 /** A column of the code font as drawn, ui(12), until diff.js measures it. */
 export const codeChar = () => CHAR * ui(12) / 12;
 // Code lines go to the list in runs of up to this many, one item each: Herdr's v_virtual_list takes at most 10000 items,

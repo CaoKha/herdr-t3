@@ -14,7 +14,7 @@ function load(host = {}) {
     shared: (k) => { if (k === "t3.spaceIcons") reads.icons++; return state[k]; }, setShared: (k, v) => { state[k] = v; },
     Buffer, createHash: require("node:crypto").createHash, Date, ...host,
   });
-  const src = ["store.js", "color.js", "space-arrival.js", "project.js"].map((f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"))).join("\n");
+  const src = ["store.js", "layout-settings.js", "color.js", "space-arrival.js", "git.js", "project.js"].map((f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"))).join("\n");
   vm.runInContext(src + "\nglobalThis.project = { projectMark, placeOf, monogramColor, monogram, linkedIcon, lookUp };", context);
   return { ...context.project, state, reads, context };
 }
@@ -149,7 +149,7 @@ const t = { background: "#000000", dim: "DIM" };
   {
     const sharedState = {};
     let lookCalls = 0, now = 1000;
-    const modSrc = ["store.js", "color.js", "space-arrival.js", "project.js"].map((f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"))).join("\n");
+    const modSrc = ["store.js", "layout-settings.js", "color.js", "space-arrival.js", "git.js", "project.js"].map((f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"))).join("\n");
     const sp = { id: "s1", name: "One", folder: "/proj", machine: null, tabs: [] };
     const ctx = vm.createContext({
       image: (src) => element("image", src), svg: (src) => element("svg", src), h_flex: () => element(),

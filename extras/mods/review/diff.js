@@ -4,16 +4,18 @@ import { notify, spaces } from "herdr";
 import { review } from "./daemon.js";
 import { codeInset, FILE, noteWidth, NUMBER_W, ROW, wrapRow } from "./rows.js";
 import { canFull } from "./review-load.js";
-import { PANE, LU, mono, zoom, isLight, checkMark, diffStats, popover } from "./controls.js";
-import { button as drawButton } from "./button.js";
+import { mono, isLight, checkMark, diffStats, popover } from "./controls.js";
+import { PANE, LU } from "./review-menu.js";
+import { button as drawButton, keepPress } from "./button.js";
 import { fileStatus } from "./files.js";
 import { emptyState } from "./panel-states.js";
 import { holdWidth } from "./nav-column.js";
 import { alpha } from "./color.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 import { openMenu } from "./menus.js";
-import { MENU_ROW } from "./menu-row.js";
+import { menuHeight } from "./menu-row.js";
 import { agentFor, fileRows, lineKey, pickLine, sendLines } from "./lines.js";
+import { FADE } from "./tip.js";
 
 // The runs measured for a character's width, and a wide one's: long enough that rounding the whole to a pixel doesn't matter.
 const MEASURED = "0".repeat(100), MEASURED_WIDE = "中".repeat(100);
@@ -196,7 +198,7 @@ export function hbars(view, t) {
     const width = side === 2 ? view.view : view.view / 2, max = view.sideMax(side);
     const thumb = Math.max(24, width * width / view.sideWidth[side]);
     return div().id(`hbar-${side}`).absolute().bottom(side === 2 && sides.length > 1 ? 8 : 1).left(side === 1 ? view.view / 2 : 0).w(width).h(6)
-      .opacity(view.barsOn ? 1 : 0).transition("opacity", { duration: 150, easing: "ease-out" })
+      .opacity(view.barsOn ? 1 : 0).transition("opacity", FADE)
       .child(div().absolute().left((width - thumb) * Math.min(view.shift[side], max) / max).w(thumb).h_full().rounded_full().bg(alpha(t.muted, "80")));
   });
 }
@@ -331,7 +333,7 @@ function lineMenu(view, hit, cx) {
   cx.stop_propagation();
   if (!isPicked(view, hit.path, hit.row)) pickAt(view, hit, false, cx);
   const space = spaces().find(s => s.id === view.space), target = agentFor(view.space);
-  openMenu("lines", { height: 8 + ui(MENU_ROW) }, { menuMod: PANE, source: { space: view.space, tab: space?.tabs.find(tab => tab.active)?.id },
+  openMenu("lines", { height: menuHeight(1) }, { menuMod: PANE, source: { space: view.space, tab: space?.tabs.find(tab => tab.active)?.id },
     agent: target.terminal ? { terminal: target.terminal } : null, reason: target.reason });
 }
 
@@ -340,7 +342,7 @@ function linesBar(view, t) {
   const target = agentFor(view.space), { path } = view.linePick, n = view.linePick.keys.size;
   return h_flex().id("review-lines-bar").absolute().bottom(12).left(12).right(12).h(40).px(8).gap(8).items_center()
     .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg()
-    .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_mouse_down("right", (_e, cx) => cx.stop_propagation())
+    .on_mouse_down("left", keepPress).on_mouse_down("right", keepPress)
     .child(div().flex_none().max_w(240).truncate().text_color(t.dim).child(`${n} ${n === 1 ? "line" : "lines"} · ${path.slice(path.lastIndexOf("/") + 1)}`))
     .child(Input.new(view.lineNote).flex_1().min_w(0).h(24).text_size(ui(12)).text_color(t.foreground))
     .when(!target.terminal, el => el.child(div().flex_none().text_color(t.dim).child(target.reason)))

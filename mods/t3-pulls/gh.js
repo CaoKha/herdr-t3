@@ -5,7 +5,7 @@ import { pageRest, PAGE_CAP } from "./paging.js";
 
 // The repository's open PRs, most recently updated first: the Repo list and every stack drawn from it.
 export const OPEN_PAGE = 100;
-export const BRANCH_PAGE = 30;
+const BRANCH_PAGE = 30;
 
 const CARD = "number title url state isDraft updatedAt headRefName baseRefName author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }";
 

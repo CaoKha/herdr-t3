@@ -1,11 +1,12 @@
 // The space panel (docs/adr/0012, 0017): the `panel` column at the window's right, the `panel-body` stack its render slots.
 // Each space keeps its record in t3.panels (docs/internals/storage.md). Where Herdr's own layout docks the Review extra in its
 // stack instead (no `panel-empty` slot), the host owns the head and these only show the page.
-import { layout, run, spaces, shared, setShared, exec, window } from "herdr";
+import { layout, run, spaces, shared, setShared, window } from "herdr";
 import { KEY } from "./store.js";
 import { GROUP_GAP } from "./button.js";
 import { workFolder } from "./terminal-context.js";
 import { surfaceActivate, surfaceAdd, surfaceOpenFile, surfaceNavigate, surfaceClose, surfaceResetFiles } from "./surfaces.js";
+import { repoTop } from "./git.js";
 
 /** Layout `node`'s descendant (or itself) with `id`, else null. */
 export const layoutNode = (node, id) => node?.id === id ? node : (node?.children ?? []).reduce((hit, c) => hit ?? layoutNode(c, id), null);
@@ -219,8 +220,7 @@ export const reviewRepo = async (space = activeSpaceId()) => {
   const sp = spaces().find(s => s.id === space);
   if (!sp) return { root: null, problem: "No space is open." };
   const folder = workFolder(sp.id);
-  const top = folder ? await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"], { cwd: folder, on: sp.machine ?? null }).catch(() => null) : null;
-  const root = top?.code === 0 && top.stdout?.trim();
+  const root = folder ? await repoTop(folder, sp.machine ?? null).catch(() => null) : null;
   return root ? { root, problem: "" } : { root: null, problem: REVIEW_PROBLEMS.noRepo };
 };
 

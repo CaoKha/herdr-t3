@@ -9,21 +9,23 @@ import { panelState, surfacesFor, closeSurface, openFile, navigateFolder, resetF
 import { terminalFor, spaceFolder } from "./terminal-context.js";
 import { treeRows, treeIndex, pathEntries, sortEntries, treeKey, treeList, treeRow, revealRow } from "./file-tree.js";
 import { withNav, treeHead, navOpen, setNavOpen, holdWidth, NAV_NARROW, navShown } from "./nav-column.js";
-import { MENU_W, folderHeight, MENU_CLOSED, openMenu, closeMenus, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
+import { folderHeight, MENU_CLOSED, openMenu, rowItems, launch, initMenu, closeMenu, menuView } from "./menus.js";
 import { KEY, wrapLines, setWrapLines } from "./store.js";
 import { installedTargets, knownTargets, targetIcon, openInHeight } from "./open-in.js";
-import { split, ghostButton, tint, GROUP_GAP } from "./button.js";
+import { split, ghostButton, tint, GROUP_GAP, keepPress } from "./button.js";
 import { loadingState, noticeBar } from "./panel-states.js";
 import { stopsInit, stopsEnd, enter, focusRoot, stop, within } from "./focus.js";
 import { opener, popupOpen, hang } from "./trigger.js";
 import { tip, hoverKept, glow } from "./tip.js";
-import { MENU_ROW } from "./menu-row.js";
+import { MENU_W, menuHeight } from "./menu-row.js";
 import { LIST, join, parseListing } from "./file-listing.js";
 import { IGNORED, PROBE, REMOTE_SEARCH, REMOTE_MAX, parentOf, nameOf, ancestors, filesRoot, parseIgnored, markIgnored, folderEntries, terms, narrows,
   filterPaths, rankPaths, kindOf, readProblem, failedRead, ticket } from "./model.js";
 import { languageOf, codeStyle, codeEditor } from "./code.js";
 import { compactField } from "./field.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
+import { GIT } from "./git.js";
+import { closeTops } from "./popup-menu.js";
 
 const MOD = "mods/t3-files";
 const RESULTS = 200, REMOTE_IMAGE = 512 * 1024, TEXT_MAX = 1024 * 1024;
@@ -54,9 +56,7 @@ const FULL = 3; // the spaces last shown that keep all they read; older ones kee
 const CACHE = "cache/t3-files"; // under the app's home, where image() can read
 let lastImage = 0; // The host caches decoded images by path, even after the copied file is deleted.
 
-const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"]; // keep reads from updating the index or filesystem-monitor state
 
-const zoom = () => Number(settings()?.zoom) || 1;
 const editorStyle = (t = theme(), font = settings().font_family) => codeStyle(t, font);
 
 const rootOkay = (s, sp) => (sp.machine ?? null) === (s.on ?? null) && filesRoot(sp, s.root, spaceFolder(sp, panes()), home()) === s.root;
@@ -107,7 +107,7 @@ export default class Files extends View {
         const c = await nextCommand(), at = c.indexOf(":"), [what, arg] = [c.slice(0, at), c.slice(at + 1)];
         // The terminal's pane-close keys only dismiss menus while Files has the keyboard.
         if (c === "close" || c === "close:menu") {
-          if (!closeMenus() && c === "close") closeSurface();
+          if (!closeTops("t3-files") && c === "close") closeSurface();
           cx.notify();
           continue;
         }
@@ -137,7 +137,7 @@ export default class Files extends View {
 
   // A space's state, made the first time and made again when its root moves; the latest one last. The FULL last keep all
   // they read; older ones only how they were being read, and read again when back.
-  stateFor(sp, ps = panes(), cx = null, drawing = false) {
+  stateFor(sp, ps, cx, drawing) {
     let st = this.states.get(sp.id);
     const on = sp.machine ?? null, nextRoot = filesRoot(sp, st?.root ?? null, spaceFolder(sp, ps), home());
     const moved = Boolean(st && (st.root !== nextRoot || st.on !== on));
@@ -166,7 +166,7 @@ export default class Files extends View {
     const finish = () => {
       st.flushReset = null;
       resetFilesTabs(sp.id);
-      closeMenus();
+      closeTops("t3-files");
       if (spaces().some(s => s.active && s.id === sp.id) && this.search.value() !== st.query) this.search.set_value(st.query);
     };
     if (drawing && cx) {
@@ -200,7 +200,7 @@ export default class Files extends View {
   sync(cx, focus = false, all = spaces(), ps = null, drawing = false) {
     if (checking()) return null;
     // The layout read once (panelState), not again for each space kept.
-    const sp = all.find((s) => s.active), panel = panelState();
+    const sp = all.find((s) => s.active), panel = panelState(sp?.id);
     for (const [id, st] of this.states) {
       if (!all.some((s) => s.id === id)) { this.drop(st); this.states.delete(id); continue; }
       const tabs = surfacesFor(id, panel.pages).tabs;
@@ -630,7 +630,7 @@ export default class Files extends View {
   rowMenu(st, path, keys = false) {
     const agent = terminalFor(st.id), editors = (knownTargets() ?? this.targets).filter(name => name !== "Finder");
     const n = rowItems({ remote: Boolean(st.on), platform: window()?.platform, agent, editors }).length;
-    openMenu("row", { height: 8 + n * ui(MENU_ROW) }, { source: this.source(st), path, agent: agent ? { terminal: agent.terminal } : null, editors }, keys);
+    openMenu("row", { height: menuHeight(n) }, { source: this.source(st), path, agent: agent ? { terminal: agent.terminal } : null, editors }, keys);
     this.opened = { id: `row:${path}`, at: Date.now() };
   }
 
@@ -716,7 +716,7 @@ export default class Files extends View {
     const crumb = (label, path, last) => {
       // The root's words sit where Review's scope button has them, so switching pages doesn't move the first letter (t3-tokens "Rules" R1).
       const id = `crumb-${path}`, el = div().id(id).flex_none().max_w(160).truncate().px(2).when(path === "", el => el.pl(10)).rounded(4).text_color(last ? t.foreground : t.dim).when(last, el => el.font_medium())
-        .when(!last, el => el.cursor_pointer().role("button").accessibility_label(`Go to ${label}`).hover(s => s.text_color(t.foreground)).on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => this.navigate(st, path, cx)))
+        .when(!last, el => el.cursor_pointer().role("button").accessibility_label(`Go to ${label}`).hover(s => s.text_color(t.foreground)).on_mouse_down("left", keepPress).on_click((_e, cx) => this.navigate(st, path, cx)))
         .child(label);
       return last ? el : stop(this, t, id, el, 4);
     };
@@ -757,7 +757,7 @@ export default class Files extends View {
     const kept = (key, el) => available ? stop(this, t, key, el, 8) : el;
     return split(t, { id: "t3-files-open-group", mainId: id, moreId, chevron: `${MOD}/icons/chevron-down.svg`, size: "xs", surface: "chrome", hot, on: popupOpen(this, moreId, MENU_CLOSED), disabled: !available, label: `Open in ${target}`, moreLabel: "Choose application" },
       main => tip(this, t, id, available ? `Open in ${target}` : "Local applications cannot open a remote file", kept(id, main.child(this.targetIcon(target, t, 14)).on_hover(hover(id))
-        .when(available, el => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target, rootOkay); })))),
+        .when(available, el => el.on_mouse_down("left", keepPress).on_click((_e, cx) => { cx.stop_propagation(); launch(this.source(st), st.file ?? st.folder, target, rootOkay); })))),
       more => kept(moreId, more.on_hover(hover(moreId)).when(available, opener(this, { id: moreId, closed: MENU_CLOSED, onOpen: (b, cx) => {
         openMenu("open-in", { height: openInHeight(names), ...hang(b, MENU_W) }, { source: this.source(st), targets: names }, !b);
         cx.spawn(async cx => { this.targets = await installedTargets(); cx.notify(); });
@@ -769,7 +769,7 @@ export default class Files extends View {
   // The file: Preview or Code for Markdown, the code, an image or why there's none. Only drawn with a file open.
   content(st, t) {
     const v = st.view, md = kindOf(st.file ?? "") === "markdown", code = shared(KEY.markdown) === "code";
-    return div().id("t3-files-content").size_full().min_h(0).min_w(0).on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+    return div().id("t3-files-content").size_full().min_h(0).min_w(0).on_mouse_down("left", keepPress)
         .child(!v || v.loading ? loadingState(MOD, t, "t3-files-loading", "Loading the file…")
           // A file there's nothing to show of says why, as an empty page, with T3's Try again and a way to it in the tree.
           : v.problem ? v_flex().id("t3-files-problem").size_full().p(24).gap(12).items_center().justify_center().text_center().text_size(ui(12)).role("alert")
@@ -867,7 +867,7 @@ export default class Files extends View {
     const id = `t3-files-retry-${path}`;
     return tip(this, t, id, st.errors.get(path), div().id(id).flex_none().text_size(ui(12)).text_color(t.ansi1).cursor_pointer().role("button")
       .accessibility_label("Can't list this folder. Retry").child("Can't list · Retry").on_hover(glow(this, id))
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); retry(path, cx); }), { below: true });
+      .on_mouse_down("left", keepPress).on_click((_e, cx) => { cx.stop_propagation(); retry(path, cx); }), { below: true });
   }
 
   // The folder's tree, as T3's: a click opens a file or a folder; the keys move a ring, ↵ opens what it's on. The ring shows

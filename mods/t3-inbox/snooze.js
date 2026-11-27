@@ -1,16 +1,15 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Popover, Popup, Select, InputState, Input, NumberInput } from "gpui-base";
-import { run, theme, props, settings, closeOverlay } from "herdr";
+import { run, theme, props, closeOverlay } from "herdr";
 import { segmented } from "./segmented.js";
 import { stopsInit, stop, focusRoot, onStop } from "./focus.js";
 import { menuJump, openLit } from "./list.js";
 import { menuRow, menuRule, menuHint } from "./menu-row.js";
-import { glow, tip } from "./tip.js";
-import { MOTION } from "./motion.js";
+import { glow, tip, FADE } from "./tip.js";
 import { presets } from "./snooze-presets.js";
 import { button, radiusOf } from "./button.js";
 import { alpha } from "./color.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 // A custom snooze can be far off; its timer needn't be.
 export const DAY = 86400000;
@@ -141,7 +140,7 @@ export function customView(view) {
     .accessibility_label(name).child(svg(`mods/t3-inbox/icons/${glyph}.svg`).size(16).flex_none().text_color(t.muted));
   // T3's unit Select, on the kit's: it owns Esc and ↑/↓/Enter opening; the highlight, the pick and a press elsewhere are ours.
   // The trigger is drawn as the date's, the list under it, the chosen one shaded.
-  const zoom = Number(settings()?.zoom) || 1;
+  const z = zoom();
   const showUnits = (open) => {
     view.unitOpen = open;
     if (open) view.unitAt = UNITS.findIndex(([u]) => u === view.unit);
@@ -154,7 +153,7 @@ export function customView(view) {
   };
   const unitTrigger = stop(view, t, "custom-unit-button", h_flex().id("custom-unit-button").w_full().h(32).px(11).gap(8).rounded(8).border(1).border_color(t.border).bg(t.input).items_center().cursor_pointer()
     .on_hover((on) => { view.overUnit = on; })
-    .on_size_change((size) => { view.unitW = size.width / zoom; })
+    .on_size_change((size) => { view.unitW = size.width / z; })
     .on_click((_e, cx) => {
       showUnits(!view.unitOpen);
       (view.unitOpen ? view.unitKeys : view.unitFocus).focus();
@@ -234,7 +233,7 @@ export function customView(view) {
 
 export function snoozeButton(view, t, a, { now, offer: napOffer, delay }, pick) {
   const key = a.address, napId = `snooze-${key}`;
-  const menu = view.napMenu === key, zoom = Number(settings()?.zoom) || 1;
+  const menu = view.napMenu === key, z = zoom();
   return tip(view, t, napId, "Snooze agent", Popover.new(`snooze-menu-${key}`).anchor(view.napRight - NAP_MENU_W >= NAP_MENU_MARGIN ? "top_right" : "top_left").open(menu).track_focus(view.napKeys)
     .on_open_change((open, cx) => {
       if (!open && view.napMenu !== key) {
@@ -254,8 +253,8 @@ export function snoozeButton(view, t, a, { now, offer: napOffer, delay }, pick) 
       cx.notify();
     })
     .trigger(h_flex().id(napId).h(20).px(6).flex_none().items_center().justify_center().rounded(6)
-      .opacity(napOffer ? 1 : 0).transition("opacity", MOTION).on_hover(glow(view, napId))
-      .on_mouse_down("left", (e) => { view.napPress = key; view.napRight = e.bounds ? (e.bounds.x + e.bounds.width) / zoom : null; })
+      .opacity(napOffer ? 1 : 0).transition("opacity", FADE).on_hover(glow(view, napId))
+      .on_mouse_down("left", (e) => { view.napPress = key; view.napRight = e.bounds ? (e.bounds.x + e.bounds.width) / z : null; })
       .role("button").accessibility_label("Snooze agent")
       .child(svg("mods/t3-inbox/icons/clock.svg").size(12).flex_none().text_color(menu || view.hot === napId ? t.foreground : t.muted))
       .when(napOffer, (el) => stop(view, t, napId, el, 6)))
@@ -263,7 +262,7 @@ export function snoozeButton(view, t, a, { now, offer: napOffer, delay }, pick) 
       const choices = [...presets(now), { label: "Custom…", custom: true }];
       // Sized as T3's menu: as wide as its rows. Nothing lit until the pointer or a key gets there.
       return el.content(v_flex().id(`snooze-panel-${key}`).min_w(160).mt(4).p(4).rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(14))
-        .opacity(view.napShown === false ? 0 : 1).transition("opacity", MOTION)
+        .opacity(view.napShown === false ? 0 : 1).transition("opacity", FADE)
         .track_focus(view.napKeys).key_context("InboxSnoozeMenu")
         .on_action("t3_inbox_snooze_pick", (_e, cx) => {
           if (choices[view.napAt]) pick(a, choices[view.napAt], cx);

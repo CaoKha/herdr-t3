@@ -5,7 +5,7 @@ import { h_flex, v_flex } from "gpui-base";
 import { checking, exec, theme } from "herdr";
 import { focusRoot } from "./focus.js";
 import { menuKeys, scrollList } from "./list.js";
-import { menuRow, MENU_ROW } from "./menu-row.js";
+import { menuRow, MENU_ROW, menuHeight } from "./menu-row.js";
 import { ui } from "./layout-settings.js";
 
 // T3 contracts/editor.ts; LaunchServices also finds bundles absent from this GUI process's PATH.
@@ -53,7 +53,7 @@ export function targetIcon(mod, name, t, size = 16) {
 // At most this tall, so twenty editors scroll and the keys' row stays in view (list.js scrollList).
 const OPEN_IN_MAX = 420;
 /** The popup's height for `names` (a row saying why when there are none). */
-export const openInHeight = (names) => Math.min(OPEN_IN_MAX, 8 + Math.max(1, names.length) * ui(MENU_ROW));
+export const openInHeight = (names) => Math.min(OPEN_IN_MAX, menuHeight(Math.max(1, names.length)));
 
 /** An Open in menu opened before the probe has finished: redrawn once it has, so it lists what it found (targetsMenu). */
 export function awaitTargets(cx) {

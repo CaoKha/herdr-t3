@@ -488,7 +488,7 @@ for (const width of [208, 256]) {
 {
   const f = fixture(208), ag = f.load("t3-agents");
   for (const status of ["working", "blocked", "idle", "done"]) {
-    const slot = ag.status(f.theme(), { status });
+    const slot = f.scopes.get("t3-agents").agentStatus(ag, f.theme(), { status });
     assert.equal(slot.style.size, 20, `${status} keeps the same status column`);
     const mark = slot.items[0];
     assert.ok(mark.style.w === 12 && "justify_center" in mark.style, `${status} mark is centred 12 wide, as T3's one-line row, so centers line up`);

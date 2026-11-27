@@ -18,6 +18,7 @@ const SIZES = {
 // An icon-only button's icon, as T3's icon, icon-sm and icon-xs sizes.
 const ICON = { default: 16, sm: 16, compact: 14, xs: 14, micro: 12, tiny: 12 };
 export const DISABLED = 0.64;
+export const keepPress = (_e, cx) => cx.stop_propagation();
 // Within a group each button fills its own square; groups stand 8 apart (docs/internals/t3-tokens.md "Rules" P3).
 export const GROUP_GAP = 4;
 

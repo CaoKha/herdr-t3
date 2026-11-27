@@ -2,7 +2,7 @@
 // on both. Each paints no background: the panel's shows through.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { button as drawButton, radiusOf } from "./button.js";
+import { button as drawButton, radiusOf, keepPress } from "./button.js";
 import { glow } from "./tip.js";
 import { stop } from "./focus.js";
 import { alpha } from "./color.js";
@@ -34,7 +34,7 @@ export function noticeBar(t, id, text, color, key, label, act, view) {
     .child(div().id(`${id}-text`).flex_1().min_w(0).child(text))
     .child(drawButton(t, `${id}-${key}`, { variant: "plain", text: label, surface: "card", hot: view?.hot === `${id}-${key}` })
       .when(Boolean(view), el => el.on_hover(glow(view, `${id}-${key}`)))
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_mouse_down("left", keepPress)
       .on_click((_e, cx) => { cx.stop_propagation(); act(cx); })
       .map(el => view?.fs ? stop(view, t, `${id}-${key}`, el, radiusOf()) : el));
 }

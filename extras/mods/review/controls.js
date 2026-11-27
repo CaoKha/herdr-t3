@@ -1,14 +1,13 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings, setShared, shared } from "herdr";
-import { button as drawButton } from "./button.js";
+import { button as drawButton, keepPress } from "./button.js";
 import { glow } from "./tip.js";
-import { PANE, LU, COMPACT, MODEL_ROW, zoom, pickMark, searchField, popupClosed } from "./review-menu.js";
+import { PANE, popupClosed } from "./review-menu.js";
 import { subPlace } from "./submenu.js";
 import { opener } from "./trigger.js";
 import { alpha } from "./color.js";
-import { ui } from "./layout-settings.js";
-export { PANE, LU, COMPACT, MODEL_ROW, zoom, pickMark, searchField };
+import { ui, zoom } from "./layout-settings.js";
 
 // The toolbar, 32 high, not T3's 40: its row's centre falls on the work column's pane header's (40 of tabs, 2 of border, half
 // of 28), so the two read as one line (docs/internals/specs/review.md). Its menus hang 4 under its 28 buttons, centred in it.
@@ -18,7 +17,7 @@ export const HEADER = 32, BELOW = HEADER / 2 + 28 / 2 + 4;
 // one closes it, unless it's on its submenu (`subRect`, subAt).
 export function popover(view, t, id, closes = true) {
   return v_flex().id(id).rounded(8).bg(t.popover).border_1().border_color(t.border).text_size(ui(14)).shadow_lg()
-    .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+    .on_mouse_down("left", keepPress)
     .on_scroll_wheel((_e, cx) => cx.stop_propagation())
     .when(closes, el => el.on_mouse_down_out((e, cx) => { if (!inSub(view, e)) view.closePopup(cx, true); }));
 }
@@ -76,13 +75,12 @@ export function checkMark(t, state) {
 }
 
 // The pane's xs buttons; `note` stays dim after the label. `pops`: the popover it toggles, on while it's open (trigger.js).
-export function button(view, t, id, label, action, { color, icon, iconSize, after, primary, note, pops, size = "xs", surface = "card" } = /** @type {{ color?: any, icon?: any, iconSize?: number, after?: any, primary?: boolean, note?: any, pops?: string, size?: "sm" | "xs", surface?: "chrome" | "card" }} */ ({})) {
+export function button(view, t, id, label, action, { color, icon, iconSize, primary, note, pops, size = "xs", surface = "card" } = /** @type {{ color?: any, icon?: any, iconSize?: number, primary?: boolean, note?: any, pops?: string, size?: "sm" | "xs", surface?: "chrome" | "card" }} */ ({})) {
   const el = drawButton(t, id, { variant: primary ? "primary" : "plain", text: label, icon, iconSize, color, size, surface, hot: view.hot === id, on: Boolean(pops) && view.popup === pops })
     .on_hover(glow(view, id));
   return (pops ? opener(view, { closed: popupClosed(pops), onOpen: (b, cx) => action(cx, !b) })(el)
-    : el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); action(cx); }))
-    .when(Boolean(note), el => el.child(div().opacity(FADED).child(note)))
-    .when(Boolean(after), el => el.child(svg(after).size(14).flex_none()));
+    : el.on_mouse_down("left", keepPress).on_click((_e, cx) => { cx.stop_propagation(); action(cx); }))
+    .when(Boolean(note), el => el.child(div().opacity(FADED).child(note)));
 }
 
 // As the app's DiffStats, each only when there are any, measured as T3's DiffStatLabel.

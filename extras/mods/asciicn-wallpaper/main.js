@@ -11,17 +11,16 @@ import { KEY, Library, MOD, finish, isLight, madePicture, makePicture, pictureKe
 import { readImage } from "./source.js";
 import { fromSlider, nextPreset, pan, scroll, toSlider, zoomAt } from "./framing.js";
 import { enter, focusRoot, stop, stopsEnd, stopsInit } from "./focus.js";
-import { DISABLED, button as drawButton, ghostButton, radiusOf } from "./button.js";
+import { DISABLED, button as drawButton, ghostButton, radiusOf, keepPress } from "./button.js";
 import { FADE, POINTER_WATCH, dragGone, pointerMoved, tip } from "./tip.js";
 import { popupOpen, trigger } from "./trigger.js";
-import { MENU_ROW, menuRow } from "./menu-row.js";
+import { menuRow, menuHeight } from "./menu-row.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
 import { KEY as LAYOUT, closedKey } from "./store.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 const STYLES = [['dots', 'Dots'], ['braille', 'Braille'], ['blocks', 'Blocks'], ['quadrants', 'Quadrants']];
 const styleName = (style) => STYLES.find(([id]) => id === style)?.[1] ?? style;
-const zoom = () => Number(settings()?.zoom) || 1;
 // Where the pointer shows the switcher: it at its widest, 12 from the corner, and about 60 more each way.
 const CORNER = { w: 368, h: 104 };
 const opener = () => ({ macos: "open", windows: "explorer" })[window()?.platform] ?? "xdg-open";
@@ -36,7 +35,6 @@ const menuItems = (windows) => [
   ...(windows ? [] : [{ id: "image", label: "Choose image…", icon: "image" }]),
   { id: "folder", label: "Open wallpaper folder", icon: "folder" },
 ];
-const menuHeight = (items) => 8 + items.length * ui(MENU_ROW);
 // Waits (docs/internals/specs/wallpaper.md): an indicator only once a wait passes SHOW ms, then kept at least KEEP ms, so
 // nothing flashes. FILL: the progress bar's last stretch, while Home loads the first picture.
 const SHOW = 150, KEEP = 300, FILL = 400;
@@ -151,7 +149,7 @@ export default class Wallpaper extends View {
 
   // Above +, its right edge on +'s. A popup's `at` is its top left, in zoomed px.
   openMenu(b) {
-    const z = zoom(), height = menuHeight(menuItems(window()?.platform === "windows"));
+    const z = zoom(), height = menuHeight(menuItems(window()?.platform === "windows").length);
     this.menuToken = token();
     const at = b && { x: Math.max(0, b.x + b.width - MENU_W * z), y: Math.max(0, b.y - (height + 6) * z) };
     openOverlay({ mod: MOD, kind: "popup", width: MENU_W, height, ...(at ? { at } : {}), props: { menu: "add", token: this.menuToken, ...litProp(!b) } });
@@ -705,7 +703,7 @@ export default class Wallpaper extends View {
     return v_flex().id("wallpaper-card").absolute().right(12).bottom(12).w(this.cardWidth()).p(16).gap(12)
       .rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(12)).text_color(t.muted)
       // The canvas lies under it: a press or scroll here is the card's.
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_mouse_down("left", keepPress)
       .on_scroll_wheel((_e, cx) => cx.stop_propagation())
       .children([...rows, footer]);
   }

@@ -3,7 +3,7 @@ import { gql, ownerName, githubParts } from "./github.js";
 import { pageRest } from "./paging.js";
 import { fromGitHub, branchIssueNumber } from "./model.js";
 
-export const GH_MINE_PAGE = 50;
+const GH_MINE_PAGE = 50;
 
 const GH_CARD = "number title url state stateReason updatedAt assignees(first: 5) { nodes { login name } }";
 const GH_COMMENT = "id body bodyHTML url createdAt author { login }";
@@ -15,7 +15,7 @@ const GH_COMMENTS = `query($owner: String!, $name: String!, $number: Int!, $afte
   comments(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { ${GH_COMMENT} } } } } }`;
 
 /** The repository's issues the viewer is assigned and still open, or with `search` any issue its words find; newest first. */
-export async function listGitHub(repo, search = "") {
+async function listGitHub(repo, search = "") {
   const q = search.trim() ? `repo:${repo} is:issue sort:updated-desc ${search.trim()}` : `repo:${repo} is:issue is:open assignee:@me sort:updated-desc`;
   const data = await gql(`query($q: String!) { search(type: ISSUE, query: $q, first: ${GH_MINE_PAGE}) { issueCount nodes { ... on Issue { ${GH_CARD} } } } }`, { q });
   const nodes = (data?.search?.nodes ?? []).filter((n) => n?.number);
@@ -23,7 +23,7 @@ export async function listGitHub(repo, search = "") {
 }
 
 /** Issue `number` in full with its comments (paging.js, up to its cap), or null when the number isn't an issue (a PR, none). */
-export async function gitHubIssue(repo, number) {
+async function gitHubIssue(repo, number) {
   let data;
   try { data = await gql(GH_ISSUE, { ...ownerName(repo), number }); }
   catch (e) { if (/Could not resolve to an Issue/i.test(e?.message ?? "")) return null; throw e; }
@@ -36,7 +36,7 @@ export async function gitHubIssue(repo, number) {
 /** Repository `repo`'s GitHub issues as the page's provider (linear.js linearIssues has the same shape), read only: no `write`. */
 export function githubIssues(repo) {
   return {
-    id: "github", where: repo, refreshLabel: `Refresh GitHub issues in ${repo}`, openLabel: "Open on GitHub", canWrite: false, hasStates: false, branchInFull: true,
+    id: "github", where: repo, refreshLabel: `Refresh GitHub issues in ${repo}`, openLabel: "Open on GitHub", branchInFull: true,
     branchIssues: async (info) => {
       const n = branchIssueNumber(info.branch), issue = n ? await gitHubIssue(repo, n) : null;
       return issue ? [issue] : [];
@@ -48,6 +48,6 @@ export function githubIssues(repo) {
     mine: () => listGitHub(repo),
     search: (q) => listGitHub(repo, q),
     detail: (card) => gitHubIssue(repo, card.number),
-    parts: (owner, body, html) => githubParts(owner, body, html),
+    parts: githubParts,
   };
 }

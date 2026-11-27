@@ -5,6 +5,7 @@ import { h_flex } from "gpui-base";
 import { run } from "herdr";
 import { stop } from "./focus.js";
 import { ui } from "./layout-settings.js";
+import { keepPress } from "./button.js";
 
 /** What the button takes besides its name: the 16px tile and the 4 after it. */
 export const BRAND_FIXED = 16 + 4;
@@ -24,7 +25,7 @@ export function brand(view, t, { named, zoom }) {
   return stop(view, t, "home", h_flex().id("home").h(28).min_w(0).flex_none().gap(4).items_center().rounded(6)
     .text_size(ui(14)).font_medium().text_color(t.muted)
     .role("button").accessibility_label("Home")
-    .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+    .on_mouse_down("left", keepPress)
     .on_click(() => run("t3-tabs.home"))
     .child(image("frame/welcome/herdr.png").size(16).flex_none().rounded(4))
     .when(named, (el) => el.child(div().id("home-name").flex_none().child("Herdr")

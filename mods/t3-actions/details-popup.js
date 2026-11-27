@@ -1,6 +1,6 @@
 // Details' popup (cmd-shift-b): opening and closing it, the source it was opened on, and the menus that hang off it (popup-menu.js).
 // What it draws is workspace-details.js's; its Actions row actions.js's, its Review row review-details.js's.
-import { spaces, panes, props, settings, openOverlay, closeOverlay, setShared, run, focused } from "herdr";
+import { spaces, panes, props, openOverlay, closeOverlay, setShared, run, focused } from "herdr";
 import { within, focusStop } from "./focus.js";
 import { hang, opener } from "./trigger.js";
 import { openPopup, menuClosed, backTo } from "./popup-menu.js";
@@ -9,7 +9,7 @@ import { terminalFor, workFolder } from "./terminal-context.js";
 import { closedKey } from "./store.js";
 import { panelState } from "./panel.js";
 import { detailsAnchor } from "./titlebar.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 export const MENU_CLOSED = closedKey("t3-actions", "menu"), DETAILS_CLOSED = closedKey("t3-actions", "details");
 export const CHEVRON = "mods/t3-actions/icons/chevron-down.svg";
@@ -50,7 +50,7 @@ export const rowMenu = (view, id, height, open) => opener(view, { closed: MENU_C
 
 // Row `id`'s bounds as a press would give them, zoomed px: inside the card's 1 border and 8 padding, as wide as a row.
 function keyRow(view, id) {
-  const at = props().at, row = view.grid?.find(r => r.ids.includes(id)), z = Number(settings().zoom) || 1;
+  const at = props().at, row = view.grid?.find(r => r.ids.includes(id)), z = zoom();
   return at && row ? { x: at.x + 9 * z, y: at.y + row.top * z, width: ROW_W * z, height: ui(32) * z } : null;
 }
 
@@ -80,7 +80,7 @@ export function toggleDetails(bounds) {
   const viewport = globalThis.window?.viewport_size?.();
   // No press: keys opened it, so its first control takes the keyboard (list.js litProp). `at`: where it hangs, for its rows' menus.
   const keys = !bounds;
-  if (!bounds && viewport) bounds = detailsAnchor(viewport, Number(settings().zoom) || 1, panelState().open);
+  if (!bounds && viewport) bounds = detailsAnchor(viewport, zoom(), panelState().open);
   const place = hang(bounds, CARD_W);
   reg().id = openOverlay({ mod: "t3-actions", kind: "popup", frame: "none", width: CARD_W, height: CARD_MAX, ...place,
     props: { actions: "details", source, at: place.at ?? null, ...litProp(keys) } });

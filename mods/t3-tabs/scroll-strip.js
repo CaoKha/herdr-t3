@@ -2,8 +2,8 @@
 // script, so the row is clipped and offset by `at`, kept in `state` between frames.
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { settings } from "herdr";
 import { alpha } from "./color.js";
+import { zoom } from "./layout-settings.js";
 
 /**
  * Where the row sits: the `focus` tab in view with the least move, as T3's scrollIntoView({ inline: "nearest" }), only when
@@ -38,7 +38,7 @@ export const stripEnds = (state) => ({ back: (state.at ?? 0) > 0.5, next: (state
 
 /** The wheel, either way, moves the row; the next frame keeps it in range. */
 export function stripWheel(state, e) {
-  state.at = (state.at ?? 0) - (Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y) / (Number(settings()?.zoom) || 1);
+  state.at = (state.at ?? 0) - (Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y) / zoom();
 }
 
 /** An arrow: half the room further, as T3's scrollTabs, within the row. @param {-1 | 1} dir */

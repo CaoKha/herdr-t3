@@ -6,13 +6,13 @@
 // word, so it's read from the terminal's own (terminals()).
 export const ownStatus = (word, address, all) => (byParent(all).at.get(address)?.status === "error" ? "blocked" : word);
 
-// Each list terminals() gave, indexed once, as a render asks about many agents: its live terminals by parent, and every one
-// by address.
+// Each list terminals() gave, indexed once, as a render asks about many agents: its live terminals by parent, every one
+// by address, and each address's descendants once asked.
 const indexes = new WeakMap();
 function byParent(all) {
   let ix = indexes.get(all);
   if (!ix) {
-    ix = { kids: new Map(), at: new Map() };
+    ix = { kids: new Map(), at: new Map(), below: new Map() };
     for (const k of all) {
       if (!ix.at.has(k.address)) ix.at.set(k.address, k);
       if (k.state !== "live") continue;
@@ -57,7 +57,15 @@ export function kidTree(all, addr, lead = [], seen = new Set()) {
   });
 }
 
-export const descendants = (all, addr) => kidTree(all, addr).map((r) => r.k);
+export function descendants(all, addr) {
+  const { below } = byParent(all);
+  let ks = below.get(addr);
+  if (!ks) {
+    ks = kidTree(all, addr).map((r) => r.k);
+    below.set(addr, ks);
+  }
+  return ks;
+}
 
 // Its own word with what's under it: needing the person first, then its own done, then busy or waiting on
 // sub-agents it will hear back from, else its own. No word of its own: no agent, whatever it started.
@@ -83,7 +91,14 @@ export function notNews(k, word, kids) {
 
 // Snapshot once per render, like namer(): what's under each address, as words to put together (treeStatus).
 export function subAgents(agentList, all) {
-  const listed = new Map(agentList.map((a) => [a.address, a.status]));
-  // A failed turn needs the person as a question does.
-  return (addr) => descendants(all, addr).map((k) => { const s = kidStatus(k, listed); return s === "error" ? "blocked" : s; });
+  const listed = new Map(agentList.map((a) => [a.address, a.status])), words = new Map();
+  return (addr) => {
+    let w = words.get(addr);
+    if (!w) {
+      // A failed turn needs the person as a question does.
+      w = descendants(all, addr).map((k) => { const s = kidStatus(k, listed); return s === "error" ? "blocked" : s; });
+      words.set(addr, w);
+    }
+    return w;
+  };
 }

@@ -4,9 +4,10 @@
 // root's press and inlineMenuKey from its root's keys).
 import { v_flex, Popup } from "gpui-base";
 import { trigger } from "./trigger.js";
-import { menuRow } from "./menu-row.js";
+import { menuRow, MENU_W } from "./menu-row.js";
 import { menuKeys } from "./list.js";
 import { ui } from "./layout-settings.js";
+import { keepPress } from "./button.js";
 
 /**
  * The trigger and, while it's open, its menu. `items`: `{ label, icon?, trail?, disabled?, hint?, pick(cx) }`. Opened by keys,
@@ -19,10 +20,10 @@ export function inlineMenu(view, t, id, { label, icon, wide, disabled, items }, 
   const open = view.menu?.id === id;
   if (open) view.menu.items = items;
   const button = trigger(view, t, id, { label, icon, wide, size: "xs", open, disabled, onOpen: (b) => { view.menu = open ? null : { id, at: b ? -1 : 0, items }; } }, extra);
-  return Popup.new(`${id}-popup`, button).anchor("top_right").when(open, (el) => el.content(v_flex().id(`${id}-menu`).w(220).mt(4).p(4).rounded(8)
+  return Popup.new(`${id}-popup`, button).anchor("top_right").when(open, (el) => el.content(v_flex().id(`${id}-menu`).w(MENU_W).mt(4).p(4).rounded(8)
     .bg(t.popover).border_1().border_color(t.border).shadow_lg().text_size(ui(14))
     // A press here isn't a press elsewhere in the page.
-    .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+    .on_mouse_down("left", keepPress)
     .children(items.map((it, i) => menuRow(view, t, `${id}-item-${i}`, { at: [view.menu, "at", i], label: it.label, icon: it.icon, trail: it.trail,
       disabled: it.disabled, hint: it.hint, pick: (cx) => { view.menu = null; it.pick(cx); cx.notify(); } })))));
 }

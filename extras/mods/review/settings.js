@@ -1,14 +1,14 @@
 import { div, svg, image } from "gpui-kit";
 import { h_flex, Switch } from "gpui-base";
-import { exec, window as appWindow } from "herdr";
 import { request } from "./daemon.js";
 import { scrollList, openLit } from "./list.js";
 import { hoverRow, subOpened, subLeft } from "./submenu.js";
-import { menuRow, menuHint } from "./menu-row.js";
+import { menuRow, menuHint, menuRule, menuLabel } from "./menu-row.js";
 import { wrapLines, setWrapLines } from "./store.js";
-import { PANE, MODEL_ROW, SPLIT_MIN, BELOW, pref, setPref, pickMark, searchField, popover, toPane, subState, subAt } from "./controls.js";
-import { searchHeight } from "./review-menu.js";
+import { SPLIT_MIN, BELOW, pref, setPref, popover, toPane, subState, subAt } from "./controls.js";
+import { searchHeight, PANE, MODEL_ROW, pickMark, searchField } from "./review-menu.js";
 import { ui } from "./layout-settings.js";
+import { openUrl } from "./open-url.js";
 
 // Models the settings list before the search must narrow them.
 const LISTED = 200;
@@ -16,14 +16,6 @@ const LISTED = 200;
 // As the app's LOCALES (core/locales.ts): the languages an analysis can write in, by their own names.
 const LOCALES = [["en", "English"], ["zh-CN", "简体中文"], ["zh-TW", "繁體中文"], ["ja", "日本語"], ["ko", "한국어"], ["es", "Español"], ["fr", "Français"],
   ["de", "Deutsch"], ["pt-BR", "Português (Brasil)"], ["ru", "Русский"], ["it", "Italiano"], ["id", "Bahasa Indonesia"]];
-
-// In the browser, as mods/pulls-review opens one.
-function openUrl(url) {
-  const platform = appWindow()?.platform;
-  const [command, args] = platform === "macos" ? ["open", [url]]
-    : platform === "windows" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : ["xdg-open", [url]];
-  exec(command, args).catch(() => {});
-}
 
 // The settings panel reads the daemon's agents and shared settings each time it opens: the browser may have changed them.
 // Each lands on its own: the agents take seconds after the daemon starts, settings shown meanwhile can be picked. Only the
@@ -129,8 +121,7 @@ function settingsRest(view, key, e, cx) {
   hoverRow(subState(view), key, at, cx, (key, row, cx) => key ? openPage(view, key, cx, row) : view.settingsPage && settingsBack(view, cx));
 }
 
-// As T3's MenuGroupLabel and MenuSeparator, and its ComboboxStatus, its 12 in the panel's 4 and 8.
-const rule = (t) => div().h(1).my(4).mx(8).flex_none().bg(t.border);
+// As T3's ComboboxStatus, its 12 in the panel's 4 and 8.
 const note = (t, text, color = t.dim) => div().p(8).flex_none().text_size(ui(12)).font_medium().text_color(color).child(text);
 
 /** The settings, as the app's settings dialog in a panel: the view's choices, then the analysis's (analyzing when a count
@@ -139,11 +130,10 @@ const note = (t, text, color = t.dim) => div().p(8).flex_none().text_size(ui(12)
 export function settingsPanel(view, t) {
   const page = view.settingsPage, locale = view.locale(), { agent, model, catalog } = view.models();
   const split = pref("split") === true, autoAnalyze = pref("autoAnalyze") === true;
-  const label = (text) => div().h(ui(28)).px(8).flex_none().flex().items_center().text_size(ui(12)).font_medium().text_color(t.dim).child(text);
   // A row without a submenu: resting on it closes the open one.
   const off = (e, cx) => settingsRest(view, null, e, cx);
   const link = (id, text, url) => div().id(id).text_color(t.muted).hover(s => s.text_color(t.foreground).underline()).role("link")
-    .on_click((_e, cx) => { cx.stop_propagation(); openUrl(url); }).child(text);
+    .on_click((_e, cx) => { cx.stop_propagation(); openUrl(url).catch(() => {}); }).child(text);
   // A setting with a submenu, as T3's MenuSubTrigger: its name, its value and a chevron; lit while its submenu is open.
   const nav = (id, text, value) => h_flex().id(`settings-${id}`).h(ui(28)).px(8).gap(8).flex_none().items_center().rounded(4).hover(s => s.bg(t.selected))
     .when(page === id, el => el.bg(t.selected))
@@ -154,15 +144,15 @@ export function settingsPanel(view, t) {
     .child(svg("mods/review/icons/chevron-right.svg").size(16).mr(-2).flex_none().text_color(t.dim));
   const current = view.agents?.find(a => a.name === agent);
   const rows = [
-    label("View"),
+    menuLabel(t, "View"),
     // Split needs a diff SPLIT_MIN wide: narrower, the choice is kept and the diff unified, so it shows faded.
     choiceRow(t, "Diff", [["view-unified", "Unified", !split], ["view-split", "Split", split, view.view < SPLIT_MIN]], (id, cx) => { if ((id === "view-split") !== split) view.toggleSplit(cx); }).on_mouse_move(off),
     // Long lines wrap at the diff's width by default, or scroll sideways as T3's; the page's own choice, apart from Files' (store.js).
     choiceRow(t, "Lines", [["lines-scroll", "Scroll", !wrapLines()], ["lines-wrap", "Wrap", wrapLines()]], (id, cx) => {
       setWrapLines(id === "lines-wrap"); cx.notify();
     }).on_mouse_move(off),
-    rule(t),
-    label("AI"),
+    menuRule(t),
+    menuLabel(t, "AI"),
     Switch.new("auto-analyze").checked(autoAnalyze).accessibility_label("Analyze automatically")
       .on_change((on, cx) => { setPref("autoAnalyze", on); cx.notify(); })
       // As T3's MenuCheckboxItem, its switch variant.
@@ -178,7 +168,7 @@ export function settingsPanel(view, t) {
     !view.agents ? !view.settingsError && note(t, "Looking for agents…")
       : view.agents.length ? nav("agent", "Agent", current ? `${current.label} ${current.version}` : "None") : note(t, "No agent CLI found on PATH"),
     Boolean(current) && nav("model", "Model", !model ? "Default" : catalog.find(m => m.id === model)?.name ?? model),
-    rule(t),
+    menuRule(t),
     // Credit, as the app's footer: pulls.review is antfu's; this pane draws from JinJieBeWater's fork of it.
     h_flex().id("settings-credit").on_mouse_move(off).h(ui(28)).px(8).gap(4).flex_none().items_center().text_size(ui(11)).text_color(t.dim)
       .child(image(`mods/${PANE}/icons/logo.svg`).w(12).h(12).flex_none())

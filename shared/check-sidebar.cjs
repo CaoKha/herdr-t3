@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const source = fs.readFileSync(path.join(__dirname, "sidebar.js"), "utf8").replace(/^export /gm, "");
+const source = fs.readFileSync(path.join(__dirname, "sidebar.js"), "utf8").replace(/^import [^;]*;\n/gm, "").replace(/^export /gm, "");
 const { sidebarParts, toggleLeft } = vm.runInNewContext(source + "\n({ sidebarParts, toggleLeft });");
 
 for (const active of ["inbox", "lists"]) {

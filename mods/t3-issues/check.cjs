@@ -200,6 +200,7 @@ async function keys() {
   find(root, "t3-issues-github-linear").handlers.on_click({}, p.cx); await p.settle();
   same([p.view.source(), p.st().provider.id], ["linear", "linear"]);
   assert.ok(p.w.fetches.length > asked, "and its lists come from Linear");
+
 }
 
 async function linearPage() {

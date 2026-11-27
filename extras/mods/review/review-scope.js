@@ -5,11 +5,12 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { shared } from "herdr";
 import { scrollList, step, menuJump } from "./list.js";
-import { git, readReview, readPicks, readRefs, argPage } from "./review-git.js";
+import { readReview, readPicks, readRefs, argPage } from "./review-git.js";
 import { PANE, LU, MODEL_ROW, pickMark, searchField } from "./review-menu.js";
 import { menuRow, menuRule } from "./menu-row.js";
 import { ago } from "./ago.js";
 import { ui } from "./layout-settings.js";
+import { git } from "./git.js";
 
 // A conventional commit's type and scope (`fix(t3-tabs): `), dimmed so the words after it lead.
 const PREFIX = /^[a-z]+(\([^)]*\))?!?: /;

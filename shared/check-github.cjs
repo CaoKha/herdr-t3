@@ -9,7 +9,7 @@ const ran = [];
 let answer = () => ({ code: 0, stdout: "" });
 const ctx = vm.createContext({ exec: async (cmd, args, o = {}) => { ran.push({ cmd, args, cwd: o.cwd ?? null, on: o.on ?? null }); return answer(cmd, args); }, JSON, Promise, Error, Map, Set, Object, String, Uint8Array });
 const read = (name) => fs.readFileSync(path.join(__dirname, name), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "");
-vm.runInContext(`${read("images.js")}\n${read("github.js")}\nglobalThis.g = { repositoryFromRemote, parseDiscovery, discoverRepo, ghProblem, gh, gql, htmlImages, pairImages, splitBody };`, ctx);
+vm.runInContext(`${read("images.js")}\n${read("git.js")}\n${read("github.js")}\nglobalThis.g = { repositoryFromRemote, parseDiscovery, discoverRepo, ghProblem, gh, gql, htmlImages, pairImages, splitBody };`, ctx);
 const { g } = ctx;
 const json = (x) => JSON.parse(JSON.stringify(x));
 

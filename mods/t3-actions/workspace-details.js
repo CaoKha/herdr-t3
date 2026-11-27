@@ -2,7 +2,7 @@
 // Only Details watches its source: a menu acts on it after a last check, and goes with Details when it goes.
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { checking, props, settings, closeOverlay, exec, notify, theme, window, shared, setShared } from "herdr";
+import { checking, props, closeOverlay, exec, notify, theme, window, shared, setShared } from "herdr";
 import { stop, focusRoot, focusStop, onStop } from "./focus.js";
 import { hasOpen } from "./popup-menu.js";
 import { split, cardRow } from "./button.js";
@@ -11,11 +11,11 @@ import { MENU_CLOSED, CHEVRON, CARD_MAX, sourceOkay, openLayer, rowMenu, focusSo
 import { detailsControl, state } from "./actions.js";
 import { reviewDetailsView, prefetchRange } from "./review-details.js";
 import { menuKeys, propsLit } from "./list.js";
-import { menuRow, menuRule, MENU_ROW } from "./menu-row.js";
+import { menuRow, menuRule, MENU_ROW, MENU_W, menuHeight } from "./menu-row.js";
 import { installedTargets, knownTargets, openTarget, targetIcon, targetsMenu, openInHeight } from "./open-in.js";
 import { glow, tip, tipMark } from "./tip.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 const DETAILS_ITEMS = [["environment", "Machine and folder"], ["openIn", "Open in"], ["scripts", "Actions"], ["review", "Review"]];
 function detailsVisibility() {
@@ -86,7 +86,7 @@ export function initDetails(view, cx) {
 
 // From its row: under it, as the other rows' menus; from a right-click on the card, where the pointer is.
 const itemsHeight = () => 8 + ui(28) + DETAILS_ITEMS.length * ui(MENU_ROW) + 9 + ui(MENU_ROW);
-function chooseDetailsItems(place = { width: 220, height: itemsHeight() }, keys = false) { return openLayer("details-items", place, {}, keys); }
+function chooseDetailsItems(place = { width: MENU_W, height: itemsHeight() }, keys = false) { return openLayer("details-items", place, {}, keys); }
 
 export function detailsItemsMenu(view) {
   const t = theme(), visible = detailsVisibility(), dirty = Object.values(visible).some(on => !on);
@@ -132,7 +132,7 @@ export function directoryMenu(view) {
 
 function machineRow(view, t, s) {
   return cardRow(t, "details-context", { locked: true }).pr(0).accessibility_label(`Machine: ${view.machineName}`)
-    .when(Boolean(s.folder), el => el.on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openLayer("directory-menu", { width: 220, height: 8 + ui(MENU_ROW) }); cx.notify(); }))
+    .when(Boolean(s.folder), el => el.on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openLayer("directory-menu", { width: MENU_W, height: menuHeight(1) }); cx.notify(); }))
     .child(div().id("details-machine-icon").size(16).flex_none().child(svg("mods/t3-actions/icons/laptop.svg").size(16).text_color(t.dim)))
     .child(div().id("details-machine-slot").flex_1().min_w(0).child(measuredTooltip(view, t, "details-machine-name", view.machineName, nameText(view, "details-machine-name", view.machineName, { size: 13, weight: "medium" }).id("details-machine-name").w_full().whitespace_nowrap().on_hover(glow(view, "details-machine-name")), { below: true }).w_full().min_w(0)))
     .child(div().id("details-path-slot").w(32).h_full().flex_none().flex().justify_center().items_center().child(tipMark(view, t, "details-path", s.folder || "No working directory", svg("mods/t3-actions/icons/folder.svg").size(16).text_color(t.dim), { below: true })));
@@ -165,7 +165,7 @@ export function detailsView(view) {
   const guess = !shown && !review ? 16 + ui(32) : (shown ? 16 + ui(32) * shown : 0) + (review ? 16 + ui(32) + (shown ? 1 : 0) : 0);
   const content = v_flex().id("details-content").w_full().flex_none()
     .on_size_change((size, cx) => {
-      const height = Math.ceil(size.height / (Number(settings().zoom) || 1));
+      const height = Math.ceil(size.height / zoom());
       if (height > 0 && height !== view.detailsHeight) { view.detailsHeight = height; cx.notify(); }
     })
     .when(shown > 0, el => el.child(workspace)).when(Boolean(review), el => el.child(review))

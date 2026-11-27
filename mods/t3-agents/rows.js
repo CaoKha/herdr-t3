@@ -7,11 +7,11 @@ import { focusAgent } from "./zoom.js";
 import { kidStatus, kidTree } from "./tree.js";
 import { statusMark, STATUS_WORD } from "./status-mark.js";
 import { projectMark } from "./project.js";
-import { glow, hoverKept, tip, tipMark } from "./tip.js";
-import { detailsFor, detailsAt, detailsLine, detailsCard } from "./details.js";
+import { glow, hoverKept, tip, tipMark, FADE } from "./tip.js";
+import { detailsFor, detailsAt, detailsLine, detailsCard, detailsHover, detailsUp } from "./details.js";
 import { programIcon } from "./program.js";
 import { stop, within } from "./focus.js";
-import { MOTION, foldArrow } from "./motion.js";
+import { foldArrow } from "./motion.js";
 import { pin } from "./pins.js";
 import { openMenu } from "./menu.js";
 import { button, radiusOf } from "./button.js";
@@ -70,11 +70,7 @@ function agentSubRow(view, t, s, st, shown, card, ghost) {
     .id(rowId)
     .role("button").accessibility_label(name)
     .when(!on, el => el.hover(s => s.bg(t.hover)).active(s => s.bg(t.selected)))
-    .on_hover((over, cx) => {
-      if (over) { view.hovered = rowId; detailsFor(view, rowId, cx); }
-      else if (view.hovered === rowId) { view.hovered = null; detailsFor(view, null, cx); }
-      cx.notify();
-    })
+    .on_hover(detailsHover(view, rowId))
     .on_mouse_move((e) => detailsAt(view, rowId, e))
     .on_mouse_down("right", agentMenu(view, k.address))
     .on_click((_e, cx) => {
@@ -148,7 +144,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
   const details = (a, name, key = a.address) => {
     const machine = a.address.includes("/") ? a.address.split("/")[0] : null;
     const branch = ps.find((p) => p.pane === a.pane)?.branch, pic = programIcon(a.program, 12, t.muted);
-    const up = view.details === key || view.detailsOut === key;
+    const up = detailsUp(view, key);
     return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
       .when(up, (pop) => pop.content(detailsCard(view, t, key, name, [
         a.space_name && detailsLine(t, projectMark("mods/t3-agents", sp.find((s) => s.id === a.space) ?? { name: a.space_name }, 12, t, ps, true), a.space_name),
@@ -169,7 +165,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
     const leads = on || offer || st === "blocked" || st === "done";
     // Over the time's slot on hover, as in the shipped list; the two cross-fade, as T3's corner. Faded out it's no button.
     const pinButton = () => button(t, pinId, { icon: `mods/t3-agents/icons/${isPinned ? "pin-off" : "pin"}.svg`, label: isPinned ? "Unpin" : "Pin", surface: "row", hot: view.hot === pinId })
-      .opacity(offer ? 1 : 0).transition("opacity", MOTION)
+      .opacity(offer ? 1 : 0).transition("opacity", FADE)
       .when(offer, (el) => stop(view, t, pinId, el
         .on_hover(glow(view, pinId))
         .on_click((_e, cx) => {
@@ -191,7 +187,7 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
     const fromKid = st !== "idle" && st !== own;
     const lead = (subs.length ? button(t, ghost ? undefined : iconId, { size: "tiny", surface: "row", label: view.isFolded(a.address) ? "Expand sub-agents" : "Collapse sub-agents", hot: !ghost && view.hot === iconId })
       : h_flex().size(16).flex_none().items_center().justify_center()).when(Boolean(pic), el => el.child(pic));
-    const time = div().flex_none().text_size(ui(12)).text_color(t.dim).opacity(offer ? 0 : 1).transition("opacity", MOTION).when(Boolean(since), el => el.child(duration(now - since)));
+    const time = div().flex_none().text_size(ui(12)).text_color(t.dim).opacity(offer ? 0 : 1).transition("opacity", FADE).when(Boolean(since), el => el.child(duration(now - since)));
     const base = h_flex()
       .relative()
       .w_full().min_w(0)
@@ -224,15 +220,11 @@ export function agentEntries(view, t, { list, all, shown, ps, sp, now, byPriorit
     if (ghost) return base;
     return stop(view, t, rowId, base
       .id(rowId)
-      .transition("opacity", MOTION)
+      .transition("opacity", FADE)
       .role("button").accessibility_label(label(a) || a.program?.name || a.address)
       .when(!on, el => el.hover(s => s.bg(t.hover)).active(s => s.bg(t.selected)))
       .when([view.hovered, view.details, view.detailsOut].includes(a.address), (el) => el.child(details(a, name)))
-      .on_hover((over, cx) => {
-        if (over) { view.hovered = a.address; detailsFor(view, a.address, cx); }
-        else if (view.hovered === a.address) { view.hovered = null; detailsFor(view, null, cx); }
-        cx.notify();
-      })
+      .on_hover(detailsHover(view, a.address))
       .on_mouse_move((e) => detailsAt(view, a.address, e))
       .on_mouse_down("right", agentMenu(view, a.address))
       .on_click((_e, cx) => {

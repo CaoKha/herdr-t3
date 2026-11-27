@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const kit = require("./check-kit.js");
 const element = kit.elements();
 
-const context = vm.createContext({ div: () => element(), svg: () => element("svg") });
+const context = vm.createContext({ div: () => element(), svg: () => element("svg"), FADE: {} });
 vm.runInContext(kit.strip(fs.readFileSync(path.join(__dirname, "motion.js"), "utf8")) + "\nglobalThis.motion = { planMotion, leavingRows };", context);
 const { planMotion, leavingRows } = context.motion;
 const afters = [];

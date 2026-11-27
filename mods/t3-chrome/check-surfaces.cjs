@@ -7,7 +7,7 @@ let props = { part: 'surface-empty' }, s = { pages: ['files', 'review', 'panel-e
 const win = () => ({ platform: 'macos' }); win.viewport_size = () => ({ width: 1800, height: 1000 });
 const glyph = src => { const el = element(); el.src = src; return el; };
 const c = vm.createContext({ ui: (n) => n, checking: () => false, View: class {}, div: element, h_flex: element, v_flex: element, svg: glyph, image: glyph,
-  props: () => props, panelState: () => s, spaces: () => [{ id: 's', active: true, folder: '/space' }], panes: () => [], settings: () => ({ zoom: 2 }), window: win, shared: () => null,
+  props: () => props, panelState: () => s, spaces: () => [{ id: 's', active: true, folder: '/space' }], panes: () => [], zoom: () => 2, window: win, shared: () => null,
   layout: () => ({ id: 'root', children: [{ id: 'panel', children: [{ id: 'panel-head', size: { px: 40 }, padding: [0, 12] }] }] }),
   showPage: id => calls.push(['add', id]), closeSurface: (id, mode) => calls.push(['close', id, mode]), activateSurface: id => calls.push(['select', id]),
   hidePanel() {}, toggleWide() {}, updates: () => ({ app: {} }), openOverlay: p => calls.push(['overlay', p]), closeOverlay: () => calls.push(['dismiss']), run() {},
@@ -20,7 +20,7 @@ const c = vm.createContext({ ui: (n) => n, checking: () => false, View: class {}
 });
 const load = f => vm.runInContext(kit.strip(fs.readFileSync(__dirname + '/' + f, 'utf8')), c);
 ['color.js', 'list.js', 'pierre-icons-data.js', 'pierre-icons.js', 'measured-text.js', 'scroll-strip.js', 'status-mark.js', 'store.js', 'titlebar.js', 'palette.js'].forEach(load);
-vm.runInContext('(() => {\n' + ['button.js', 'trigger.js', 'tab.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.tint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang; globalThis.closableTab = tab; globalThis.ghostTint = tint;\n})();', c);
+vm.runInContext('(() => {\n' + ['button.js', 'trigger.js', 'tab.js'].map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.tint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.DISABLED = DISABLED; globalThis.trigger = trigger; globalThis.hang = hang; globalThis.closableTab = tab; globalThis.ghostTint = tint; globalThis.keepPress = keepPress;\n})();', c);
 load('menu-row.js');
 vm.runInContext(fs.readFileSync(__dirname + '/main.js', 'utf8').replace(/^import [^;]*;\n/gm, '').replace('export default class', 'globalThis.Mod = class'), c);
 const t = { foreground: '#ffffff', muted: '#888888', dim: '#777777', selected: '#333333', chrome: '#111111', hover: '#222222', popover: '#000000', border: '#444444', raised: '#555555' };

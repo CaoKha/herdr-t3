@@ -2,8 +2,9 @@ import { focused, run, shared, props, notify, openOverlay } from "herdr";
 import { focusAgent, focusPane } from "./zoom.js";
 import { detailsFor } from "./details.js";
 import { t3Settings } from "./layout-settings.js";
-import { KEY } from "./store.js";
+import { KEY, writeLocal } from "./store.js";
 import { pinList, unpin, putBack } from "./pins.js";
+import { rememberNotice } from "./notice.js";
 
 export function inboxActions(view, model) {
   const { every, viewing, term, napUntil, wake, state, settledAt, busy, pinned, out, busyRows } = model;
@@ -14,19 +15,18 @@ export function inboxActions(view, model) {
     detailsFor(view, null, cx);
   };
   // Undo puts back only the pins it took, where they were: pins made since stay (pins.js).
-  const repin = putBack;
   const unpinRow = (address, cx) => {
     const before = [...pinList()], took = [address];
     if (!before.includes(address)) return;
     unpin(took);
-    view.remember("Unpinned", 1, () => repin(before, took), cx);
+    rememberNotice("Unpinned", 1, () => putBack(before, took), cx);
   };
   // Brought back, it's news again: the top of the list.
   const unsettle = (a, cx) => {
     away(a, cx);
     view.setLabel("settled", a.address, "", cx);
     view.changed[a.address] = { ...view.changed[a.address], at: Date.now(), start: null };
-    localStorage.setItem("changes", JSON.stringify(view.changed));
+    writeLocal("changes", view.changed);
   };
   const go = (a) => a.mod ? focusPane(a.pane) : focusAgent(a.address);
   // Putting away the agent in view moves on to the next card down the list, from the top past the end, as T3 does;
@@ -58,10 +58,10 @@ export function inboxActions(view, model) {
     if (kept.length) {
       let undone = false;
       const failed = new Set();
-      const note = view.remember("Settled", kept.length, () => {
+      const note = rememberNotice("Settled", kept.length, () => {
         undone = true;
         const settled = kept.filter((a) => !failed.has(a.address));
-        repin(before, settled.map((a) => a.address));
+        putBack(before, settled.map((a) => a.address));
         for (const a of settled) {
           view.setLabel("settled", a.address, "", cx);
           if (naps.get(a) > Date.now()) view.setLabel("snoozed", a.address, String(naps.get(a)), cx);
@@ -71,7 +71,7 @@ export function inboxActions(view, model) {
       for (const a of kept) {
         view.setLabel("settled", a.address, `${Date.now()}:${term.get(a.address)?.turn ?? 0}`, cx, () => {
           failed.add(a.address);
-          if (!undone && before.includes(a.address)) repin(before, [a.address]);
+          if (!undone && before.includes(a.address)) putBack(before, [a.address]);
           note.drop(1, cx);
         });
         if (naps.get(a)) wake(a, cx);
@@ -83,7 +83,7 @@ export function inboxActions(view, model) {
   };
   const snooze = (a, at, cx) => {
     const seen = viewing(a);
-    const note = view.remember("Snoozed", 1, () => { wake(a, cx); if (seen) bringBack(a); }, cx);
+    const note = rememberNotice("Snoozed", 1, () => { wake(a, cx); if (seen) bringBack(a); }, cx);
     view.setLabel("snoozed", a.address, String(at), cx, () => note.drop(1, cx));
     // The card moves away without a pointer-leave event, for it or for the clock under the pointer.
     view.napMenu = view.hovered = view.hot = null;

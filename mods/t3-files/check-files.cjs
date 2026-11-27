@@ -88,8 +88,8 @@ function makePage({ page = "files", spaces = [space("s1", "/r", true)], panes = 
     localStorage: { getItem: (k) => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     Date: clock, Promise, Math, Number, String, Boolean, Map, Set, Object, Array, JSON, RegExp, Error, Uint8Array,
   });
-  const files = ["store.js", "layout-settings.js", "focus.js", "trigger.js", "tip.js", "field.js", "list.js", "menu-row.js", "terminal-context.js", "surfaces.js", "panel.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-tree.js", "file-listing.js", "nav-column.js", "submenu.js", "popup-menu.js", "panel-states.js", "model.js", "code.js", "menus.js", "main.js"];
-  const buttons = load("color.js") + "\nconst { drawButton, split, ghostButton, tint, DISABLED, GROUP_GAP } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split, ghostButton, tint, DISABLED, GROUP_GAP };\n})();\n";
+  const files = ["store.js", "layout-settings.js", "focus.js", "trigger.js", "tip.js", "field.js", "list.js", "menu-row.js", "terminal-context.js", "surfaces.js", "git.js", "panel.js", "open-in.js", "pierre-icons-data.js", "pierre-icons.js", "file-tree.js", "file-listing.js", "nav-column.js", "submenu.js", "popup-menu.js", "panel-states.js", "model.js", "code.js", "menus.js", "main.js"];
+  const buttons = load("color.js") + "\nconst { drawButton, split, ghostButton, tint, DISABLED, GROUP_GAP, keepPress } = (() => {\n" + load("button.js") + "\nreturn { drawButton: button, split, ghostButton, tint, DISABLED, GROUP_GAP, keepPress };\n})();\n";
   vm.runInContext((buttons + files.map(load).join("\n")).replace("export default class", "globalThis.Mod = class"), ctx);
   const send = (c) => { if (wake) { const x = wake; wake = null; x(c); } else commands.push(c); };
   const view = new ctx.Mod();

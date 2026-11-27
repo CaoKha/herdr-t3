@@ -11,7 +11,7 @@ const srcs = (n) => !n || typeof n !== "object" ? [] : [...(typeof n.src === "st
 const tips = [];
 const scope = vm.createContext({ ui: (n) => n, 
   div: element, h_flex: element, svg: src => Object.assign(element(), { src }), Popup: { new: (_id, el) => element().child(el) },
-  settings: () => ({ zoom: 1 }), pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, POINTER_WATCH: 100, FADE: {},
+  zoom: () => 1, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, POINTER_WATCH: 100, FADE: {},
   tip: (_v, _t, id, label, el, options) => { tips.push([id, label, options]); return el; }, tipCard: element,
   glow: (view, id) => (on) => { if (on) view.hot = id; else if (view.hot === id) view.hot = null; },
   keptHover: (view, key, id) => ({ hover: (on) => { if (on) view[key] = id; else if (view[key] === id) view[key] = null; }, move() {} }),
@@ -19,7 +19,7 @@ const scope = vm.createContext({ ui: (n) => n,
 });
 const strip = (f) => kit.strip(fs.readFileSync(path.join(__dirname, f), "utf8"));
 vm.runInContext(strip("color.js"), scope);
-vm.runInContext(`(() => {\n${strip("button.js")}\nglobalThis.button = button; globalThis.ghostTint = tint;\n})();`, scope);
+vm.runInContext(`(() => {\n${strip("button.js")}\nglobalThis.button = button; globalThis.ghostTint = tint; globalThis.keepPress = keepPress;\n})();`, scope);
 vm.runInContext(strip("measured-text.js"), scope);
 vm.runInContext(strip("tab.js") + "\nglobalThis.tab = tab;", scope);
 

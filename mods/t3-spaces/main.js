@@ -14,8 +14,8 @@ import { openMenu } from "./menu.js";
 import { stopsInit, stopsEnd, stop, focusRoot, enter } from "./focus.js";
 import { trigger } from "./trigger.js";
 import { sidebarParts } from "./sidebar.js";
-import { KEY, closedKey, readLocal } from "./store.js";
-import { button, radiusOf } from "./button.js";
+import { KEY, closedKey, readLocal, writeLocal } from "./store.js";
+import { button, radiusOf, keepPress } from "./button.js";
 import { alpha } from "./color.js";
 import { prepareSpace } from "./space-arrival.js";
 import { ui } from "./layout-settings.js";
@@ -116,7 +116,7 @@ export default class Spaces extends View {
           // Connected some other way (Add machine, hc machine add): no repair is left to hide its spaces behind.
           const fixed = this.machines.filter((m) => m.state === "connected" && this.reconnecting[m.name] && !this.reconnecting[m.name].busy);
           for (const m of fixed) delete this.reconnecting[m.name];
-          if (fixed.length) localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+          if (fixed.length) writeLocal("machines.reconnecting", this.reconnecting);
         }
       } catch {}
       cx.notify();
@@ -133,7 +133,7 @@ export default class Spaces extends View {
     const state = this.reconnecting[name] ??= { machine, removed: false };
     state.busy = true;
     state.error = null;
-    localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+    writeLocal("machines.reconnecting", this.reconnecting);
     cx.notify();
     cx.spawn(async cx => {
       try {
@@ -148,7 +148,7 @@ export default class Spaces extends View {
         if (!state.removed) {
           await ask(["machine", "rm", name]);
           state.removed = true;
-          localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+          writeLocal("machines.reconnecting", this.reconnecting);
         }
         const args = ["machine", "add"];
         if (machine.via) args.push("--via", machine.target);
@@ -158,13 +158,13 @@ export default class Spaces extends View {
         if (machine.temporary) args.push("--temp");
         await ask(args);
         this.folded.delete(name);
-        localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
+        writeLocal("machines.folded", [...this.folded]);
         delete this.reconnecting[name];
       } catch (e) {
         state.error = String(e.message ?? e);
         state.busy = false;
       }
-      localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+      writeLocal("machines.reconnecting", this.reconnecting);
       this.refreshMachines(cx);
       cx.notify();
     });
@@ -172,7 +172,7 @@ export default class Spaces extends View {
 
   toggleRepo(repo, cx) {
     this.foldedRepos.has(repo) ? this.foldedRepos.delete(repo) : this.foldedRepos.add(repo);
-    localStorage.setItem("repos.folded", JSON.stringify([...this.foldedRepos]));
+    writeLocal("repos.folded", [...this.foldedRepos]);
     cx.notify();
   }
 
@@ -213,7 +213,7 @@ export default class Spaces extends View {
         .when(connected || (rebuilt && !repair?.busy), el => el.on_mouse_down("right", (_e, cx) => openMenu(this, "machine", { machine: m, connected, connect: rebuilt && !repair?.busy }, cx)))
         .on_click((_e, cx) => {
           folded ? this.folded.delete(m) : this.folded.add(m);
-          localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
+          writeLocal("machines.folded", [...this.folded]);
           cx.notify();
         })
         // -1: the glyph's own inset, so its edge meets the heading and the spaces' marks.
@@ -300,7 +300,7 @@ export default class Spaces extends View {
     return ghost ? el : tip(this, t, id, label, stop(this, t, id, el
       .on_hover(glow(this, id))
       // Pressing it neither selects nor drags the space.
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_mouse_down("left", keepPress)
       .on_click((_e, cx) => { cx.stop_propagation(); this.toggleRepo(repo, cx); }), radiusOf("micro")));
   }
 

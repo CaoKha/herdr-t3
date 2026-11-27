@@ -1,12 +1,10 @@
 // What the Review page and Details' Review row draw alike: their names, the radio's check and a menu's search field.
 import { div, svg } from "gpui-kit";
 import { h_flex, Input } from "gpui-base";
-import { settings } from "herdr";
 import { closedKey } from "./store.js";
 import { ui } from "./layout-settings.js";
 
 export const PANE = "review", LU = "mods/review/icons", COMPACT = 640, MODEL_ROW = 28;
-export const zoom = () => Number(settings()?.zoom) || 1;
 // Stamped as the Review page's popover `name` closes to a press outside it, for the button that opened it (trigger.js); another's
 // button still opens its own. One key for every Review tab: two presses a moment apart in two of them can't both be on a button.
 export const popupClosed = (name) => closedKey(PANE, name);

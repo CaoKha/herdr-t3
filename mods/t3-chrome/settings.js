@@ -2,12 +2,12 @@
 // its sizes, type and theme colors as they are there, not T3's, so it reads as Herdr's. What it holds is t3.settings (docs/adr/0009).
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex, Select, Popup } from "gpui-base";
-import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFile, exec, layout } from "herdr";
+import { theme, props, closeOverlay, run, shared, setShared, appHome, readTextFile, exec } from "herdr";
 import { SETTINGS, t3Settings } from "./layout-settings.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { menuKeys, openLit } from "./list.js";
 import { menuRow } from "./menu-row.js";
-import { sidebarParts } from "./sidebar.js";
+import { sidebarPage } from "./sidebar.js";
 import { keyOf } from "./tip.js";
 
 const SECTIONS = [
@@ -21,7 +21,7 @@ const ROWS = [
   { section: "home", key: "afterAway", title: "After putting away", about: "Settling, snoozing or dragging away the agent in view.", options: () => [["home", "Home"], ["next", "Next card"]] },
   { section: "home", key: "homeMod", title: "Home shows", about: "A terminal, or a mod that offers itself with \"home\": true in its mod.json.", options: (view) => view.homeMods },
   { section: "sidebar", key: "sidebarShows", title: "Sidebar shows", about: "The Inbox, or the Spaces and Agents lists.", also: "t3-tabs.sidebar", options: () => [["inbox", "Inbox"], ["lists", "Lists"]],
-    get: () => sidebarParts(layout()).stack?.active ?? "lists", set: (child) => run("layout.select", { stack: "sidebar-lists", child }) },
+    get: () => sidebarPage() ?? "lists", set: (child) => run("layout.select", { stack: "sidebar-lists", child }) },
   { section: "text", key: "textSize", title: "Text size", about: "The layout's panels, lists and menus; the terminals keep their own. Default is Herdr's interface size.",
     options: () => [[null, "Default"], ...[12, 13, 14, 15, 16, 18].map((n) => [n, `${n} px`])] },
 ];

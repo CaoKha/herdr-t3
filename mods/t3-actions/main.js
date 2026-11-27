@@ -2,7 +2,7 @@
 // the menu, the editor and Details (cmd-shift-b) are this mod opened as overlays.
 import { View, div } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
-import { theme, run, openOverlay, closeOverlay, props, setShared, spaces, settings, nextCommand, shared } from "herdr";
+import { theme, run, openOverlay, closeOverlay, props, setShared, spaces, nextCommand, shared } from "herdr";
 import { glow } from "./tip.js";
 import { stopsInit, stopsEnd, stop, focusRoot, onStop } from "./focus.js";
 import { KEY } from "./store.js";
@@ -15,7 +15,7 @@ import { MOD, ICONS, icon, lit, state, barControl, openBarMenu, initMenu, action
 import { awaitTargets } from "./open-in.js";
 import { dialog, dialogTitle, dialogButton } from "./dialog.js";
 import { initCleanUp, cleanUpView } from "./clean-up.js";
-import { ui } from "./layout-settings.js";
+import { ui, fitBlock } from "./layout-settings.js";
 
 const ACTION_PLACES = [["tab", "Tab"], ["right", "Right"], ["down", "Down"]];
 const BAR_MENU = "bar-menu:";
@@ -174,22 +174,12 @@ export default class Actions extends View {
     if (overlay === "details") return detailsView(this);
     if (overlay === "review-scope") return rangeMenu(this);
     if (overlay === "review-commits") return commitsMenu(this);
-    const stopPress = (_e, cx) => cx.stop_propagation(), home = shared(KEY.home);
+    const home = shared(KEY.home);
     return focusRoot(this, h_flex().size_full().items_center().justify_end()
       // Home has no project to run them in.
-      .when(!home || !spaces().some(s => s.active && s.id === home), el => el.child(h_flex().id("actions-fit").flex_none().pr(props()?.details ? 0 : 8).items_center().on_size_change((size) => this.fit(size))
-        .when(!props()?.details, el => el.child(barControl(this, theme(), stopPress)))
+      .when(!home || !spaces().some(s => s.active && s.id === home), el => el.child(h_flex().id("actions-fit").flex_none().pr(props()?.details ? 0 : 8).items_center().on_size_change((size) => fitBlock(this, size))
+        .when(!props()?.details, el => el.child(barControl(this, theme())))
         .when(Boolean(props()?.details), el => el.child(trigger(this, theme(), "details-toggle", { icon: "mods/t3-actions/icons/square-menu.svg", label: "Details",
           action: "t3-tabs.details", below: true, open: Boolean(openedDetails()), closed: DETAILS_CLOSED, onOpen: (b) => toggleDetails(b) }))))));
-  }
-
-  // With the block's id in props.block, it sizes that block to the control: layout.resize, which Herdr keeps with the
-  // layout's clicks. on_size_change reports zoomed pixels; a layout's are logical.
-  fit(size) {
-    // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
-    const id = props()?.block, px = Math.ceil(size.width / (Number(settings()?.zoom) || 1) - 0.5);
-    if (!id || px === this.fitted) return;
-    this.fitted = px;
-    run("layout.resize", { id, px });
   }
 }

@@ -33,7 +33,7 @@ const env = {
   theme: () => ({ selected: "#123456" }), props: () => props, panes: () => { reads.panes++; return [pane, shell, review]; }, shared: (k) => sharedValues[k] ?? null, home: () => "/home/me",
   // A new list each call, as Herdr gives (tree.js indexes each list once).
   terminals: () => { reads.terminals++; return [...terms]; }, agents: () => { reads.agents++; return agentList; }, spaces: () => { reads.spaces++; return [{ id: "s1", name: "project", tabs: [tab] }]; }, layout: () => sidebar,
-  run: (name, args) => calls.push([name, args]), openOverlay: (o) => calls.push(["overlay", o]), closeOverlay: (id) => calls.push(["close", id]), settings: () => ({ zoom: 1 }), setShared: (k, v) => { sharedValues[k] = v; },
+  run: (name, args) => calls.push([name, args]), openOverlay: (o) => calls.push(["overlay", o]), closeOverlay: (id) => calls.push(["close", id]), settings: () => ({ zoom: 1 }), zoom: () => 1, monoFont: () => "JetBrains Mono", setShared: (k, v) => { sharedValues[k] = v; },
   window: Object.assign(() => ({ platform: "macos", active: true }), { mouse_position: () => pointer, viewport_size: () => ({ width: 1000, height: 800 }) }),
 };
 const now = Date.now();
@@ -52,7 +52,7 @@ function load(...files) {
     .replace(/^import .*;\r?\n/gm, "").replace(/export (function|const) /g, "$1 ").replace("export default class", "globalThis.Mod = class");
   const context = vm.createContext({ ...env });
   // Load the real synced helper, including the alias main.js imports.
-  vm.runInContext("(() => {\n" + ["color.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.GROUP_GAP = GROUP_GAP; globalThis.trigger = trigger; globalThis.hang = hang;\n})();", context);
+  vm.runInContext("(() => {\n" + ["color.js", "button.js", "trigger.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "") + "\nglobalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.DISABLED = DISABLED; globalThis.GROUP_GAP = GROUP_GAP; globalThis.trigger = trigger; globalThis.hang = hang; globalThis.keepPress = keepPress;\n})();", context);
   vm.runInContext(src, context, { filename: files.at(-1) });
   const mod = new context.Mod(); mod.init({}, cx);
   // Drawn with a cx, as Herdr draws it: a draw may arrange a one-shot.

@@ -2,7 +2,7 @@
 import { shared, setShared } from "herdr";
 import { KEY } from "./store.js";
 
-const LIVE_MS = 5000;
+export const LIVE_MS = 5000;
 const FADE_IN_MS = 16;
 const FADE_OUT_MS = 250;
 

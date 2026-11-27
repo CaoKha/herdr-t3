@@ -1,11 +1,10 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, Popup } from "gpui-base";
-import { settings, props } from "herdr";
+import { props } from "herdr";
 import { namer } from "./name.js";
 import { projectMark } from "./project.js";
-import { glow, tip, tipMark, keyOf } from "./tip.js";
-import { MOTION } from "./motion.js";
-import { detailsLive, detailsFor, detailsLine, detailsCard } from "./details.js";
+import { glow, tip, tipMark, keyOf, FADE } from "./tip.js";
+import { detailsLive, detailsFor, detailsLine, detailsCard, detailsHover, detailsUp } from "./details.js";
 import { programIcon } from "./program.js";
 import { statusMark, took } from "./status-mark.js";
 import { stop, within } from "./focus.js";
@@ -13,9 +12,9 @@ import { snoozeButton } from "./snooze.js";
 import { SLIM } from "./list-view.js";
 import { ago } from "./ago.js";
 import { openMenu } from "./menu.js";
-import { button, radiusOf } from "./button.js";
+import { button, radiusOf, keepPress } from "./button.js";
 import { worktreeLabel } from "./worktree.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom, monoFont } from "./layout-settings.js";
 
 // The settle key: the layout's tab bar holds it; a standalone Inbox, its own command.
 const settleKey = () => keyOf("t3-tabs.settle") ? "t3-tabs.settle" : "t3-inbox.settle";
@@ -30,14 +29,9 @@ export function inboxRowView(view, t, model, actions, drag) {
   const { now, ps, sp, facts, state, viewing, running, woke, busy, pins, started, since, wake, hidden, napUntil, settledAt } = model;
   const { settle, unsettle, away, pick, unpinRow } = actions;
   const { dragging, plan, verb, badge, swept, row, open, sweepFrom, justDropped } = drag;
-  const zoom = Number(settings()?.zoom) || 1;
+  const z = zoom();
   const title = namer({ terminals: model.all, spaces: sp });
   const checkouts = view.worktrees.frame();
-  const hover = (a) => (on, cx) => {
-    if (on) { view.hovered = a.address; detailsFor(view, a.address, cx); }
-    else if (view.hovered === a.address) { view.hovered = null; detailsFor(view, null, cx); }
-    cx.notify();
-  };
   // A button's icon and text brighten together: a hover style reaches the text but not the svg, so it's state.
   const lit = (id, color) => (view.hot === id ? t.foreground : color);
   // A space's mark, as t3-spaces draws it.
@@ -50,7 +44,7 @@ export function inboxRowView(view, t, model, actions, drag) {
     const id = `unpin-${a.address}`, label = "Unpin agent", hot = view.hot === id || within(view, [id]);
     const el = button(t, id, { size: "tiny", surface: "row", label, hot,
       icon: hot ? "mods/t3-inbox/icons/pin-off.svg" : "mods/t3-inbox/icons/pin.svg" })
-      .on_hover(glow(view, id)).on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_hover(glow(view, id)).on_mouse_down("left", keepPress)
       .on_click((_e, cx) => {
         cx.stop_propagation();
         if (justDropped()) return;
@@ -75,7 +69,7 @@ export function inboxRowView(view, t, model, actions, drag) {
   // The whole corner holds it, so the gap between two controls doesn't flash it.
   const details = (a) => {
     const { machine, branch, hasError } = facts(a), pic = programIcon(a.program, 12, t.muted);
-    const up = view.details === a.address || view.detailsOut === a.address;
+    const up = detailsUp(view, a.address);
     return Popup.new(`details-${a.address}`, div()).absolute().top(-1).right(-1).size(1)
       .when(up && !view.napMenu && !dragging && !view.sweep?.moved, (pop) => pop.content(detailsCard(view, t, a.address, title(a), [
         a.space_name && detailsLine(t, avatar(a.space, a.space_name, 12), a.space_name),
@@ -118,11 +112,11 @@ export function inboxRowView(view, t, model, actions, drag) {
     // changed. The time is monospace children, one per part, so a monospace space doesn't open "1h 5m" wider than the gaps.
     const pill = (color, mark, label, time) => h_flex().id(`state-${a.address}`).h(20).gap(4).flex_none().items_center().font_medium().text_color(color)
       .child(mark).child(div().child(label))
-      .when(Boolean(time), (el) => el.children(time.split(" ").map((part) => div().font_family(settings().font_family ?? "JetBrains Mono").child(part))));
+      .when(Boolean(time), (el) => el.children(time.split(" ").map((part) => div().font_family(monoFont()).child(part))));
     // It wakes where it was, so this carries the weight, as T3's; a click dismisses it, and it stays on hover.
     const wokeMark = woke(a) && tip(view, t, `woke-${a.address}`, "Clear Woke mark", stop(view, t, `woke-${a.address}`, h_flex().id(`woke-${a.address}`).h(20).gap(4).flex_none().items_center().font_medium().text_color(t.blocked)
       .hover((s) => s.underline()).on_hover(glow(view, `woke-${a.address}`)).role("button").accessibility_label("Clear Woke mark")
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_mouse_down("left", keepPress)
       .on_click((_e, cx) => {
         cx.stop_propagation();
         view.hot = null; // It goes, before the pointer can report leaving it.
@@ -151,11 +145,11 @@ export function inboxRowView(view, t, model, actions, drag) {
       // As T3's corner: hovered, the controls take the slot and the state fades out from under them, but for Woke.
       : h_flex().id(`corner-${a.address}`).relative().h(20).min_w(32).gap(4).flex_none().items_center().justify_end()
         .when(acting, (el) => el.on_hover((on, cx) => { view.detailsHold = on ? a.address : null; cx.notify(); }))
-        .child(div().flex_none().when(quiet, (el) => el.absolute().top(0).right(0)).opacity(quiet ? 0 : 1).transition("opacity", MOTION).child(status))
+        .child(div().flex_none().when(quiet, (el) => el.absolute().top(0).right(0)).opacity(quiet ? 0 : 1).transition("opacity", FADE).child(status))
         .child(h_flex().id(`controls-${a.address}`).h(20).flex_none().items_center().when(!acting, (el) => el.absolute().top(0).right(0))
         .when(Boolean(clock), (el) => el.child(clock))
         .child(div().when(!offer, (el) => el.absolute().top(0).right(0)).child(tip(view, t, id, a.mod ? "Settle and close" : "Settle agent", h_flex().id(id).h(20).px(6).mr(-4).gap(4).flex_none().items_center().rounded(6)
-        .text_size(ui(12)).text_color(lit(id, t.muted)).opacity(offer ? 1 : 0).transition("opacity", MOTION)
+        .text_size(ui(12)).text_color(lit(id, t.muted)).opacity(offer ? 1 : 0).transition("opacity", FADE)
         // Faded out it's no button: a click there is the card's. As T3's row controls, hover only lights it: no ground.
         .when(offer, (el) => el.on_hover(glow(view, id)).role("button").accessibility_label(a.mod ? "Settle and close" : "Settle").when(!a.mod, (b) => b.on_mouse_down("left", sweepFrom("settle", a))).on_click((_e, cx) => {
           cx.stop_propagation();
@@ -171,9 +165,9 @@ export function inboxRowView(view, t, model, actions, drag) {
     // T3's card row, 8 in, not T3's 10, so its words and icons end where the buttons' icons above do (t3-tokens "Rules" R3).
     const base = v_flex().id(`${ghost ? "ghost-" : ""}card-${a.address}`).px(8).py(8).flex_none().rounded(6)
       // A working row recedes until it's hovered or in view, as T3's.
-      .when(!ghost, (el) => el.opacity(running(a) && !woke(a) && !on && !over ? 0.7 : 1).transition("opacity", MOTION));
-    return (ghost ? base : row(base, a, details).role("button").accessibility_label(title(a)).on_hover(hover(a)).when(Boolean(menuMod), context(a))
-      .on_click(open(a)).on_size_change((size) => { view.cardH = size.height / zoom; }))
+      .when(!ghost, (el) => el.opacity(running(a) && !woke(a) && !on && !over ? 0.7 : 1).transition("opacity", FADE));
+    return (ghost ? base : row(base, a, details).role("button").accessibility_label(title(a)).on_hover(detailsHover(view, a.address)).when(Boolean(menuMod), context(a))
+      .on_click(open(a)).on_size_change((size) => { view.cardH = size.height / z; }))
       .when(on, (el) => el.bg(t.selected))
       .when(!on && !ghost && !dragging && !view.sweep?.moved, (el) => el.when(menu, (m) => m.bg(t.hover)).hover((s) => s.bg(t.hover)).active((s) => s.bg(t.selected)))
       .child(h_flex().h(ui(20)).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
@@ -203,7 +197,7 @@ export function inboxRowView(view, t, model, actions, drag) {
     // As T3's settled rows: its project's mark, not its program's.
     const mark = avatar(a.space, a.space_name, 16);
     const undo = h_flex().id(undoId).h(24).px(6).flex_none().items_center().justify_center().rounded(6)
-      .opacity(over ? 1 : 0).transition("opacity", MOTION)
+      .opacity(over ? 1 : 0).transition("opacity", FADE)
       // Faded out it's no button: a click there is the row's.
       .when(over, (el) => el.on_hover(glow(view, undoId)).role("button").accessibility_label(undoLabel)
         .on_mouse_down("left", sweepFrom(napping ? "unsnooze" : "unsettle", a)).on_click((_e, cx) => {
@@ -220,15 +214,15 @@ export function inboxRowView(view, t, model, actions, drag) {
       ? h_flex().gap(4).items_center().text_color(t.accent).child(svg("mods/t3-inbox/icons/alarm-clock.svg").size(12).flex_none().text_color(t.accent)).child(left(napUntil(a), now))
       : !ghost && ago(settledAt(a)[0], now);
     const base = h_flex().id(`${ghost ? "ghost-" : ""}slim-${a.address}`).h(ui(SLIM)).px(8).gap(10).flex_none().items_center().rounded(6);
-    return (ghost ? base : row(base, a, details).role("button").accessibility_label(title(a)).on_hover(hover(a)).when(Boolean(menuMod), context(a)).on_click(open(a)))
+    return (ghost ? base : row(base, a, details).role("button").accessibility_label(title(a)).on_hover(detailsHover(view, a.address)).when(Boolean(menuMod), context(a)).on_click(open(a)))
       .when(on, (el) => el.bg(t.selected))
       .when(!on && !ghost && !dragging && !view.sweep?.moved, (el) => el.hover((s) => s.bg(t.hover)).active((s) => s.bg(t.selected)))
-      .child(h_flex().id(`slim-mark-${a.address}`).size(16).flex_none().items_center().justify_center().opacity(bright ? 1 : 0.4).transition("opacity", MOTION).child(ghost ? mark : tipMark(view, t, `slim-space-${a.address}`, a.space_name, mark, { delay })))
+      .child(h_flex().id(`slim-mark-${a.address}`).size(16).flex_none().items_center().justify_center().opacity(bright ? 1 : 0.4).transition("opacity", FADE).child(ghost ? mark : tipMark(view, t, `slim-space-${a.address}`, a.space_name, mark, { delay })))
       .child(div().flex_1().min_w(0).truncate().when(on, (el) => el.font_medium()).text_color(bright ? t.foreground : t.muted).child(title(a)))
       .child(ghost ? (verb ? badge(verb) : div()) : swept(a) ? badge(view.sweep.action === "unsnooze" ? "wake" : "unsettle")
         // T3's corner: the time fades out on hover as the undo arrow fades in over it.
         : h_flex().id(`slim-corner-${a.address}`).relative().h(24).min_w(32).flex_none().items_center().justify_end()
-          .child(div().flex_none().text_size(ui(12)).text_color(t.dim).opacity(over ? 0 : 1).transition("opacity", MOTION).child(time))
+          .child(div().flex_none().text_size(ui(12)).text_color(t.dim).opacity(over ? 0 : 1).transition("opacity", FADE).child(time))
           .child(div().absolute().top(0).right(-4).child(tip(view, t, undoId, undoLabel, undo, { action: on && !napping ? settleKey() : undefined, delay }))))
       .when(!ghost, (el) => stop(view, t, `slim-${a.address}`, el));
   };

@@ -1,31 +1,23 @@
 // New: open a tab in a live space, reopen a bookmarked project, or start a space on a chosen machine.
 import { View, div, svg } from "gpui-kit";
-import { h_flex, v_flex, InputState, Input } from "gpui-base";
-import { checking, exec, notify, theme, spaces, panes, machines, settings, run, closeOverlay, props, home, window, shared, setShared } from "herdr";
+import { h_flex, v_flex, InputState } from "gpui-base";
+import { checking, exec, notify, theme, spaces, panes, machines, run, closeOverlay, props, home, shared, setShared } from "herdr";
 import { projectMark, placeOf } from "./project.js";
-import { dormantProjects, forgetProject } from "./projects.js";
+import { dormantProjects, forgetProject, shortFolder } from "./projects.js";
 import { newSpacePlan } from "./new-space.js";
 import { step } from "./list.js";
 import { keyOf, keyLabel } from "./tip.js";
 import { ghostButton } from "./button.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
-import { keycap, footAction, paletteFooter } from "./palette.js";
-import { ui } from "./layout-settings.js";
+import { keycap, footAction, paletteFooter, PALETTE_ROW, paletteFrame, paletteSearch, paletteRow, paletteEmpty } from "./palette.js";
+import { ui, zoom } from "./layout-settings.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
-const ROW = 48;
 const HEAD = 28;
 // The list's share of T3's 420 once its border, search, top inset and heading, bottom inset and footer are in; the popup hugs its content.
 const LIST_MAX = 420 - 2 - 48 - 8 - 28 - 8 - 41;
 const STATE = { ready: "Connected", loading: "Loading…", unavailable: "Unavailable" };
-
-function shortFolder(folder) {
-  const h = home();
-  if (!folder) return "";
-  if (h && (folder === h || folder.startsWith(`${h}/`) || folder.startsWith(`${h}\\`))) return "~" + folder.slice(h.length);
-  return folder;
-}
 
 // Batch-checks local folders via `sh` (`fs/promises` is sandboxed to manifest read roots and has no stat).
 // Fails open (null) if `sh` cannot run so shell issues never block opening valid folders.
@@ -125,7 +117,7 @@ export default class NewMenu extends View {
     }
     const entry = item.space ?? item.project;
     const folder = entry && !entry.machine ? (item.space ? placeOf(item.space, panes()) : item.project?.folder) : null;
-    const warn = (f) => notify({ title: "Folder not found", body: `${shortFolder(f)} no longer exists on this computer.`, level: "warning" });
+    const warn = (f) => notify({ title: "Folder not found", body: `${shortFolder(f, home())} no longer exists on this computer.`, level: "warning" });
     const openItem = () => {
       closeOverlay(props().overlay);
       const p = item.project;
@@ -192,8 +184,8 @@ export default class NewMenu extends View {
     const folder = space ? placeOf(space, ps) : project?.folder;
     const missing = Boolean(entry && !entry.machine && folder && this.missing.has(folder));
     // Another machine's folder is said whole: `~` here is this computer's home. An empty one on a live remote space is its home.
-    const sub = entry ? (entry.machine ? folder || "~" : shortFolder(folder)) : item.sub;
-    return h_flex().id(item.key).w_full().h(ui(ROW)).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
+    const sub = entry ? (entry.machine ? folder || "~" : shortFolder(folder, home())) : item.sub;
+    return paletteRow(item.key)
       .role("button").accessibility_label(entry?.name ?? item.name)
       .when(on, el => el.bg(t.selected))
       .when(Boolean(item.off) || missing, el => el.opacity(0.64))
@@ -226,7 +218,7 @@ export default class NewMenu extends View {
     const id = "new-rows";
     const hasProjects = !this.picking && dormantCount > 0;
     const hasProjectsHead = !this.picking && liveCount > 0 && dormantCount > 0;
-    const row = ui(ROW), head = ui(HEAD);
+    const row = ui(PALETTE_ROW), head = ui(HEAD);
     const headTop = liveCount * row;
     const rowTop = (i) => i * row + (hasProjectsHead && i >= liveCount ? head : 0);
     const needTop = (i) => hasProjectsHead && i === liveCount ? headTop : rowTop(i);
@@ -260,12 +252,12 @@ export default class NewMenu extends View {
       }
     }
     return div().id(id).relative().overflow_hidden().flex_none().h(seen)
-      .on_mouse_move((e) => { this.pointerY = { ...this.pointerY, [id]: e.local_position.y / (Number(settings()?.zoom) || 1) }; })
+      .on_mouse_move((e) => { this.pointerY = { ...this.pointerY, [id]: e.local_position.y / zoom() }; })
       .on_hover((on) => { if (!on) this.pointerY = { ...this.pointerY, [id]: undefined }; })
       .on_scroll_wheel((e, cx) => {
         // Herdr hands a wheel to what's under a popup too.
         cx.stop_propagation();
-        const from = this.scrollTop[id], next = Math.max(0, Math.min(from - e.delta.y / (Number(settings()?.zoom) || 1), max));
+        const from = this.scrollTop[id], next = Math.max(0, Math.min(from - e.delta.y / zoom(), max));
         if (next === from) return;
         this.scrollTop = { ...this.scrollTop, [id]: next };
         let firstFull = -1, lastFull = -1;
@@ -292,10 +284,10 @@ export default class NewMenu extends View {
     const hints = [
       ["↑ ↓", "Navigate"],
       ["Enter", this.picking ? "New space" : "New tab"],
-      ...(hasProjects ? [[window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Remove"]] : []),
+      ...(hasProjects ? [[keyLabel("ctrl-d"), "Remove"]] : []),
       ["Esc", "Close"],
     ];
-    return focusRoot(this, v_flex().id("new-menu").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(ui(14)).line_height(`${ui(20)}px`)
+    return focusRoot(this, paletteFrame(t, "new-menu")
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
         const to = step(e, this.at, items.length);
@@ -310,13 +302,11 @@ export default class NewMenu extends View {
         cx.stop_propagation();
         cx.notify();
       })
-      .child(h_flex().h(36).my(6).flex_none().pl(18).pr(20).gap(7).items_center()
-        .child(svg("mods/t3-new-menu/icons/search.svg").size(16).flex_none().text_color(t.dim))
-        .child(Input.new(this.picking ? this.machineInput : this.spaceInput).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)))
+      .child(paletteSearch(t, "mods/t3-new-menu/icons/search.svg", this.picking ? this.machineInput : this.spaceInput))
       .child(div().mt(8).px(16).py(6).flex_none().text_size(ui(12)).line_height(`${ui(16)}px`).font_medium().text_color(t.muted).child(heading))
       .child(div().flex_none().mb(8).px(8)
         .when(items.length > 0, el => el.child(this.rowsView(t, items, ps, liveCount, dormantCount)))
-        .when(items.length === 0, el => el.child(div().py(40).text_center().text_color(t.dim).child(this.picking ? "No matching machines." : "No matching spaces."))))
+        .when(items.length === 0, el => el.child(paletteEmpty(t, this.picking ? "No matching machines." : "No matching spaces."))))
       .child(paletteFooter(t, hints, this.picking
         ? stop(this, t, "new-back", footAction(t, "new-back", "Back to spaces").on_click((_e, cx) => this.showMachines(false, cx)).child("← Spaces"), 8)
         : stop(this, t, "space-new", footAction(t, "space-new", "New space").on_click((_e, cx) => plan.ask ? this.showMachines(true, cx) : this.choose(plan.candidates[0], cx))

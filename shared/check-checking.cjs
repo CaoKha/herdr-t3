@@ -12,10 +12,10 @@ async function check(checking) {
   const env = {
     checking: () => checking, View: class {}, div: element, closedKey: () => "closed", MOD: "asciicn-wallpaper",
     props: () => ({}), appHome: () => "/app", home: () => "/home",
-    theme: () => ({ background: "#000" }), settings: () => ({ theme: "test", zoom: 2 }),
+    theme: () => ({ background: "#000" }), settings: () => ({ theme: "test", zoom: 2 }), zoom: () => 2,
     shared: key => key === "layout" ? "herdr-t3" : undefined, layout: () => ({ titlebar: "none", traffic_lights: [16, 12] }),
     window: () => ({ platform: "macos", active: true }),
-    sidebarParts: () => ({}), toggleLeft: () => 8, BRAND_FIXED: 17,
+    sidebarParts: () => ({}), toggleLeft: () => 8, BRAND_FIXED: 17, placeOf: (s) => s.folder,
     exec: async (...args) => { effects.push(["exec", ...args]); return { code: 0, stdout: "", stderr: "" }; },
     hc: async (...args) => { effects.push(["hc", ...args]); return { code: 0, stdout: '{"machines":[]}' }; },
     readTextFile: async () => '{"titlebar":"none","traffic_lights":[16,12]}',

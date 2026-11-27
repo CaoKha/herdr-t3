@@ -52,13 +52,13 @@ const context = vm.createContext({
   View: class {}, div: el, svg: (path) => { const n = el(); n.style.path = path; return n; }, image: (path) => { const n = el(); n.style.path = path; return n; }, v_flex: el, h_flex: el,
   run: (name, args) => calls.push(args === undefined ? [name] : [name, args]), props: () => target, closeOverlay: (id) => { closed.push(id); context.menuClosed?.(id); }, openOverlay: (spec) => { calls.push(["overlay", spec]); return `o${++opened}`; },
   window: { viewport_size: () => view, mouse_position: () => mouse },
-  theme: () => theme, keys: () => { keyReads++; return keyList; }, settings: () => ({ zoom }), terminals: () => [...terms], agents: () => [...agentList], spaces: () => spaceList, panes: () => paneList, focused: () => focusState, exec: async () => ({ code: 1 }),
+  theme: () => theme, keys: () => { keyReads++; return keyList; }, settings: () => ({ zoom }), zoom: () => zoom, monoFont: () => "JetBrains Mono", terminals: () => [...terms], agents: () => [...agentList], spaces: () => spaceList, panes: () => paneList, focused: () => focusState, exec: async () => ({ code: 1 }),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, hc: async () => ({ code: 0 }), notify() {},
   knownAgents: async () => [{ name: "Claude Code", run: ["claude"], installed: true, icon: "agents/claude.svg" }, { name: "Codex", run: ["codex"], installed: false }],
   layout: () => ({ id: "root", children: [{ id: "sidebar-lists", active: list, children: [] }] }),
   keyLabel: (k) => tipScope.keyLabel(k),
 });
-const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "space-arrival.js", "name.js", "program.js", "known-agents.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
+const src = ["store.js", "color.js", "labels.js", "pins.js", "tree.js", "sidebar.js", "space-arrival.js", "name.js", "program.js", "known-agents.js", "status-mark.js", "zoom.js", "list.js", "menu-row.js", "snooze-presets.js", "submenu.js", "popup-menu.js", "git.js", "project.js", "main.js"].map((f) => fs.readFileSync(path.join(__dirname, f), "utf8")).join("\n")
   .replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Menu = class").replace(/^export /gm, "");
 vm.runInContext(src, context);
 // Timers run when the test says time has passed.

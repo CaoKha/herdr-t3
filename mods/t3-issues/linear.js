@@ -6,10 +6,10 @@ import { ownParts } from "./images.js";
 import { pageRest } from "./paging.js";
 import { MINE_FILTER, searchFilter, identifierFilter, fromLinear, branchCandidates } from "./model.js";
 
-export const ENDPOINT = "https://api.linear.app/graphql";
+const ENDPOINT = "https://api.linear.app/graphql";
 // Upload addresses in what Linear sends come back signed for this long, so a picture downloads without the key.
-export const SIGNED_FOR = "600";
-export const MINE_PAGE = 50;
+const SIGNED_FOR = "600";
+const MINE_PAGE = 50;
 
 /**
  * The key, or null: the macOS Keychain's `linear-api-key` item, else LINEAR_API_KEY in Herdr's own environment, else in a login
@@ -54,13 +54,13 @@ const LINEAR_COMMENT = "id body url createdAt user { name displayName } parent {
 const LIST = `query($filter: IssueFilter) { issues(filter: $filter, first: ${MINE_PAGE}, orderBy: updatedAt) { pageInfo { hasNextPage } nodes { ${LINEAR_CARD} } } }`;
 
 /** The viewer's issues (MINE_FILTER), or with `search` any issue it finds, most recently updated first; `more` past the page. */
-export async function listIssues(key, search = "") {
+async function listIssues(key, search = "") {
   const data = await linear(key, LIST, { filter: search.trim() ? searchFilter(search) : MINE_FILTER });
   return { items: (data?.issues?.nodes ?? []).map(fromLinear), more: Boolean(data?.issues?.pageInfo?.hasNextPage) };
 }
 
 /** The issues named by `ids` (`ENG-12`) that Linear has; the others are dropped. */
-export async function issuesNamed(key, ids) {
+async function issuesNamed(key, ids) {
   if (!ids.length) return [];
   const data = await linear(key, `query($filter: IssueFilter) { issues(filter: $filter, first: ${ids.length}) { nodes { ${LINEAR_CARD} } } }`, { filter: identifierFilter(ids) });
   const found = (data?.issues?.nodes ?? []).map(fromLinear);
@@ -74,7 +74,7 @@ const DETAIL = `query($id: String!) { issue(id: $id) { ${LINEAR_CARD} descriptio
 const LINEAR_COMMENTS = `query($id: String!, $after: String) { issue(id: $id) { comments(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { ${LINEAR_COMMENT} } } } }`;
 
 /** An issue in full, by Linear's id: its comments paged to the end (paging.js, up to its cap), its team's workflow states. */
-export async function issueDetail(key, id) {
+async function issueDetail(key, id) {
   const issue = (await linear(key, DETAIL, { id }))?.issue;
   if (!issue) throw new Error("This issue isn't there, or the key can't read it.");
   const { nodes, truncated } = await pageRest(issue.comments, async (after) => (await linear(key, LINEAR_COMMENTS, { id, after }))?.issue?.comments);
@@ -85,7 +85,7 @@ export async function issueDetail(key, id) {
  * One write on `issue`: `{ kind: "state", target }` (a team state) or `{ kind: "comment" | "reply", body, parent? }` (`parent` the
  * thread's first comment); typed text only in the JSON body.
  */
-export async function writeIssue(key, issue, w) {
+async function writeIssue(key, issue, w) {
   const data = w.kind === "state"
     ? await linear(key, "mutation($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }", { id: issue.id, stateId: w.target.id })
     : await linear(key, "mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success } }", { input: { issueId: issue.id, body: w.body, ...(w.parent ? { parentId: w.parent.id } : {}) } });
@@ -95,7 +95,7 @@ export async function writeIssue(key, issue, w) {
 /** Linear as the page's provider (ghissues.js githubIssues has the same shape), read and written with `key`. */
 export function linearIssues(key) {
   return {
-    id: "linear", where: "Linear", refreshLabel: "Refresh Linear issues", openLabel: "Open in Linear", canWrite: true, hasStates: true, branchInFull: false,
+    id: "linear", where: "Linear", refreshLabel: "Refresh Linear issues", openLabel: "Open in Linear", branchInFull: false,
     branchIssues: (info) => issuesNamed(key, branchCandidates(info.branch, info.config)),
     noBranchIssue: (info) => {
       const ids = branchCandidates(info.branch, info.config);
@@ -105,6 +105,6 @@ export function linearIssues(key) {
     search: (q) => listIssues(key, q),
     detail: (card) => issueDetail(key, card.id),
     write: (issue, w) => writeIssue(key, issue, w),
-    parts: (owner, body) => ownParts(owner, body),
+    parts: ownParts,
   };
 }

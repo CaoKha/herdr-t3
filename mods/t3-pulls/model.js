@@ -46,7 +46,7 @@ export const checksOf = memo((pr) => {
 });
 
 /** How many checks are failing, running, passed and skipped; `counted` those not skipped. */
-export const checkCounts = memo((pr) => {
+const checkCounts = memo((pr) => {
   const n = { failure: 0, pending: 0, success: 0, skipped: 0 };
   for (const c of checksOf(pr)) n[c.kind]++;
   return { failing: n.failure, running: n.pending, passed: n.success, skipped: n.skipped, counted: n.failure + n.pending + n.success };
@@ -64,7 +64,7 @@ export const reviewersOf = memo((pr) => {
 });
 
 /** The reviewers a review is owed or given by, a plain comment aside; `approved` of them. */
-export const askedReviewers = memo((pr) => {
+const askedReviewers = memo((pr) => {
   const asked = reviewersOf(pr).filter((r) => r.state !== "COMMENTED" && r.state !== "DISMISSED");
   return { asked: asked.length, approved: asked.filter((r) => r.state === "APPROVED").length, changes: asked.some((r) => r.state === "CHANGES_REQUESTED") };
 });

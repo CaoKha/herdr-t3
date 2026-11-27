@@ -2,10 +2,10 @@
 // Each page keeps its width (`nav.width`) and whether its column is open (`nav.open`) in its own localStorage.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { settings } from "herdr";
 import { ghostButton } from "./button.js";
 import { alpha } from "./color.js";
 import { dragGone, pointerMoved, POINTER_WATCH } from "./tip.js";
+import { zoom } from "./layout-settings.js";
 
 const NAV = 256, NAV_MIN = 160, NAV_MAX = 560, CONTENT_MIN = 256;
 export const NAV_NARROW = 640;
@@ -50,7 +50,7 @@ export const treeHead = (id, head) => h_flex().id(id).h(32).mb(8).flex_none().px
 export function withNav(t, id, body, { content, head, list, open, handle }) {
   // The content on the theme's `background`, as T3's code surface (`--code-background`); the column stays on the page's chrome.
   if (!open) return div().id(`${id}-solo`).size_full().min_w(0).bg(t.background).child(content);
-  const [least, most] = navRange(body), z = Number(settings()?.zoom) || 1, mine = drag?.id === id;
+  const [least, most] = navRange(body), z = zoom(), mine = drag?.id === id;
   const width = mine ? Math.min(most, Math.max(least, drag.width)) : navWidth(body);
   // Written once, on release. A pointer leaving the page lets go there, and so does a release outside the window, which brings
   // neither a release nor a leave (tip.js dragGone, as the sidebar's drags).

@@ -3,17 +3,19 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, ScrollHandle } from "gpui-base";
-import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, setAgentOrder, settings, openOverlay, closeOverlay, props, nextCommand, window } from "herdr";
+import { agents, terminals, panes, spaces, focused, theme, layout, shared, setShared, openOverlay, closeOverlay, props, nextCommand, window } from "herdr";
 import { descendants, notNews, ownStatus, subAgents, treeStatus } from "./tree.js";
 import { stopsInit, stopsEnd, focusRoot, enter } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { menuKeys, litOnHover, litProp, propsLit } from "./list.js";
-import { MOTION, planMotion, flying, leavingRows } from "./motion.js";
-import { agentEntries, agentStatus, STACK, RANK, SECTION } from "./rows.js";
-import { sidebarParts } from "./sidebar.js";
-import { KEY, closedKey, readLocal } from "./store.js";
-import { prunePins, setPinned } from "./pins.js";
-import { ui } from "./layout-settings.js";
+import { planMotion, flying, leavingRows } from "./motion.js";
+import { agentEntries, STACK, RANK, SECTION } from "./rows.js";
+import { sidebarParts, revealAfterDraw, publishOrder } from "./sidebar.js";
+import { KEY, closedKey, readLocal, writeLocal } from "./store.js";
+import { prunePins, setPinned, endedIn } from "./pins.js";
+import { ui, zoom } from "./layout-settings.js";
+import { FADE } from "./tip.js";
+import { detailsGone } from "./details.js";
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
@@ -79,14 +81,7 @@ export default class Agents extends View {
   requestReveal(key, cx) {
     this.cancelReveal();
     if (!key) return;
-    const request = this.reveal = { key, ready: false };
-    this.revealTimer = cx.timer.after(0, (cx) => {
-      if (this.reveal !== request) return;
-      this.revealTimer = null;
-      if (!revealVisible()) { this.cancelReveal(); return; }
-      request.ready = true;
-      cx.notify();
-    });
+    revealAfterDraw(this, { key, ready: false }, revealVisible, cx);
   }
 
   isFolded(id, initial = true) {
@@ -95,7 +90,7 @@ export default class Agents extends View {
 
   toggleFold(id, cx, initial = true) {
     this.folded[id] = !this.isFolded(id, initial);
-    localStorage.setItem("folded", JSON.stringify(this.folded));
+    writeLocal("folded", this.folded);
     cx.notify();
   }
 
@@ -115,20 +110,17 @@ export default class Agents extends View {
     // Gone and old: the list alone is empty right after a start.
     const listed = new Set(list.map((a) => a.address));
     for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
-    localStorage.setItem("changes", JSON.stringify(this.changed));
+    writeLocal("changes", this.changed);
   }
 
   // Drops pins and fold choices of agents that ended. Only for machines the list has heard from:
   // right after a start, or while a machine connects, its agents aren't listed yet.
   prune(all) {
-    const kept = prunePins(all);
-    const machine = (addr) => (addr.includes("/") ? addr.split("/")[0] : "");
-    const heard = new Set(all.map((k) => machine(k.address)));
-    const live = new Set(all.filter((k) => k.state === "live").map((k) => k.address));
+    const kept = prunePins(all), isEnded = endedIn(all);
     // Group headers (sp-…, sec-…, pinned) fold under the same store; only agents' entries end.
-    const ended = Object.keys(this.folded).filter((k) => !/^(sp-|sec-|pinned$)/.test(k) && heard.has(machine(k)) && !live.has(k));
+    const ended = Object.keys(this.folded).filter((k) => !/^(sp-|sec-|pinned$)/.test(k) && isEnded(k));
     for (const k of ended) delete this.folded[k];
-    if (ended.length) localStorage.setItem("folded", JSON.stringify(this.folded));
+    if (ended.length) writeLocal("folded", this.folded);
     return kept;
   }
 
@@ -158,7 +150,7 @@ export default class Agents extends View {
       .p(4)
       .bg(t.popover)
       .text_size(ui(14))
-      .opacity(this.shown ? 1 : 0).transition("opacity", MOTION)
+      .opacity(this.shown ? 1 : 0).transition("opacity", FADE)
       .track_focus(this.keys).on_key_down(menuKeys(this, SORTS.map((s) => s.label), (at) => choose(SORTS[at])))
       .child(div().px(8).py(6).text_size(ui(12)).line_height(`${ui(16)}px`).font_medium().text_color(t.muted).child("Sort agents"))
       .children(SORTS.map((s, i) => h_flex()
@@ -176,10 +168,6 @@ export default class Agents extends View {
         .child(svg(`mods/t3-agents/icons/${s.icon}.svg`).size(16).mx(-2).flex_none().text_color(t.muted))
         .child(div().flex_1().child(s.label))
         .when(s.id === on, (el) => el.child(svg("mods/t3-agents/icons/check.svg").size(14).flex_none().text_color(t.foreground)))));
-  }
-
-  status(t, a, note = "", id) {
-    return agentStatus(this, t, a, note, id);
   }
 
   // What every look owes, drawn or not: each agent's history, the done being read, and ended agents' pins and folds dropped.
@@ -239,15 +227,8 @@ export default class Agents extends View {
   }
 
   publishRows(drawn, parts) {
-    if (parts.stack?.active !== "inbox") {
-      if (JSON.stringify(drawn) !== JSON.stringify(shared(KEY.agentsRows) ?? null)) setShared(KEY.agentsRows, drawn);
-      const key = JSON.stringify(drawn.order);
-      if (key !== this.agentOrder || shared(KEY.agentOrder) !== "lists") {
-        this.agentOrder = key;
-        setAgentOrder(drawn.order);
-        if (shared(KEY.agentOrder) !== "lists") setShared(KEY.agentOrder, "lists");
-      }
-    } else this.agentOrder = null;
+    if (parts.stack?.active !== "inbox") publishOrder(this, { key: KEY.agentsRows, drawn, order: drawn.order, owner: "lists" });
+    else this.agentOrder = null;
   }
 
   render(cx) {
@@ -264,9 +245,7 @@ export default class Agents extends View {
     const gone = this.hovered;
     if (gone && !entries.some((e) => e.key === gone)) {
       this.hovered = this.hot = null;
-      /** @type {any} */ (this).detailsWait?.cancel();
-      if (this.details === gone) this.details = null;
-      if (this.detailsOut === gone) this.detailsOut = null;
+      detailsGone(this, gone);
     }
     const target = (data.shown && entries.some((e) => e.key === `sub-${data.shown}`) ? `sub-${data.shown}`
       : data.shown && entries.some((e) => e.key === data.shown) ? data.shown
@@ -278,7 +257,7 @@ export default class Agents extends View {
     // A long list draws only the rows in view, scrolled by the wheel (windowed). shortcut: windowed, Tab reaches only the rows drawn;
     // switch to a host virtual list when its rows can hold handlers.
     const windowed = entries.length > WINDOW_AT;
-    const z = Number(settings()?.zoom) || 1, at = /** @type {any} */ (this).motion.at, total = entries.reduce((sum, e) => sum + e.h, 0);
+    const z = zoom(), at = /** @type {any} */ (this).motion.at, total = entries.reduce((sum, e) => sum + e.h, 0);
     const seen = this.listH ?? FIRST_H;
     if (windowed && this.reveal?.ready) {
       const box = at.get(target);

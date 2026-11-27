@@ -1,6 +1,7 @@
 // The one way a popup's list moves.
 import { div } from "gpui-kit";
-import { settings, props, closeOverlay } from "herdr";
+import { props, closeOverlay } from "herdr";
+import { zoom } from "./layout-settings.js";
 
 // ↑/↓, round the ends; with nothing lit, ↓ is the first row and ↑ the last. The row to move to, or -1 for any other key.
 export function step(e, at, n) {
@@ -53,16 +54,16 @@ export function scrollList(view, id, { count, row, at = -1, height, draw, wheele
   return div().id(id).relative().overflow_hidden()
     .when(height !== undefined, (el) => el.flex_none().h(height))
     .when(height === undefined, (el) => el.on_size_change((size, cx) => {
-      const h = size.height / (Number(settings()?.zoom) || 1);
+      const h = size.height / zoom();
       if (h !== seen) { view.listHeight = { ...view.listHeight, [id]: h }; cx.notify(); }
     }))
-    .on_mouse_move((e) => { view.pointerY = { ...view.pointerY, [id]: e.local_position.y / (Number(settings()?.zoom) || 1) }; })
+    .on_mouse_move((e) => { view.pointerY = { ...view.pointerY, [id]: e.local_position.y / zoom() }; })
     .on_hover((on) => { if (!on) view.pointerY = { ...view.pointerY, [id]: undefined }; })
     // From the scroll as it is now: a trackpad sends several events between two renders.
     .on_scroll_wheel((e, cx) => {
       // Herdr hands a wheel to what's under a popup too.
       cx.stop_propagation();
-      const from = view.scrollTop[id], next = Math.max(0, Math.min(from - e.delta.y / (Number(settings()?.zoom) || 1), max));
+      const from = view.scrollTop[id], next = Math.max(0, Math.min(from - e.delta.y / zoom(), max));
       if (next === from) return;
       view.scrollTop = { ...view.scrollTop, [id]: next };
       wheeled(at < 0 ? -1 : Math.min(Math.max(at, Math.ceil(next / row)), Math.floor((next + seen) / row) - 1), cx);

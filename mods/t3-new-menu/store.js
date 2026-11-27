@@ -39,3 +39,4 @@ export function readLocal(key, fallback) {
     return fallback;
   }
 }
+export const writeLocal = (key, value) => localStorage.setItem(key, JSON.stringify(value));

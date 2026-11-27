@@ -1,8 +1,8 @@
 // Go to a pane (the shipped picker's mod.clone), drawn as T3's command palette: a row a pane, named and marked as its pane header is,
 // so lazygit beside an agent is found as itself. The panes you were in lately lead, as T3's recent threads, so ⌘P, Enter goes back and forth.
 import { View, div, svg } from "gpui-kit";
-import { h_flex, v_flex, InputState, Input } from "gpui-base";
-import { theme, spaces, panes, agents, terminals, focused, run, closeOverlay, props, window, shared, setShared } from "herdr";
+import { h_flex, v_flex, InputState } from "gpui-base";
+import { theme, spaces, panes, agents, terminals, focused, run, closeOverlay, props, shared, setShared } from "herdr";
 import { modStatus, namer, programOf } from "./name.js";
 import { focusPane } from "./zoom.js";
 import { notNews, ownStatus, subAgents, terminalByAddress, treeStatus } from "./tree.js";
@@ -12,11 +12,11 @@ import { programIcon } from "./program.js";
 import { step, scrollList } from "./list.js";
 import { stopsInit, stop, focusRoot } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
-import { footAction, paletteFooter } from "./palette.js";
+import { footAction, paletteFooter, PALETTE_ROW, paletteFrame, paletteSearch, paletteRow, paletteEmpty } from "./palette.js";
 import { ui } from "./layout-settings.js";
+import { keyLabel } from "./tip.js";
 
 // As T3's command item: 6 + a 20px title + a 16px line + 6.
-const ROW = 48;
 // The list's share of T3's 420 once its border, search, top and bottom insets and footer are in; the popup hugs its content.
 const LIST_MAX = 420 - 2 - 48 - 8 - 8 - 41;
 
@@ -76,7 +76,7 @@ export default class Picker extends View {
   row(item, selection, ps, byAddress) {
     const pane = item.p.pane, t = theme(), on = selection.pane === pane, s = item.s, st = item.status;
     const mark = st === "done" && notNews(byAddress.get(item.p.terminal), item.p.status, item.under) ? null : statusMark("mods/t3-picker", t, st, 14);
-    return h_flex().id(item.key).w_full().h(ui(ROW)).px(8).py(6).gap(8).rounded(4).items_center().flex_none()
+    return paletteRow(item.key)
       .role("button").accessibility_label(item.label)
       .when(on, (el) => el.bg(t.selected))
       .on_hover((over, cx) => { if (over && this.selection === selection && selection.pane !== pane) { selection.pane = pane; cx.notify(); } })
@@ -86,7 +86,7 @@ export default class Picker extends View {
       .child(v_flex().flex_1().min_w(0)
         .child(div().truncate().text_color(t.foreground).when(Boolean(item.here), (d) => d.font_medium()).child(item.label))
         .child(h_flex().min_w(0).gap(4).items_center().text_size(ui(12)).line_height(`${ui(16)}px`).text_color(t.dim)
-          .child(programIcon(item.program, 12, t.muted) ?? svg("mods/t3-picker/icons/terminal.svg").size(12).flex_none().text_color(t.muted))
+          .child(programIcon(item.program, 12, t.muted, "mods/t3-picker/icons/terminal.svg"))
           .child(div().flex_none().text_color(t.muted).child(item.program?.name ?? "Terminal"))
           .child(div().flex_none().child("·"))
           // As T3 marks a remote thread: a server icon, then the name.
@@ -106,7 +106,7 @@ export default class Picker extends View {
     const index = () => items.findIndex(item => item.p.pane === selection.pane);
     const at = index();
     if (at < 0 && selection.pane !== undefined) selection.pane = null;
-    return focusRoot(this, v_flex().id("picker").size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl().text_size(ui(14)).line_height(`${ui(20)}px`)
+    return focusRoot(this, paletteFrame(t, "picker")
       .on_key_down((e, cx) => {
         if (e.key === "escape") return closeOverlay(props().overlay);
         if (this.selection !== selection) return;
@@ -117,16 +117,14 @@ export default class Picker extends View {
         cx.stop_propagation();
         cx.notify();
       })
-      .child(h_flex().h(36).my(6).flex_none().pl(18).pr(20).gap(7).items_center()
-        .child(svg("mods/t3-picker/icons/search.svg").size(16).flex_none().text_color(t.dim))
-        .child(Input.new(this.input).flex_1().h_full().text_size(ui(14)).text_color(t.foreground)))
+      .child(paletteSearch(t, "mods/t3-picker/icons/search.svg", this.input))
       // No heading: there is one kind of row, and the room goes to the list.
       .child(div().flex_none().mt(8).mb(8).px(8)
-        .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ui(ROW), at, height: Math.min(items.length * ui(ROW), LIST_MAX),
+        .when(items.length > 0, (el) => el.child(scrollList(this, "picker-rows", { count: items.length, row: ui(PALETTE_ROW), at, height: Math.min(items.length * ui(PALETTE_ROW), LIST_MAX),
           draw: (i) => this.row(items[i], selection, ps, byAddress), wheeled: (keep) => { if (this.selection === selection) selection.pane = items[keep]?.p.pane ?? null; } })))
-        .when(items.length === 0, (el) => el.child(div().py(40).text_center().text_color(t.dim).child("No matching terminals."))))
+        .when(items.length === 0, (el) => el.child(paletteEmpty(t, "No matching terminals."))))
       // New work goes through New, which picks the space (and for a new space, the machine).
-      .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [window()?.platform === "macos" ? "⌃D" : "Ctrl+D", "Close pane"], ["Esc", "Close"]],
+      .child(paletteFooter(t, [["↑ ↓", "Navigate"], ["Enter", "Go"], [keyLabel("ctrl-d"), "Close pane"], ["Esc", "Close"]],
         stop(this, t, "picker-new", footAction(t, "picker-new", "New tab in…")
           .on_click(() => { closeOverlay(props().overlay); run("mod.open", { name: "t3-new-menu" }); })
           .child(svg("mods/t3-picker/icons/square-pen.svg").size(14).text_color(t.muted))

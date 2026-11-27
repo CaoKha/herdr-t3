@@ -3,7 +3,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { panes, terminals, agents, spaces, props, run, theme, home, openOverlay, closeOverlay, settings, shared, setShared, layout } from "herdr";
+import { panes, terminals, agents, spaces, props, run, theme, home, openOverlay, closeOverlay, shared, setShared } from "herdr";
 import { namer, programOf } from "./name.js";
 import { kidStatus, kidTree, subAgents } from "./tree.js";
 import { statusMark, STATUS_WORD, took } from "./status-mark.js";
@@ -13,11 +13,11 @@ import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { menuJump, scrollList, litProp, propsLit } from "./list.js";
 import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
-import { sidebarParts } from "./sidebar.js";
+import { sidebarPage } from "./sidebar.js";
 import { KEY, closedKey } from "./store.js";
 import { openMenu } from "./menu.js";
-import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
-import { ui } from "./layout-settings.js";
+import { button as drawButton, radiusOf, GROUP_GAP, keepPress } from "./button.js";
+import { ui, monoFont } from "./layout-settings.js";
 
 // The list as the layout's other menus (the sort menu, the right-click menu): 4 around 28px rows.
 const KIDS_WIDTH = 280, KIDS_SHOWN = 10, KIDS_CLOSED = closedKey("t3-pane", "kids");
@@ -83,7 +83,7 @@ export default class Pane extends View {
       else run("terminal.peek", { terminal: address });
     };
     // T3's text-2xs with tabular figures: the time in monospace children, one per part, as the Inbox's pill.
-    const mono = settings()?.font_family ?? "JetBrains Mono";
+    const mono = monoFont();
     // No status_ms means unchanged since creation, for working and idle alike.
     const since = (k) => k.status_ms || k.created_ms || 0;
     // Its status at the row's end, the Agents rows' mark; needing the person or failed, the word too; working or idle, for how long.
@@ -149,7 +149,7 @@ export default class Pane extends View {
   button(t, id, icon, label, action, key) {
     return tip(this, t, id, label, stop(this, t, id, drawButton(t, id, { icon, label, surface: "card", hot: this.hot === id })
       .on_hover(glow(this, id))
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .on_mouse_down("left", keepPress)
       .on_click((_e, cx) => {
         cx.stop_propagation();
         action();
@@ -169,7 +169,7 @@ export default class Pane extends View {
     // With the Inbox the bar's breadcrumb names the agent in view: an agent's pane shown alone (its tab's only one, or zoomed)
     // doesn't say it again. Split, the names tell the panes apart.
     const alone = p.zoomed || ps.filter((q) => q.tab === p.tab).length === 1;
-    const inbox = sidebarParts(layout()).stack?.active === "inbox";
+    const inbox = sidebarPage() === "inbox";
     const crumbed = alone && inbox && every.some((a) => a.address === p.terminal);
     const name = crumbed || (!p.mod && pic && named === p.program?.name) ? "" : named;
     // Split, the panes beside the focused one recede, as T3's split terminals do, with no ring: their icon, name and folder a

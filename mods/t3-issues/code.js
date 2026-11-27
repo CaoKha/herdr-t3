@@ -6,6 +6,7 @@ import { Editor, EditorState, ScrollHandle, TextView } from "gpui-base";
 import { checking, settings, theme } from "herdr";
 import { alpha } from "./color.js";
 import { ui } from "./layout-settings.js";
+import { keepPress } from "./button.js";
 
 export const codeFont = () => String(settings()?.font_family ?? "") || "Menlo";
 
@@ -55,7 +56,7 @@ const codeRows = (lines, column) => {
 const codeBox = (view, t, id) => {
   const handle = view.codeViews.scrolls.get(id);
   view.codeViews.boxes.add(id);
-  return div().id(id).flex_none().rounded(6).bg(t.background).overflow_y_scrollbar().on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+  return div().id(id).flex_none().rounded(6).bg(t.background).overflow_y_scrollbar().on_mouse_down("left", keepPress)
     .when(Boolean(handle), (el) => el.track_scroll(handle).on_scroll_wheel((e, cx) => { if (canScroll(handle, e.delta.y)) cx.stop_propagation(); }));
 };
 /** Whether a scroll area at `pos` (a ScrollHandle) moves for a wheel of `dy` (positive towards its top). */

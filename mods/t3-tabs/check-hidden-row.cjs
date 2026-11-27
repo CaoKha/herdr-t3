@@ -24,12 +24,12 @@ const env = {
   agents: () => list, projectMark: () => element(),
   panes: () => [{ pane: "p9", tab: "c9", mod: "review", title: "Review" }],
   shared: k => k === "t3-inbox.rows" ? rows : null,
-  sidebarParts: () => ({ rail: { hidden }, stack: { active: mode } }), toggleLeft: () => 8, panelState: () => ({ pages: [], tabs: [], open: false }),
+  sidebarParts: () => ({ rail: { hidden }, stack: { active: mode } }), sidebarPage: () => mode, toggleLeft: () => 8, panelState: () => ({ pages: [], tabs: [], open: false }),
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
   glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false, keptHover: () => ({ hover() {}, move() {} }),
   tipCard: (_t, id) => element().id(id), FADE: {},
   run() {}, focusAgent() {}, focusPane() {},
-  navigation: () => ({ get atHome() { return atHome; }, frame: () => ({ tabs: atHome ? [] : [{ id: "c1", active: true, named: true, name: "Task" }], context: atHome || mode !== "inbox" ? null : ctx }) }),
+  navigation: () => ({ get atHome() { return atHome; }, frame: () => ({ tabs: atHome ? [] : [{ id: "c1", active: true, named: true, name: "Task" }], context: atHome || mode !== "inbox" ? null : ctx, every: env.agents(), all: env.terminals(), panes: env.panes() }) }),
   subAgents: () => () => [], namer: () => x => x.title, programIcon: () => null, programOf: x => x.program ?? null,
   ownStatus: s => s, treeStatus: s => s, notNews: () => false, stillSettled: () => false, modStatus: () => "done",
   terminalByAddress: all => new Map(all.map(k => [k.address, k])),
@@ -42,7 +42,8 @@ function load(dir) {
   for (const f of ["color.js", "measured-text.js", "details.js", "scroll-strip.js", "status-mark.js", "store.js", "list.js"]) vm.runInContext(read(f), scope);
   vm.runInContext("globalThis.namedLabel = named;", scope);
   vm.runInContext("(() => {\n" + strip(["color.js", "button.js", "trigger.js", "tab.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n"))
-    + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.opener = opener; globalThis.popupOpen = popupOpen; globalThis.hang = hang;\n})()", scope);
+    + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.opener = opener; globalThis.popupOpen = popupOpen; globalThis.hang = hang; globalThis.keepPress = keepPress;\n})()", scope);
+  vm.runInContext("(() => {\n" + strip(fs.readFileSync(path.join(dir, "navigation.js"), "utf8")) + "\nglobalThis.nameOf = nameOf;\n})()", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, pressed: null, over: null, area: 900 });
 }

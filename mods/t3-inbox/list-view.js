@@ -1,14 +1,15 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { settings, layout } from "herdr";
-import { glow, undoLabel } from "./tip.js";
-import { MOTION, planMotion, flying } from "./motion.js";
+import { layout } from "herdr";
+import { glow, undoLabel, FADE } from "./tip.js";
+import { planMotion, flying } from "./motion.js";
 import { focusStop, onStop, stop } from "./focus.js";
 import { inboxTop } from "./filter.js";
 import { FIRST, MORE } from "./row-model.js";
 import { ago } from "./ago.js";
 import { projectMark } from "./project.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
+import { undoNotice } from "./notice.js";
 
 // T3's slim rows and Show more (h-9) and its shelves' headers (h-8), logical px.
 export const SLIM = 36, SHELF = 32;
@@ -49,7 +50,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
   const { d, dragging, lifted, plan, cardH, rows, hot, aim, gap, others, placeholder, boundary, pinTo } = drag;
   const { card, slim } = draw;
   const showMore = view.open && put.length > view.limit;
-  const zoom = Number(settings()?.zoom) || 1;
+  const z = zoom();
   const lit = (id, color) => view.hot === id ? t.foreground : color;
   const scoped = sp.filter((s) => scope.includes(s.id));
   const lane = (section, xs, draw, spacing) => drag.lane(section, xs, draw, spacing, fly);
@@ -109,7 +110,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
   }
   // A row in its wrapper, which flies: drawn first where it was (or 40px up and clear, coming in), then let go.
   const fly = (key, kind, child) => {
-    return flying(view, key, child).on_size_change((size) => { view.rowH[`${kind}:${key}`] = size.height / zoom + (kind === "card" || kind === "work" ? CARD_GAP : STACK); });
+    return flying(view, key, child).on_size_change((size) => { view.rowH[`${kind}:${key}`] = size.height / z + (kind === "card" || kind === "work" ? CARD_GAP : STACK); });
   };
   // A row that left, drawn inert where it was and fading out, riding as T3's clones do.
   const leaving = (x) => {
@@ -119,7 +120,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
     try { drawn = x.kind === "slim" ? slim(x.a, true) : card(x.a, true); } catch { return null; } // Gone with too much of its state.
     const away = view.motion.leaving;
     return div().id(`leaving-${x.key}-${view.motion.step}`).absolute().left(8).right(8).top(x.y + (away ? x.travel ?? 0 : 0))
-      .opacity(away ? 0 : 1).transition("top", MOTION).transition("opacity", MOTION).child(drawn);
+      .opacity(away ? 0 : 1).transition("top", FADE).transition("opacity", FADE).child(drawn);
   };
   // When a drawn Working time next reads differently: by the second under a minute, then by the minute (status-mark.js took).
   view.clockAt = Math.min(Infinity, ...[...pinned, ...busyRows].filter(running).map(started).filter((at) => at > 0 && at < Infinity).map((at) => {
@@ -134,7 +135,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
   const noticeSummary = standaloneNotice ? `${n.action} ${n.count} agent${n.count === 1 ? "" : "s"},` : "";
   const noticeUndo = standaloneNotice ? undoLabel("t3-tabs.undo", "t3-inbox.undo") : "";
   const noteW = (key, sub, pad = 0) => (size, cx) => {
-    const w = Math.max(0, size.width / (Number(settings()?.zoom) || 1) - pad);
+    const w = Math.max(0, size.width / zoom() - pad);
     if (sub === undefined) {
       if (view[key] === w) return;
       view[key] = w;
@@ -157,7 +158,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
       .on_size_change(noteW("noticeUndoW", noticeUndo))
       .on_click((_e, cx) => {
         cx.stop_propagation();
-        view.undo(cx);
+        undoNotice(cx);
       })
       .child(noticeUndo)));
   const measureSummary = standaloneNotice && div().id(`undo-summary-measure-${noticeSummary}`).absolute().top(0).left(0).h(0).overflow_hidden().whitespace_nowrap()
@@ -167,7 +168,7 @@ export function inboxList(view, t, model, drag, draw, cx) {
   const body = v_flex().id("inbox-list").relative().flex_1().min_h(0).px(8).overflow_y_scroll()
     .when(Boolean(view.listScroll), (el) => el.track_scroll(view.listScroll))
     .on_scroll_wheel(() => view.cancelReveal())
-    .on_size_change((size) => { view.listH = size.height / zoom; });
+    .on_size_change((size) => { view.listH = size.height / z; });
   // Count actual direct layout children, not just agent rows. Keep the exit layer one child even as ghosts change.
   const indices = new Map();
   let index = 0;

@@ -4,9 +4,12 @@ import { focused, panes, spaces } from "herdr";
 const recent = () => /** @type {any} */ (globalThis).t3TerminalContext ??= new Map();
 // `all`: panes(), when the caller has read it (each read copies every pane).
 export function rememberTerminal(all = panes()) {
-  const f = focused();
-  for (const [key, was] of recent()) if (!all.some(p => p.terminal === was.terminal && p.tab === was.tab)) recent().delete(key);
-  if (f?.terminal) recent().set(`${f.space}:${f.tab}`, { ...f });
+  const f = focused(), kept = recent();
+  if (kept.size) {
+    const open = new Set(all.map(p => `${p.tab}\0${p.terminal}`));
+    for (const [key, was] of kept) if (!open.has(`${was.tab}\0${was.terminal}`)) kept.delete(key);
+  }
+  if (f?.terminal) kept.set(`${f.space}:${f.tab}`, { ...f });
 }
 export function terminalFor(space = spaces().find(s => s.active)?.id, tab = spaces().find(s => s.id === space)?.tabs.find(t => t.active)?.id, all = panes()) {
   rememberTerminal(all);

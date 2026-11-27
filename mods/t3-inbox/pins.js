@@ -29,13 +29,20 @@ export function putBack(before, took) {
   if (back.length) setPinned(current);
 }
 
-// Drops pins of agents that ended, only for machines `all` has heard from: while starting or connecting, a machine's agents aren't listed yet.
-export function prunePins(all) {
-  const pins = pinList();
-  const machine = (addr) => (addr.includes("/") ? addr.split("/")[0] : "");
-  const heard = new Set(all.map((k) => machine(k.address)));
+const machineOf = (addr) => (addr.includes("/") ? addr.split("/")[0] : "");
+
+// Whether an address's agent ended, only for machines `all` has heard from: while starting or connecting, a machine's agents
+// aren't listed yet.
+export function endedIn(all) {
+  const heard = new Set(all.map((k) => machineOf(k.address)));
   const live = new Set(all.filter((k) => k.state === "live").map((k) => k.address));
-  const kept = pins.filter((p) => !heard.has(machine(p)) || live.has(p));
+  return (addr) => heard.has(machineOf(addr)) && !live.has(addr);
+}
+
+// Drops pins of agents that ended.
+export function prunePins(all) {
+  const pins = pinList(), ended = endedIn(all);
+  const kept = pins.filter((p) => !ended(p));
   if (kept.length !== pins.length) setPinned(kept);
   return kept;
 }

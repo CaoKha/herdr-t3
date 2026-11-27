@@ -13,18 +13,18 @@ const cx = { notify() {}, stop_propagation() {} };
 // Host reads a draw makes: each copies what it returns.
 const reads = { layout: 0, panel: 0, home: 0 };
 const env = {
-  ui: (n) => n,
+  ui: (n) => n, keepPress: (_e, cx) => cx.stop_propagation(),
   View: class {}, div: element, svg: src => { const e = element(); e.src = src; return e; }, image: element, h_flex: element,
   Popup: { new: (_id, trigger) => element().child(trigger) },
-  theme: () => t, props: () => part, settings: () => ({ zoom: 1 }), window: () => ({ platform, buttons: true }),
+  theme: () => t, props: () => part, settings: () => ({ zoom: 1 }), zoom: () => 1, window: () => ({ platform, buttons: true }),
   spaces: () => [space], agents: () => [], terminals: () => [], panes: () => [], layout: () => { reads.layout++; return {}; }, shared: () => null,
-  sidebarParts: () => ({ stack: { active: "lists" } }), toggleLeft: () => 8, panelState: () => { reads.panel++; return { pages: ["files"], page: "files", tabs: [], open: panelOpen }; },
+  sidebarParts: () => ({ stack: { active: "lists" } }), sidebarPage: () => env.sidebarParts(env.layout()).stack?.active, toggleLeft: () => 8, panelState: () => { reads.panel++; return { pages: ["files"], page: "files", tabs: [], open: panelOpen }; },
   tip: (_view, _t, _id, _label, el) => el, stop: (_view, _t, _id, el) => el, focusRoot: (_view, el) => el,
   glow: (view, id) => on => { view.hot = on ? id : null; }, within: () => false,
   tipCard: (_t, id) => element().id(id), FADE: {},
   run: (cmd, args) => calls.push([cmd, args]), newTab: s => calls.push(["new", s.id]), togglePanel: () => calls.push(["panel"]),
   toggleWide: () => calls.push(["wide"]), hidePanel: () => calls.push(["hide"]), updates: () => ({ app: {} }), KEY: {}, REVIEW_STATUS: "review.status",
-  navigation: () => ({ get atHome() { reads.home++; return home; }, frame: () => ({ tabs: [tab], context: null }) }),
+  navigation: () => ({ get atHome() { reads.home++; return home; }, frame: () => ({ tabs: [tab], context: null, every: [], all: [], panes: [] }) }),
   subAgents: () => () => [], namer: () => p => p.title, programIcon: () => null,
   terminalByAddress: all => new Map(all.map(k => [k.address, k])),
   POINTER_WATCH: 100, pointerAt: () => null, pointerGone: () => false, pointerMoved() {}, pressed() {}, justClosed: () => false,
@@ -41,10 +41,12 @@ function load(dir) {
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/status-mark.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/store.js"), "utf8")), scope);
   vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/list.js"), "utf8")), scope);
+  vm.runInContext(strip(fs.readFileSync(path.join(__dirname, "../../shared/menu-row.js"), "utf8")), scope);
   vm.runInContext('globalThis.namedLabel = named;', scope);
   // The brand bar's Home button, t3-chrome's alone.
   if (fs.existsSync(path.join(dir, "brand.js"))) vm.runInContext(strip(fs.readFileSync(path.join(dir, "brand.js"), "utf8")), scope);
   vm.runInContext("(() => {\n" + strip(["color.js", "button.js", "trigger.js", "tab.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n")) + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; Object.assign(globalThis, { trigger, opener, popupOpen, hang });\n})();", scope);
+  if (fs.existsSync(path.join(dir, "navigation.js"))) vm.runInContext("(() => {\n" + strip(fs.readFileSync(path.join(dir, "navigation.js"), "utf8")) + "\nglobalThis.nameOf = nameOf;\n})()", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, surfaceWidths: {}, surfaceStrip: {}, pressed: null, over: null, area: 600 });
 }
@@ -133,7 +135,7 @@ panelOpen = false;
 platform = "linux";
 root = tabs.render();
 assert.equal(find(root, "minimize").items[0], "−"); assert.equal(find(root, "maximize").items[0], "□");
-const toggle = tabs.sidebarToggle(t, () => {});
+const toggle = tabs.sidebarToggle(t);
 assert.equal(toggle.style.h, 28); assert.equal(toggle.style.w, 28, "the 28px square, its icon alone"); assert.equal(toggle.items.length, 1);
 click(toggle, "sidebar-toggle");
 assert.equal(calls.pop()[0], "t3-tabs.toggle-sidebar");
@@ -186,7 +188,9 @@ assert.equal(calls.pop()[0], "t3-tabs.close-tab:b", "a middle press closes the t
   const tree = vm.createContext({ Date: clock });
   vm.runInContext(kit.strip(fs.readFileSync(path.join(__dirname, "tree.js"), "utf8")) + "\nglobalThis.real = { ownStatus, treeStatus, notNews, subAgents };", tree);
   const was = { ...env };
-  Object.assign(env, tree.real, { Date: clock, agents: () => [{ address: "t1", tab: "b", status: "done" }], terminals: () => [term],
+  const agents = () => [{ address: "t1", tab: "b", status: "done" }], terminals = () => [term];
+  Object.assign(env, tree.real, { Date: clock, agents, terminals,
+    navigation: () => Object.assign(was.navigation(), { frame: () => ({ tabs: [tab], context: null, every: agents(), all: terminals(), panes: [] }) }),
     sidebarParts: () => ({ stack: { active: mode } }), stopsEnd() {} });
   const view = load(__dirname), marked = () => kit.walk(find(view.render(drawCx), "tab-b")).some(n => "rounded_full" in n.style);
   for (const k of Object.keys(env)) if (!(k in was)) delete env[k];
@@ -227,7 +231,7 @@ const pending = [], timedCx = { ...cx, timer: { after(ms, callback) { const task
 const tick = ms => { const i = pending.findIndex(task => !task.cancelled && task.ms === ms); assert.notEqual(i, -1); pending.splice(i, 1)[0].callback(timedCx); };
 const bounds = { x: 10, y: 20, width: 30, height: 24 };
 const crumbContext = { space: { id: 's', name: 'Space' }, head: 'agent', parent: 'parent' };
-const crumbData = { every: [{ address: 'agent', title: 'Wide title' }, { address: 'parent', title: 'Parent' }], ps: [], name: a => a.title, narrow: false, stopPress() {} };
+const crumbData = { every: [{ address: 'agent', title: 'Wide title' }, { address: 'parent', title: 'Parent' }], ps: [], name: a => a.title, narrow: false };
 env.projectMark = () => element();
 const crumbs = load(__dirname);
 root = crumbs.crumb(t, crumbContext, crumbData);
@@ -251,11 +255,12 @@ find(root, 'crumb-parent').handlers.on_hover(true, timedCx); assert.equal(crumbs
 
 // bar-measure only writes KEY.compact when the boolean value actually changes.
 {
-  const wasShared = env.shared, wasSetShared = env.setShared, wasSettings = env.settings, wasPart = part;
+  const wasShared = env.shared, wasSetShared = env.setShared, wasSettings = env.settings, wasZoom = env.zoom, wasPart = part;
   let compactValue = undefined, writes = 0, zoom = 1;
   env.shared = (k) => k === "t3-tabs.compact" ? compactValue : null;
   env.setShared = (k, v) => { if (k === "t3-tabs.compact") { compactValue = v; writes++; } };
   env.settings = () => ({ zoom });
+  env.zoom = () => zoom;
   part = { part: "measure" };
   const measure = load(__dirname);
   const el = find(measure.render(), "bar-measure");
@@ -272,7 +277,7 @@ find(root, 'crumb-parent').handlers.on_hover(true, timedCx); assert.equal(crumbs
   assert.deepEqual([compactValue, writes], [false, 2], "zoomed 2048/2 = 1024 stays false without rewriting");
   el.handlers.on_size_change({ width: 2046 });
   assert.deepEqual([compactValue, writes], [true, 3], "zoomed 2046/2 = 1023 crosses to true");
-  env.shared = wasShared; env.setShared = wasSetShared; env.settings = wasSettings; part = wasPart;
+  env.shared = wasShared; env.setShared = wasSetShared; env.settings = wasSettings; env.zoom = wasZoom; part = wasPart;
 }
 
 console.log("ok: tab/window/sidebar and chrome buttons use the real helper and preserve their clicks, counts and platform glyphs.");

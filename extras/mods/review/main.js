@@ -3,13 +3,13 @@
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, VirtualListScrollHandle, InputState, TextView } from "gpui-base";
-import { checking, exec, nextCommand, setShared, shared, spaces, theme, props, window as appWindow } from "herdr";
+import { checking, nextCommand, setShared, shared, spaces, theme, props, window as appWindow } from "herdr";
 import { panelState, surfacesFor, closeSurface, reviewRepo, surfaceBorn, reviewRequest, reviewShown, REVIEW_SHOWN, REVIEW_STATUS } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { buildItems, codeChar, contentWidth, groupFiles, rowsToAsk, wrapColumns, LOOKAHEAD } from "./rows.js";
-import { PANE, LU, SPLIT_MIN, DISABLED, HEADER, BELOW, pref, setPref, zoom, subState } from "./controls.js";
+import { SPLIT_MIN, DISABLED, HEADER, BELOW, pref, setPref, subState } from "./controls.js";
 import { GROUP_GAP } from "./button.js";
-import { popupClosed } from "./review-menu.js";
+import { PANE, LU, popupClosed } from "./review-menu.js";
 import { subOpened } from "./submenu.js";
 import { colors, loadReview, loadRows, pollReview, applyReview, analyzeReview, toggleFull, recolorFulls } from "./review-load.js";
 import { loadSettings, models, submitModel, pageRows, locale, settingsPanel, settingsSub, openPage } from "./settings.js";
@@ -25,10 +25,12 @@ import { setReviewed, headerPress, diffView, hbars, foldMenu } from "./diff.js";
 import { analysisStatus, statusPanel, head, header } from "./header.js";
 import { reviewKey } from "./keys.js";
 import { wrapLines } from "./store.js";
-import { initMenu, closeMenu, menuView, closeMenus } from "./menus.js";
+import { initMenu, closeMenu, menuView } from "./menus.js";
 import { installedTargets } from "./open-in.js";
 import { sendLines } from "./lines.js";
-import { textSize, ui } from "./layout-settings.js";
+import { textSize, ui, zoom } from "./layout-settings.js";
+import { git } from "./git.js";
+import { closeTops } from "./popup-menu.js";
 
 // A request this young when its space's review starts is the click that opened the panel; an older one was already shown.
 const FRESH = 10000;
@@ -84,7 +86,7 @@ export default class ReviewPanel extends View {
       for (;;) {
         const [name, page] = (await nextCommand()).split(":"), s = this.shown();
         if (name === "send" && s?.linePick) sendLines(s, cx);
-        if (name === "close" && !closeMenus(PANE)) {
+        if (name === "close" && !closeTops(PANE)) {
           if (s?.popup) s.closePopup(cx);
           else if (page !== "menu") closeSurface();
         }
@@ -101,11 +103,12 @@ export default class ReviewPanel extends View {
     cx.timer.every(15000, (cx) => each(s => s.refresh(cx)));
     // Unseen, a review is due a read, which follows within a second of it being seen again. A space closed leaves nothing.
     cx.timer.every(1000, (cx) => {
-      const byId = new Map(spaces().map(s => [s.id, s]));
+      if (!this.bySpace.size) return;
+      const every = spaces(), byId = new Map(every.map(s => [s.id, s])), p = panelState();
       for (const [id, s] of this.bySpace) {
         const sp = byId.get(id);
-        if (!sp || !s.surfaceAlive()) { s.evict(); this.bySpace.delete(id); if (this.front === s) this.front = null; }
-        else if (!s.readable()) s.deferRead();
+        if (!sp || !s.surfaceAlive(p)) { s.evict(); this.bySpace.delete(id); if (this.front === s) this.front = null; }
+        else if (!s.readable(p, every)) s.deferRead();
         else if (s.noRepo && !s.root && !s.loading) { if (workFolder(id) !== s.startFolder) s.start(sp, cx); }
         else if (s.dirty) s.load(cx);
       }
@@ -164,7 +167,7 @@ export default class ReviewPanel extends View {
     this.review = null; this.switching = false; this.baseCommits = null; this.full.clear(); this.fullReads.clear(); this.parts.clear();
     this.scroll = null; this.wrapHold = {};
     // Back to the panel's own, none, as at begin.
-    for (const key of ["itemList", "itemsId", "sizes", "visible", "paths", "pathsOf", "treeOf", "tabStats", "settling", "lastSpied", "revealedCurrent", "scopeGit", "picks", "refs"]) delete this[key];
+    for (const key of ["itemList", "itemsId", "sizes", "visible", "paths", "pathsOf", "treeOf", "tabStats", "settling", "lastSpied", "spiedAt", "spiedText", "revealedCurrent", "scopeGit", "picks", "refs"]) delete this[key];
   }
 
   // A space's review's own state, at its start: what review.shown says it showed, and requests from before it ignored.
@@ -203,7 +206,7 @@ export default class ReviewPanel extends View {
       if (this.root || !root) { this.noRepo = !this.root; return cx.notify(); }
       this.noRepo = false;
       this.root = root;
-      const head = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "symbolic-ref", "--short", "-q", "HEAD"], { cwd: root, on: this.on }).catch(() => null);
+      const head = await git(root, ["symbolic-ref", "--short", "-q", "HEAD"], this.on).catch(() => null);
       const branch = head?.code === 0 && head.stdout.trim();
       if (!live()) return;
       if (!this.page) { this.page = this.base = branch ? changesPage(chosenBase(this), branch) : "/worktree"; this.load(cx); }
@@ -225,21 +228,20 @@ export default class ReviewPanel extends View {
   // No review shown, or none yet: what belonged to the last one goes with it.
   forget() { this.restoreTo = null; this.review = null; this.linePick = null; this.switching = false; this.groupKey = null; this.current = null; this.full.clear(); this.fullReads.clear(); this.parts.clear(); this.shift = [0, 0, 0]; }
 
-  surfaceAlive() {
-    return !panelState().owns || surfaceBorn("review", this.space) === this.surfaceBorn;
+  surfaceAlive(p = panelState()) {
+    return !p.owns || surfaceBorn("review", this.space) === this.surfaceBorn;
   }
 
   // This review's space the active one and the panel open on its review page, whichever window is in front.
-  inView() {
-    if (!this.surfaceAlive() || !spaces().some(s => s.active && s.id === this.space)) return false;
-    const p = panelState();
+  inView(p = panelState(), every = spaces()) {
+    if (!this.surfaceAlive(p) || !every.some(s => s.active && s.id === this.space)) return false;
     return p.open && p.page === PANE && (!p.owns || p.active === PANE);
   }
 
-  onScreen() { return appWindow()?.active !== false && this.inView(); }
+  onScreen(p, every) { return appWindow()?.active !== false && this.inView(p, every); }
 
   // Reads wait for the window to be in front, but for the first: until it lands or fails, the page says it is loading.
-  readable() { return this.onScreen() || (!this.review && !this.error && this.inView()); }
+  readable(p, every) { return this.onScreen(p, every) || (!this.review && !this.error && this.inView(p, every)); }
 
   // Drop the visible period's reads and merge their retries into the next page refresh.
   deferRead() {
@@ -515,10 +517,9 @@ export default class ReviewPanel extends View {
     // while a mark lands (its own read follows): a read then would fail or be dropped, and ask again at once.
     if ((this.rowsWanted().length || this.pageWanted()) && !this.loading && !this.error && !this.marking) this.loadRows(cx);
     const group = this.group();
-    // The column lists the group's files; with none to list (no changes), it's away and its switch greyed.
-    this.navShown = this.treeOpen();
-    // The keys move in the file tree only while it's drawn.
-    this.treeShown = this.navShown;
+    // The column lists the group's files; with none to list (no changes), it's away and its switch greyed. The keys move in the
+    // file tree only while it's drawn.
+    this.treeShown = this.treeOpen();
     // There's always a file in front while the group has one: its first, until a click, a key or the list's top says another.
     // Its folders open, so the tree shows it.
     if (group && !this.switching && !groupFiles(group).includes(this.current)) { this.current = groupFiles(group)[0] ?? null; if (this.current) openTo(this, this.current); }
@@ -549,7 +550,7 @@ export default class ReviewPanel extends View {
         // As the app's FeedbackLoading.
         ? div().flex_1().min_h(0).when(!this.error, el => el.child(loadingState("mods/review", t, "review-loading", "Loading the review…")))
         // The diff on the left, the files in the panel's navigation column on the right, at the window's edge (ADR 0013).
-        : div().flex_1().min_h(0).child(withNav(t, "review", this.width, { open: this.navShown, head: navHead(this, t), list: fileTree(this, t).size_full(),
+        : div().flex_1().min_h(0).child(withNav(t, "review", this.width, { open: this.treeShown, head: navHead(this, t), list: fileTree(this, t).size_full(),
           // The group shown's summary over its diff, as the app's group header: its title 13 medium, its words 12.
           content: v_flex().size_full().min_w(0)
             // A rule-based group's summary is the daemon's boilerplate for its folder rule.
@@ -596,7 +597,13 @@ export default class ReviewPanel extends View {
     return new Set((this.itemList ?? []).slice(start, end).filter(item => item.kind !== "group").map(item => item.path));
   }
 
-  spied() { return this.review ? JSON.stringify([[...this.visibleFiles()], this.stickyFile()?.path, this.pageWanted(), this.current]) : ""; }
+  spied() {
+    if (!this.review) return "";
+    const { start = 0, end = 0 } = this.visible ?? {}, at = [this.review, this.itemList, start, end, this.switching, this.current];
+    if (this.spiedAt?.every((v, i) => v === at[i])) return this.spiedText;
+    this.spiedAt = at;
+    return (this.spiedText = JSON.stringify([[...this.visibleFiles()], this.stickyFile()?.path, this.pageWanted(), this.current]));
+  }
 
   // The file whose header or rows open the view; before the list draws, none.
   topFile() {

@@ -1,9 +1,11 @@
 // Where a review opens, and opening it: `open` in this folder's config.json picks the fork's daemon (in a Herdr pane, the
 // installed app or the browser) or the official CLI.
 
-import { checking, exec, hc, window, notify, closeOverlay, appHome, readTextFile } from "herdr";
-import { argPage, changedFiles, git } from "./review-git.js";
+import { checking, exec, hc, notify, closeOverlay, appHome, readTextFile } from "herdr";
+import { argPage, changedFiles } from "./review-git.js";
 import { openReview } from "./panel.js";
+import { git } from "./git.js";
+import { openUrl } from "./open-url.js";
 
 // `open` in this folder's config.json (mods/README.md); none or "herdr" is the fork's daemon in the panel's review page.
 // "pwa":      the fork's `jin.review -d --pwa`, in the installed jin.review app.
@@ -41,14 +43,6 @@ async function pageFor(root, args, on = null) {
   return branch && branch !== main && (main || !["main", "master"].includes(branch)) ? argPage([], branch) : "/";
 }
 
-async function openUrl(url) {
-  const platform = window()?.platform;
-  const [command, args] = platform === "macos" ? ["open", [url]]
-    : platform === "windows" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : ["xdg-open", [url]];
-  const r = await exec(command, args);
-  if (r.code !== 0) throw new Error(`Could not open ${url}`);
-}
-
 // The official CLI is a foreground server: herdr-core keeps one per worktree, found again by its label.
 async function official(root, args, page) {
   const label = `${LABEL}=${root}`;
@@ -61,7 +55,8 @@ async function official(root, args, page) {
   const { text } = await core(["read", live.address, "--lines", "5000"]);
   const origin = /pulls\.review is serving (http:\/\/[^/\s]+)/.exec(text)?.[1];
   if (!origin) throw new Error(`pulls.review is still starting. Its output: hc read ${live.address}`);
-  await openUrl(origin + (page ?? await pageFor(root, args)));
+  const url = origin + (page ?? await pageFor(root, args)), r = await openUrl(url);
+  if (r.code !== 0) throw new Error(`Could not open ${url}`);
 }
 
 // A space's review is the `review` page of the window's one panel (docs/adr/0011): the request names the space, and the

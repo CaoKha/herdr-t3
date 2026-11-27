@@ -12,7 +12,7 @@ const src = fs.readFileSync(path.join(__dirname, "list.js"), "utf8")
   .replace(/^import .*;\r?\n/gm, "").replace(/^export (function|const) /gm, "$1 ")
   + "\nglobalThis.list = { step, menuJump, scrollList, menuKeys, openLit, litProp, propsLit };";
 let closed = [], popupProps = { overlay: "o1" };
-const context = vm.createContext({ div: element, settings: () => ({ zoom }), Date: { now: () => now }, props: () => popupProps, closeOverlay: (id) => closed.push(id) });
+const context = vm.createContext({ div: element, zoom: () => zoom, Date: { now: () => now }, props: () => popupProps, closeOverlay: (id) => closed.push(id) });
 vm.runInContext(src, context);
 const { step, menuJump, scrollList, menuKeys, openLit, litProp, propsLit } = context.list;
 

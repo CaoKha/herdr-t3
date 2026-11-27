@@ -6,7 +6,7 @@ import { stopsInit, stopsEnd, stop, focusRoot } from "./focus.js";
 import { trigger, hang } from "./trigger.js";
 import { notePanelWidth } from "./titlebar.js";
 import { menuKeys, litProp, propsLit } from "./list.js";
-import { menuRow, menuHint, MENU_ROW } from "./menu-row.js";
+import { menuRow, menuHint, MENU_W, menuHeight } from "./menu-row.js";
 import { toggleLeft, sidebarParts } from "./sidebar.js";
 import { brand, BRAND_FIXED, BRAND_GAP } from "./brand.js";
 import { initSettings, settingsView } from "./settings.js";
@@ -14,21 +14,20 @@ import { KEY, closedKey } from "./store.js";
 import { panelState, showPage, hidePanel, toggleWide, activateSurface, closeSurface, reviewRepo, layoutNode, REVIEW_STATUS } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { stripAt, stripEnds, stripWheel, stripPage, stripFades } from "./scroll-strip.js";
-import { button as drawButton, radiusOf, GROUP_GAP } from "./button.js";
+import { button as drawButton, radiusOf, GROUP_GAP, keepPress } from "./button.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { statusMark } from "./status-mark.js";
 import { tab as closableTab } from "./tab.js";
 import { keycap } from "./palette.js";
 import { alpha } from "./color.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
+import { LIVE_MS } from "./notice.js";
 
 // The space panel's surfaces (docs/adr/0017) that aren't a file, in the order + lists them: their names, icons and + keys. Review
 // wears pulls.review's own mark, as the Review bar does: a review, not a git command. In its colors, so an image. A page slot
 // not named here (another mod's) shows by its slot's id.
 const PAGES = { files: ["Files", "folder-tree", false, "f"], review: ["Review", "pulls-review", true, "r"], pulls: ["Pull requests", "git-pull-request", false, "p"], issues: ["Issues", "circle-dot", false, "i"] };
 // The surface menus: as wide as t3-menu's, as tall as their rows and their 4 in (docs/internals/t3-tokens.md "Menu rows").
-const MENU_W = 220, menuHeight = (rows) => rows * ui(MENU_ROW) + 8;
-const zoomOf = () => Number(settings()?.zoom) || 1;
 const side = (n) => [].concat(n?.padding ?? 0).at(-1);
 // The layout's room each side of the panel head's mod: the panel's and the head's padding put its ends 12 in, as the
 // surfaces' own rows below it (t3-tokens "Rules" R1).
@@ -69,15 +68,15 @@ export default class WorkspaceChrome extends View {
   alignLayout(cx) {
     if (checking()) return;
     if (shared("layout") !== "herdr-t3") return;
-    const root = /** @type {any} */ (layout()), w = window(), zoom = Number(settings().zoom) || 1;
+    const root = /** @type {any} */ (layout()), w = window(), z = zoom();
     if (w?.platform !== "macos" || w.fullscreen || root?.titlebar !== "none" || !root.traffic_lights || this.layoutWriting) return;
     // Native buttons are unzoomed, centered 8px below y; the brand row's center is 20 logical px.
-    const y = Math.round((12 + 20 * (zoom - 1)) * 1000) / 1000;
+    const y = Math.round((12 + 20 * (z - 1)) * 1000) / 1000;
     // After the name, T3's 4 + 2 × 28 + 12; never under T3's 208. Only once the name is measured: before that there is no row to fit.
     const { rail } = sidebarParts(root);
-    const min = this.brandNameW && rail ? Math.max(208, Math.ceil(toggleLeft(w, root, zoom) + 28 + BRAND_GAP + BRAND_FIXED + this.brandNameW + 72)) : undefined;
+    const min = this.brandNameW && rail ? Math.max(208, Math.ceil(toggleLeft(w, root, z) + 28 + BRAND_GAP + BRAND_FIXED + this.brandNameW + 72)) : undefined;
     // Once per value: an update that rewrites the layout is aligned again, a failure isn't retried.
-    const seen = `${zoom}:${root.traffic_lights[1]}:${min}:${rail?.min}`;
+    const seen = `${z}:${root.traffic_lights[1]}:${min}:${rail?.min}`;
     if (this.layoutSeen === seen) return;
     this.layoutSeen = seen;
     const lights = root.traffic_lights[1] !== y, fit = min !== undefined && rail.min !== min;
@@ -127,12 +126,12 @@ export default class WorkspaceChrome extends View {
       const ready = updates().app.ready;
       // T3's undo notice (t3-inbox.notice), in this row's free space so it covers nothing; Undo is inert while it fades. One older than
       // its 5s plus the fade is left from before a restart.
-      const undo = shared(KEY.notice), undoLive = Boolean(undo?.live && Date.now() - undo.at < 5000);
+      const undo = shared(KEY.notice), undoLive = Boolean(undo?.live && Date.now() - undo.at < LIVE_MS);
       const noticeActive = Boolean(undo && Date.now() - undo.at < 6000);
       const summary = noticeActive ? `${undo.action}${undo.count === 1 ? "" : ` ${undo.count}`},` : "";
       const undoText = noticeActive ? undoLabel("t3-tabs.undo") : "";
       const noteW = (key, sub) => (size, cx) => {
-        const w = size.width / zoomOf();
+        const w = size.width / zoom();
         if (sub === undefined) {
           if (this[key] === w) return;
           this[key] = w;
@@ -184,21 +183,21 @@ export default class WorkspaceChrome extends View {
     // As T3's: past the macOS window buttons (layout traffic_lights) the sidebar's toggle, where it stays with the sidebar hidden
     // (t3-tabs draws it there then, sidebar.js toggleLeft), then BRAND_GAP on Herdr's tile and name, then a place to drag the window. Which
     // mode the sidebar shows is a setting (settings.js) and ⌘⇧L, not a button here.
-    const w = window(), zoom = settings().zoom || 1, left = toggleLeft(w, layout(), zoom);
+    const w = window(), z = settings().zoom || 1, left = toggleLeft(w, layout(), z);
     // One look always, as T3's (brand.js): a click goes Home. The name gets what's left past the inset, the right padding, the toggle,
     // BRAND_GAP and the rest of the button; short of room it gives way whole, never the tile or the toggle.
     const named = !this.brandW || this.brandW - left - 8 - 28 - BRAND_GAP - BRAND_FIXED >= (this.brandNameW || 0);
     return focusRoot(this, h_flex().id("brand").size_full().bg(t.chrome).pl(left).pr(8).items_center()
-      .on_size_change((size, cx) => { this.brandW = size.width / zoom; cx.notify(); })
+      .on_size_change((size, cx) => { this.brandW = size.width / z; cx.notify(); })
       // T3's 28px title bar button.
       .child(tip(this, t, "sidebar-toggle", "Hide sidebar", stop(this, t, "sidebar-toggle", drawButton(t, "sidebar-toggle", {
         size: "sm", icon: "mods/t3-chrome/icons/panel-left.svg", label: "Hide sidebar", hot: this.hot === "sidebar-toggle" })
         .flex_none().on_hover(glow(this, "sidebar-toggle"))
-        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_mouse_down("left", keepPress)
         // It goes with the sidebar, before the pointer can report leaving it.
         .on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true }))
       .child(div().w(BRAND_GAP).flex_none())
-      .child(brand(this, t, { named, zoom }))
+      .child(brand(this, t, { named, zoom: z }))
       .child(div().flex_1()));
   }
 
@@ -219,7 +218,7 @@ export default class WorkspaceChrome extends View {
   // + 's menu: under its press, else (the panel's cmd-t) under where + stands: the head's mod ends its padding in from the
   // window's right, + after the tabs as the strip has them scrolled. A popup's `at` is in zoomed px.
   openSurfaceMenu(press) {
-    const z = zoomOf(), rows = this.pageItems(panelState()).length;
+    const z = zoom(), rows = this.pageItems(panelState()).length;
     let at = hang(press, 0, { align: "start", gap: 6 }).at;
     if (!at && this.headW) {
       const root = layout(), high = layoutNode(root, "panel-head")?.size?.px ?? 40;
@@ -232,11 +231,11 @@ export default class WorkspaceChrome extends View {
   // The space panel's head (docs/internals/specs/space-panel.md): T3's tabs, + after them in the same scrolled strip, T3's arrows
   // while it overflows, then widen and put away; its ends over its pages' rows ("Rules" P3, R1). The rest of the row drags the window.
   panelHead(t) {
-    const s = panelState(), space = spaces().find(p => p.active), z = zoomOf(), w = window();
+    const s = panelState(), space = spaces().find(p => p.active), z = zoom(), w = window();
     // Review's run for this space, marked as a tab's agent is.
     const word = space && shared(REVIEW_STATUS)?.[space.id];
     const mark = statusMark("mods/t3-chrome", t, word, 14);
-    const own = (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation());
+    const own = (el) => el.on_mouse_down("left", keepPress);
     const widths = this.surfaceWidths;
     for (const id of Object.keys(widths)) if (!s.tabs.some(tab => tab.id === id)) delete widths[id];
     const page = (tab) => {
@@ -249,12 +248,12 @@ export default class WorkspaceChrome extends View {
       return closableTab(this, t, key, { mod: "mods/t3-chrome", label, icon, active: on, maxW: 144, mark: id === "review" ? mark : null, close: () => closeSurface(id),
         menu: () => openOverlay({ mod: "t3-chrome", kind: "popup", width: MENU_W, height: menuHeight(tab.path ? 5 : 4), props: { part: "surface-context", space: space?.id, target: id, born: tab.born } }) }, el => el
         .on_click(() => activateSurface(id))
-        .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (widths[id] !== w) { widths[id] = w; cx.notify(); } }));
+        .on_size_change((size, cx) => { const w = size.width / zoom(); if (widths[id] !== w) { widths[id] = w; cx.notify(); } }));
     };
     const button = (id, icon, label, action, { key = undefined, size = /** @type {"xs" | "sm"} */ ("sm"), disabled = false } = {}) => tip(this, t, id, label, stop(this, t, id, drawButton(t, id, {
       size, disabled, on: id === "panel-close" || (id === "panel-wide" && s.wide), icon: `mods/t3-chrome/icons/${icon}.svg`, label, hot: this.hot === id })
       .when(!disabled, el => el.on_hover(glow(this, id)).on_click((_e, cx) => { this.hot = null; action(); cx.notify(); }))
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation()), radiusOf(size)), { action: key, below: true });
+      .on_mouse_down("left", keepPress), radiusOf(size)), { action: key, below: true });
     const add = trigger(this, t, "surface-add", { icon: "mods/t3-chrome/icons/plus.svg", label: "Open a surface", size: "xs", below: true,
       closed: SURFACE_CLOSED, onOpen: (b) => this.openSurfaceMenu(b) });
     // The strip: the tabs, + (24) after them; the active tab in view (scroll-strip.js).
@@ -268,7 +267,7 @@ export default class WorkspaceChrome extends View {
       // What the panel takes from the work column: the head, its padding and the root's divider.
       .on_size_change((size, cx) => { const root = layout(); notePanelWidth(size.width + (2 * headPad(root) + (root?.divider?.width ?? 0)) * z); if (this.headW !== size.width / z) { this.headW = size.width / z; cx.notify(); } })
       .child(div().id("surface-scroll").relative().flex_1().min_w(0).h_full().overflow_hidden()
-        .on_size_change((size, cx) => { const w = size.width / zoomOf(); if (this.surfaceRoom !== w) { this.surfaceRoom = w; cx.notify(); } })
+        .on_size_change((size, cx) => { const w = size.width / zoom(); if (this.surfaceRoom !== w) { this.surfaceRoom = w; cx.notify(); } })
         .on_scroll_wheel((e, cx) => { stripWheel(strip, e); cx.notify(); })
         .child(h_flex().id("surface-strip").h_full().ml(-at).gap(4).items_center().children(s.tabs.map(page)).child(add))
         .children(stripFades(t.chrome, strip)))

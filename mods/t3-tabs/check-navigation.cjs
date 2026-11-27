@@ -42,8 +42,8 @@ function fixture() {
   vm.runInContext(source, scope, { filename: "navigation.js" });
   Object.assign(core, vm.runInContext("({ namer, programOf, focusAgent, focusPane, writeLabel })", scope));
   return { ...core, terminals: () => terminals, panes: () => panes, cx, slots, state, shown, calls, labelled, overlays, closed, notifications, timers, events,
-    navigation: (beforeAsk, over = {}) => {
-      const view = scope.navigation(beforeAsk, { ...core, ...over }), frame = view.frame;
+    navigation: (over = {}) => {
+      const view = scope.navigation({ ...core, ...over }), frame = view.frame;
       if (twice) view.frame = () => { view.advance(); const model = frame(); view.advance(); return model; };
       return view;
     },
@@ -59,7 +59,7 @@ function checkBookmarks() {
     { id: "known-home", machine: null, name: "My Home", named: true, folder: "/home/test", tabs: [] },
     { id: "named-home", machine: null, name: "Home\u200b", named: true, folder: "/private/home", tabs: [] },
     { id: "unnamed-home-folder", machine: null, name: "~", folder: "/home/test", tabs: [] });
-  f.navigation(undefined, { checking: () => true }).advance();
+  f.navigation({ checking: () => true }).advance();
   const saved = () => f.state["t3.projects"];
   assert.equal(saved(), undefined, "checking leaves bookmarks alone");
   f.navigation().frame();
@@ -140,7 +140,7 @@ function cleanupFixture() {
 
 async function checkCleanup() {
   {
-    const { f } = cleanupFixture(), view = f.navigation(() => f.events.push("prepare"));
+    const { f } = cleanupFixture(), view = f.navigation();
     const say = command => view.handle(command, f.cx);
     await say("cleanup");
     assert.equal(f.overlays.length, 1, "ask before closing any terminal");
@@ -172,7 +172,7 @@ async function checkCleanup() {
     assert.deepEqual(f.calls, [], "a manual close replaces the cleanup answer");
     await say("cleanup");
     assert.deepEqual(f.closed, [1, 2, 3], "cleanup and manual close replace the prior dialog");
-    assert.deepEqual(f.events, ["prepare", "open", "prepare", "close", "open", "prepare", "close", "open", "prepare", "close", "open"]);
+    assert.deepEqual(f.events, ["open", "close", "open", "close", "open", "close", "open"]);
     await say(closeAnswer(dialog));
     await say(replaced);
     assert.deepEqual(f.calls, [], "a replaced cleanup answer cannot close anything");
@@ -200,7 +200,7 @@ async function checkCleanup() {
   {
     const { f, idle, settled, quiet, response } = cleanupFixture();
     let finish;
-    const view = f.navigation(undefined, {
+    const view = f.navigation({
       hc: args => finish && args[1] === idle.terminal ? new Promise(resolve => finish = () => resolve(response(args))) : Promise.resolve(response(args)),
     });
     await view.handle("cleanup", f.cx);
@@ -361,7 +361,7 @@ async function checkCleanup() {
     // Concurrent cleanup triggers: latest-wins serial guard drops stale slow scans so they don't open or overwrite dialogs.
     const { f, idle, response } = cleanupFixture();
     const gates = [];
-    const view = f.navigation(undefined, {
+    const view = f.navigation({
       hc: args => args[1] === idle.terminal
         ? new Promise(resolve => gates.push(() => resolve(response(args))))
         : Promise.resolve(response(args)),
@@ -652,7 +652,7 @@ async function check() {
     f.spaces()[0].tabs[0].active = true; f.agents()[0].focused = false;
     f.panes().push({ pane: "pm", tab: "b0", mod: "review" });
     Object.assign(f.shown, { tab: "b0", pane: "pm", agent: null });
-    f.navigation(undefined, counted).advance();
+    f.navigation(counted).advance();
     assert.deepEqual([reads, scans], [{ spaces: 1, panes: 1, agents: 1, terminals: 1 }, 0]);
   }
   // With no space open there is none to put a tab in: New picks one, as at Home.
@@ -871,7 +871,8 @@ async function check() {
     assert.deepEqual(made(), [["space.select", { id: "h" }]], "there's one Home");
 
     await pending;
-    assert.deepEqual(plain(view.frame()), { tabs: [], atHome: true, context: null }, "Home has no visible tabs");
+    const { tabs, atHome, context } = view.frame();
+    assert.deepEqual(plain({ tabs, atHome, context }), { tabs: [], atHome: true, context: null }, "Home has no visible tabs");
     await say("new");
     assert.deepEqual(made(), [["mod.open", { name: "t3-new-menu" }]], "New picks the space");
     // New's pick, a menu's New tab: the space is named, in view or not.
@@ -1087,7 +1088,7 @@ async function check() {
     f.panes().splice(0, Infinity, { pane: "p1", tab: "a", terminal: "t1" }, { pane: "p2", tab: "a", terminal: "t2" },
       { pane: "m", tab: "b", mod: "board" }, { pane: "p4", tab: "c", terminal: "t4" });
     Object.assign(f.shown, { tab: "a", pane: "p1" });
-    const view = f.navigation(() => f.events.push("prepare"));
+    const view = f.navigation();
     const say = command => view.handle(command, f.cx);
     // What `hc get` says: its own shell at the prompt, a program it started, a program that is the terminal, or no answer.
     const shell = { pid: 1, foreground: { pid: 1, name: "zsh" } }, program = { pid: 1, foreground: { pid: 2, name: "sleep" } }, own = { pid: 1, foreground: { pid: 1, name: "sleep" } };
@@ -1112,7 +1113,7 @@ async function check() {
     assert.deepEqual(f.calls, [], "nothing closes before the answer");
     await say("close-tab");
     f.overlays.pop();
-    assert.deepEqual(f.events.slice(-3), ["prepare", "close", "open"], "prepare the dialog before replacing the previous one");
+    assert.deepEqual(f.events.slice(-2), ["close", "open"], "close the previous dialog before opening the next");
     Object.assign(f.shown, { tab: "c", pane: "p4" });
     await say("close-tab");
     asked = f.overlays.pop();
@@ -1503,7 +1504,7 @@ async function check() {
       if (name === "pane.close") ps.splice(ps.findIndex(p => p.pane === args.pane), 1);
     };
     const hc = () => Promise.resolve({ code: 0, stdout: JSON.stringify({ pid: 1, foreground: busy ? { pid: 2, name: "lazygit" } : { pid: 1, name: "zsh" } }) });
-    const view = f.navigation(undefined, { run, hc });
+    const view = f.navigation({ run, hc });
     // A step waits to see the one before: time moves until the command is through.
     const say = async (command, mod, panes, tabs = [...new Set(panes.map(p => p.tab))]) => {
       ps.splice(2, Infinity, ...panes.map(p => ({ ...p }))); home.tabs = tabs.map(id => ({ id })); f.calls.length = 0;
@@ -1530,7 +1531,7 @@ async function check() {
     // An agent started in Home turns it into an ordinary space where it is, renamed for its folder: nothing moves or parks.
     // Its old name doesn't make it Home again before the rename shows; going Home makes a new one.
     {
-      const strip = f.navigation(undefined, { run });
+      const strip = f.navigation({ run });
       list.forEach(s => { s.active = s.id === "h"; });
       ps.splice(2, Infinity, { pane: "pq", tab: "ht", terminal: "t6" }); home.tabs = [{ id: "ht", active: true, named: true, name: "Home" }]; every.push({ address: "t6", tab: "ht", status: "working" });
       f.calls.length = 0; strip.frame(); strip.frame();
@@ -1572,7 +1573,7 @@ async function checkNewTabMissingFolder() {
     f.panes()[0].cwd = "/home/test/vanished";
     f.panes().push({ pane: "p-prog", tab: "prog", terminal: "t-prog" });
     f.slots.lists = { id: "sidebar-lists", active: "inbox" };
-    const view = f.navigation(undefined, { folderExists: async (p) => { probed.push(p); return false; } });
+    const view = f.navigation({ folderExists: async (p) => { probed.push(p); return false; } });
     const show = (id, agent) => {
       tabs.forEach(c => { c.active = c.id === id; });
       f.agents()[0].focused = Boolean(agent);
@@ -1594,7 +1595,7 @@ async function checkNewTabMissingFolder() {
   {
     // Local named space (`new:s1`) whose creation folder outside home() is missing, plus home boundary check (`/home/test-other`).
     const f = fixture(), probed = [];
-    const view = f.navigation(undefined, { folderExists: async (p) => { probed.push(p); return false; } });
+    const view = f.navigation({ folderExists: async (p) => { probed.push(p); return false; } });
     await view.handle("new:s1", f.cx);
     assert.deepEqual(probed, ["/work/p1"]);
     assert.deepEqual(f.calls, []);
@@ -1623,7 +1624,7 @@ async function checkNewTabMissingFolder() {
     const f = fixture(), probed = [];
     f.spaces()[0].active = false;
     f.spaces()[2].active = true;
-    const view = f.navigation(undefined, { folderExists: async (p) => { probed.push(p); return false; } });
+    const view = f.navigation({ folderExists: async (p) => { probed.push(p); return false; } });
     await view.handle("new", f.cx);
     await view.handle("new:s2", f.cx);
     assert.deepEqual(probed, [], "remote spaces are never probed locally");
@@ -1650,7 +1651,7 @@ async function checkNewTabMissingFolder() {
   {
     // checking() skips folder probing.
     const f = fixture(), probed = [];
-    const view = f.navigation(undefined, { checking: () => true, folderExists: async (p) => { probed.push(p); return false; } });
+    const view = f.navigation({ checking: () => true, folderExists: async (p) => { probed.push(p); return false; } });
     await view.handle("new", f.cx);
     assert.deepEqual(probed, []);
     assert.deepEqual(plain(f.calls), [["tab.new", { space: "s0", folder: "/work/s0" }]]);
@@ -1786,7 +1787,7 @@ async function checkPruningAndLinearScans() {
       },
     });
     const f = fixture();
-    const view = f.navigation(undefined, {
+    const view = f.navigation({
       spaces: () => baseSpaces,
       agents: () => baseAgents,
       terminals: () => countReads(baseTerms, () => { termReads++; }),

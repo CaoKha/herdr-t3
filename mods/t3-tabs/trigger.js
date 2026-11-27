@@ -4,13 +4,14 @@
 import { button, radiusOf } from "./button.js";
 import { tip, glow } from "./tip.js";
 import { stop, pressed, justClosed } from "./focus.js";
-import { shared, settings } from "herdr";
+import { shared } from "herdr";
+import { zoom } from "./layout-settings.js";
 
 /** Where a popup `width` wide hangs under the pressed control `b` (its bounds, zoomed px): `gap` below it, right edges together
  *  (`align` "end", `nudge` px past the right edge) or left ("start"). No press (keys, assistive tech): {}, the app's place. */
 export function hang(b, width, { align = "end", gap = 4, nudge = 0 } = {}) {
   if (!b) return {};
-  const z = Number(settings()?.zoom) || 1;
+  const z = zoom();
   return { at: { x: align === "end" ? b.x + b.width + (nudge - width) * z : b.x, y: b.y + b.height + gap * z } };
 }
 

@@ -1,7 +1,7 @@
 // A thing's details as T3's thread card, with its timing: for Inbox rows and tabs.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { POINTER_WATCH, pointerAt, pointerGone, pointerMoved } from "./tip.js";
+import { POINTER_WATCH, pointerAt, pointerGone, pointerMoved, FADE } from "./tip.js";
 import { alpha } from "./color.js";
 import { ui } from "./layout-settings.js";
 
@@ -21,7 +21,7 @@ function fadeOut(view, key, cx) {
 export const detailsAt = (view, key, e) => { pointerMoved(e.position); view.detailsBox = { key, box: e.bounds }; };
 
 // What a row's hover shows goes with the pointer, even when its leave never comes: see pointerGone.
-export function detailsWatch(view, key, cx) {
+function detailsWatch(view, key, cx) {
   view.detailsWatch?.cancel();
   const stop = () => { view.detailsWatch.cancel(); view.detailsWatch = null; };
   // What slid under a still pointer has no box until a move: see pointerGone.
@@ -76,17 +76,30 @@ export function detailsFor(view, key, cx) {
   });
 }
 
+export const detailsUp = (view, key) => view.details === key || view.detailsOut === key;
+
+export const detailsHover = (view, key) => (over, cx) => {
+  if (over) { view.hovered = key; detailsFor(view, key, cx); }
+  else if (view.hovered === key) { view.hovered = null; detailsFor(view, null, cx); }
+  cx.notify();
+};
+
+export function detailsGone(view, key) {
+  view.detailsWait?.cancel();
+  if (view.details === key) view.details = null;
+  if (view.detailsOut === key) view.detailsOut = null;
+}
+
 export const detailsLine = (t, mark, text) => h_flex().gap(8).min_w(0).items_center().child(mark).child(div().min_w(0).truncate().text_color(alpha(t.foreground, "bf")).child(text));
 
 // The title, then its lines. The caller hangs it from a Popup and gives it its gap from what it describes.
 // `wrap`: the title runs on over lines, for one the row it describes can't show whole (a commit's subject). `hide`: fades out and stays up, to come back.
 // `from`: where it slides from, toward the row: T3's scales, which Herdr can't.
-const detailsFade = /** @type {const} */ ({ duration: 150, easing: "ease-out" });
 export function detailsCard(view, t, key, title, lines, { wrap, hide, from = -4 } = /** @type {{ wrap?: any, hide?: any, from?: number }} */ ({})) {
   const shown = view.details === key && view.detailsIn && !hide;
   return v_flex().id(`details-card-${key}`).max_w(320).p(12).gap(8).rounded(6).border(1).border_color(t.border)
     // Solid: T3's glass blurs what's behind it, which a mod can't, and a terminal's text would show through.
-    .bg(t.chrome).shadow_xl().text_size(ui(12)).line_height(`${ui(16)}px`).opacity(shown ? 1 : 0).left(shown ? 0 : from).transition("opacity", detailsFade).transition("left", detailsFade)
+    .bg(t.chrome).shadow_xl().text_size(ui(12)).line_height(`${ui(16)}px`).opacity(shown ? 1 : 0).left(shown ? 0 : from).transition("opacity", FADE).transition("left", FADE)
     .child(div().min_w(0).when(!wrap, el => el.truncate()).line_height(1.25).font_medium().text_color(t.foreground).child(title))
     .child(v_flex().pl(2).gap(6).children(lines.filter(Boolean)));
 }

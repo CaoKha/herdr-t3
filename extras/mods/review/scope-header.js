@@ -10,7 +10,7 @@ import { LU, COMPACT, MODEL_ROW, pickMark, searchField, searchHeight, popupClose
 import { popover, toPane, subState, subAt, HEADER, BELOW } from "./controls.js";
 import { BASES, chosenBase, changesPage, diffCommits, repo, scopeOf, scopeRows, scopeList, scopeRow, scopeItems, readScope, releaseScope, openReviewPage, menuKey, commitsKey, commitsBody } from "./review-scope.js";
 import { opener } from "./trigger.js";
-import { button as drawButton, ghostButton, GROUP_GAP } from "./button.js";
+import { button as drawButton, ghostButton, GROUP_GAP, keepPress } from "./button.js";
 import { glow } from "./tip.js";
 import { menuRow } from "./menu-row.js";
 import { ui } from "./layout-settings.js";
@@ -165,7 +165,7 @@ export function baseMenu(view, t) {
         .when(Boolean(item.local && item.remote), el => el.child(div().id(`${item.id}-remote`).w(22).h(14).p(1).flex().rounded_full()
           .bg(remote ? t.accent : t.input).when(remote, el => el.justify_end())
           .role("switch").accessibility_label(`Use remote version of ${item.label}${remote ? ", on" : ""}`)
-          .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+          .on_mouse_down("left", keepPress)
           .on_click((_e, cx) => { cx.stop_propagation(); pickBase(view, remote ? item.local : item.remote, cx, true); })
           .child(div().size(12).rounded_full().bg(t.background))))
         .when(Boolean(item.remote) && !item.local, el => el.child(svg(`${LU}/check.svg`).size(12).text_color(t.dim))) })

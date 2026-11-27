@@ -27,14 +27,9 @@ export function initCleanUp(view, cx) {
   stopsInit(view, cx, "modal");
 }
 
-const hoverCleanRow = (view, id) => (over, cx) => {
-  const to = over ? id : view.overRow === id ? null : view.overRow;
-  if (to !== view.overRow) { view.overRow = to; cx.notify(); }
-};
-
-const hoverCard = (view, id) => (over, cx) => {
-  const to = over ? id : view.overCard === id ? null : view.overCard;
-  if (to !== view.overCard) { view.overCard = to; cx.notify(); }
+const hoverOver = (view, key, id) => (over, cx) => {
+  const to = over ? id : view[key] === id ? null : view[key];
+  if (to !== view[key]) { view[key] = to; cx.notify(); }
 };
 
 // The space's own mark, as Inbox's cards wear it; a space already gone keeps a plain one. `all`, `ps`: spaces() and panes(),
@@ -60,7 +55,7 @@ function closeRow(view, t, prefix, r, done, mark, closePane) {
   const id = `${prefix}-${r.pane}`, closeId = `clean-up-close-pane-${r.pane}`;
   const lit = view.overRow === id || view.hot === id || view.hot === closeId || within(view, [id, closeId]);
   const icon = prefix === "clean-up-settled"
-    ? (programIcon(r.program, 14, t.muted) ?? svg("mods/t3-actions/icons/terminal.svg").size(14).flex_none().text_color(t.muted))
+    ? programIcon(r.program, 14, t.muted, "mods/t3-actions/icons/terminal.svg")
     : svg("mods/t3-actions/icons/terminal.svg").size(14).flex_none().text_color(t.muted);
   const meta = h_flex().flex_none().max_w(180).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
     .child(div().min_w(0).truncate().child(r.space))
@@ -72,7 +67,7 @@ function closeRow(view, t, prefix, r, done, mark, closePane) {
     : null;
   return stop(view, t, id, h_flex().id(id).h(ui(32)).px(8).gap(8).items_center().rounded(6).cursor_pointer()
     .when(lit, (el) => el.bg(tint(t, "card", false)))
-    .on_hover(hoverCleanRow(view, id)).on_click(() => { done(); run(`t3-tabs.go-pane:${r.pane}`, {}); })
+    .on_hover(hoverOver(view, "overRow", id)).on_click(() => { done(); run(`t3-tabs.go-pane:${r.pane}`, {}); })
     .role("button").accessibility_label(`Go to ${r.name}`)
     .child(div().flex_none().opacity(lit ? 1 : 0.4).child(mark(r)))
     .child(div().flex_none().opacity(0.6).child(icon))
@@ -92,7 +87,7 @@ function card(view, t, c, done, mark) {
   // A card on the dialog's face: a 4% fill at rest so it reads as one, the card surface's 7% hovered.
   const row = v_flex().id(id).px(8).py(8).rounded(6).cursor_pointer()
     .bg(lit ? tint(t, "card", false) : alpha(t.foreground, "0a"))
-    .on_hover(hoverCard(view, id)).on_click(() => { done(); run(`t3-tabs.go-pane:${c.pane}`, {}); })
+    .on_hover(hoverOver(view, "overCard", id)).on_click(() => { done(); run(`t3-tabs.go-pane:${c.pane}`, {}); })
     .role("button").accessibility_label(`Go to ${c.name}`)
     .child(h_flex().h(ui(20)).gap(6).items_center().text_size(ui(12)).text_color(t.dim)
       .child(mark(c))
@@ -102,7 +97,7 @@ function card(view, t, c, done, mark) {
       .child(stopBtn))
     .child(h_flex().h(ui(20)).mt(4).gap(6).items_center()
       .child(div().flex_1().min_w(0).truncate().text_color(lit ? t.foreground : t.muted).child(c.name))
-      .child(div().flex_none().opacity(0.6).child(programIcon(c.program, 14, t.muted) ?? svg("mods/t3-actions/icons/terminal.svg").size(14).flex_none().text_color(t.muted))));
+      .child(div().flex_none().opacity(0.6).child(programIcon(c.program, 14, t.muted, "mods/t3-actions/icons/terminal.svg"))));
   return stop(view, t, id, row, 6);
 }
 
@@ -127,23 +122,24 @@ export function cleanUpView(view, cx = undefined) {
   const byAgent = new Map(ags.map((a) => [a.address, a]));
   const byAddr = new Map(terms.map((k) => [k.address, k]));
   const kids = subAgents(ags, terms);
-  const stillSettledRow = (r) => {
+  const rowPane = (r) => {
     const pane = byPane.get(r.pane);
-    if (!pane || (tabNow && pane.tab === tabNow)) return false;
-    const term = pane.terminal ?? r.terminal;
-    if (r.terminal && pane.terminal && pane.terminal !== r.terminal) return false;
-    if (!term) return false;
-    const a = byAgent.get(term), k = byAddr.get(term);
-    return Boolean(a && k && stillSettled(k, ownStatus(a.status, term, terms), kids(term)));
+    if (!pane || (tabNow && pane.tab === tabNow)) return null;
+    if (r.terminal && pane.terminal && pane.terminal !== r.terminal) return null;
+    return { pane, term: pane.terminal ?? r.terminal };
+  };
+  const stillSettledRow = (r) => {
+    const at = rowPane(r);
+    if (!at?.term) return false;
+    const a = byAgent.get(at.term), k = byAddr.get(at.term);
+    return Boolean(a && k && stillSettled(k, ownStatus(a.status, at.term, terms), kids(at.term)));
   };
   const stillShell = (r) => {
-    const pane = byPane.get(r.pane);
-    if (!pane || (tabNow && pane.tab === tabNow)) return false;
-    const term = pane.terminal ?? r.terminal;
-    if (r.terminal && pane.terminal && pane.terminal !== r.terminal) return false;
-    if (!term) return true;
-    const k = byAddr.get(term);
-    return !byAgent.has(term) && !pane.program?.agent && k?.status == null && !kids(term).length;
+    const at = rowPane(r);
+    if (!at) return false;
+    if (!at.term) return true;
+    const k = byAddr.get(at.term);
+    return !byAgent.has(at.term) && !at.pane.program?.agent && k?.status == null && !kids(at.term).length;
   };
   // A row goes as its pane does or stops being idle: stopped here, or changed anywhere; counts and closing spaces follow.
   const settled = (p.settled ?? []).filter(stillSettledRow);
@@ -170,6 +166,14 @@ export function cleanUpView(view, cx = undefined) {
   const yes = () => { if (!total || !p.command) return; done(); run(p.command.name, p.command.args ?? {}); };
   const toggleSettled = (_e, cx) => { view.openSettled = !view.openSettled; cx.notify(); };
   const toggleShells = (_e, cx) => { view.openShells = !view.openShells; cx.notify(); };
+  const shelf = ({ scope, title, rows, rowPrefix, open, toggle, closing, label }) => (el) => el.child(v_flex()
+    .child(shelfHead(view, t, "t3-actions", `clean-up-${scope}`, title, { count: rows.length,
+      open,
+      toggle,
+      side: closing.length ? `closes ${cleanUpAnd(closing.map((s) => s.name))}` : null,
+      trail: p.command ? actionButton(view, t, `clean-up-close-${scope}`, { text: "Close", label, act: () => runScoped(scope) }) : null,
+    }))
+    .when(open, (el) => el.child(v_flex().gap(1).children(rows.map((r) => closeRow(view, t, rowPrefix, r, done, mark, closePane))))));
   const scopeNote = "Skips the tab you're on, and programs in the space you're in.";
   const noteText = combinedCloses ? `Closes ${cleanUpAnd(closingAll.map((s) => s.name))}. ${scopeNote}` : scopeNote;
   return focusRoot(view, dialog("action-clean-up", t).track_focus(view.ask)
@@ -189,22 +193,10 @@ export function cleanUpView(view, cx = undefined) {
     })
     .child(div().px(24).pt(24).pb(12).child(dialogTitle(t, "Clean up")))
     .child(v_flex().id("clean-up-body").px(16).gap(8).max_h(420).overflow_y_scrollbar()
-      .when(settled.length > 0, (el) => el.child(v_flex()
-        .child(shelfHead(view, t, "t3-actions", "clean-up-settled", "Settled", { count: settled.length,
-          open: view.openSettled,
-          toggle: toggleSettled,
-          side: closingSettled.length ? `closes ${cleanUpAnd(closingSettled.map((s) => s.name))}` : null,
-          trail: p.command ? actionButton(view, t, "clean-up-close-settled", { text: "Close", label: `Close ${settled.length} settled ${settled.length === 1 ? "agent" : "agents"}`, act: () => runScoped("settled") }) : null,
-        }))
-        .when(view.openSettled, (el) => el.child(v_flex().gap(1).children(settled.map((r) => closeRow(view, t, "clean-up-settled", r, done, mark, closePane)))))))
-      .when(shells.length > 0, (el) => el.child(v_flex()
-        .child(shelfHead(view, t, "t3-actions", "clean-up-shells", "Idle shells", { count: shells.length,
-          open: view.openShells,
-          toggle: toggleShells,
-          side: closingShells.length ? `closes ${cleanUpAnd(closingShells.map((s) => s.name))}` : null,
-          trail: p.command ? actionButton(view, t, "clean-up-close-shells", { text: "Close", label: `Close ${shells.length} idle ${shells.length === 1 ? "shell" : "shells"}`, act: () => runScoped("shells") }) : null,
-        }))
-        .when(view.openShells, (el) => el.child(v_flex().gap(1).children(shells.map((r) => closeRow(view, t, "clean-up-shell", r, done, mark, closePane)))))))
+      .when(settled.length > 0, shelf({ scope: "settled", title: "Settled", rows: settled, rowPrefix: "clean-up-settled", open: view.openSettled,
+        toggle: toggleSettled, closing: closingSettled, label: `Close ${settled.length} settled ${settled.length === 1 ? "agent" : "agents"}` }))
+      .when(shells.length > 0, shelf({ scope: "shells", title: "Idle shells", rows: shells, rowPrefix: "clean-up-shell", open: view.openShells,
+        toggle: toggleShells, closing: closingShells, label: `Close ${shells.length} idle ${shells.length === 1 ? "shell" : "shells"}` }))
       .when(cards.length > 0, (el) => el.child(v_flex()
         .child(shelfHead(view, t, "t3-actions", "clean-up-left", "Left behind", { count: cards.length, side: "no agent at work" }))
         .child(v_flex().gap(5).children(cards.map((c) => card(view, t, c, done, mark)))))))

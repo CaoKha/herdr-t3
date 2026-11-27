@@ -1,10 +1,10 @@
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { LU, COMPACT, HEADER, button, popover } from "./controls.js";
+import { HEADER, button, popover } from "./controls.js";
 import { ghostButton, GROUP_GAP } from "./button.js";
 import { trigger } from "./trigger.js";
 import { tip } from "./tip.js";
-import { popupClosed } from "./review-menu.js";
+import { LU, COMPACT, popupClosed } from "./review-menu.js";
 import { scopeHeader } from "./scope-header.js";
 import { navToggle, setNavOpen, NAV_NARROW } from "./nav-column.js";
 import { ui } from "./layout-settings.js";
@@ -77,14 +77,14 @@ export function header(view, t, head) {
       .children(head.parts.map(p => div().text_color(t[p.color] ?? t.dim).child(p.text)))))
     .child(div().flex_1())
     .children(words.map(b => button(view, t, b.id, b.text, b.pops ? (cx, keys) => view.togglePopup(b.pops, cx, keys) : b.run,
-      { after: b.after, icon: b.lead, iconSize: 14, color: t[b.color], note: b.note, pops: b.pops, size: "sm", surface: "chrome" })))
+      { icon: b.lead, iconSize: 14, color: t[b.color], note: b.note, pops: b.pops, size: "sm", surface: "chrome" })))
     .child(h_flex().id("review-tools").flex_none().gap(GROUP_GAP).items_center()
       .children(icons.map(b => {
         const run = b.pops ? (cx, keys) => view.togglePopup(b.pops, cx, keys) : b.run;
         // An icon alone says what it does in its label.
-        if (b.pops) return trigger(view, t, b.id, { icon: b.icon, iconSize: 14, label: b.label, color: t[b.color], disabled: b.disabled, below: true,
+        if (b.pops) return trigger(view, t, b.id, { icon: b.icon, iconSize: 14, label: b.label, color: t[b.color], below: true,
           open: view.popup === b.pops, closed: popupClosed(b.pops), onOpen: (at, cx) => run(cx, !at) });
-        return tip(view, t, b.id, b.label, ghostButton(view, t, b.id, { icon: b.icon, iconSize: 14, label: b.label, act: run, color: t[b.color], disabled: b.disabled, size: "sm", surface: "chrome" }), { below: true });
+        return tip(view, t, b.id, b.label, ghostButton(view, t, b.id, { icon: b.icon, iconSize: 14, label: b.label, act: run, color: t[b.color], size: "sm", surface: "chrome" }), { below: true });
       }))
       // Last, the file tree's switch, greyed with no files to list.
       .child(tip(view, t, "review-nav-toggle", open ? "Hide the file tree" : "Show the file tree",

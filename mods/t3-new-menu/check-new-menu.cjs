@@ -26,7 +26,7 @@ const context = vm.createContext({
   ui: (n) => n,
   View: class {}, div: element, svg: element, image: element, h_flex: element, v_flex: element, Input: { new: element },
   InputState: { new: () => { const on = {}; let value = ""; return { on: (e, f) => { on[e] = f; }, value: () => value, focus() {}, set_value(v) { value = v; }, type(v) { value = v; on.change({}, cx); }, submit() { on.submit({}, cx); } }; } },
-  settings: () => ({ zoom: 1 }),
+  settings: () => ({ zoom: 1 }), zoom: () => 1, monoFont: () => "JetBrains Mono",
   theme: () => ({ foreground: "#fff", ansi1: "#f00" }), spaces: () => spaces, machines: () => machines, panes: () => { paneReads++; return [...panes]; }, run: (name, args) => calls.push([name, args]),
   notify: (n) => notifications.push(n),
   shared: (k) => state[k], setShared: (k, v) => { state[k] = v; }, closeOverlay() { closed++; }, props: () => ({ overlay: "o", ...openProps }), window: () => ({ platform }), keys: () => [{ section: "global", keys: "cmd-n", action: "space.new" }], home: () => "/home/me",
@@ -43,9 +43,9 @@ const context = vm.createContext({
 });
 const read = (file) => fs.readFileSync(path.join(__dirname, file), "utf8");
 // Keep project helpers in their module scope so their private keyOf doesn't collide with tip.js.
-const projects = `const { projectMark, placeOf, dormantProjects, forgetProject } = (() => {
-${["project.js", "projects.js"].map((file) => kit.strip(read(file))).join("\n")}
-return { projectMark, placeOf, dormantProjects, forgetProject };
+const projects = `const { projectMark, placeOf, dormantProjects, forgetProject, shortFolder } = (() => {
+${["git.js", "project.js", "projects.js"].map((file) => kit.strip(read(file))).join("\n")}
+return { projectMark, placeOf, dormantProjects, forgetProject, shortFolder };
 })();`;
 const src = ["color.js", "store.js", "list.js", "tip.js", "button.js", "focus.js", "palette.js", "new-space.js", "main.js"]
   .map((file) => kit.strip(read(file))).join("\n").replace("export default class", "globalThis.Mod = class");

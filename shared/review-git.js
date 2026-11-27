@@ -1,8 +1,7 @@
 // What the Review bar counts and the Review page's scope menu lists, read from git. Read-only: nothing here writes under .git.
 import { exec } from "herdr";
+import { git } from "./git.js";
 
-// Keep these reads from updating the repository's index or filesystem-monitor state. `on`: the space's machine, null for this one.
-export const git = (cwd, args, on = null) => exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", ...args], { cwd, on });
 // The files the pane lists for the working tree, as the daemon's worktreeDiff reads them: HEAD to the working tree, net,
 // new files marked intent-to-add in a throwaway copy of the index so a moved file pairs up as one rename.
 const NET = `d=$(mktemp -d) && trap 'rm -rf "$d"' EXIT && { cp "$(git rev-parse --git-path index)" "$d/i" 2>/dev/null; export GIT_INDEX_FILE="$d/i"; } && `
@@ -26,8 +25,25 @@ export const argPage = (args, branch) => browserPath(args[0] === "--worktree" ? 
 export async function readReview(cwd, on = null) {
   const top = await git(cwd, ["rev-parse", "--show-toplevel"], on);
   if (top.code !== 0) return null;
+  const root = top.stdout.trim();
+  const [review, compared] = await Promise.all([readStatus(root, on), compareBase(root, on)]);
+  if (!review || !compared) return review;
+  const { ref, count } = compared;
+  // `base` is the branch name; `baseRef` is what was compared, named in the label so a fork's stale origin/main reads as itself.
+  review.base = ref.replace(/^origin\//, "");
+  review.baseRef = ref;
+  // On the default branch or a detached HEAD the CLI opens its ref picker instead: nothing to show.
+  if (review.branch !== review.base && review.branch !== "(detached)") {
+    [review.newer, review.unmerged] = count.stdout.trim().split(/\s+/).map(n => parseInt(n, 10) || 0);
+    // A branch tracking the default branch: its ↑ is the same commits as N ahead of base.
+    if (review.upstream === `origin/${review.base}`) review.ahead = 0;
+  }
+  return review;
+}
+
+async function readStatus(root, on) {
   // File by file, as the page it opens lists them: plain status folds a new folder into one line.
-  const root = top.stdout.trim(), status = await git(root, ["status", "--porcelain=v2", "--branch", "--untracked-files=all"], on);
+  const status = await git(root, ["status", "--porcelain=v2", "--branch", "--untracked-files=all"], on);
   if (status.code !== 0) return null;
   const review = { root, on, branch: null, upstream: null, base: null, baseRef: null, changed: 0, ahead: 0, behind: 0, unmerged: 0, newer: 0, gone: false };
   let ab = false, lines = 0;
@@ -40,24 +56,18 @@ export async function readReview(cwd, on = null) {
   review.changed = await changedFiles(root, lines, on);
   // git leaves out branch.ab when the upstream is set but gone, as after a merged PR's branch is deleted.
   review.gone = Boolean(review.upstream) && !ab;
-  // The default branch as the CLI resolves it (resolveDefaultBranch): origin/HEAD, else main or master.
+  return review;
+}
+
+// The default branch as the CLI resolves it (resolveDefaultBranch): origin/HEAD, else main or master.
+async function compareBase(root, on) {
   const originHead = (await git(root, ["symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD"], on)).stdout.trim();
   const names = originHead ? [originHead.replace(/^origin\//, "")] : ["main", "master"];
   for (const ref of names.flatMap(name => [`origin/${name}`, name])) {
     const count = await git(root, ["rev-list", "--left-right", "--count", `${ref}...HEAD`], on);
-    if (count.code !== 0) continue; // No such ref.
-    // `base` is the branch name; `baseRef` is what was compared, named in the label so a fork's stale origin/main reads as itself.
-    review.base = ref.replace(/^origin\//, "");
-    review.baseRef = ref;
-    // On the default branch or a detached HEAD the CLI opens its ref picker instead: nothing to show.
-    if (review.branch !== review.base && review.branch !== "(detached)") {
-      [review.newer, review.unmerged] = count.stdout.trim().split(/\s+/).map(n => parseInt(n, 10) || 0);
-      // A branch tracking the default branch: its ↑ is the same commits as N ahead of base.
-      if (review.upstream === `origin/${review.base}`) review.ahead = 0;
-    }
-    break;
+    if (count.code === 0) return { ref, count };
   }
-  return review;
+  return null;
 }
 
 // Read on demand (a menu's opening), so the bar's poll stays cheap.

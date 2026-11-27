@@ -8,15 +8,15 @@ import { checking, spaces, theme, nextCommand, run } from "herdr";
 import { panelState, closeSurface, showPage } from "./panel.js";
 import { tint } from "./button.js";
 import { loadingState, emptyState, errorBar, noticeBar } from "./panel-states.js";
-import { stopsInit, stopsEnd, enter, stop } from "./focus.js";
+import { stopsInit, enter, stop } from "./focus.js";
 import { keycap } from "./palette.js";
 import { alpha } from "./color.js";
 import { inlineMenu } from "./inline-menu.js";
 import { discoverRepo, ghProblem } from "./github.js";
-import { initPictures, dropPictures } from "./pictures.js";
-import { codeFont, dropCode } from "./code.js";
+import { initPictures } from "./pictures.js";
+import { codeFont } from "./code.js";
 import { initPage, refreshPage, freshness, pageFrame, pageShown, sectionOpen, section, control, textButton, note, line, rich, said, stateIcon,
-  openUrl, writeError, draftKey, since } from "./page.js";
+  browse, writeError, draftKey, since, closePage, ghFailed } from "./page.js";
 import { initComposer, sent, commentBox, replyBox, replyButton } from "./composer.js";
 import { segmented } from "./segmented.js";
 import { compactField } from "./field.js";
@@ -74,9 +74,7 @@ export default class Issues extends View {
   }
 
   async close() {
-    stopsEnd(this);
-    dropCode(this);
-    await dropPictures(this);
+    await closePage(this);
   }
 
   // What a space shows: what was read for its tab's folder on its machine, and what the person picked. `token`, `detailToken`
@@ -105,8 +103,7 @@ export default class Issues extends View {
   // A failure: gh's that stop everything, Linear refusing the key, else a bar over what was last read.
   failed(st, e) {
     if (e?.rejected) { this.key = null; this.keyIssue = "rejected"; return; }
-    const message = e?.message ?? String(e), problem = ghProblem(message);
-    if (problem) st.gh = problem; else Object.assign(st, { gh: null, error: message });
+    ghFailed(st, e);
   }
 
   read(st, cx) {
@@ -211,7 +208,7 @@ export default class Issues extends View {
    */
   write(st, issue, w, cx, draft = null) {
     const provider = st.provider;
-    if (st.writing || !provider?.canWrite || this.source() !== provider.id) return;
+    if (st.writing || !provider?.write || this.source() !== provider.id) return;
     const cards = [issue, ...(st.branch ?? []), ...(st.mine?.items ?? []), ...(st.found?.items ?? [])].filter((i) => i.id === issue.id);
     const was = cards.map((c) => c.state);
     st.writing = { kind: w.kind, thread: w.parent ?? null };
@@ -236,16 +233,10 @@ export default class Issues extends View {
     });
   }
 
-  browse(st, url, cx) {
-    cx.spawn(async (cx) => {
-      try { await openUrl(url); } catch (e) { st.actionError = e.message; cx.notify(); }
-    });
-  }
-
   // A PR of the tab's own repository opens in the Pull requests page (its `open:<n>` command); any other on GitHub.
   openPR(st, pr, cx) {
     if (st.info?.repo && pr.repo.toLowerCase() === st.info.repo.toLowerCase() && showPage("pulls")) run(`t3-pulls.open:${pr.number}`, {});
-    else this.browse(st, pr.url, cx);
+    else browse(st, pr.url, cx);
   }
 
   render(cx) {
@@ -270,14 +261,14 @@ export default class Issues extends View {
         : segmented(this, t, [tab("branch", "Branch", st.branch?.length), tab("mine", "Mine", st.mine ? `${st.mine.items.length}${st.mine.more ? "+" : ""}` : undefined)], { role: "tab" }))
       .child(searching ? this.searchField(t) : div().flex_1())
       .child(control(this, t, "t3-issues-refresh", "refresh-cw", st.provider?.refreshLabel ?? "Refresh issues", (cx) => refreshPage(this, cx)))
-      .when(Boolean(d?.issue && st.provider?.hasStates && issue.states.length > 0), (el) => el.child(this.stateMenuButton(st, issue, t)))
+      .when(Boolean(d?.issue && issue.states?.length > 0), (el) => el.child(this.stateMenuButton(st, issue, t)))
       .when(Boolean(issue), (el) => el.child(this.moreMenu(st, issue, t)));
   }
 
   // ⋯: the issue in the browser, its link copied.
   moreMenu(st, issue, t) {
     return inlineMenu(this, t, "t3-issues-more", { label: "More", icon: icon("ellipsis"), items: [
-      { label: st.provider.openLabel, icon: icon("external-link"), pick: (cx) => this.browse(st, issue.url, cx) },
+      { label: st.provider.openLabel, icon: icon("external-link"), pick: (cx) => browse(st, issue.url, cx) },
       { label: "Copy link", icon: icon("link"), pick: (cx) => cx.write_to_clipboard(issue.url) }] });
   }
 
@@ -378,7 +369,7 @@ export default class Issues extends View {
         .when(full, (el) => el
           .child(part("prs", "Linked PRs", () => this.prRows(st, issue, t), issue.prs.length))
           .child(part("description", "Description", () => [(issue.description ?? "").trim()
-            ? rich(this, t, `t3-issues-body-${st.id}-${issue.id}`, st.provider.parts(issue, issue.description, issue.descriptionHTML), (url, cx) => this.browse(st, url, cx))
+            ? rich(this, t, `t3-issues-body-${st.id}-${issue.id}`, st.provider.parts(issue, issue.description, issue.descriptionHTML), (url, cx) => browse(st, url, cx))
             : note(t, "No description.")]))
           .child(part("comments", "Comments", () => this.commentRows(st, issue, t, now, cx), issue.comments.length))));
   }
@@ -406,12 +397,12 @@ export default class Issues extends View {
   }
 
   said(st, t, id, c, now) {
-    return said(this, t, id, c, { now, parts: c.body.trim() ? st.provider.parts(c, c.body, c.bodyHTML) : [], open: (url, cx) => this.browse(st, url, cx) });
+    return said(this, t, id, c, { now, parts: c.body.trim() ? st.provider.parts(c, c.body, c.bodyHTML) : [], open: (url, cx) => browse(st, url, cx) });
   }
 
   // Each thread: its first comment, its replies indented; where the provider takes writes, Reply under it and a new-comment box at the end.
   commentRows(st, issue, t, now, cx) {
-    const canWrite = st.provider.canWrite, writing = st.writing;
+    const canWrite = Boolean(st.provider.write), writing = st.writing;
     const rows = commentThreads(issue).map(([root, ...replies]) => {
       const id = `t3-issues-thread-${root.id}`, key = draftKey(issue.id, root.id);
       return v_flex().id(id).gap(2)

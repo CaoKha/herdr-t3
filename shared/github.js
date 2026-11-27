@@ -3,10 +3,9 @@
 // has no stdin, so a query goes as a raw `-f` field. After Branch PR's gh.js (munza/herdr-mods, Apache-2.0).
 import { exec } from "herdr";
 import { splitBody, imgAttributes, assetKey, size, UUID, mapImages, imagesOf } from "./images.js";
+import { GIT } from "./git.js";
 
 const GH_TIMEOUT = 26000, DISCOVER_TIMEOUT = 20000;
-// Reads that leave the index and the filesystem monitor alone.
-export const GIT = ["--no-optional-locks", "-c", "core.fsmonitor=false"];
 
 /** "owner/name" of a GitHub remote URL (https, ssh, scp-like, an ssh alias such as github-work), else null. */
 export function repositoryFromRemote(remote) {

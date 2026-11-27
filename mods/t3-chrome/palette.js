@@ -1,7 +1,7 @@
 // The layout's keycaps (Home, the panel's empty page, Go to and New) and the command palettes' footer (Go to, New), as T3's
 // Kbd (`ui/kbd.tsx`) and CommandPalette's footer.
-import { div } from "gpui-kit";
-import { h_flex } from "gpui-base";
+import { div, svg } from "gpui-kit";
+import { h_flex, v_flex, Input } from "gpui-base";
 import { alpha } from "./color.js";
 import { ui } from "./layout-settings.js";
 
@@ -18,3 +18,12 @@ export const paletteFooter = (t, hints, end) => h_flex().flex_none().px(16).py(1
   .border_t(1).border_color(alpha(t.foreground, "12")).bg(alpha(t.foreground, "06")).font_medium().text_color(t.muted)
   .child(h_flex().gap(12).items_center().children(hints.map(([keys, what]) => h_flex().gap(4).items_center().children(keys.split(" ").map((k) => keycap(t, k))).child(what))))
   .child(end);
+
+export const PALETTE_ROW = 48;
+export const paletteFrame = (t, id) => v_flex().id(id).size_full().min_h(0).rounded(16).border(1).border_color(t.border).bg(t.popover).shadow_2xl()
+  .text_size(ui(14)).line_height(`${ui(20)}px`);
+export const paletteSearch = (t, icon, input) => h_flex().h(36).my(6).flex_none().pl(18).pr(20).gap(7).items_center()
+  .child(svg(icon).size(16).flex_none().text_color(t.dim))
+  .child(Input.new(input).flex_1().h_full().text_size(ui(14)).text_color(t.foreground));
+export const paletteRow = (id) => h_flex().id(id).w_full().h(ui(PALETTE_ROW)).px(8).py(6).gap(8).rounded(4).items_center().flex_none();
+export const paletteEmpty = (t, text) => div().py(40).text_center().text_color(t.dim).child(text);

@@ -2,7 +2,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
 const kit = require("./check-kit.js"), element = kit.elements(), { find } = kit;
 let zoom = 1, notices = 0;
 const cx = { notify() { notices++; } }, view = {}, tips = [];
-const c = vm.createContext({ ui: (n) => n, div: element, settings: () => ({ zoom }), Popup: { new: (id, trigger) => element().id(id).child(trigger) },
+const c = vm.createContext({ ui: (n) => n, div: element, zoom: () => zoom, Popup: { new: (id, trigger) => element().id(id).child(trigger) },
   tip: (_v, _t, id, label, trigger, options) => { tips.push({ id, label, options }); return trigger; }, tipCard: (_t, id) => element().id(id), FADE: {} });
 vm.runInContext(kit.strip(fs.readFileSync(__dirname + '/measured-text.js', 'utf8')), c);
 let node = c.nameText(view, 'title', 'iiii', { size: 14, weight: 'medium' });

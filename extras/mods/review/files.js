@@ -3,7 +3,8 @@ import { hoverKept } from "./tip.js";
 import { h_flex } from "gpui-base";
 import { treeRows, pathEntries, sortEntries, treeList, treeRow, revealRow, statusBadge } from "./file-tree.js";
 import { foldAllButton, NAV_NARROW } from "./nav-column.js";
-import { PANE, checkMark } from "./controls.js";
+import { checkMark } from "./controls.js";
+import { PANE } from "./review-menu.js";
 import { groupFiles } from "./rows.js";
 import { categoryIcon, criticalMark } from "./groups.js";
 import { spaces, window as appWindow } from "herdr";
@@ -13,8 +14,9 @@ import { openMenu, rowItems } from "./menus.js";
 import { join } from "./file-listing.js";
 import { closedKey } from "./store.js";
 import { popupOpen } from "./trigger.js";
-import { MENU_ROW } from "./menu-row.js";
+import { menuHeight } from "./menu-row.js";
 import { ui } from "./layout-settings.js";
+import { keepPress } from "./button.js";
 
 export const TREE = "review-files";
 
@@ -48,7 +50,7 @@ export function fileTree(view, t) {
       cx.stop_propagation();
       const agent = terminalFor(view.space), editors = (knownTargets() ?? []).filter(name => name !== "Finder");
       const count = rowItems({ remote: Boolean(on), platform: appWindow()?.platform, agent, editors, deleted }).length;
-      openMenu("row", { height: 8 + count * ui(MENU_ROW) }, { menuMod: PANE,
+      openMenu("row", { height: menuHeight(count) }, { menuMod: PANE,
         source: { space: view.space, tab: space?.tabs.find(tab => tab.active)?.id, root: view.root, on },
         path: row.real ?? row.path, deleted, agent: agent ? { terminal: agent.terminal } : null, editors });
       // The open row is remembered only for this run, as Files' context highlight is.
@@ -58,7 +60,7 @@ export function fileTree(view, t) {
   const checkbox = (id, files, label) => {
     const done = files.filter(f => f.reviewed).length, state = !done ? "none" : done === files.length ? "all" : "some";
     return checkMark(t, state).id(id).role("check_box").accessibility_label(`${label}: ${done} of ${files.length} reviewed`)
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); view.setReviewed(files, state !== "all", cx); });
+      .on_mouse_down("left", keepPress).on_click((_e, cx) => { cx.stop_propagation(); view.setReviewed(files, state !== "all", cx); });
   };
   const rows = treeOf(view), ringed = view.handle.is_focused() && view.focusPath ? rows.findIndex(r => r.path === view.focusPath) : -1, guides = view.treeHot === "tree";
   // The file in front, wherever the list or a key put it, shows in the tree.
@@ -87,7 +89,7 @@ export function fileTree(view, t) {
     return pathRow(row, `tree-f-${row.path}`, { selected: view.current === row.path, focused, guides, status: LETTER[f.status] ?? "M", dim: f.reviewed, struck: f.reviewed,
       leading: checkMark(t, f.changed ? "changed" : f.reviewed ? "all" : "none").id(`tree-check-${row.path}`).role("check_box")
         .accessibility_label(f.reviewed ? `${row.path}: reviewed` : `${row.path}: not reviewed`)
-        .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); view.setReviewed(f, !f.reviewed, cx); }) }, f.status === "removed")
+        .on_mouse_down("left", keepPress).on_click((_e, cx) => { cx.stop_propagation(); view.setReviewed(f, !f.reviewed, cx); }) }, f.status === "removed")
       .on_click((_e, cx) => { view.focusPath = null; if (view.width < NAV_NARROW) view.narrowNav = false; view.select(row.path, cx); });
   };
   // The indent guides show while the pointer is on the tree, as Files'.

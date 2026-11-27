@@ -15,7 +15,7 @@ const textView = (key, source) => {
   return el;
 };
 const load = (scale = 1) => {
-  const c = vm.createContext({ div: () => element(), TextView: { markdown: textView }, Editor: { new: () => element("editor") }, settings: () => ({ font_family: "Mono" }), alpha: (c, a) => `${c}${a}`,
+  const c = vm.createContext({ keepPress: (_e, cx) => cx.stop_propagation(), div: () => element(), TextView: { markdown: textView }, Editor: { new: () => element("editor") }, settings: () => ({ font_family: "Mono" }), alpha: (c, a) => `${c}${a}`,
     ui: (n) => scale === 1 ? n : Math.round(n * scale) });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "code.js"), "utf8").replace(/^import [^;]*;\r?\n/gm, "").replace(/^export /gm, "")
     + "\nglobalThis.code = { languageOf, fenceLanguage, fenceDiff, diffRows, diffRowsOf, codeStyle, codeSyntax, canScroll, initCode, diffView, codeView, drewCode };", c);

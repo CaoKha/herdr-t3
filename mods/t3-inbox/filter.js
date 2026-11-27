@@ -7,9 +7,9 @@ import { glow, tip } from "./tip.js";
 import { stop } from "./focus.js";
 import { step, scrollList } from "./list.js";
 import { FIRST } from "./row-model.js";
-import { KEY, closedKey } from "./store.js";
+import { KEY, closedKey, writeLocal } from "./store.js";
 import { openMenu } from "./menu.js";
-import { button, radiusOf } from "./button.js";
+import { button, radiusOf, keepPress } from "./button.js";
 import { trigger } from "./trigger.js";
 import { namer } from "./name.js";
 import { ui } from "./layout-settings.js";
@@ -65,7 +65,7 @@ export function inboxMatches(view, { sp, every }) {
 export function pickInboxSpace(view, s, shift, cx) {
   if (!s) return;
   view.scope = !s.id ? [] : !shift ? [s.id] : view.scope.includes(s.id) ? view.scope.filter((id) => id !== s.id) : [...view.scope, s.id];
-  localStorage.setItem("scope", JSON.stringify(view.scope));
+  writeLocal("scope", view.scope);
   // A new scope starts the settled tail over, as T3's does.
   view.limit = FIRST;
   if (!shift) view.scopeOpen = false;
@@ -147,7 +147,7 @@ export function inboxTop(view, t, model) {
       .text_color(t.foreground).accessibility_label("Search Inbox"))
     .when(Boolean(view.inline.query), (el) => el.child(stop(view, t, "inbox-search-clear", button(t, "inbox-search-clear", { size: "micro", icon: "mods/t3-inbox/icons/x.svg", label: "Clear search",
       hot: view.hot === "inbox-search-clear" }).mr(-4).on_hover(glow(view, "inbox-search-clear"))
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => view.clearInline(cx, true)), radiusOf("micro")))),
+      .on_mouse_down("left", keepPress).on_click((_e, cx) => view.clearInline(cx, true)), radiusOf("micro")))),
     6, { enter: () => view.inlineInput.focus() });
   // T3's top group: 8 in and the search field 4 before its buttons, which touch. The right edge is the brand bar's above, so the two rows of icons line up.
   const top = h_flex().id("inbox-top").h(32).px(8).gap(4).flex_none().items_center()

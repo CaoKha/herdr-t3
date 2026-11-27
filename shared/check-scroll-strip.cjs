@@ -1,7 +1,7 @@
 // scroll-strip.js: where a clipped row of tabs sits, and whether its arrows can move it.
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const element = require('./check-kit.js').elements();
-const c = vm.createContext({ settings: () => ({ zoom: 2 }), Math, Number, div: () => element(), h_flex: () => element() });
+const c = vm.createContext({ zoom: () => 2, Math, Number, div: () => element(), h_flex: () => element() });
 vm.runInContext(['color.js', 'scroll-strip.js'].map(f => fs.readFileSync(`${__dirname}/${f}`, 'utf8')).join('\n').replace(/^import [^;]*;\n/gm, '').replace(/^export /gm, '') + '\nglobalThis.api = { stripAt, stripEnds, stripWheel, stripPage, stripFades };', c);
 const { stripAt, stripEnds, stripWheel, stripPage, stripFades } = c.api, widths = [100, 100, 100, 100, 24], o = { widths, gap: 4, room: 200 };
 const ends = (s) => JSON.stringify(stripEnds(s));

@@ -1,4 +1,5 @@
 import { placeOf } from "./project.js";
+import { GIT } from "./git.js";
 
 // Where a space is now. `ps`: panes(), read once by the caller (each read copies every pane).
 const where = (s, ps) => JSON.stringify([s.machine ?? null, placeOf(s, ps)]);
@@ -38,7 +39,8 @@ export function repoFacts({ exec, watchFolder, cx }) {
     // Moved there: what it knew of that place may be old.
     const next = {};
     for (const s of sp) next[s.id] = where(s, own[s.id]);
-    const keys = new Set(Object.values(next).filter((k) => JSON.parse(k)[1]));
+    const place = new Map(Object.values(next).map((k) => [k, JSON.parse(k)]));
+    const keys = new Set([...place.keys()].filter((k) => place.get(k)[1]));
     // Where no space is any more: forgotten, so a commit looks only where spaces are and a repo none is in isn't watched.
     for (const k of Object.keys(git)) if (!keys.has(k)) { delete git[k]; unsure.delete(k); }
     for (const k of Object.keys(checked)) if (!keys.has(k)) delete checked[k];
@@ -59,13 +61,13 @@ export function repoFacts({ exec, watchFolder, cx }) {
     busy = nextBusy;
     for (const m of machines) {
       const readable = m.layout === "ready";
-      if (readable && ready[m.name] === false) for (const k of keys) if (JSON.parse(k)[0] === m.name) due.add(k);
+      if (readable && ready[m.name] === false) for (const k of keys) if (place.get(k)[0] === m.name) due.add(k);
       ready[m.name] = readable;
     }
     if (active && visible) {
       for (const k of keys) {
         const asks = git[k] || unsure.has(k);
-        if (asks && !folded.has(JSON.parse(k)[0]) && now - (checked[k] ?? 0) > FALLBACK) due.add(k);
+        if (asks && !folded.has(place.get(k)[0]) && now - (checked[k] ?? 0) > FALLBACK) due.add(k);
       }
     }
     return due;
@@ -104,7 +106,7 @@ export function repoFacts({ exec, watchFolder, cx }) {
     try {
       // No optional locks: a status that touched the index would wake the watch again.
       // Writes nothing under .git (index lock, fsmonitor cookie): watch() would wake on it.
-      const r = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain=v2", "--branch", "--untracked-files=no"], { cwd, on });
+      const r = await exec("git", [...GIT, "status", "--porcelain=v2", "--branch", "--untracked-files=no"], { cwd, on });
       if (!wanted()) return;
       unsure.delete(key); // Only now: until it answers, what it couldn't say stays unsaid.
       if (r.code !== 0) {
@@ -114,7 +116,7 @@ export function repoFacts({ exec, watchFolder, cx }) {
         return;
       }
       // The repo's own .git folder names it; a worktree's top differs from it.
-      const rev = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd, on });
+      const rev = await exec("git", [...GIT, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], { cwd, on });
       if (!wanted()) return;
       const lines = (rev.stdout ?? "").trim().split(/\r?\n/).map((s) => s.trim());
       if (rev.code !== 0 || lines.length !== 2 || !lines[0] || !lines[1]) {

@@ -2,23 +2,25 @@
 // frame, controls and rows they draw with.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { checking, spaces, window, layout, settings, exec } from "herdr";
+import { checking, spaces, window, layout } from "herdr";
 import { panelState, layoutNode } from "./panel.js";
 import { workFolder } from "./terminal-context.js";
 import { treeHead } from "./nav-column.js";
 import { button, ghostButton, tint, radiusOf } from "./button.js";
-import { stop, focusRoot } from "./focus.js";
+import { stop, focusRoot, stopsEnd } from "./focus.js";
 import { tip, glow } from "./tip.js";
-import { readLocal } from "./store.js";
+import { readLocal, writeLocal } from "./store.js";
 import { shelfHead } from "./shelf.js";
 import { closeInlineMenu, inlineMenuKey } from "./inline-menu.js";
-import { pictureBody, fetchPictures } from "./pictures.js";
+import { pictureBody, fetchPictures, dropPictures } from "./pictures.js";
 import { initCode, diffView, drewCode, syncCode, dropCode } from "./code.js";
 import { ago } from "./ago.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
+import { openUrl } from "./open-url.js";
+import { ghProblem } from "./github.js";
 
 // A shown page reads again this often, with the window in front.
-export const READ_EVERY = 60000;
+const READ_EVERY = 60000;
 // Which sections the person opened or shut, by section, in this copy's localStorage (docs/internals/storage.md).
 export const SECTIONS_KEY = "sections.open";
 
@@ -32,12 +34,22 @@ export const writeError = (kind, message) => kind === "comment" || kind === "rep
 // One draft per subject (a PR, an issue) for a new comment, one per thread for a reply.
 export const draftKey = (subject, thread = null) => `${subject}${thread ? `:${thread}` : ""}`;
 
-export async function openUrl(url) {
-  const platform = window()?.platform;
-  const [command, args] = platform === "macos" ? ["open", [url]]
-    : platform === "windows" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : ["xdg-open", [url]];
-  const r = await exec(command, args).catch(() => null);
-  if (r?.code !== 0) throw new Error(`Couldn't open ${url}`);
+export async function closePage(view) {
+  stopsEnd(view);
+  dropCode(view);
+  await dropPictures(view);
+}
+
+export function ghFailed(st, e) {
+  const message = e?.message ?? String(e), problem = ghProblem(message);
+  if (problem) st.gh = problem; else Object.assign(st, { gh: null, error: message });
+}
+
+export function browse(st, url, cx) {
+  cx.spawn(async (cx) => {
+    const r = await openUrl(url).catch(() => null);
+    if (r?.code !== 0) { st.actionError = `Couldn't open ${url}`; cx.notify(); }
+  });
 }
 
 /**
@@ -69,12 +81,12 @@ export function stateFor(view, sp) {
  * The one place a page decides to read: only while it shows for the active space, with the window in front; on showing (a space
  * switch too), when the folder moved, then every READ_EVERY. It owns `seen`, the space last read for while shown.
  */
-export function tickPage(view, cx) {
+function tickPage(view, cx) {
   if (checking() || window()?.active === false) return;
   const all = spaces();
   for (const id of view.states.keys()) if (!all.some((s) => s.id === id)) view.states.delete(id);
   const panel = layoutNode(layout(), "panel"), sp = all.find((s) => s.active);
-  if (!panel || panel.hidden || !sp || !pageShown(view)) { view.seen = null; dropCode(view); return; }
+  if (!panel || panel.hidden || !sp || !pageShown(view, panelState(sp.id))) { view.seen = null; dropCode(view); return; }
   const st = stateFor(view, sp);
   if (view.seen !== sp.id || !st.readAt) { view.seen = sp.id; view.read(st, cx); }
   else if (!st.reading && Date.now() - st.readAt >= READ_EVERY) view.read(st, cx);
@@ -96,7 +108,7 @@ export const sectionOpen = (view, key, fallback = true) => typeof view.sections[
 
 export function toggleSection(view, key, open, cx) {
   view.sections = { ...view.sections, [key]: open };
-  localStorage.setItem(SECTIONS_KEY, JSON.stringify(view.sections));
+  writeLocal(SECTIONS_KEY, view.sections);
   cx.notify();
 }
 
@@ -115,7 +127,7 @@ export function pageFrame(view, t, cx, { panel, head, bars = [], body }) {
     .track_focus(view.handle).on_mouse_down("left", (_e, cx) => { view.handle.focus(); if (closeInlineMenu(view)) cx.notify(); })
     .on_key_down((e, cx) => inlineMenuKey(view, e, cx))
     .on_size_change((size, cx) => {
-      const width = size.width / (Number(settings()?.zoom) || 1);
+      const width = size.width / zoom();
       if (width !== view.width) { view.width = width; cx.notify(); }
     })
     .child(treeHead(`${modName(view)}-head`, head))

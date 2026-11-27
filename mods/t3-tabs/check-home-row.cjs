@@ -35,10 +35,10 @@ const env = {
 function load(dir) {
   const scope = vm.createContext({ ...env });
   const read = f => strip(fs.readFileSync(path.join(__dirname, "../../shared", f), "utf8"));
-  for (const f of ["color.js", "measured-text.js", "details.js", "scroll-strip.js", "status-mark.js", "store.js", "list.js"]) vm.runInContext(read(f), scope);
+  for (const f of ["color.js", "measured-text.js", "details.js", "scroll-strip.js", "status-mark.js", "store.js", "notice.js", "list.js"]) vm.runInContext(read(f), scope);
   vm.runInContext("globalThis.namedLabel = named;", scope);
   vm.runInContext("(() => {\n" + strip(["color.js", "button.js", "trigger.js", "tab.js"].map(f => fs.readFileSync(path.join(dir, f), "utf8")).join("\n"))
-    + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.opener = opener; globalThis.popupOpen = popupOpen; globalThis.hang = hang;\n})()", scope);
+    + "\nglobalThis.tab = tab; globalThis.drawButton = button; globalThis.radiusOf = radiusOf; globalThis.ghostTint = tint; globalThis.GROUP_GAP = GROUP_GAP; globalThis.opener = opener; globalThis.popupOpen = popupOpen; globalThis.hang = hang; globalThis.keepPress = keepPress;\n})()", scope);
   vm.runInContext(fs.readFileSync(path.join(dir, "main.js"), "utf8").replace(/^import .*;\r?\n/gm, "").replace("export default class", "globalThis.Mod = class"), scope);
   return { row: Object.assign(new scope.Mod(), { nameW: {}, tabStrip: {}, pressed: null, over: null }), KEY: vm.runInContext("KEY", scope) };
 }

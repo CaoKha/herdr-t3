@@ -4,7 +4,7 @@ import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { tip, glow, keptHover } from "./tip.js";
 import { stop, within } from "./focus.js";
-import { button, tint as ghostTint } from "./button.js";
+import { button, tint as ghostTint, keepPress } from "./button.js";
 import { nameText, measuredTooltip } from "./measured-text.js";
 import { ui } from "./layout-settings.js";
 
@@ -27,7 +27,7 @@ export function tab(view, t, id, { mod, label, icon, active = false, width, maxW
   const x = tip(view, t, closeId, closeLabel, button(t, closeId, { size: "tiny", surface: "tab", label: `Close ${label}`, hot: over, icon: over ? `${mod}/icons/x.svg` : undefined })
     .when(!over, (el) => el.child(icon))
     .on_hover(glow(view, closeId))
-    .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click((_e, cx) => { cx.stop_propagation(); close(); })
+    .on_mouse_down("left", keepPress).on_click((_e, cx) => { cx.stop_propagation(); close(); })
     .when(over, (el) => stop(view, t, closeId, el, 4)), { action: closeAction, below: true, delay: 500 });
   const el = h_flex().id(id).relative().h(ui(24)).when(width != null, (e) => e.w(width)).when(maxW != null, (e) => e.max_w(maxW)).pl(6).pr(8).gap(2)
     .flex_none().items_center().rounded(6).text_size(ui(12))

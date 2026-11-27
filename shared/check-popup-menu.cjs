@@ -7,7 +7,7 @@ const vm = require("node:vm");
 let p = {}, opened = 0, closed = [], zoom = 1, drawing = false;
 const state = {}, reads = [];
 const context = vm.createContext({ ui: (n) => n, 
-  props: () => p, settings: () => ({ zoom }), shared: (k) => { reads.push(k); return state[k]; },
+  props: () => p, zoom: () => zoom, shared: (k) => { reads.push(k); return state[k]; },
   openOverlay: (spec) => { context.spec = spec; return `o${++opened}`; },
   // As Herdr runs a closed popup's close(), which calls menuClosed.
   closeOverlay: (id) => { closed.push(id); context.menuClosed(id); },

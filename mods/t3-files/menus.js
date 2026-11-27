@@ -6,9 +6,9 @@ import { v_flex } from "gpui-base";
 import { checking, props, closeOverlay, theme, shared, setShared, spaces, exec, run, notify, window } from "herdr";
 import { focusRoot, stopsInit, stopsEnd } from "./focus.js";
 import { menuKeys, scrollList, propsLit } from "./list.js";
-import { menuRow, menuRule, MENU_ROW } from "./menu-row.js";
+import { menuRow, menuRule, MENU_ROW, MENU_W, menuHeight } from "./menu-row.js";
 import { hoverRow, subLeft } from "./submenu.js";
-import { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed } from "./popup-menu.js";
+import { openPopup, openBeside, closeSub, subGone, closeChain, menuClosed } from "./popup-menu.js";
 import { targetsMenu, awaitTargets, openTarget, targetIcon } from "./open-in.js";
 import { pierreFileIcon } from "./pierre-icons.js";
 import { KEY, closedKey } from "./store.js";
@@ -18,7 +18,7 @@ import { ui } from "./layout-settings.js";
 const menuMod = () => props()?.menuMod ?? "t3-files";
 const menuIcons = () => `mods/${menuMod()}`; // each mod draws only its own icons/
 // As t3-menu's.
-export const MENU_W = 220, folderHeight = () => 8 + 12 * ui(MENU_ROW);
+export const folderHeight = () => menuHeight(12);
 // Stamped as a top menu closes, for the control that opened it (trigger.js); a submenu's, for the menu it hangs off.
 export const MENU_CLOSED = closedKey("t3-files", "menu");
 
@@ -122,7 +122,6 @@ function goTo(view, dir, cx, lit) {
 const backDir = (view) => view.dir === props().dir ? null : view.dir.slice(0, Math.max(0, view.dir.lastIndexOf("/")));
 
 /** Closes the mod's open menus before its tab, for cmd-w: whether there was one. */
-export const closeMenus = (mod = "t3-files") => closeTops(mod);
 
 /** Its submenu goes with it; the control that opened it, or the menu it hangs off, learns it's gone. */
 export function closeMenu(view) {
@@ -161,7 +160,7 @@ function items(view) {
 // Row `i`'s submenu beside it, Open with's editors (the one row with one). `lit`: keys opened it, so its first row is lit, as Base UI's.
 function openSub(view, i, lit) {
   const p = props(), it = items(view)[i];
-  openBeside(view, i, it.id, { top: 4 + i * ui(MENU_ROW), width: MENU_W - 8 }, { mod: menuMod(), width: MENU_W, height: 8 + p.editors.length * ui(MENU_ROW),
+  openBeside(view, i, it.id, { top: 4 + i * ui(MENU_ROW), width: MENU_W - 8 }, { mod: menuMod(), width: MENU_W, height: menuHeight(p.editors.length),
     props: { menuMod: menuMod(), files: it.sub, source: p.source, path: p.path, editors: p.editors } }, null, lit);
 }
 

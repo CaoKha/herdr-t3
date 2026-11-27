@@ -6,19 +6,20 @@ import { div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input, Popup } from "gpui-base";
 import { checking, spaces, panes, focused, watchFolder, window, openOverlay, props, setShared, shared, theme, home } from "herdr";
 import { launch } from "./open.js";
-import { detailsFor, detailsAt, detailsLine, detailsCard } from "./details.js";
+import { detailsFor, detailsAt, detailsLine, detailsCard, detailsUp } from "./details.js";
 import { glow, tip } from "./tip.js";
 import { step, scrollList } from "./list.js";
 import { stop } from "./focus.js";
 import { KEY, closedKey } from "./store.js";
-import { git, argPage, readReview, readPicks } from "./review-git.js";
-import { button, radiusOf, tint } from "./button.js";
-import { menuRow, MENU_ROW } from "./menu-row.js";
+import { argPage, readReview, readPicks } from "./review-git.js";
+import { button, radiusOf, tint, keepPress } from "./button.js";
+import { menuRow, menuLabel, MENU_ROW } from "./menu-row.js";
 import { statusMark } from "./status-mark.js";
 import { hang, trigger } from "./trigger.js";
 import { reviewShown, REVIEW_STATUS } from "./panel.js";
 import { alpha } from "./color.js";
 import { ui } from "./layout-settings.js";
+import { git } from "./git.js";
 
 const MOD = "pulls-review";
 // A conventional commit's type and scope (`fix(t3-tabs): `), dimmed so the words after it lead.
@@ -28,7 +29,7 @@ const MENU_CLOSED = closedKey(MOD, "menu");
 export const menuClosed = () => setShared(MENU_CLOSED, Date.now());
 
 // The menu's rows (T3's MenuItem), and what sits above them: its padding, search field and either the pages' switch or a title.
-const MENU_W = 368, menuChrome = (tabs) => 8 + ui(33) + 10 + ui(28) + (tabs ? 4 : 0);
+const REVIEW_MENU_W = 368, menuChrome = (tabs) => 8 + ui(33) + 10 + ui(28) + (tabs ? 4 : 0);
 
 // The shipped `changes` mod's lookup, except for a mod pane (below).
 export function reviewLocation() {
@@ -196,8 +197,6 @@ export function reviewMenu(view) {
     detailsFor(view, /^review-(commit|branch)-/.test(id) ? id : null, cx);
     cx.notify();
   };
-  // As T3's MenuGroupLabel.
-  const title = (text) => div().h(ui(28)).px(8).flex_none().flex().items_center().text_size(ui(12)).font_medium().text_color(t.dim).child(text);
   const tabs = menuTabs(), tab = view.tab, scope = tab === "branches" ? `vs ${base}` : branch === "(detached)" ? "" : `on ${branch}`;
   // As T3's segmented ToggleGroup; the page shown on a popover's on fill (button.js tint), as a pressed button on a card.
   const segment = (id, label, n) => h_flex().id(`review-tab-${id}`).h(ui(24)).px(10).gap(8).flex_none().items_center().rounded(6).text_size(ui(12)).font_medium()
@@ -238,7 +237,7 @@ export function reviewMenu(view) {
       .child(h_flex().p(2).gap(2).flex_none().rounded(8).bg(alpha(t.foreground, "0f"))
         .child(segment("commits", "Commits", commits.length)).child(segment("branches", "Branches", branches.length)))
       .child(div().flex_1()).child(div().min_w(0).truncate().text_size(ui(12)).text_color(t.dim).child(scope))))
-    .when(!tabs, el => el.child(title(tab === "branches" ? `Branches vs ${base}` : branch === "(detached)" ? "Commits" : `Commits on ${branch}`)))
+    .when(!tabs, el => el.child(menuLabel(t, tab === "branches" ? `Branches vs ${base}` : branch === "(detached)" ? "Commits" : `Commits on ${branch}`)))
     .when(tab === "branches", el => el.child(list("review-branches", branches.length, (i) => {
       const b = branches[i], id = `review-branch-${b.name}`;
       return row(i, id, `Review branch ${b.name}` + (b.count === undefined ? "" : `, ${b.count} ahead of ${base}`), (_e, cx) => openPick(branchArgs(b), cx), {
@@ -270,7 +269,7 @@ const initial = (t, name) => div().size(12).flex_none().rounded_full().bg(t.bord
   .text_size(ui(8)).font_medium().text_color(t.muted).child(name.slice(0, 1).toUpperCase());
 
 function commitCard(view, t, id, c, upstream, out, now) {
-  const up = view.details === id || view.detailsOut === id;
+  const up = detailsUp(view, id);
   return Popup.new(`details-${id}`, div()).absolute().top(-1).left(-1).size(1).anchor("top_right")
     .when(up, pop => pop.content(detailsCard(view, t, id, c.subject, [
       c.time && detailsLine(t, svg("mods/pulls-review/icons/clock.svg").size(12).flex_none().text_color(t.muted), when(c.time, now)),
@@ -281,7 +280,7 @@ function commitCard(view, t, id, c, upstream, out, now) {
 
 // A branch's card, as a commit's: its last commit, then how it stands against the base and its upstream, and where it's checked out.
 function branchCard(view, t, id, b, base, now) {
-  const up = view.details === id || view.detailsOut === id, icon = (name, color = t.muted) => svg(`mods/pulls-review/icons/${name}.svg`).size(12).flex_none().text_color(color);
+  const up = detailsUp(view, id), icon = (name, color = t.muted) => svg(`mods/pulls-review/icons/${name}.svg`).size(12).flex_none().text_color(color);
   const ahead = /ahead (\d+)/.exec(b.track ?? "")?.[1], behind = /behind (\d+)/.exec(b.track ?? "")?.[1];
   const upstream = !b.upstream ? "No upstream" : b.track === "gone" ? `${b.upstream} is gone`
     : !ahead && !behind ? `Up to date with ${b.upstream}` : `${[ahead && `${ahead} not pushed`, behind && `${behind} to pull`].filter(Boolean).join(", ")} · ${b.upstream}`;
@@ -309,11 +308,11 @@ function openPicks(view, r, at, source) {
     // Tall enough for the longer page, so turning pages doesn't resize it; one page alone has a title instead of the switch.
     const tabs = branches.length > 0 && commits.length > 0;
     const height = Math.min(368, menuChrome(tabs) + (tabs ? Math.max(commits.length, branches.length) : commits.length + branches.length) * ui(MENU_ROW));
-    openOverlay({ mod: MOD, kind: "popup", at, width: MENU_W, height, props: { menu: "review", source, root: r.root, branch: r.branch, base: r.base, baseRef: r.baseRef, upstream: r.gone ? null : r.upstream, commits, branches, unpushed, height } });
+    openOverlay({ mod: MOD, kind: "popup", at, width: REVIEW_MENU_W, height, props: { menu: "review", source, root: r.root, branch: r.branch, base: r.base, baseRef: r.baseRef, upstream: r.gone ? null : r.upstream, commits, branches, unpushed, height } });
   } finally { view.readingPicks = false; } })();
 }
 
-export function reviewBar(view, t, stopPress) {
+export function reviewBar(view, t) {
   // The layout's rightmost header owns its only panel toggle (ADR 0017); Home has no counts.
   if (props()?.toggle || onHome()) return null;
   // Looked up on each render, so the frame that shows another space already shows its own counts.
@@ -351,12 +350,12 @@ export function reviewBar(view, t, stopPress) {
   // Under this click's press, if it came with one (from the keys, the app's place). Started here, so a second click while git
   // reads finds it reading.
   const openMenu = (b, cx) => {
-    const reading = openPicks(view, r, hang(b, MENU_W).at, source);
+    const reading = openPicks(view, r, hang(b, REVIEW_MENU_W).at, source);
     if (!reading) return false;
     cx.spawn(() => reading);
   };
   // No outline: ghost buttons in a row, as the tab bar's own. The last button ends where the bar does, so it stays put as the counts come and go.
-  return h_flex().id("pulls-review").h(ui(24)).flex_none().items_center().gap(4).on_mouse_down("left", stopPress)
+  return h_flex().id("pulls-review").h(ui(24)).flex_none().items_center().gap(4).on_mouse_down("left", keepPress)
     .children(segments.map(s => item(/** @type {any} */ (s))))
     // Stays with no counts: on a clean default branch it's the only way in.
     // With the analysis's mark after the logo, it grows to hold both.

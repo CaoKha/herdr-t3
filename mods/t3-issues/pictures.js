@@ -11,7 +11,7 @@ import { imageExt, curlArgs, imageSize, drawnSize } from "./images.js";
 import { codeView, fenceLanguage, fenceDiff, diffView, diffRowsOf } from "./code.js";
 import { ui } from "./layout-settings.js";
 
-export const PICTURES_AT_ONCE = 3;
+const PICTURES_AT_ONCE = 3;
 
 /**
  * The view's pictures, under `cache` (`cache/<mod>`): by asset key `{ status: "loading" | "done" | "failed", src, path?,

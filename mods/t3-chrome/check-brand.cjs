@@ -9,6 +9,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements(), { find, walk, strings } = kit;
 const ran = [];
 const scope = vm.createContext({
+  keepPress: (_e, cx) => cx.stop_propagation(),
   ui: (n) => n,
   div: element, h_flex: element, svg: (src) => element("svg", src), image: (src) => element("image", src),
   run: (...a) => ran.push(a),

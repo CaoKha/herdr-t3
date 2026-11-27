@@ -1,10 +1,10 @@
 // Popup menus that hang off one another, as T3's MenuSub; a submenu is a popup of its own beside its row. Which hangs off
 // which is kept for this run in one registry: mods share one JS context (terminal-context.js), so every copy reads the same.
-import { openOverlay, closeOverlay, props, settings, shared } from "herdr";
+import { openOverlay, closeOverlay, props, shared } from "herdr";
 import { subPlace, subOpened } from "./submenu.js";
 import { MENU_ROW } from "./menu-row.js";
 import { litProp } from "./list.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 // id → { mod, parent, kind, back? }: the popup it hangs off (null: a top one), what it is, for a row's on state (hasOpen), and
 // for a submenu, how its menu takes the keyboard back when it closes.
@@ -55,7 +55,7 @@ export function closeChain() {
  *  Enter opened it, so its first row lights. */
 export function openBeside(view, i, key, row, spec, kind = null, keys = false) {
   closeSub(view);
-  const p = props() ?? {}, z = Number(settings()?.zoom) || 1;
+  const p = props() ?? {}, z = zoom();
   // shortcut: with no row seen yet (keys only), the row is placed from the pointer where the menu opened, as Herdr opens it
   // there; a menu Herdr pushed back into the window puts its submenu off by as much. Upgrade if Herdr reports where an element is.
   const o = view.origin ?? { x: 0, y: 0 };

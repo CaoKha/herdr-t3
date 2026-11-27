@@ -1,12 +1,11 @@
 import { div } from "gpui-kit";
 import { Popup } from "gpui-base";
-import { settings } from "herdr";
 import { tip, tipCard, FADE } from "./tip.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 const textStyle = (el, size, weight) => weight === "medium" ? el.text_size(ui(size)).font_medium() : el.text_size(ui(size)).font_normal();
 const widthChanged = (view, key, id) => (size, cx) => {
-  const width = size.width / (Number(settings().zoom) || 1);
+  const width = size.width / zoom();
   // Only this run's layout measurements; never a preference or a character-count estimate.
   const widths = view[key] ??= {};
   if (widths[id] === width) return;

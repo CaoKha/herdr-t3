@@ -8,7 +8,7 @@ const kit = require("./check-kit.js");
 const element = kit.elements({ args: "all" }), { find } = kit;
 // A mod as Herdr would load it (kit.bundle), button.js's helpers kept to the three the inbox imports.
 const bundle = (dir, file = "main.js", seen = new Set()) => kit.bundle((name) => fs.readFileSync(path.join(dir, name), "utf8"), file,
-  (name, src) => name === "button.js" ? "const { button, radiusOf, GROUP_GAP } = (() => {\n" + kit.strip(src) + "\nreturn { button, radiusOf, GROUP_GAP }; })();" : null, seen);
+  (name, src) => name === "button.js" ? "const { button, radiusOf, GROUP_GAP, keepPress } = (() => {\n" + kit.strip(src) + "\nreturn { button, radiusOf, GROUP_GAP, keepPress }; })();" : null, seen);
 
 function slims(node, out = []) {
   if (!node || typeof node !== "object") return out;
@@ -234,7 +234,7 @@ test("a card Settle removes its pin immediately, and a quick Undo keeps it", asy
   const held = []; f.context.hc = () => new Promise((done) => held.push(done));
   f.mod.hovered = "A"; f.render(); f.event("settle-A", "on_click"); f.flush();
   assert.deepEqual(f.pins, ["B"], "the pin goes while the write is pending");
-  f.mod.undo(f.cx); f.flush();
+  f.context.undoNotice(f.cx); f.flush();
   held[0]({ code: 0 }); await new Promise(setImmediate); f.flush();
   assert.deepEqual(f.pins, ["A", "B"], "an older successful Settle cannot undo a newer Undo's pin restore");
 });
@@ -243,7 +243,7 @@ test("a failed Settle after a quick Undo preserves newer pin choices", async () 
   const f = fixture(); f.add("A"); f.add("B"); f.add("C"); f.pins = ["A", "B"];
   const held = []; f.context.hc = () => new Promise(done => held.push(done));
   f.mod.hovered = "A"; f.render(); f.event("settle-A", "on_click"); f.flush();
-  f.mod.undo(f.cx); f.flush();
+  f.context.undoNotice(f.cx); f.flush();
   assert.deepEqual(f.pins, ["A", "B"]);
   f.pins = ["B", "C"];
   held[0]({ code: 1, stderr: "offline" }); await new Promise(setImmediate);
@@ -338,7 +338,7 @@ test("an external label clear and a local Undo keep their old places", async () 
   const g = fixture(); g.add("A", "idle", 100).focused = true; g.add("B", "idle", 300); g.render();
   g.settle(); g.flush(); await new Promise(setImmediate);
   g.label("A", "settled", "1000:0"); g.render(1100);
-  g.mod.undo(g.cx); g.flush(); await new Promise(setImmediate);
+  g.context.undoNotice(g.cx); g.flush(); await new Promise(setImmediate);
   g.label("A", "settled", ""); g.render(2000);
   assert.deepEqual(g.active(), ["B", "A"], "Undo restores the previous order");
 });
@@ -404,7 +404,7 @@ test("Undo in another window keeps Active order through Inbox, footer and tab-ba
     const tabs = f.loadTabs(); f.render(); g.render();
     if (via === "tabs") await tabs.settle(f.cx); else { f.settle(); f.flush(); await new Promise(setImmediate); }
     f.label("B", "settled", "1000:0"); f.render(1100); g.render(1100);
-    if (via === "inbox") f.mod.undo(f.cx); else { await tabs.undo(); f.render(); }
+    if (via === "inbox") f.context.undoNotice(f.cx); else { await tabs.undo(); f.render(); }
     f.flush(); await new Promise(setImmediate); f.label("B", "settled", "");
     f.render(1200); g.render(20000);
     assert.deepEqual(f.active(), ["A", "B", "C"], `${via}: the action window keeps its place`);
@@ -649,11 +649,11 @@ test("a layout Inbox and tab-bar share instant Undo while hidden or behind Lists
     const f = fixture(); f.context.props = () => ({ home: "t3-tabs.home" }); f.mode = mode; f.hidden = true;
     const tabs = f.loadTabs();
     let undone = 0;
-    f.mod.remember("Snoozed", 1, () => { undone++; }, f.cx);
+    f.context.rememberNotice("Snoozed", 1, () => { undone++; }, f.cx);
     await tabs.undo(f.cx);
     assert.equal(undone, 1, `${mode}: t3-tabs.undo runs Inbox undo immediately even when hidden`);
     assert.equal(f.state["t3.notice"], null);
-    f.mod.remember("Snoozed", 1, () => {}, f.cx);
+    f.context.rememberNotice("Snoozed", 1, () => {}, f.cx);
     const stale = f.timers.filter(t => !t.cancelled && t.at === f.now + 5000).at(-1);
     f.pins = ["A"];
     tabs.unpin("A", f.cx);
@@ -667,7 +667,7 @@ test("a layout Inbox and tab-bar share instant Undo while hidden or behind Lists
 test("Undo pressed just before five seconds runs before expiry, without waiting for any poll", { skip: !fs.existsSync(path.join(__dirname, "../t3-tabs/main.js")) }, async () => {
   const f = fixture(); f.context.props = () => ({ home: "t3-tabs.home" }); let undone = 0;
   const tabs = f.loadTabs();
-  f.mod.remember("Snoozed", 1, () => { undone++; }, f.cx);
+  f.context.rememberNotice("Snoozed", 1, () => { undone++; }, f.cx);
   f.now += 4999;
   await tabs.undo(f.cx);
   assert.equal(undone, 1);
@@ -680,7 +680,7 @@ test("Undo pressed just before five seconds runs before expiry, without waiting 
 test("at Home the settle key leaves a live Settled notice alone: Undo has its own key, as T3's", () => {
   const f = fixture(); f.context.props = () => ({ home: "t3-tabs.home" }); let undone = 0;
   f.state["t3-tabs.home"] = "home"; f.context.focused = () => ({ space: "home" });
-  f.mod.remember("Settled", 1, () => undone++, f.cx);
+  f.context.rememberNotice("Settled", 1, () => undone++, f.cx);
   f.settle();
   assert.equal(undone, 0);
   assert.ok(f.state["t3.notice"]?.live, "the notice stays for its Undo");
@@ -1331,10 +1331,10 @@ test("with the layout's footer there, the notice goes to it, as T3's footer row 
   assert.equal(find(f.tree, "undo-notice-1"), null, "nothing over the list");
   assert.deepEqual(plain(f.state["t3.notice"]), { action: "Settled", count: 1, gen: 1, shown: false, live: true, at: 1000 });
   f.render(1016); assert.equal(f.state["t3.notice"].shown, true, "then it fades in, there");
-  await f.mod.undo(f.cx);
+  await f.context.undoNotice(f.cx);
   assert.equal(f.mod.pending.settled.A, "");
   assert.equal(f.state["t3.notice"], null, "undo clears notice immediately");
-  const writes = f.jobs.length; await f.mod.undo(f.cx); assert.equal(f.jobs.length, writes, "a second Undo does nothing");
+  const writes = f.jobs.length; await f.context.undoNotice(f.cx); assert.equal(f.jobs.length, writes, "a second Undo does nothing");
 });
 
 test("folding Working slides its header down with the list, as T3's markers move, so nothing passes over it", () => {
@@ -1660,7 +1660,7 @@ test("with a Home, Undo brings the agent back while the person is still there, a
     if (put === "settle") f.settle();
     else f.mod.customSnooze(`A:${Date.now() + 3600000}`, f.cx);
     a.focused = false; atHome(f, where); f.render(); f.calls.length = 0;
-    f.mod.undo(f.cx);
+    f.context.undoNotice(f.cx);
     assert.deepEqual(plain(f.calls), back ? [["agent.focus", { terminal: "A" }]] : [], `${put} from ${where}`);
   }
 });
@@ -2112,7 +2112,7 @@ test("a quick Undo stays undone while its writes are under way, whichever lands 
   const answer = async (i) => { held[i]({ code: 0 }); await new Promise(setImmediate); f.flush(); };
   f.settle(); f.flush(); f.render();
   assert.deepEqual(shown(), [[], ["A"]]);
-  f.mod.undo(f.cx); f.flush(); f.render(1100);
+  f.context.undoNotice(f.cx); f.flush(); f.render(1100);
   assert.deepEqual(shown(), [["A"], []]);
   f.label("A", "settled", "1000:0"); f.render(1200);
   assert.deepEqual(shown(), [["A"], []], "the settle lands: still as the Undo left it");
@@ -2200,18 +2200,18 @@ test("Undo puts back the pin it took, in its place, and leaves one made since", 
   f.render(); f.mod.hovered = "P"; f.render();
   f.event("settle-P", "on_click"); f.flush(); f.render(1100);
   f.pins = ["Q", "B"]; f.render(1200);
-  f.mod.undo(f.cx);
+  f.context.undoNotice(f.cx);
   assert.deepEqual(f.pins, ["P", "Q", "B"]);
   // A drag's unpin too; one pinned again meanwhile is left alone.
   f.flush(); f.label("P", "settled", ""); f.mod.dropped = 0; f.render(7000); f.mod.listH = 600; f.render(7000);
   f.mod.drag = { from: "P", moved: true, y: 300, grab: 10, height: 30, target: { section: "active" } }; f.render(7000);
   f.event("t3-inbox-root", "on_mouse_up:left"); f.render(7100);
   assert.deepEqual([f.pins, f.mod.notice.action], [["Q", "B"], "Unpinned"]);
-  f.pins = ["Q", "C", "B"]; f.mod.undo(f.cx);
+  f.pins = ["Q", "C", "B"]; f.context.undoNotice(f.cx);
   assert.deepEqual(f.pins, ["P", "Q", "C", "B"]);
   f.pins = ["Q", "P"]; f.render(7200);
   f.mod.drag = { from: "Q", moved: true, y: 300, grab: 10, height: 30, target: { section: "active" } }; f.render(7200);
-  f.event("t3-inbox-root", "on_mouse_up:left"); f.pins = ["Q", "P"]; f.mod.undo(f.cx);
+  f.event("t3-inbox-root", "on_mouse_up:left"); f.pins = ["Q", "P"]; f.context.undoNotice(f.cx);
   assert.deepEqual(f.pins, ["Q", "P"]);
 });
 
@@ -2554,7 +2554,7 @@ test("the pin button unpins without opening or dragging, and Undo puts the pin b
   assert.deepEqual(bubble, ["stopped", "stopped"]);
   assert.equal(f.mod.drag ?? null, null);
   assert.deepEqual(f.pins, ["C", "B"]);
-  f.mod.undo(f.cx);
+  f.context.undoNotice(f.cx);
   assert.deepEqual(f.pins, ["C", "A", "B"]);
   assert.deepEqual([f.labelled, f.calls], [[], []]);
 });
@@ -2684,7 +2684,7 @@ test("standalone Undo notice omits its summary whole when short of room and brin
   f.context.keys = () => [{ action: "t3-tabs.undo", keys: "cmd-shift-z" }];
   a.focused = true;
   f.render();
-  f.mod.remember("Unpinned", 12, () => {}, f.cx);
+  f.context.rememberNotice("Unpinned", 12, () => {}, f.cx);
   f.render(1016);
   const note = () => find(f.tree, `undo-notice-${f.mod.notice.gen}`);
 
@@ -2723,7 +2723,7 @@ test("standalone Undo notice omits its summary whole when short of room and brin
   f.event(note().key, "on_size_change", { width: 150 * zoom });
   f.render(1016);
   assert.deepEqual(texts(note()), ["⇧⌘Z to undo"]);
-  f.mod.remember("Settled", 1, () => {}, f.cx);
+  f.context.rememberNotice("Settled", 1, () => {}, f.cx);
   f.render(1032);
   f.event("undo-summary-measure-Settled 1 agent,", "on_size_change", { width: 50 * zoom });
   f.render(1032);

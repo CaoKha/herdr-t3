@@ -30,7 +30,7 @@ const make = () => { const p = element(); proxies.set(made.at(-1), p); return p;
 const sets = [];
 let win = { active: true };
 const context = vm.createContext({ KEY: { navWidth: "t3.navWidth" }, shared: (k) => store.get(k) ?? null, keys: () => [], window: () => win, Popup: { new: () => make() },
-  setShared: (k, v) => { sets.push([k, v]); store.set(k, v); }, settings: () => ({ zoom: 2 }),
+  setShared: (k, v) => { sets.push([k, v]); store.set(k, v); }, zoom: () => 2,
   div: make, h_flex: make, v_flex: make, svg: make, ghostButton: make,
   localStorage: { getItem: (k) => store.get(`local:${k}`) ?? null, setItem: (k, v) => { sets.push([k, String(v)]); store.set(`local:${k}`, String(v)); } } });
 vm.runInContext(src, context);

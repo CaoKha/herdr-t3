@@ -6,7 +6,7 @@ import { sidebarParts } from "./sidebar.js";
 import { agentStep } from "./agent-step.js";
 import { newTab, placeOf } from "./project.js";
 import { lookAgents } from "./known-agents.js";
-import { rememberProjects } from "./projects.js";
+import { rememberProjects, shortFolder } from "./projects.js";
 import { t3Settings } from "./layout-settings.js";
 import { KEY } from "./store.js";
 import { writeLabel } from "./labels.js";
@@ -21,8 +21,10 @@ async function folderExists(folder) {
   }
 }
 
+export const nameOf = (c, lead, name) => c.named ? c.name : lead ? name(lead) : "Terminal";
+
 // One instance per Tabs view; the Herdr operations also admit the check's fake core.
-export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => checking(), spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel, folderExists }) {
+export function navigation(core = { checking: () => checking(), spaces, panes, agents, terminals, machines: () => machines(), run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home: () => home(), window: () => window(), namer, programOf, focusAgent, focusPane, writeLabel, folderExists }) {
   const { checking, spaces, panes, agents, terminals, machines, run, openOverlay, closeOverlay, focused, hc, notify, layout, shared, setShared, home, window, namer, programOf, focusAgent, focusPane, writeLabel, folderExists: checkFolder = folderExists } = core;
   // lastIn: each tab's agent last in view, which the Inbox's bar holds while a program there has the focus.
   // fresh: spaces where the person started something new (a New tab, New's pick, cmd-t) since last looking at an agent there.
@@ -35,7 +37,6 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
   const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
   // The Inbox's ways with attention hold unless Lists is the mode (docs/adr/0002).
   const listsShown = () => sidebarParts(layout()).stack?.active === "lists";
-  const nameOf = (c, lead, name) => c.named ? c.name : lead ? name(lead) : "Terminal";
 
   // Home: one place to land, a space of its own on this computer, known by its id so whatever someone arranges there is theirs.
   // The layout's lists leave it out and the keys that walk spaces go around it, so it takes no number. This mod answers for it
@@ -147,20 +148,11 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
   }
   const atPrompt = async (terminal) => (await foreground(terminal)).prompt;
 
-  function openCleanUp(props, cx) {
-    beforeAsk(cx);
+  // t3-actions draws T3's alert dialog and Clean up: the shipped confirm mod's measures are its own.
+  function openDialog(props) {
     if (asking) closeOverlay(asking);
     tabAnswer = cleanupAnswer = null;
     asking = openOverlay({ mod: "t3-actions", kind: "dialog", frame: "none", width: 512, props });
-  }
-
-  function confirmClose(title, detail, command, cx) {
-    // The dialog covers it, nothing reports the leaving until the pointer moves, and the × stops the press that would close the card.
-    beforeAsk(cx);
-    if (asking) closeOverlay(asking);
-    tabAnswer = cleanupAnswer = null;
-    // t3-actions draws T3's alert dialog: the shipped confirm mod's measures are its own.
-    asking = openOverlay({ mod: "t3-actions", kind: "dialog", frame: "none", width: 512, props: { actions: "confirm", title, detail, yes: "Close", command: { name: command } } });
   }
 
   // As T3's confirmTerminalClose: `Close terminal "Pi"?` or `Close 2 terminals?`, then what that ends.
@@ -168,7 +160,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     const [title, detail] = names.length === 1
       ? [`Close terminal "${names[0]}"?`, "This stops the running process and clears its history."]
       : [`Close ${names.length} terminals?`, `This stops their running processes and clears their histories: ${names.map(n => `"${n}"`).join(", ")}.`];
-    confirmClose(title, detail + more, command, cx);
+    openDialog({ actions: "confirm", title, detail: detail + more, yes: "Close", command: { name: command } });
   }
 
   function cleanupScope() {
@@ -270,7 +262,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     const cards = rows(pane => kept.has(pane)).map(c => ({ ...c, process: kept.get(c.pane) }));
     const serial = n ? ++cleanupSerial : null;
     const command = serial ? `cleanup-now:${serial}` : null;
-    openCleanUp({ actions: "clean-up", settled, shells, cards, command: command && { name: `t3-tabs.${command}` } }, cx);
+    openDialog({ actions: "clean-up", settled, shells, cards, command: command && { name: `t3-tabs.${command}` } });
     cleanupAnswer = serial ? { serial, settled: settledMap, shells: shellsMap } : null;
   }
 
@@ -511,7 +503,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   // Once what Herdr's pick showed is out of view, and its seen has come back from the core (or the lower write could land first),
   // its turn is unread again. Still in view after a few seconds: the person stayed there, so it was seen after all.
-  function payBack(tab, home, terms, every, ps, byAddress = new Map(terms.map(k => [k.address, k])), byAgent = new Map(every.map(a => [a.address, a]))) {
+  function payBack(tab, home, terms, every, ps, byAddress, byAgent) {
     for (const [addr, o] of owed) {
       const k = byAddress.get(addr), a = byAgent.get(addr);
       if (!k || (k.turn ?? 0) !== o.turn || o.turn < 1) { owed.delete(addr); continue; }
@@ -537,7 +529,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   // A snooze ends on a failure in its tree or a new turn given in view, as the Inbox ends it; here too, in either sidebar,
   // as the Inbox copy may not have started (docs/adr/0003). Seeing it once it has woken stays the Inbox's: Woke is its mark.
-  function endSnoozes(terms, every, viewing, byAddress = new Map(terms.map(k => [k.address, k])), byAgent = new Map(every.map(a => [a.address, a]))) {
+  function endSnoozes(terms, every, viewing, byAddress, byAgent) {
     for (const addr of waking.keys()) if (!byAddress.has(addr)) waking.delete(addr);
     const was = states, active = window()?.active, now = Date.now();
     const under = subAgents(every, terms);
@@ -559,7 +551,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   // The agent in view, as the Inbox's row in view (t3-inbox/row-model.js inboxInView): the focused one; else a sub-agent with
   // no row of its own (a block, a peek) stands for its nearest agent; a mod pane for the agent beside it, unless it has a card.
-  function inViewAgent(terms, every, ps, byAddress = new Map(terms.map(k => [k.address, k])), byAgent = new Map(every.map(a => [a.address, a]))) {
+  function inViewAgent(terms, every, ps, byAddress, byAgent) {
     const own = every.find(a => a.focused);
     if (own) return own.address;
     const f = focused();
@@ -636,7 +628,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
 
   function tabOrder() {
     const observation = advance(), w = work(observation);
-    return { w, tabs: visibleTabs(w), home: observation.home };
+    return { w, tabs: visibleTabs(w), observation };
   }
 
   // The next or previous tab the bar shows, going around.
@@ -653,6 +645,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
     advance() {
       const now = advance(), next = rememberProjects(now.spaces, now.panes, homeId(), home(), shared(KEY.projects));
       if (next && !checking()) setShared(KEY.projects, next);
+      return now;
     },
     nextCard,
     async handle(command, cx) {
@@ -723,9 +716,7 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
           }
           const folder = !space.machine && !checking() ? placeOf(space, panes()) : null;
           if (folder && !(await checkFolder(folder))) {
-            const h = home();
-            const shown = h && (folder === h || folder.startsWith(`${h}/`) || folder.startsWith(`${h}\\`)) ? "~" + folder.slice(h.length) : folder;
-            notify({ title: "Folder not found", body: `${shown} no longer exists on this computer.`, level: "warning" });
+            notify({ title: "Folder not found", body: `${shortFolder(folder, home())} no longer exists on this computer.`, level: "warning" });
             return;
           }
           const live = spaces().find(s => s.id === space.id);
@@ -745,8 +736,8 @@ export function navigation(beforeAsk = (_cx) => {}, core = { checking: () => che
       else if (command === "tab-prev") walkTabs(-1);
     },
     frame() {
-      const { w, tabs, home } = tabOrder();
-      return { tabs, atHome: home, context: context(w, tabs) };
+      const { w, tabs, observation: { home, every, all, panes } } = tabOrder();
+      return { tabs, atHome: home, context: context(w, tabs), every, all, panes };
     },
   };
   return api;

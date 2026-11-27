@@ -1,20 +1,19 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { focused, run, settings, window } from "herdr";
+import { focused, run, window } from "herdr";
 import { focusPane } from "./zoom.js";
-import { pointerGone, POINTER_WATCH, pointerMoved } from "./tip.js";
+import { pointerGone, POINTER_WATCH, pointerMoved, FADE } from "./tip.js";
 import { detailsAt, detailsFor } from "./details.js";
-import { MOTION } from "./motion.js";
 import { SLIM, CARD_GAP, LIST_TOP } from "./list-view.js";
 import { byCard } from "./row-model.js";
 import { setPinned } from "./pins.js";
 import { alpha } from "./color.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 export function inboxDrag(view, t, model, actions) {
   const { list, pins, pinned, put, out, busy, hidden, settledAt, working, since, state, viewing, napUntil, wake, napRows } = model;
   const { settle, unsettle, unpinRow, go } = actions;
-  const zoom = Number(settings()?.zoom) || 1;
+  const z = zoom();
   // Dragging, as T3's sidebar (Sidebar.drag.ts, Sidebar.pointer.ts): a press and a 6px move lifts a row, which follows the pointer
   // inside the list. While it's lifted the Pinned and Active labels open and the list opens a gap where it will land: Pinned keeps
   // a hand-made order, Active and Settled their own, so the gap opens where that puts it.
@@ -82,18 +81,18 @@ export function inboxDrag(view, t, model, actions) {
   // The gap: a card and the list's spacing in Pinned and Active, a slim row in Settled.
   const cardH = lifted && !fromShelf ? d.height : view.cardH ?? ui(78);
   const gap = (key) => div().id(`gap-${key}`).flex_none().h(plan?.gap !== key ? 0 : plan.section === "settled" ? ui(SLIM) : cardH + CARD_GAP)
-    .when(dragging, (el) => el.transition("height", MOTION));
+    .when(dragging, (el) => el.transition("height", FADE));
   // Each droppable row sits in a lane: the gap that opens above it, the row (folding away once the lifted one is
   // headed elsewhere, holding its place until then) with the list's spacing, and after the last, the end gap.
   const lane = (section, xs, draw, spacing, fly) => xs.map((a, i) => v_flex().id(`lane-${a.address}`).flex_none()
     .child(gap(a.address))
     .child(v_flex().id(`hold-${a.address}`).flex_none()
-      .when(dragging && d.from === a.address, (el) => el.overflow_hidden().opacity(0).h(plan ? 0 : d.height + spacing).transition("height", MOTION))
+      .when(dragging && d.from === a.address, (el) => el.overflow_hidden().opacity(0).h(plan ? 0 : d.height + spacing).transition("height", FADE))
       .child(fly(a.address, section === "settled" || section === "snoozed" ? "slim" : "card", draw(a))).when(spacing > 0, (el) => el.child(div().h(spacing).flex_none())))
     .when(i === xs.length - 1, (el) => el.child(gap(`end-${section}`))));
   // T3's boundaries: Pinned and Active labels, shown only while dragging; the list opens room for them.
   const boundary = (id, text, section, to) => h_flex().id(id).flex_none().overflow_hidden().h(dragging ? ui(24) : 0)
-    .transition("height", MOTION).px(8).gap(8).items_center().text_size(ui(12)).font_medium()
+    .transition("height", FADE).px(8).gap(8).items_center().text_size(ui(12)).font_medium()
     .on_mouse_move((_e, cx) => aim(to, cx))
     .when(dragging, (el) => el.child(div().text_color(hot(section) ? t.accent : t.muted).child(text))
       .child(div().flex_1().h(1).bg(hot(section) ? alpha(t.accent, "80") : t.border)));
@@ -111,7 +110,7 @@ export function inboxDrag(view, t, model, actions) {
     .when([view.hovered, view.details, view.detailsOut].includes(a.address), (r) => r.child(details(a)))
     .on_mouse_down("left", (e) => {
       if (a.mod || sectionOf(a) === "working" || view.pending.settled[a.address] !== undefined || view.pending.snoozed[a.address] !== undefined || view.hot === `snooze-${a.address}`) return;
-      view.drag = { from: a.address, at: e.position, grab: (e.local_position?.y ?? 0) / zoom, height: (e.bounds?.height ?? 0) / zoom, moved: false, target: null };
+      view.drag = { from: a.address, at: e.position, grab: (e.local_position?.y ?? 0) / z, height: (e.bounds?.height ?? 0) / z, moved: false, target: null };
     })
     .on_mouse_move((e, cx) => {
       // Lifted, the root tracks the pointer: a second report of one place would read as having stopped.
@@ -227,7 +226,7 @@ export function inboxDrag(view, t, model, actions) {
       else pointerMoved(e.position);
       g.moved = true;
       view.dragBox = e.bounds;
-      g.last = e.local_position ? { x: e.local_position.x / zoom, y: e.local_position.y / zoom } : g.last;
+      g.last = e.local_position ? { x: e.local_position.x / z, y: e.local_position.y / z } : g.last;
       if (view.drag) view.drag.y = g.last?.y ?? view.drag.y;
       cx.notify();
     })

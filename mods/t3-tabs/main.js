@@ -4,7 +4,7 @@ import { checking, spaces, panes, agents, terminals, run, openOverlay, focused, 
 import { modStatus, namer, programOf } from "./name.js";
 import { notNews, ownStatus, stillSettled, subAgents, terminalByAddress, treeStatus } from "./tree.js";
 import { statusMark } from "./status-mark.js";
-import { tip, glow, undoLabel } from "./tip.js";
+import { tip, glow, undoLabel, FADE } from "./tip.js";
 import { detailsFor, detailsAt } from "./details.js";
 import { programIcon } from "./program.js";
 import { focusAgent, focusPane } from "./zoom.js";
@@ -13,23 +13,24 @@ import { stopsInit, stopsEnd, stop, focusRoot, within } from "./focus.js";
 import { opener, popupOpen, hang, trigger } from "./trigger.js";
 import { agentsOn, lookAgents } from "./known-agents.js";
 import { litProp } from "./list.js";
-import { sidebarParts, toggleLeft } from "./sidebar.js";
-import { navigation } from "./navigation.js";
+import { sidebarParts, toggleLeft, sidebarPage } from "./sidebar.js";
+import { navigation, nameOf } from "./navigation.js";
 import { projectMark } from "./project.js";
 import { KEY, closedKey } from "./store.js";
-import { rememberNotice, undoNotice } from "./notice.js";
+import { rememberNotice, undoNotice, LIVE_MS } from "./notice.js";
 import { pinList, pin, unpin, putBack } from "./pins.js";
 import { writeLabel } from "./labels.js";
 import { openMenu } from "./menu.js";
 import { panelState, togglePanel, toggleWide, syncPanel, restorePanel, reviewRepo, layoutNode } from "./panel.js";
 import { rememberTerminal } from "./terminal-context.js";
 import { stripAt, stripWheel, stripFades } from "./scroll-strip.js";
-import { button as drawButton, radiusOf, tint as ghostTint, GROUP_GAP } from "./button.js";
+import { button as drawButton, radiusOf, tint as ghostTint, GROUP_GAP, keepPress } from "./button.js";
 import { nameText, named as namedLabel } from "./measured-text.js";
 import { tab } from "./tab.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom, fitBlock } from "./layout-settings.js";
+import { MENU_W, menuHeight } from "./menu-row.js";
 
-const inboxShown = () => sidebarParts(layout()).stack?.active === "inbox";
+const inboxShown = () => sidebarPage() === "inbox";
 // The tab bar's row, as layouts/herdr-t3.json has it.
 const ROW_PX = 40;
 
@@ -51,8 +52,8 @@ const NARROW = 360;
 // The panes you were in, the one you're in first, for Go to's order (T3's recent threads): kept by the `keys` copy, as it
 // always shows, so every way of moving counts. A closed pane leaves it.
 const RECENT = 30;
-function keepRecent() {
-  const here = focused()?.pane, open = new Set(panes().map(p => p.pane)), was = shared(KEY.recent) ?? [];
+function keepRecent(ps) {
+  const here = focused()?.pane, open = new Set(ps.map(p => p.pane)), was = shared(KEY.recent) ?? [];
   const next = [...(here ? [here] : []), ...was.filter(p => p !== here)].filter(p => open.has(p)).slice(0, RECENT);
   if (next.length !== was.length || next.some((p, i) => p !== was[i])) setShared(KEY.recent, next);
 }
@@ -76,7 +77,6 @@ const nav = () => brain ??= navigation();
 
 // A tab nobody named reads as its lead pane: the agent in it, else the focused one.
 const leadOf = (mine) => mine.find(p => p.status != null) ?? mine.find(p => p.focused) ?? mine[0];
-const nameOf = (c, lead, name) => c.named ? c.name : lead ? name(lead) : "Terminal";
 
 // Home's shown tab's pane when it is one mod's pane alone, the surface that can take the whole right side; else null.
 function homeLone(home) {
@@ -85,8 +85,6 @@ function homeLone(home) {
 }
 const homeWhole = (home) => Boolean(homeLone(home));
 
-// New tab's menu, as wide as the layout's other menus (t3-menu's).
-const NEW_MENU_W = 220;
 
 export default class Tabs extends View {
   /** @type {{ space?: string }} */
@@ -166,7 +164,7 @@ export default class Tabs extends View {
   async settle(cx, given = null) {
     // Settle is the Inbox's: Lists has no Settled to put it in (docs/adr/0002).
     // At Home the key has nothing in view to settle, and Undo has its own key, as T3's; a menu still names its agent.
-    if ((!given && this.navigation.atHome) || sidebarParts(layout()).stack?.active === "lists") return;
+    if ((!given && this.navigation.atHome) || sidebarPage() === "lists") return;
     const f = { ...focused() }, ps = panes(), p = ps.find(p => p.pane === f.pane), every = agents(), all = terminals();
     if (!given && p?.mod && programOf(p)?.inbox) {
       if (!["working", "blocked"].includes(modStatus(p))) await this.navigation.handle(`close-pane-now:${p.pane}`, cx);
@@ -207,7 +205,7 @@ export default class Tabs extends View {
   async snooze(arg, cx) {
     const i = arg.lastIndexOf(":"), address = arg.slice(0, i), at = Number(arg.slice(i + 1));
     if (!(at > Date.now())) return notify({ title: "Couldn't snooze the agent", body: "That time has passed. Choose another.", level: "warning" });
-    if (sidebarParts(layout()).stack?.active === "lists") return;
+    if (sidebarPage() === "lists") return;
     // The menu or dialog may still be open when the agent or something under it starts needing the person.
     const every = agents(), all = terminals(), a = every.find(a => a.address === address), k = all.find(k => k.address === address);
     if (!a || !k || treeStatus(ownStatus(a.status, address, all), subAgents(every, all)(address)) === "blocked") return;
@@ -232,7 +230,7 @@ export default class Tabs extends View {
 
   // Mark unread is the Inbox's (docs/adr/0002): puts an idle agent back to Done in place by rolling `herdr.seen` back a turn.
   async unread(address) {
-    if (sidebarParts(layout()).stack?.active === "lists") return;
+    if (sidebarPage() === "lists") return;
     const every = agents(), all = terminals(), a = every.find(a => a.address === address), k = all.find(k => k.address === address);
     if (!a || !k) return;
     const kids = subAgents(every, all)(address), own = ownStatus(a.status, address, all), turn = Number(k.turn);
@@ -275,18 +273,18 @@ export default class Tabs extends View {
 
   // With the sidebar hidden the row holds only its toggle, where the brand bar has it, as T3's collapsed sidebar leaves its trigger.
   // How agents are doing is the sidebar's and Herdr's notice's to show, so the row says none of it (docs/adr/0010).
-  sidebarToggle(t, stopPress) {
+  sidebarToggle(t) {
     return tip(this, t, "sidebar-toggle", "Show sidebar", stop(this, t, "sidebar-toggle", drawButton(t, "sidebar-toggle", {
       size: "sm", icon: "mods/t3-tabs/icons/panel-left.svg", label: "Show sidebar", hot: this.hot === "sidebar-toggle" })
       .mr(4).on_hover(glow(this, "sidebar-toggle"))
       // It goes when the sidebar shows, before the pointer can report leaving it.
-      .on_mouse_down("left", stopPress).on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true });
+      .on_mouse_down("left", keepPress).on_click(() => { this.hot = null; run("t3-tabs.toggle-sidebar"); }), radiusOf("sm")), { action: "t3-tabs.toggle-sidebar", below: true });
   }
 
   // Home's row (`home-row` in `work-home`) wears Home's colour so the two are one surface; with the wallpaper as Home it draws the
   // same picture, offset by the row's height and cut to itself, from where Home reports it (KEY.homeShown). Another Home's value,
   // or Home now another mod or split, draws nothing. Sidebar hidden, the toggle floats here and the Undo notice gets a chrome pill.
-  homeRow(t, w, stopPress, windowButtons) {
+  homeRow(t, w, windowButtons) {
     const home = shared(KEY.home), shown = shared(KEY.homeShown), lone = homeLone(home);
     const pic = shown?.path && shown.home === home && lone?.mod === "asciicn-wallpaper" ? shown : null;
     const root = layout(), hidden = Boolean(sidebarParts(root).rail?.hidden), notice = hidden && this.undoNotice(t);
@@ -294,21 +292,11 @@ export default class Tabs extends View {
       .pl(hidden ? toggleLeft(w, root, settings().zoom) : 8).pr(4).gap(4).items_center().bg(t.background)
       .when(Boolean(pic), el => el.child(div().id("home-picture").absolute().right(pic.right).top(pic.top + ROW_PX).w(pic.w).h(pic.h)
         .opacity(pic.opacity).child(image(pic.path).size_full())))
-      .when(hidden, el => el.child(this.sidebarToggle(t, stopPress)))
+      .when(hidden, el => el.child(this.sidebarToggle(t)))
       .when(Boolean(notice), el => el.child(h_flex().id("home-notice").flex_none().h(28).px(8).items_center().rounded(8).bg(t.chrome).child(notice)))
       .child(div().flex_1())
       // The panel open, its head has the window buttons, as away (`window-end`).
       .when(Boolean(w?.buttons) && !panelState().open, el => el.child(windowButtons())));
-  }
-
-  // With props.block, sizes that block to `size`: layout.resize, which Herdr keeps with the layout's clicks.
-  // on_size_change reports zoomed pixels; a layout's are logical.
-  fit(size) {
-    // The window snaps a zoomed width to whole pixels: up to half a px over its logical width isn't more room needed.
-    const z = Number(settings()?.zoom) || 1, id = props()?.block, px = Math.ceil(size.width / z - 0.5);
-    if (!id || px === this.fitted) return;
-    this.fitted = px;
-    run("layout.resize", { id, px });
   }
 
   // At Home the bar has nothing to show, so its row folds to the panes' gap, unless the sidebar is hidden (it holds the toggle and the
@@ -370,23 +358,22 @@ export default class Tabs extends View {
     // on_size_change reports zoomed pixels. Past T3's 768 for the same controls: here they share the row with the tabs.
     if (part === "measure") return div().id("bar-measure").size_full()
       .on_size_change((size) => {
-        const next = size.width / (Number(settings()?.zoom) || 1) < 1024;
+        const next = size.width / zoom() < 1024;
         if (shared(KEY.compact) !== next) setShared(KEY.compact, next);
       });
     const t = theme(), w = window();
     if (part === "keys") {
-      this.navigation.advance();
-      rememberTerminal();
+      const { panes: ps } = this.navigation.advance();
+      rememberTerminal(ps);
       const space = syncPanel(this);
-      keepRecent();
+      keepRecent(ps);
       this.fitRow(w, Boolean(space) && space === shared(KEY.home));
       return div();
     }
-    const stopPress = (_e, cx) => cx.stop_propagation();
     // As T3's titlebar controls, with the brand bar's chrome hover.
     const button = (id, icon, label, action, key, glyph = undefined) => tip(this, t, id, label, stop(this, t, id,
       drawButton(t, id, { icon, label, size: "sm", surface: "chrome", hot: this.hot === id })
-        .on_hover(glow(this, id)).on_mouse_down("left", stopPress).on_click(action)
+        .on_hover(glow(this, id)).on_mouse_down("left", keepPress).on_click(action)
         .when(Boolean(glyph), el => el.child(glyph)), radiusOf("sm")), { action: key, below: true });
     // The work header's end: Lists' terminal + before Details (t3-actions' block), so it never moves Details; after Details the panel's
     // toggle while no panel head owns it, then the window's buttons. tabs-end-inset keeps the toggle where the open panel's head puts
@@ -399,31 +386,31 @@ export default class Tabs extends View {
       // With the Inbox, the breadcrumb's space is the way to a new tab.
       const newTabShown = !this.navigation.atHome && !inboxShown();
       return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
-        .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => this.fit(size))
+        .child(h_flex().id("tabs-end").flex_none().items_center().when(newTabShown, el => el.pr(GROUP_GAP)).on_size_change((size) => fitBlock(this, size))
           // One size with the panel toggle beside it ("Rules" R2).
           .when(newTabShown, el => el.child(this.newTabMenu(t)))));
     }
     if (part === "window") {
       const panel = panelState(), toggleShown = !this.navigation.atHome && panel.pages.length > 0 && !panel.open;
       return focusRoot(this, h_flex().size_full().items_center().justify_end().bg(t.chrome)
-        .child(h_flex().id("window-end").flex_none().items_center().when(toggleShown, el => el.pl(GROUP_GAP)).on_size_change((size) => this.fit(size))
+        .child(h_flex().id("window-end").flex_none().items_center().when(toggleShown, el => el.pl(GROUP_GAP)).on_size_change((size) => fitBlock(this, size))
           // The space panel's toggle, over where it opens: the sidebar's panel-left, mirrored. Only while closed: open, the panel's head has it.
           .when(toggleShown, el => el.child(button("panel-toggle", "mods/t3-tabs/icons/panel-right.svg",
             "Show panel", () => togglePanel(), "t3-tabs.panel")))
           .when(w?.buttons && !panel.open, el => el.child(windowButtons()))));
     }
-    if (part === "home") return this.homeRow(t, w, stopPress, windowButtons);
+    if (part === "home") return this.homeRow(t, w, windowButtons);
     const space = spaces().find(p => p.active);
     const root = layout(), { rail: sidebar, stack: sidebarMode } = sidebarParts(root);
     // At Home, none: Home itself tells where this is.
-    const { tabs: shown, context: ctx } = this.navigation.frame(), inbox = sidebarMode?.active === "inbox";
+    const { tabs: shown, context: ctx, every, all, panes: ps } = this.navigation.frame(), inbox = sidebarMode?.active === "inbox";
     // With the Inbox, the breadcrumb holds the tab in view and the parent's: the strip has the rest.
     const strip = ctx ? [...ctx.kin, ...ctx.programs] : shown;
     // Each agent with its sub-agents (tree.js).
-    const every = agents(), all = terminals(), under = subAgents(every, all);
+    const under = subAgents(every, all);
     const byAddress = terminalByAddress(all);
     const st = (a) => treeStatus(ownStatus(a.status, a.address, all), under(a.address));
-    const ps = panes(), tabName = namer({ terminals: all, agents: every }), now = Date.now();
+    const tabName = namer({ terminals: all, agents: every }), now = Date.now();
     // In Lists a snooze's end brings a done mark back (statusOf) with nothing else changing: the earliest one redraws the strip.
     this.redrawAt(inbox ? Infinity : all.reduce((at, k) => { const wake = Number(k.labels?.snoozed); return wake > now && wake < at ? wake : at; }, Infinity), cx);
     // The tab's most urgent agent, ranked as the app ranks tabs; a done one only while it's still news.
@@ -531,12 +518,12 @@ export default class Tabs extends View {
         stripWheel(this.tabStrip, e);
         cx.notify();
       })
-      .when(Boolean(sidebar?.hidden), el => el.child(this.sidebarToggle(t, stopPress)))
+      .when(Boolean(sidebar?.hidden), el => el.child(this.sidebarToggle(t)))
       .when(Boolean(notice), el => el.child(notice))
       // The tabs' row, measured whole: with the Inbox the breadcrumb and the strip share it.
       .child(h_flex().id("tab-area").flex_1().min_w(0).h_full().items_center().gap(8)
         .on_size_change((size, cx) => { this.area = size.width / settings().zoom; cx.notify(); })
-        .when(Boolean(ctx), el => el.child(this.crumb(t, ctx, { every, ps, name: tabName, narrow: area - this.room - 8 < NARROW, stopPress })))
+        .when(Boolean(ctx), el => el.child(this.crumb(t, ctx, { every, ps, name: tabName, narrow: area - this.room - 8 < NARROW })))
         .child(h_flex().id("tab-scroll").relative().h_full().items_center().overflow_hidden()
           // 8 from Actions, as from the breadcrumb: the bar's 4 and these 4.
           .when(Boolean(ctx), el => el.w(stripWant).flex_shrink(1).min_w(0).mr(4)
@@ -544,7 +531,7 @@ export default class Tabs extends View {
           .when(!ctx, el => el.flex_1().min_w(0))
           .child(h_flex().id("tab-strip").flex_none().h_full().items_center().gap(TAB_GAP).ml(-at)
             .children(entries.map(e => e.rule ? div().id(e.id).w(1).h(16).mx(4).flex_none().bg(t.border)
-              : e.group ? this.paneGroup(t, e, widths.get(e.id), { name: tabName, stopPress })
+              : e.group ? this.paneGroup(t, e, widths.get(e.id), { name: tabName })
               : item(e.c, strip.indexOf(e.c)))))
           // A cut end fades out, in both modes: one way for the strip to run out of room, and a tab cut short reads as cut, not as
           // a narrow tab. 16px of the bar's own color in steps, there being no gradient fill for an element.
@@ -556,20 +543,20 @@ export default class Tabs extends View {
   newTabMenu(t) {
     const sp = spaces().find(p => p.active), agents = agentsOn(sp?.machine), rows = 1 + (agents ? agents.length : 1);
     return trigger(this, t, "tab-new", { icon: "mods/t3-tabs/icons/plus.svg", label: "New tab", action: "t3-tabs.new", below: true,
-      closed: closedKey("t3-menu"), onOpen: (b) => sp && openOverlay({ mod: "t3-menu", kind: "popup", width: NEW_MENU_W, height: 8 + rows * ui(28) + (rows > 1 ? 9 : 0),
-        ...hang(b, NEW_MENU_W, { align: "end" }), props: { tab: "new-tab", target: { space: sp.id }, ...litProp(!b) } }) });
+      closed: closedKey("t3-menu"), onOpen: (b) => sp && openOverlay({ mod: "t3-menu", kind: "popup", width: MENU_W, height: menuHeight(rows) + (rows > 1 ? 9 : 0),
+        ...hang(b, MENU_W, { align: "end" }), props: { tab: "new-tab", target: { space: sp.id }, ...litProp(!b) } }) });
   }
 
   // With the Inbox showing, who's in view, as T3's thread header: the space, a sub-agent's parent, then the agent in view
   // (docs/internals/specs/tab-bar.md). Held or away, the title dims and leads back.
-  crumb(t, ctx, { every, ps, name, narrow, stopPress }) {
+  crumb(t, ctx, { every, ps, name, narrow }) {
     const space = ctx.space, dim = ctx.held || ctx.away, agentOf = (address) => every.find(a => a.address === address);
     const nameOf = (address) => { const a = agentOf(address); return a ? name(a) : address; };
     // The title's menu is the agent's (t3-menu's "agent"), hung under the title as T3's thread actions; a click while it's open closes
     // it. The space crumb's menu has its own close stamp, so the two never block each other.
     const titled = ctx.sub ?? ctx.head, spaceClosed = closedKey("t3-menu", "space");
     const menu = (b) => {
-      openOverlay({ mod: "t3-menu", kind: "popup", width: 220, height: 260, ...hang(b, 220, { align: "start" }), props: { tab: "agent", target: { address: titled }, ...litProp(!b) } });
+      openOverlay({ mod: "t3-menu", kind: "popup", width: MENU_W, height: 260, ...hang(b, MENU_W, { align: "start" }), props: { tab: "agent", target: { address: titled }, ...litProp(!b) } });
     };
     const spaceMenu = (b) => {
       openOverlay({ mod: "t3-menu", kind: "popup", width: 280, ...hang(b, 280, { align: "start" }), props: { tab: "space-switch", target: { id: space.id }, ...litProp(!b) } });
@@ -580,7 +567,7 @@ export default class Tabs extends View {
     // its card's).
     const context = (kind, target) => (_e, cx) => { detailsFor(this, null, cx); openMenu(this, kind, target, cx); };
     const sep = (id) => div().id(id).flex_none().text_color(t.dim).child("/");
-    const press = (e, cx) => { stopPress(e, cx); detailsFor(this, null, cx); };
+    const press = (e, cx) => { keepPress(e, cx); detailsFor(this, null, cx); };
     const act = (action) => (_e, cx) => { action(); cx.notify(); };
     // A name shown whole has no label, as a tab's (T3's title only repeats it). Cut short, or down to its icon or `…`, the tab's
     // hover label holds it whole, under it, its words where the name starts (`at`, from the item's left; the label's 1 + 8 in).
@@ -598,7 +585,7 @@ export default class Tabs extends View {
     // As T3's title: its ⌄ is part of it, there only while the item is hovered, focused or open.
     const chevron = (id) => {
       const shown = this.hot === id || within(this, [id]) || menuOn(id);
-      return div().id("crumb-menu").flex_none().opacity(shown ? 1 : 0).transition("opacity", { duration: 150, easing: "ease-out" })
+      return div().id("crumb-menu").flex_none().opacity(shown ? 1 : 0).transition("opacity", FADE)
         .child(svg("mods/t3-tabs/icons/chevron-down.svg").size(14).text_color(t.muted));
     };
     // The title: the agent in view alone, the card the Inbox lights. Another agent in its tab is reached as any is, by its card
@@ -633,7 +620,7 @@ export default class Tabs extends View {
 
   // A zoomed tab's panes, a segment each with the zoomed one lit: a click moves the zoom there (zoom.js).
   // Dashed: what one tab holds, unlike the tabs beside it. shortcut: it doesn't drag as a tab does; upgrade if Lists wants that.
-  paneGroup(t, e, width, { name, stopPress }) {
+  paneGroup(t, e, width, { name }) {
     const { panes: list, z, status } = e.group;
     const segment = (p) => {
       const on = p.pane === z.pane, id = `seg-${p.pane}`, label = name(p);
@@ -642,7 +629,7 @@ export default class Tabs extends View {
         .max_w(on ? TAB_ACTIVE : TAB_FLOOR).text_size(ui(12)).text_color(on || this.hot === id ? t.foreground : t.muted)
         .when(on, el => el.bg(ghostTint(t, "chrome", true))).when(!on, el => el.hover(s => s.bg(ghostTint(t, "chrome", false)))).on_hover(glow(this, id))
         .role("button").accessibility_label(label)
-        .on_mouse_down("left", stopPress).on_click(() => focusPane(p.pane))
+        .on_mouse_down("left", keepPress).on_click(() => focusPane(p.pane))
         .on_mouse_down("right", (_e, cx) => openMenu(this, "pane", { pane: p.pane, terminal: p.terminal }, cx))
         .child(div().size(16).flex_none().flex().items_center().justify_center().child(glyph))
         .child(nameText(this, id, label).flex_1()), 6);
@@ -655,7 +642,7 @@ export default class Tabs extends View {
   undoNotice(t) {
     const n = shared(KEY.notice);
     if (!n || Date.now() - n.at >= 6000) return null;
-    const live = n.live && Date.now() - n.at < 5000;
+    const live = n.live && Date.now() - n.at < LIVE_MS;
     const button = h_flex().id("undo-notice-undo").flex_none().h(24).items_center().font_medium().text_color(t.foreground)
       .when(live, el => stop(this, t, "undo-notice-undo", el.hover(s => s.underline()).on_hover(glow(this, "undo-notice-undo"))
         .role("button").accessibility_label(`Undo: ${n.action} ${n.count} agent${n.count === 1 ? "" : "s"}`).on_click(() => run("t3-tabs.undo")), 4)).child(undoLabel("t3-tabs.undo"));

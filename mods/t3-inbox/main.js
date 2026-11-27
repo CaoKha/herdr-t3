@@ -3,7 +3,7 @@
 
 import { View } from "gpui-kit";
 import { v_flex, InputState, ScrollHandle } from "gpui-base";
-import { agents, terminals, panes, spaces, focused, theme, shared, setShared, setAgentOrder, props, nextCommand, settings, layout, window } from "herdr";
+import { agents, terminals, panes, spaces, focused, theme, shared, props, nextCommand, layout, window } from "herdr";
 import { modStatus, programOf } from "./name.js";
 import { descendants, ownStatus, stillSettled, terminalByAddress } from "./tree.js";
 import { inboxFacts } from "./facts.js";
@@ -17,12 +17,13 @@ import { inboxActions } from "./actions.js";
 import { inboxDrag } from "./drag.js";
 import { inboxRowView } from "./row-view.js";
 import { inboxList, searchList } from "./list-view.js";
-import { sidebarParts } from "./sidebar.js";
-import { KEY, readLocal } from "./store.js";
-import { rememberNotice, forgetNotice, undoNotice } from "./notice.js";
+import { sidebarParts, revealAfterDraw, publishOrder } from "./sidebar.js";
+import { KEY, readLocal, writeLocal } from "./store.js";
+import { undoNotice } from "./notice.js";
 import { prunePins } from "./pins.js";
 import { writeLabel } from "./labels.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
+import { detailsGone } from "./details.js";
 
 // A label write render keeps asking for waits this long (ms) after failing.
 const RETRY = 60000;
@@ -118,7 +119,7 @@ export default class Inbox extends View {
         const command = await nextCommand();
         if (command === "settle") this.settleKey(cx);
         else if (command.startsWith("custom-snooze:")) this.customSnooze(command.slice("custom-snooze:".length), cx);
-        else if (command === "undo") await this.undo(cx);
+        else if (command === "undo") await undoNotice(cx);
         // pane.go onto this list (mod.json's "focusable"): the keyboard starts at Search.
         else if (command === "focus") {
           const previous = /** @type {any} */ (this).fs.last;
@@ -142,15 +143,7 @@ export default class Inbox extends View {
   requestReveal(address, cx, query = "") {
     this.cancelReveal();
     if (!address || !(query ? this.searchScroll : this.listScroll)) return;
-    const request = this.reveal = { address, query, ready: false };
-    // The next draw resolves the latest destination against its actual children.
-    this.revealTimer = cx.timer.after(0, (cx) => {
-      if (this.reveal !== request) return;
-      this.revealTimer = null;
-      if (!revealVisible()) { this.cancelReveal(); return; }
-      request.ready = true;
-      cx.notify();
-    });
+    revealAfterDraw(this, { address, query, ready: false }, revealVisible, cx);
   }
 
   revealDrawn(inView, indices, searchQuery = "") {
@@ -232,7 +225,7 @@ export default class Inbox extends View {
     // The row fields and handlers read this object live.
     for (const key of Object.keys(this.changed)) if (!(key in changes)) delete this.changed[key];
     Object.assign(this.changed, changes);
-    localStorage.setItem("changes", JSON.stringify(this.changed));
+    writeLocal("changes", this.changed);
   }
 
   // Shown at once; the label comes back from the core a moment later.
@@ -265,9 +258,6 @@ export default class Inbox extends View {
   }
 
   get notice() { return shared(KEY.notice); }
-  remember(action, count, undo, cx) { return rememberNotice(action, count, undo, cx); }
-  forget(cx) { forgetNotice(cx); }
-  undo(cx) { return undoNotice(cx); }
 
   compute(cx, publish = true, parts = sidebarParts(layout())) {
     const now = Date.now();
@@ -365,21 +355,15 @@ export default class Inbox extends View {
   publishRows(inboxMode, cards, rest, view, ordered) {
     if (!inboxMode) { this.agentOrder = null; return; }
     const drawn = { order: [...cards, ...rest].map((a) => a.address), view, cards: cards.length };
-    if (JSON.stringify(drawn) !== JSON.stringify(shared(KEY.inboxRows) ?? null)) setShared(KEY.inboxRows, drawn);
-    const order = ordered.filter((a) => !a.mod).map((a) => a.address);
-    if (JSON.stringify(order) !== this.agentOrder || shared(KEY.agentOrder) !== "inbox") {
-      this.agentOrder = JSON.stringify(order);
-      setAgentOrder(order);
-      if (shared(KEY.agentOrder) !== "inbox") setShared(KEY.agentOrder, "inbox");
-    }
+    publishOrder(this, { key: KEY.inboxRows, drawn, order: ordered.filter((a) => !a.mod).map((a) => a.address), owner: "inbox" });
   }
 
   render(cx) {
     if (props()?.customSnooze) return customView(this);
-    const t = theme(), zoom = Number(settings()?.zoom) || 1;
+    const t = theme(), z = zoom();
     const model = this.compute(cx, false), { pinned, out, busyRows, napRows, inView, inboxMode, work, nap, put } = model;
     const tree = v_flex().id("t3-inbox-root").relative().size_full().min_h(0).bg(t.chrome).text_size(ui(14))
-      .on_size_change((size) => { this.height = size.height / zoom; this.width = size.width / zoom; });
+      .on_size_change((size) => { this.height = size.height / z; this.width = size.width / z; });
     const cards = [...pinned, ...out, ...busyRows], ordered = [...pinned, ...out, ...work, ...nap, ...put];
     let drawn = new Set();
     const { query } = this.inline;
@@ -411,9 +395,7 @@ export default class Inbox extends View {
     const gone = this.hovered;
     if (gone && !drawn.has(gone)) {
       this.hovered = null;
-      /** @type {any} */ (this).detailsWait?.cancel();
-      if (this.details === gone) this.details = null;
-      if (this.detailsOut === gone) this.detailsOut = null;
+      detailsGone(this, gone);
     }
     return focusRoot(this, tree);
   }

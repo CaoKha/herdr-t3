@@ -9,6 +9,8 @@ import { ui } from "./layout-settings.js";
 
 // As written for 13px text: a row is ui(MENU_ROW) tall.
 export const MENU_ROW = 28;
+export const MENU_W = 220;
+export const menuHeight = (rows) => 8 + rows * ui(MENU_ROW);
 
 /**
  * `at`: [state, key, i], lit while `state[key] === i` (list.js litOnHover); `open`: its submenu is open, lit too. `sub`: the
@@ -41,3 +43,6 @@ export const menuHint = (t, text) => div().flex_none().text_size(ui(12)).font_me
 
 /** T3's MenuSeparator. */
 export const menuRule = (t) => div().h(1).mx(8).my(4).flex_none().bg(t.border);
+
+/** T3's MenuGroupLabel. */
+export const menuLabel = (t, text) => div().h(ui(28)).px(8).flex_none().flex().items_center().text_size(ui(12)).font_medium().text_color(t.dim).child(text);

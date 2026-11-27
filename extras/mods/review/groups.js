@@ -1,10 +1,11 @@
 import { div, svg, PathBuilder } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { groupFiles } from "./rows.js";
-import { LU, zoom, isLight, diffStats, FADED } from "./controls.js";
+import { isLight, diffStats, FADED } from "./controls.js";
+import { LU } from "./review-menu.js";
 import { hoverKept } from "./tip.js";
 import { tint } from "./button.js";
-import { ui } from "./layout-settings.js";
+import { ui, zoom } from "./layout-settings.js";
 
 // The app's category icons (Lucide here, for one icon set across the layout; the app's are Phosphor duotone, in its own shapes) and hues (Tailwind's 300 on dark, 800 on light), by category.
 const CATEGORY = {

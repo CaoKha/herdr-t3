@@ -23,7 +23,7 @@ export function initComposer(view) {
 }
 
 /** The reply box under the thread `key` names, with its draft. */
-export function openReply(view, key, cx) {
+function openReply(view, key, cx) {
   view.replyTo = key;
   view.reply.set_value(view.drafts.get(key) ?? "");
   view.reply.focus();

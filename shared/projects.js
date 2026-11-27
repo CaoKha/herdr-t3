@@ -3,6 +3,12 @@
 import { placeOf } from "./project.js";
 
 export const PROJECT_CAP = 50;
+
+export function shortFolder(folder, home) {
+  if (!folder) return "";
+  if (home && (folder === home || folder.startsWith(`${home}/`) || folder.startsWith(`${home}\\`))) return "~" + folder.slice(home.length);
+  return folder;
+}
 const PROJECT_HOME_NAME = "Home\u200b";
 const projectKey = (machine, folder) => `${machine ?? ""}\0${folder}`;
 

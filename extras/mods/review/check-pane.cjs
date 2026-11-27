@@ -11,9 +11,10 @@ const paneHeadCentre = kit.paneHeadCentre(fs.readFileSync(fs.existsSync(layoutIn
 // Follow a pane's imports once, before what needs them (kit.bundle); rows, daemon and tips are supplied by its fake env.
 // button.js's `button` is drawButton here, and trigger.js's `button` that one, not controls.js's of the same name.
 const source = (file) => kit.bundle((f) => fs.readFileSync(path.join(__dirname, f), "utf8"), file, (f, src, needs) =>
-  f === "button.js" ? "const { drawButton, ghostButton, tint, GROUP_GAP } = (() => {\n" + kit.strip(src) + "\nreturn { drawButton: button, ghostButton, tint, GROUP_GAP };\n})();"
+  f === "button.js" ? "const { drawButton, ghostButton, tint, GROUP_GAP, keepPress } = (() => {\n" + kit.strip(src) + "\nreturn { drawButton: button, ghostButton, tint, GROUP_GAP, keepPress };\n})();"
   : f === "trigger.js" ? needs() + "\nconst { trigger, opener, popupOpen } = (() => { const button = drawButton;\n" + kit.strip(src) + "\nreturn { trigger, opener, popupOpen };\n})();"
-  : f === "menus.js" ? needs() + "\nconst { initMenu, closeMenu, menuView, closeMenus, openMenu, rowItems, paste } = (() => { const window = appWindow;\n" + kit.strip(src) + "\nreturn { initMenu, closeMenu, menuView, closeMenus, openMenu, rowItems, paste };\n})();"
+  : f === "menus.js" ? needs() + "\nconst { initMenu, closeMenu, menuView, openMenu, rowItems, paste } = (() => { const window = appWindow;\n" + kit.strip(src) + "\nreturn { initMenu, closeMenu, menuView, openMenu, rowItems, paste };\n})();"
+  : f === "open-url.js" ? "const { openUrl } = (() => { const window = appWindow;\n" + kit.strip(src) + "\nreturn { openUrl };\n})();"
   : f === "popup-menu.js" ? needs() + "\nconst { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed } = (() => {\n" + kit.strip(src) + "\nreturn { openPopup, openBeside, closeSub, subGone, closeChain, closeTops, menuClosed };\n})();"
   : null, new Set(file === "main.js" ? ["rows.js", "daemon.js", "tip.js"] : []));
 
@@ -294,7 +295,7 @@ const env = {
   // tip.js's own; its watch on the pointer is checked in t3-spaces/check-sidebar.cjs.
   hoverKept: (view, key, id, el) => el.on_hover((on) => { if (on) view[key] = id; else if (view[key] === id) view[key] = null; }),
   glow: (view, id) => (on, cx) => { if (on) view.hot = id; else if (view.hot === id) view.hot = null; cx?.notify?.(); },
-  tip: (_view, _t, _id, _label, el) => el,
+  tip: (_view, _t, _id, _label, el) => el, FADE: {},
   // Paths build into nothing here; painting one is an element like any other.
   PathBuilder: (() => { const chain = new Proxy({}, { get: () => () => chain }); return { stroke: () => chain, fill: () => chain }; })(),
   window: { paint_path: () => element() }, appWindow: () => ({ platform: "macos", active: windowActive }),
@@ -674,7 +675,7 @@ const timers = [], tick = () => timers.splice(0).forEach(f => f(cx));
     const menu = new mainScope.Mod(); menu.init({}, cx); drawn.clear(); menu.render(cx);
     assert.equal(menu.bySpace, undefined, "a popup never starts another review");
     assert.ok(drawn.has("files-menu-copy-path") && drawn.has("files-menu-open"), "the shared path menu renders in Review itself");
-    assert.equal(vm.runInContext('closeMenus("review")', mainScope), true, "close keys can close the menu before the tab");
+    assert.equal(vm.runInContext('closeTops("review")', mainScope), true, "close keys can close the menu before the tab");
     assert.equal(closedOverlays.at(-1), menuProps.overlay);
     menu.close(); assert.ok(sharedStore.has("review.menuClosed"));
     menuProps = null; drawn.clear(); pane.render(cx);
