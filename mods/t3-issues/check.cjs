@@ -140,7 +140,7 @@ function makePage({ spaces, branch = "feat/eng-12-x", key = "keychain", open = t
     InputState: { new: () => { let v = ""; const s = { events: {}, on(n, f) { s.events[n] = f; }, value: () => v, set_value(x) { v = x; }, focus() {}, type(x) { v = x; s.events.change?.({}, cx); } }; w.searchBox = s; return s; } },
     TextareaState: { new: (o) => {
       let v = "";
-      const b = { placeholder: o.placeholder, events: {}, on(n, f) { b.events[n] = f; }, value: () => v, focus() {}, set_auto_grow() {},
+      const b = { placeholder: o.placeholder, events: {}, on(n, f) { b.events[n] = f; }, value: () => v, focus() { w.focusedBox = b; }, set_auto_grow() {},
         set_value(x) { assert.ok(!w.drawing, "a box's text is set outside the draw"); v = x; }, type(x) { v = x; b.events.change?.({}, cx); } };
       (w.boxes ??= []).push(b);
       return b;
@@ -284,6 +284,9 @@ async function linearPage() {
   const tricky = `She said "hi" $(rm -rf ~) \`id\`\n@notes 42 true`;
   root = (await p.draw()).root;
   const box = p.w.boxes.find((b) => b.placeholder === "Leave a comment");
+  let stopped = false;
+  find(root, "t3-issues-comment-editor-frame").handlers["on_mouse_down:left"]({}, { ...p.cx, stop_propagation() { stopped = true; } });
+  same([p.w.focusedBox === box, stopped], [true, true], "a press on the box gives it the keyboard and goes no further, so the page doesn't take it back");
   box.type(tricky);
   root = (await p.draw()).root;
   find(root, "t3-issues-comment-editor-send").handlers.on_click({}, p.cx); await p.settle();

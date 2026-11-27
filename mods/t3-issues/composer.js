@@ -45,7 +45,9 @@ export function editor(view, t, id, state, focused, label, { send, cancel = null
   const box = state ? Textarea.new(state).w_full().px(11).py(7).rounded(8).text_size(ui(13)).text_color(t.foreground).accessibility_label(label)
     : div().w_full().h(ui(76)).px(11).py(7).text_size(ui(13)).text_color(t.dim).child(label);
   return v_flex().id(id).px(6).pt(4).gap(8)
+    // A press here stays here: the page's own press (pageFrame) would take the keyboard back from the box.
     .child(div().id(`${id}-frame`).relative().rounded(8).border_1().border_color(focused ? t.accent : t.input).when(focused, (el) => el.bg(t.background))
+      .on_mouse_down("left", (_e, cx) => { state?.focus(); cx.stop_propagation(); })
       .child(box)
       .when(focused, (el) => el.child(div().absolute().inset_0().rounded(8).border(3).border_color(alpha(t.accent, "3d")))))
     .child(h_flex().gap(8).justify_end().items_center()
