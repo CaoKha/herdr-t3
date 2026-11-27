@@ -201,6 +201,22 @@ async function keys() {
   same([p.view.source(), p.st().provider.id], ["linear", "linear"]);
   assert.ok(p.w.fetches.length > asked, "and its lists come from Linear");
 
+  // With a key: the source menu switches to GitHub and back, the choice kept for the next run.
+  root = (await p.draw()).root;
+  const pickSource = async (i) => {
+    find(root, "t3-issues-source").handlers.on_click({}, p.cx);
+    root = (await p.draw()).root;
+    find(root, `t3-issues-source-item-${i}`).handlers.on_click({}, p.cx); await p.settle();
+    root = (await p.draw()).root;
+  };
+  await pickSource(1);
+  same([p.view.source(), p.st().provider.id, p.store.get("issues.source")], ["github", "github", '"github"']);
+  assert.ok(!find(root, "t3-issues-github") && find(root, "t3-issues-source"), "no no-key bar while a key is found; the menu stays to switch back");
+  const next = makePage({ spaces: [space("s1", "/r", true)], branch: "12-fix", store: p.store });
+  await next.tick(); await next.settle();
+  same([next.view.source(), next.st().provider.id], ["github", "github"], "the next run starts on GitHub");
+  await pickSource(0);
+  same([p.view.source(), p.st().provider.id, p.store.get("issues.source")], ["linear", "linear", '"linear"']);
 }
 
 async function linearPage() {

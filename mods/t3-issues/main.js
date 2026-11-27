@@ -24,8 +24,10 @@ import { findKey, linearIssues } from "./linear.js";
 import { githubIssues } from "./ghissues.js";
 import { ISSUE_BINDING, linearState, PRIORITY, initials, commentThreads, workflowOrder, sectionSummary, KEY_ADD, keyProblem } from "./model.js";
 import { ui } from "./layout-settings.js";
+import { readLocal, writeLocal } from "./store.js";
 
 const MOD = "mods/t3-issues";
+const SOURCE_KEY = "issues.source";
 const icon = (name) => `${MOD}/icons/${name}.svg`;
 // A search is sent once typing has paused this long.
 const SEARCH_WAIT = 300;
@@ -47,8 +49,9 @@ export default class Issues extends View {
     this.keyIssue = null;
     /** @type {Promise<void> | null} */
     this.looking = null;
-    // The person chose GitHub's issues while there's no key; Try again asks for the key again.
-    this.useGitHub = false;
+    // The person chose GitHub's issues, with a key or without: kept for the next run. Try Linear again, or Linear in the source
+    // menu, takes it back.
+    this.useGitHub = readLocal(SOURCE_KEY, "linear") === "github";
     this.search = InputState.new({ placeholder: "Search issues" });
     // Keystrokes so far: a search waits out the pause after the last one only.
     this.typed = 0;
@@ -86,8 +89,14 @@ export default class Issues extends View {
       writing: null, actionError: null };
   }
 
-  // Linear while a key is found, GitHub when the person asked for it meanwhile, else neither until they choose.
-  source() { return this.key ? "linear" : this.useGitHub && this.key !== undefined ? "github" : null; }
+  // GitHub when the person chose it, else Linear while a key is found, else neither until they choose.
+  source() { return this.key === undefined ? null : this.useGitHub ? "github" : this.key ? "linear" : null; }
+
+  setSource(github, cx) {
+    this.useGitHub = github;
+    writeLocal(SOURCE_KEY, github ? "github" : "linear");
+    refreshPage(this, cx);
+  }
 
   // Looked for once, by every read waiting on the same look.
   lookForKey() {
@@ -96,8 +105,8 @@ export default class Issues extends View {
   }
 
   retryKey(cx) {
-    this.key = undefined; this.keyIssue = null; this.useGitHub = false;
-    refreshPage(this, cx);
+    this.key = undefined; this.keyIssue = null;
+    this.setSource(false, cx);
   }
 
   // A failure: gh's that stop everything, Linear refusing the key, else a bar over what was last read.
@@ -243,7 +252,7 @@ export default class Issues extends View {
     const t = theme(), sp = spaces().find((s) => s.active), panel = panelState(), st = sp ? this.states.get(sp.id) : null;
     if (!sp) return div().id("t3-issues").size_full();
     const source = this.source(), bars = [];
-    if (source === "github") bars.push(noticeBar(t, "t3-issues-github", "GitHub issues: no Linear API key found.", t.muted, "linear", "Try Linear again", (cx) => this.retryKey(cx), this));
+    if (source === "github" && !this.key) bars.push(noticeBar(t, "t3-issues-github", "GitHub issues: no Linear API key found.", t.muted, "linear", "Try Linear again", (cx) => this.retryKey(cx), this));
     if (source && st?.error && !st.gh && !st.problem) bars.push(errorBar(t, "t3-issues-error", st.error, (cx) => refreshPage(this, cx), this));
     return pageFrame(this, t, cx, { panel, head: st ? this.head(st, t) : div().flex_1(), bars, body: this.body(st, t, cx) });
   }
@@ -260,9 +269,19 @@ export default class Issues extends View {
           (cx) => { st.picked = null; st.actionError = null; this.menu = null; cx.notify(); }, { size: "sm", iconSize: 14 })
         : segmented(this, t, [tab("branch", "Branch", st.branch?.length), tab("mine", "Mine", st.mine ? `${st.mine.items.length}${st.mine.more ? "+" : ""}` : undefined)], { role: "tab" }))
       .child(searching ? this.searchField(t) : div().flex_1())
+      .when(Boolean(this.key), (el) => el.child(this.sourceMenu(t)))
       .child(control(this, t, "t3-issues-refresh", "refresh-cw", st.provider?.refreshLabel ?? "Refresh issues", (cx) => refreshPage(this, cx)))
       .when(Boolean(d?.issue && issue.states?.length > 0), (el) => el.child(this.stateMenuButton(st, issue, t)))
       .when(Boolean(issue), (el) => el.child(this.moreMenu(st, issue, t)));
+  }
+
+  // Where the issues come from, while a Linear key is found (without one, the key page and the no-key bar switch).
+  sourceMenu(t) {
+    const id = "t3-issues-source", github = this.source() === "github", name = github ? "GitHub" : "Linear";
+    const item = (label, on) => ({ label, trail: on ? svg(icon("check")).size(16).flex_none().text_color(t.muted) : null,
+      pick: (cx) => { if (!on) this.setSource(label === "GitHub", cx); } });
+    return inlineMenu(this, t, id, { label: `Issues from ${name}`, wide: true, items: this.menu?.id !== id ? [] : [item("Linear", !github), item("GitHub", github)] },
+      (el) => el.child(div().child(name)).child(svg(icon("chevron-down")).size(14).flex_none().text_color(t.dim)));
   }
 
   // ⋯: the issue in the browser, its link copied.

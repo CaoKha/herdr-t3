@@ -4,10 +4,10 @@ The space panel's Issues page (`t3-issues`, the `issues` slot of `panel-body`, a
 
 ## Provider and key
 
-- Linear when a key is found, else nothing until the person picks GitHub's issues ("Show GitHub issues"), for this run.
+- Linear when a key is found, else nothing until the person picks GitHub's issues ("Show GitHub issues"). While a key is found, the header's source menu (`Linear ▾` / `GitHub ▾`) switches between the two. The choice is kept for the next run (`issues.source`); Try Linear again, or Linear in the menu, takes it back.
 - The key is looked for once, at the first read, in this order, each read from what a program prints and never passed to one: the macOS Keychain (`security find-generic-password -s linear-api-key -w`, macOS only), `LINEAR_API_KEY` in Herdr's own environment (`printenv`, as the JS runtime has no `process.env`), then a login shell's (`$SHELL -lic 'printf "\n%s" "$LINEAR_API_KEY"'`, `$SHELL` from `printenv`, its last line: startup files may print first). 5s each.
 - It lives only in the view's memory: never drawn, logged, written, or in a program's arguments. Linear gets it as `Authorization: <key>`, no scheme, as Branch Issue's helper sent it.
-- No key, or Linear answers 401/403 or an authentication error (then the key is dropped): the page says so, shows the Keychain command to store one (`security add-generic-password -a "$USER" -s linear-api-key -w`, which asks for it) and the shell-profile alternative, with Try again (looks again) and Show GitHub issues. On GitHub a `muted` bar says no key was found, with Try Linear again.
+- No key, or Linear answers 401/403 or an authentication error (then the key is dropped): the page says so, shows the Keychain command to store one (`security add-generic-password -a "$USER" -s linear-api-key -w`, which asks for it) and the shell-profile alternative, with Try again (looks again) and Show GitHub issues. On GitHub without a key, a `muted` bar says no key was found, with Try Linear again.
 
 ## Discovery
 
@@ -17,7 +17,7 @@ The space panel's Issues page (`t3-issues`, the `issues` slot of `panel-body`, a
 
 ## Lists
 
-- Header, Pull requests' one row: Branch and Mine with their counts (Mine `50+` past the first page), or Back in their place for an issue picked from a list; Mine's search field; Refresh; and for the issue shown, on Linear its state (below), then `⋯` (Open in Linear / Open on GitHub, Copy link).
+- Header, Pull requests' one row: Branch and Mine with their counts (Mine `50+` past the first page), or Back in their place for an issue picked from a list; Mine's search field; while a Linear key is found, the source menu (the provider's name and a chevron, Linear and GitHub with a check on the current one); Refresh; and for the issue shown, on Linear its state (below), then `⋯` (Open in Linear / Open on GitHub, Copy link).
 - Mine on Linear: assigned to the viewer, state type unstarted or started, 50 most recently updated. On GitHub: `repo:<repo> is:issue is:open assignee:@me sort:updated-desc`, 50.
 - Search is sent to the provider 300ms after the last keystroke, never for an earlier one (any issue, not only the viewer's): Linear by title or description words, a bare number in any team, or an identifier; GitHub by its search words in the repository. Its results replace Mine's while the field has them; Escape empties it and Mine comes back. A query equal to the one in flight, or to the one shown, isn't sent again; each search takes a token, so a late answer to an older one doesn't land.
 - An empty list is Pull requests' one centred `dim` line, naming the provider that answered: Branch `No Linear issue in this branch's name (<branch>). Name it like ABC-123-… or pick one in Mine.`, `No Linear issue <ids>.` (named but not in Linear), `No issue number in this branch's name (<branch>).` or `No issue #<n> in <repo>.` on GitHub, `HEAD is detached: no branch to read an issue from.`; Mine `No open issues assigned to you in Linear.` / `in <repo>.`, a search `No issues match "<q>" in Linear.` / `in <repo>.`
